@@ -14,6 +14,8 @@ namespace Switchboard.UI
         [SerializeField] private RectTransform plugAnchor;
         [SerializeField] private SocketGraphic socketGraphic;
         private CableController occupyingCable;
+        private bool pointerHovered;
+        private bool holdingPlug;
 
         public event Action<SocketView> Clicked;
         public event Action<SocketView, bool> HoverChanged;
@@ -29,12 +31,14 @@ namespace Switchboard.UI
         {
             if (cable == null || IsOccupied) return false;
             occupyingCable = cable;
+            RefreshHighlight();
             return true;
         }
 
         public void Release(CableController cable)
         {
             if (occupyingCable == cable) occupyingCable = null;
+            RefreshHighlight();
         }
 
         public void Configure(int rowIndex, int columnIndex, RectTransform anchor)
@@ -53,21 +57,34 @@ namespace Switchboard.UI
 
         public void OnPointerEnter(PointerEventData eventData)
         {
-            Graphic.SetHighlighted(true);
+            pointerHovered = true;
+            RefreshHighlight();
             HoverChanged?.Invoke(this, true);
         }
 
         public void OnPointerExit(PointerEventData eventData)
         {
-            Graphic.SetHighlighted(false);
+            pointerHovered = false;
+            RefreshHighlight();
             HoverChanged?.Invoke(this, false);
         }
 
         private SocketGraphic Graphic => socketGraphic != null
             ? socketGraphic : socketGraphic = GetComponent<SocketGraphic>();
 
+        public void SetPointerState(bool hovered, bool plugOnCursor)
+        {
+            pointerHovered = hovered;
+            holdingPlug = plugOnCursor;
+            RefreshHighlight();
+        }
+
+        private void RefreshHighlight() => Graphic.SetHighlighted(pointerHovered, holdingPlug && IsOccupied);
+
         private void OnDisable()
         {
+            pointerHovered = false;
+            holdingPlug = false;
             if (socketGraphic != null) socketGraphic.SetHighlighted(false);
         }
     }

@@ -10,6 +10,7 @@ namespace Switchboard.Cables
         public CablePhase Phase { get; private set; }
         public TSocket FirstSocket { get; private set; }
         public TSocket SecondSocket { get; private set; }
+        public TSocket ReconnectSocket { get; private set; }
         public bool PreventSameSocketConnection { get; }
         public bool IsInTray => Phase == CablePhase.Ready;
 
@@ -48,23 +49,27 @@ namespace Switchboard.Cables
             if (FirstSocket == null) FirstSocket = socket;
             else SecondSocket = socket;
             Phase = FirstSocket != null && SecondSocket != null ? CablePhase.Connected : CablePhase.OneEndConnected;
+            ReconnectSocket = null;
             return true;
         }
 
         public bool TryRemove(TSocket socket)
         {
             if (socket == null) return false;
+            bool wasConnected = Phase == CablePhase.Connected;
             if (Same(FirstSocket, socket)) FirstSocket = null;
             else if (Same(SecondSocket, socket)) SecondSocket = null;
             else return false;
 
             Phase = FirstSocket == null && SecondSocket == null ? CablePhase.Ready : CablePhase.OneEndConnected;
+            ReconnectSocket = wasConnected ? socket : null;
             return true;
         }
 
         public void Reset()
         {
             FirstSocket = SecondSocket = null;
+            ReconnectSocket = null;
             Phase = CablePhase.Ready;
         }
 

@@ -19,6 +19,7 @@ namespace Switchboard.UI
         private PointerEventData pointerEvent;
         private EventSystem eventSystem;
         private CableController heldCable;
+        private SocketView hoveredSocket;
         private bool cursorWasVisible;
         private bool ownsCursor;
         public CableController ActiveCable => Usable(heldCable) ? heldCable : null;
@@ -72,6 +73,7 @@ namespace Switchboard.UI
                     {
                         if (heldCable.TryReturnToTray()) heldCable = null;
                     }
+                    else if (heldCable.TryRestoreConnection()) heldCable = null;
                 }
                 else if (stored != null && stored.Available && Owns(stored.Cable) && stored.Cable.TryPickUp())
                     heldCable = stored.Cable;
@@ -115,13 +117,15 @@ namespace Switchboard.UI
         private void UpdatePointers(Vector2 position, SocketView socket, StoredCableView stored)
         {
             var selected = ActiveCable;
+            if (hoveredSocket != socket && hoveredSocket != null) hoveredSocket.SetPointerState(false, selected != null);
+            hoveredSocket = socket;
+            if (hoveredSocket != null) hoveredSocket.SetPointerState(true, selected != null);
             CursorMode = selected != null ? CableCursorMode.Plug :
                 stored != null && stored.Available && Owns(stored.Cable) ? CableCursorMode.Grab : CableCursorMode.Pointing;
             if (selected != null) selected.transform.SetAsLastSibling();
             foreach (var cable in cables)
             {
                 if (!Usable(cable)) continue;
-                cable.SetHoveredSocket(socket);
                 cable.UpdatePointer(position, cable == selected);
             }
             bool handVisible = false;
@@ -152,7 +156,9 @@ namespace Switchboard.UI
 
         private void HidePointers()
         {
-            foreach (var cable in cables) if (cable != null) { cable.SetHoveredSocket(null); cable.HidePointer(); }
+            if (hoveredSocket != null) hoveredSocket.SetPointerState(false, false);
+            hoveredSocket = null;
+            foreach (var cable in cables) if (cable != null) cable.HidePointer();
             if (handCursor != null) handCursor.gameObject.SetActive(false);
             if (ownsCursor) Cursor.visible = cursorWasVisible;
         }

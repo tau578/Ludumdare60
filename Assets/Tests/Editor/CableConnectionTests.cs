@@ -5,6 +5,52 @@ namespace Switchboard.Tests
 {
     public sealed class CableConnectionTests
     {
+        [TestCase("A1", "B2")]
+        [TestCase("B2", "A1")]
+        public void RemovedPlugRemembersItsSocketUntilRestored(string removed, string remaining)
+        {
+            var wire = new CableConnection<string>();
+            wire.TryInsert("A1"); wire.TryInsert("B2");
+            wire.TryRemove(removed);
+            Assert.That(wire.ReconnectSocket, Is.EqualTo(removed));
+            Assert.That(wire.TryInsert(remaining), Is.False);
+            Assert.That(wire.TryRemove("F6"), Is.False);
+            Assert.That(wire.ReconnectSocket, Is.EqualTo(removed));
+            Assert.That(wire.TryInsert(wire.ReconnectSocket), Is.True);
+            Assert.That(wire.FirstSocket, Is.EqualTo("A1"));
+            Assert.That(wire.SecondSocket, Is.EqualTo("B2"));
+            Assert.That(wire.Phase, Is.EqualTo(CablePhase.Connected));
+            Assert.That(wire.ReconnectSocket, Is.Null);
+        }
+
+        [Test]
+        public void RepluggingUpdatesTheSocketUsedForTheNextCancellation()
+        {
+            var wire = new CableConnection<string>();
+            wire.TryInsert("A1"); wire.TryInsert("B2"); wire.TryRemove("A1");
+            wire.TryInsert("C3");
+            Assert.That(wire.ReconnectSocket, Is.Null);
+            wire.TryRemove("C3");
+            Assert.That(wire.ReconnectSocket, Is.EqualTo("C3"));
+            wire.TryInsert(wire.ReconnectSocket);
+            Assert.That(wire.FirstSocket, Is.EqualTo("C3"));
+            Assert.That(wire.SecondSocket, Is.EqualTo("B2"));
+        }
+
+        [Test]
+        public void NewConnectionAndFullyReturnedCableHaveNoRestoreTarget()
+        {
+            var wire = new CableConnection<string>();
+            wire.TryPickUp(); wire.TryInsert("A1");
+            Assert.That(wire.ReconnectSocket, Is.Null);
+            wire.TryInsert("B2"); wire.TryRemove("A1"); wire.TryReturnToTray();
+            Assert.That(wire.ReconnectSocket, Is.Null);
+            wire.TryPickUp(); wire.TryInsert("C3");
+            Assert.That(wire.ReconnectSocket, Is.Null);
+            wire.TryInsert("D4"); wire.TryRemove("D4"); wire.TryRemove("C3");
+            Assert.That(wire.ReconnectSocket, Is.Null);
+        }
+
         [Test]
         public void PickingUpHidesStockBeforeAnyPlugIsInserted()
         {

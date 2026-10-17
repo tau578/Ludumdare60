@@ -26,7 +26,6 @@ namespace Switchboard.UI
         [SerializeField] private AudioClip blockedSound;
 
         private CableConnection<SocketView> connection;
-        private SocketView hoveredSocket;
         private Vector2 pointer;
         private bool pointerInside;
 
@@ -133,6 +132,12 @@ namespace Switchboard.UI
             return true;
         }
 
+        public bool TryRestoreConnection()
+        {
+            return Phase == CablePhase.OneEndConnected && Connection.ReconnectSocket != null &&
+                TryInsert(Connection.ReconnectSocket);
+        }
+
         private bool Reject()
         {
             PlayBlockedFeedback();
@@ -140,8 +145,6 @@ namespace Switchboard.UI
         }
 
         public void PlayBlockedFeedback() => PlaySound(blockedSound, 1f, 0.3f);
-
-        public void SetHoveredSocket(SocketView socket) => hoveredSocket = socket;
 
         private void RefreshVisuals()
         {
@@ -156,10 +159,8 @@ namespace Switchboard.UI
             firstPlug.rectTransform.anchoredPosition = firstAttached ? LocalAnchor(FirstSocket) : pointer;
             secondPlug.rectTransform.anchoredPosition = secondAttached ? LocalAnchor(SecondSocket) : pointer;
 
-            bool blocked = hoveredSocket != null && !Connection.Contains(hoveredSocket) && hoveredSocket.IsOccupied;
-            Color freeColor = blocked ? new Color(1f, 0.48f, 0.38f, 0.85f) : Color.white;
-            firstPlug.color = firstAttached ? Color.white : freeColor;
-            secondPlug.color = secondAttached ? Color.white : freeColor;
+            firstPlug.color = Color.white;
+            secondPlug.color = Color.white;
 
             wire.enabled = firstAttached || secondAttached;
             if (wire.enabled)
@@ -201,7 +202,6 @@ namespace Switchboard.UI
             if (firstPlug != null) firstPlug.gameObject.SetActive(false);
             if (secondPlug != null) secondPlug.gameObject.SetActive(false);
             pointerInside = false;
-            hoveredSocket = null;
         }
     }
 }
