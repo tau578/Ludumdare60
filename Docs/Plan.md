@@ -62,6 +62,7 @@ Ground rules:
    - Our assets go only under `Assets/Content/` and `Assets/Prefabs/Game/`.
 8. **Use Unity MCP for every project change:** scripts, assets, prefabs, scenes, build settings and tests.
    - Files that MCP can't create, such as `.asmdef` and `.jslib`, may be written with file tools. Run `refresh_unity` afterwards.
+   - **C# edits may also be made with file tools.** In Step 1b, MCP `apply_text_edits` corrupted three edits. After file edits, always compile through MCP (`refresh_unity`) and read the console.
    - Use file tools for `Docs/*.md`.
 9. **Keep the editor healthy.**
    - Compile and read the console after every batch of script changes.
@@ -96,7 +97,7 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Tests | `run_tests` with `mode: "EditMode"`, then `get_test_job` with `wait_timeout: 60` and `include_failed_tests: true` |
 | Play Mode smoke test | `manage_editor` `play` → `read_console` a few times, take a screenshot → `manage_editor` `stop` |
 | Screenshot | `manage_camera` `screenshot` with `include_image: true` and `output_folder: "Temp/Captures"`. Temp is git-ignored; never save screenshots under `Assets/`. Take screenshots while Play Mode is paused or being stepped: captures during free-running play can come out blank. |
-| Play Mode while Unity is in the background | Run In Background is off, so Play Mode stops advancing whenever Unity isn't the front window. Step 1 learned this. To drive frames:<br>1. From `execute_code`, add a self-removing `EditorApplication.update` callback that calls `EditorApplication.Step()`.<br>2. Optionally set `Time.captureDeltaTime`, for example to 0.05.<br>3. Set it back to 0 afterwards.<br>**Never set `Application.runInBackground` in the editor: it writes PlayerSettings.** |
+| Play Mode while Unity is in the background | Run In Background is off, so Play Mode stops advancing whenever Unity isn't the front window. Step 1 learned this. To drive frames:<br>1. From `execute_code`, add a self-removing `EditorApplication.update` callback that calls `EditorApplication.Step()`.<br>2. Optionally set `Time.captureDeltaTime`, for example to 0.05.<br>3. Set it back to 0 afterwards.<br>**Never set `Application.runInBackground` in the editor: it writes PlayerSettings.**<br>`Time.captureDeltaTime` seemed to have no effect while stepping. To speed up long calls, set `Time.timeScale` temporarily and reset it to 1 afterwards.<br>`GameObject.Find` also returns inactive objects, so check `activeInHierarchy`. |
 | Simulate input (cards, buttons, cords) | `execute_code` runs outside the player loop, where `Screen` has the size of an editor view, so raycasts made from it miss.<br>1. Queue a one-shot `Canvas.willRenderCanvases` handler.<br>2. Inside it, run the clicks, using EventSystem raycasts or `CableInputController.ProcessPointer(screenPosition, true)`. The team built that method for integration checks.<br>3. Pass results back through `SessionState`, and remove the handler and its keys afterwards. |
 
 ## 5. Definition of done (every step)
@@ -142,6 +143,7 @@ Follow-ups: <ideas, debts, questions>
 | Before Step 5 | A way to add cords at runtime: a cable prefab plus a tray slot, and a way to register them with `CableInputController` and the tray. | Sergei |
 | Before Step 6 | Touch input in the cord code: use `Pointer.current` instead of `Mouse.current` in `CableInputController.Update`, and hide the hand cursor on touch. | Sergei |
 | Before Step 6, or earlier if Sergei's cord work settles | Merge into one scene (D29). Agree a time when Sergei isn't editing `Level.unity`; the merge itself takes about 5 minutes. | Sergei |
+| Soon (lead asked) | Make the upgrade panel's top header about 90–100 px tall, without buttons, styled as the money-counter slot. Our counter then grows to fill it. | Sergei |
 | Before Step 7 | Decide how locked board sections look: cover plates in our overlay, or a change to the board prefab. | Sergei, Mia |
 | Before Step 8 | Sound effects (ring, alarm, coins, paid, fine, hang-up): find them or generate them. | Mia, team |
 
@@ -374,6 +376,7 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
   - The top caller slot is partly off-screen. That is the team's panel layout; leave it.
   - `CallService.Take` currently refuses a second call; make it swap (D03).
   - `GameInstaller` should log an error if `Level` fails to load. Today it fails silently.
+- **Money counter, larger:** make the font about 15–20% bigger so it fills the shop panel's header strip. If Sergei has made the header taller by then, size the counter to fill that slot.
 - **Dev panel** (`Assets/Scripts/Game/DevTools/`, compiled only under `#if UNITY_EDITOR || DEVELOPMENT_BUILD`). Toggle it with F1 or a small corner button. It offers:
   - add $10
   - spawn a call now

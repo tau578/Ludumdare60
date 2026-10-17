@@ -1,3 +1,4 @@
+using System;
 using Switchboard.Domain;
 using UnityEngine;
 
@@ -12,18 +13,24 @@ namespace Switchboard.Game
         private readonly Vector3[] slotCorners = new Vector3[4];
         private CallService calls;
         private OperatorDesk desk;
+        private EarningsService earnings;
+        private Func<IPerson, Sprite> portraitOf;
         private RectTransform[] slots = new RectTransform[0];
         private Vector3 alignedMin;
         private Vector3 alignedMax;
 
-        public void Bind(CallService callService, OperatorDesk operatorDesk, RectTransform[] callerSlots)
+        public void Bind(CallService callService, OperatorDesk operatorDesk, EarningsService earningsService,
+            RectTransform[] callerSlots, Func<IPerson, Sprite> portraits)
         {
             Unsubscribe();
             calls = callService;
             desk = operatorDesk;
+            earnings = earningsService;
+            portraitOf = portraits;
             slots = callerSlots ?? new RectTransform[0];
             calls.CallAdded += OnCallAdded;
             calls.CallStateChanged += OnCallStateChanged;
+            earnings.ConnectionFeePaid += OnConnectionFeePaid;
             card.Clicked += OnCardClicked;
             card.Hide();
         }
@@ -37,15 +44,22 @@ namespace Switchboard.Game
                 calls.CallAdded -= OnCallAdded;
                 calls.CallStateChanged -= OnCallStateChanged;
             }
+            if (earnings != null) earnings.ConnectionFeePaid -= OnConnectionFeePaid;
             if (card != null) card.Clicked -= OnCardClicked;
             calls = null;
+            earnings = null;
         }
 
-        private void OnCallAdded(CallAddedArgs e) => card.Show(e.Call);
+        private void OnCallAdded(CallAddedArgs e) => card.Show(e.Call, portraitOf?.Invoke(e.Call.Request.CallerPerson));
 
         private void OnCallStateChanged(CallStateChangedArgs e)
         {
             if (e.Call == card.Call) card.Refresh();
+        }
+
+        private void OnConnectionFeePaid(ConnectionFeePaidArgs e)
+        {
+            if (e.Call == card.Call) card.ShowConnectionFee(e.Cents);
         }
 
         private void OnCardClicked(CallCardView clicked) => desk.TryTake(clicked.Call.Id);

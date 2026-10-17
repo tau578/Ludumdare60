@@ -181,7 +181,6 @@ MonoBehaviour:
   loopRunner: {fileID: 334335210}
   moneyCounter: {fileID: 2115408883}
   callQueue: {fileID: 2115408884}
-  directoryList: {fileID: 2115408882}
 --- !u!4 &334335212
 Transform:
   m_ObjectHideFlags: 0
@@ -289,22 +288,19 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6930408535226542786, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
+      propertyPath: m_AdditionalShaderChannelsFlag
+      value: 25
+      objectReference: {fileID: 0}
+    - target: {fileID: 7833790028980209907, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
+      propertyPath: m_AdditionalShaderChannelsFlag
+      value: 25
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
---- !u!114 &2115408882 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 6228944952039044260, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
-  m_PrefabInstance: {fileID: 2115408881}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: eb53ba6ba4c6045adb362a66f06f275a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.Game.DirectoryListView
 --- !u!114 &2115408883 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 7315458190330547047, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}

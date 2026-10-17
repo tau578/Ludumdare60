@@ -3,7 +3,7 @@
 | Step | Status | Built | Verified | Playtested | Commit |
 |---|---|---|---|---|---|
 | 1. First call | done | ✅ 2026-10-17 (54 min) | ✅ 72/72 tests, scope clean | ✅ all 9 checks | e6f44e5 |
-| 1b. Fee, book, layout | not started | | | | |
+| 1b. Fee, book, layout | playtesting | ✅ 2026-10-17 (20 min) | ✅ 91/91 tests, scope clean | ⏳ | |
 | 2. A busy switchboard | not started | | | | |
 | 3. Phone book and cards | not started | | | | |
 | 4. Emergencies and fines | not started | | | | |
@@ -172,3 +172,126 @@ Follow-ups:
   - D33: scene flow `MainMenu` → `Game` → `Level`.
 - **Second merge (`9881486`):** the only conflict was the build list. Resolved to `MainMenu` (0), `Game` (1), `Level` (2), because his menu loads the next build index.
 - **Playtest overlaps:** our money counter, ticket and Directory button overlapped Sergei's upgrade panel. Step 1b fixes this and replaces our Directory list with his book.
+
+### Step 1b report: 2026-10-17
+Result: done
+
+Playable now: Start from `MainMenu` (Play) or `Game.unity`. A call rings with a fee and a rate on its badge (e.g. "9¢ + 3¢/s"). Take it, and a speech bubble left of the caller's portrait says "Walter Pryce / wants Lillian Yardley". Sergei's phone book lists our 12 English names with their jacks. A correct patch pays the fee at once with a "+9¢" popup over the card, the bubble switches to "On the line", and money rises per second. The "Paid" stamp includes the fee. The temporary Directory button, list and D key are gone.
+
+How to test: the Plan's Step 1b playtest script, with these notes:
+1. The money counter sits at the top of the right-hand column, in the empty header strip of the upgrade panel above its first "+" button (see deviation 1).
+2. The speech bubble sits in the dark margin left of the caller column, its tail pointing at the top slot's portrait. Long names wrap onto several lines.
+3. The "+N¢" popup rises over the card, not near the money counter.
+
+Created:
+- **Content** (`Assets/Scripts/Content/`):
+  - `PeopleFileData` (the JSON format: Sergei's `contactsPerPage`/`name`/`socket` plus `portrait`, `type`, `rate`, `fee`)
+  - `PeopleFileLoader` (parse and validate with `JsonUtility`), `PeopleCatalog` (valid entries plus error messages)
+  - `PersonRecord`, `CallerRecord`, `DirectoryRecord` (plain classes implementing `IPerson`, `ICaller`, `IDirectoryEntry`)
+  - `GameContent` (`IGameContent` = GameConfig settings + loaded people)
+- **Game:** `Views/FloatingTextView` (the reused "+N¢" popup).
+- **Tests:** `ConnectionFeeTests`, `PeopleFileTests`.
+
+Changed:
+- **Domain:**
+  - `ICallerType.ConnectionFeeCents` (range), `ICaller.ConnectionFeeCentsOverride`.
+  - `CallRequest.ConnectionFeeCents` (constructor: `…, connectionFeeCents = 0, attempt = 1`).
+  - `Call.ConnectionFeePaid`.
+  - `CallFactory` rolls the fee like the rate; an override > 0 wins.
+  - `EarningsService` pays the fee × multiplier once, the moment the call enters Connected (it listens to `CallStateChanged`, so tick order doesn't matter), adds it to `CentsEarned`, and raises `ConnectionFeePaid`. It takes an optional multiplier delegate (default 1) for Step 5.
+  - `GameSession.Earnings` is public.
+  - `MoneyFormat.Cents` ("10¢") and `MoneyFormat.CardRate` ("10¢ + 5¢/s"; just "5¢/s" when the fee is 0).
+  - `PersonExtensions.FullName`/`ListingName` handle a one-word name.
+- **Content:** `CallerTypeDefinition.connectionFeeCents` (default 5–15). `GameConfig` now holds `startingCents`, `callerTypes`, `peopleFile` (TextAsset) and `portraits` (name → Sprite), with `LoadPeople(boardJacks)` and `Portrait(name)`.
+- **Game:**
+  - `GameInstaller` builds the content from the people file and logs each validation error with `Debug.LogError`. It reads the board's jack labels from the `SocketView`s in Level. It logs an error if `Level` fails to load. It passes portraits and earnings to the queue.
+  - `CallQueueView` forwards `ConnectionFeePaid` to the card.
+  - `CallCardView`: fee + rate badge, speech bubble instead of the ticket, fee popup.
+- **Assets:**
+  - `Assets/Configs/PhoneBook.json` rewritten (D31): our 12 people, sorted by surname, `contactsPerPage` 6, with `portrait` `caller-NN`, `type.regular`, `rate` 0, `fee` 0. Jacks and portraits are the same as in Step 1.
+  - `Regular.asset`: fee 5–15.
+  - `GameConfig.asset`: references `PhoneBook.json` and the 12 portraits.
+- **Tests:** `Fakes` (fee fields; TestWorld's Regular has a fee of 5–15), `CallFactoryTests`, `MoneyFormatTests`, `GameSessionTests` (expects fee + rate × duration).
+- **Deleted:**
+  - `PersonDefinition`, `CallerDefinition`, `PhoneDirectoryDefinition`, `DirectoryEntry`, `DirectoryListView` (scripts and metas)
+  - `Assets/Content/People/`, `Assets/Content/Callers/`, `PhoneDirectory.asset`
+
+Scene and prefab changes:
+- **`GameUI.prefab`:**
+  - Removed `Directory` (overlay and button) and `Ticket`.
+  - `Hud/MoneyPlate` moved to (762, 486) at 212×52, with the amount auto-sized 22–40. That is x 1616–1828 and y 1000–1052 in the 1920×1080 reference. Sergei's `WorkArea` is a fixed 1920×1080 rect centred on the canvas, so centre-anchored offsets line up with his panels.
+  - `RateBadge` widened to 152×40, label auto-sized 16–28.
+  - New `CallCard/SpeechBubble` (124×140, right edge 38 px left of the card, so x 16–140 for the top slot; a rotated-square tail and a cream rounded body; label auto-sized 14–24).
+  - New `CallCard/FeePopup` (CanvasGroup with FloatingTextView: rises 48 px and fades over 1 s).
+  - Every new graphic has `raycastTarget` off.
+- **`Game.unity`:** re-saved. The stale `directoryList` field and the stripped DirectoryListView reference are gone. TMP added `m_AdditionalShaderChannelsFlag: 25` overrides on the GameUI and Hud canvases.
+- **Team scenes:** `Level.unity` and `MainMenu.unity` were opened for Play Mode checks and closed unsaved; neither was ever dirty. `git diff` is empty for every team path, ProjectSettings and Packages. `runInBackground` is still 0.
+
+Tests: 91/91 EditMode (72 before, 19 new). New:
+- ConnectionFeeTests: 5
+  - fee paid once, at the moment of connection, before any tick
+  - no fee on a wrong connection
+  - multiplier applied to the fee
+  - a finished call earns fee + duration × rate (112¢ with uneven frames)
+  - a zero fee raises no event
+- CallFactoryTests: 2 (fee within range, override wins)
+- MoneyFormatTests: 5 (Cents ×2, CardRate ×3)
+- PeopleFileTests: 7
+  - the real file through the real GameConfig: 12 valid, no errors
+  - the real file is sorted by surname
+  - the real file keeps the book's format
+  - parsing names, jacks, types and overrides
+  - invalid entries reported and left out: unknown jack, duplicate jack, unknown portrait, unknown type, empty name
+  - empty file and broken JSON reported
+
+Console: clean. Compiling, both test runs and every Play Mode run logged zero errors and zero warnings from our code. The only lines are the known Metal screenshot noise ("Ignoring depth surface load/store action as it is memoryless") and one MCP WebSocket line during a domain reload.
+
+Screenshot: `Temp/Captures/step-01b.png` shows a connected call: cord D2–B1, bubble "On the line", popup "+9¢", money counter $0.09 above the upgrade buttons, book closed. Extras: `step-01b-ringing.png` (book closed, ringing card "9¢ + 3¢/s") and `step-01b-book-open.png` (book open showing our 12 people; bubble "Walter Pryce wants Lillian Yardley").
+
+Checked in Play Mode with real EventSystem raycasts and `CableInputController.ProcessPointer`, run inside the player loop:
+- **Ring:** Walter Pryce → Lillian Yardley, fee 9, rate 3, portrait caller-06 (Walter's).
+- **Take:** the card is the topmost hit; the bubble shows the names at x 16–140, y 912–1052, clear of the board and the other slots.
+- **Book:** opens from a click on `ClosedBook` and lists all 12 people across one spread. Raycasts at four points over the open book all hit `OpenBook` (order 10), so nothing of ours covers it. A click on it closes it.
+- **Right pair** D2–B1: the wallet went from 0 to 9 in the same frame (fee 9 plus a fraction); "+9¢" popup; "On the line". The call finished at 99¢ exactly (9 + 3 × 30), with the stamp "Paid $0.99" and wallet 99.
+- **Wrong pair** (Basil Thorne wants Edgar Pennington, patched A5–F6): "Wrong number!", wallet stayed 99, call earned 0, no fee event.
+- **Flow:** `MainMenu` → Play → `Game` (index 1) → `Level` (index 2) loads additively; the session has 12 people and the book has 12 contacts.
+- **`Level.unity` alone:** one scene, none of our objects, a sandbox patch A1–F6 stays connected, and the book shows the 12 people.
+
+Deviations from Design/Plan:
+1. **Money counter is not strictly above the shop.** At 1920×1080, Sergei's `UpgradeShopPanel` spans y 204–1064, which leaves 16 px above it, and the closed book fills the column below it. I put the counter at the top of the right-hand column, inside the panel's empty header strip (y 1000–1052) above the first upgrade button (top at 994). It covers no button and has raycasts off, but it does sit on his panel's faceplate. A strict "above, no overlap" needs Sergei to move the panel down by about 60 px (a coordinated change), or a different spot for the counter.
+2. **Bubble side and size.** There are only 86 px between the caller column and the board, so the bubble goes in the 140 px margin left of the column, pointing right at the portrait. At 124 px wide, names wrap ("Walter / Pryce / wants / Lillian / Yardley"). It replaces the names with "On the line" once connected, as the brief says.
+3. **`GameConfig` no longer implements `IGameContent`.** The people come from JSON, and caching parsed data on a ScriptableObject would be runtime state on an asset. A plain `GameContent` (Content) combines GameConfig with the loaded `PeopleCatalog`. Design 6.1 still says GameConfig implements it.
+4. **Validation extras beyond the brief:** an empty jack, a duplicate name (the id is derived from the name), a negative rate or fee, and an empty or unreadable file. Invalid entries are left out and the game runs with the rest. Ids are `person.<name-words>` / `caller.<name-words>`, the same ids as Step 1.
+5. **Board jacks for validation** come from the live `SocketView.Address` values at runtime. The EditMode test uses an A1–F6 grid matching the current board.
+6. **Card badge** shows only "5¢/s" when the fee is 0.
+7. **Tooling: C# edits made with file tools.** MCP `apply_text_edits` corrupted three edits: it duplicated a line in CallFactory, dropped the new property from CallRequest, and reported a false no-op on Call.cs. After that I wrote C# with file tools, followed each batch with `refresh_unity` compile and a console read, and checked every file on disk. Assets, the prefab, the scene, deletions and tests all went through MCP. `delete_script` isn't accepted inside `batch_execute`; I used `manage_asset delete` instead.
+8. **Canvas order.** `GameUI` stays at order 10, the same as the book. The book is still on top only because nothing of ours overlaps it.
+
+Follow-ups:
+- **Tell Sergei:**
+  - `PhoneBook.json` now carries the game's people. Keep the extra fields and the sorting by surname.
+  - His `PhoneBookBuilder` menu loads `Assets/Settings/PhoneBook.json`, which no longer exists, so "Update Phone Book Directory" would throw.
+  - Ask whether the shop panel can leave room above it (deviation 1).
+- **Sorting:** consider order 5 for `GameUI` (above the board at 0, below the book at 10) before Step 2 adds live calls in the right column, so the open book is always on top.
+- **Plan §4 testing notes:**
+  - `Time.captureDeltaTime` seemed to have no effect while stepping; each `EditorApplication.Step()` advanced about 0.017–0.02 s. A temporary `Time.timeScale` (5–10, reset to 1) ran a 30 s call in 150 steps.
+  - `GameObject.Find("A/B/C")` also returns inactive children, so probes should check `activeInHierarchy`.
+- **Bubble readability:** with only 140 px of margin, long names wrap. Options: a smaller fixed font with one name per line, or shorter text such as "Pryce → Yardley" once an arrow glyph is in the atlas.
+- **Placeholder portraits:** all 12 are still the same grey circle.
+
+#### Step 1b verification (orchestrator, 2026-10-17)
+- **Tests:** an independent EditMode run passed 91/91.
+- **Console:** clean.
+- **Scope:** no team scripts, prefabs, scenes, ProjectSettings or Packages changed. `PhoneBook.json` was rewritten as agreed in D31.
+- **Screenshot `step-01b.png` shows:**
+  - the fee badge and "+9¢" popup
+  - the "On the line" bubble left of the card
+  - the money counter in the shop panel's header strip
+  - the phone book on the desk
+- **Docs:** Design status updated; Plan §3/§4 now allow C# file edits (because of the MCP edit corruption) and include the stepping notes.
+- **Open layout decisions for the lead:**
+  - the money counter sits in the shop panel's header strip (strictly above it would need Sergei to move the panel)
+  - the bubble sits in the left margin
+- **For Sergei:**
+  - `PhoneBook.json` now carries game fields.
+  - His `PhoneBookBuilder` points to a missing `Assets/Settings/PhoneBook.json`.

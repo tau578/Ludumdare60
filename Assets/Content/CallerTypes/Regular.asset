@@ -20,3 +20,6 @@ MonoBehaviour:
   durationSeconds:
     min: 15
     max: 30
+  connectionFeeCents:
+    min: 5
+    max: 15

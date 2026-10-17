@@ -20,26 +20,30 @@ namespace Switchboard.Domain.Tests
 
     internal sealed class FakeCallerType : ICallerType
     {
-        public FakeCallerType(FloatRange centsPerSecond, FloatRange durationSeconds)
+        public FakeCallerType(FloatRange centsPerSecond, FloatRange durationSeconds, FloatRange connectionFeeCents = default)
         {
             CentsPerSecond = centsPerSecond;
             DurationSeconds = durationSeconds;
+            ConnectionFeeCents = connectionFeeCents;
         }
 
         public string Id => "type.regular";
         public string DisplayName => "Regular";
         public FloatRange CentsPerSecond { get; }
+        public FloatRange ConnectionFeeCents { get; }
         public FloatRange DurationSeconds { get; }
     }
 
     internal sealed class FakeCaller : ICaller
     {
-        public FakeCaller(IPerson person, ICallerType type, float weight = 1, float centsPerSecondOverride = 0)
+        public FakeCaller(IPerson person, ICallerType type, float weight = 1, float centsPerSecondOverride = 0,
+            float connectionFeeCentsOverride = 0)
         {
             Person = person;
             Type = type;
             Weight = weight;
             CentsPerSecondOverride = centsPerSecondOverride;
+            ConnectionFeeCentsOverride = connectionFeeCentsOverride;
         }
 
         public string Id => "caller." + Person.Id;
@@ -47,6 +51,7 @@ namespace Switchboard.Domain.Tests
         public ICallerType Type { get; }
         public float Weight { get; }
         public float CentsPerSecondOverride { get; }
+        public float ConnectionFeeCentsOverride { get; }
     }
 
     internal sealed class FakeDirectoryEntry : IDirectoryEntry
@@ -85,7 +90,7 @@ namespace Switchboard.Domain.Tests
     {
         public TestWorld()
         {
-            Regular = new FakeCallerType(new FloatRange(3, 8), new FloatRange(15, 30));
+            Regular = new FakeCallerType(new FloatRange(3, 8), new FloatRange(15, 30), new FloatRange(5, 15));
             AdaCaller = new FakeCaller(Ada, Regular);
             Callers = new ICaller[] { AdaCaller, new FakeCaller(Basil, Regular), new FakeCaller(Clara, Regular) };
             Entries = new IDirectoryEntry[]
@@ -118,7 +123,7 @@ namespace Switchboard.Domain.Tests
         public static readonly JackId B2 = new JackId("B2");
         public static readonly JackId C3 = new JackId("C3");
 
-        public CallRequest AdaWantsBasil(double centsPerSecond = 5, double durationSeconds = 20) =>
-            new CallRequest(AdaCaller, Basil, centsPerSecond, durationSeconds);
+        public CallRequest AdaWantsBasil(double centsPerSecond = 5, double durationSeconds = 20, double connectionFeeCents = 0) =>
+            new CallRequest(AdaCaller, Basil, centsPerSecond, durationSeconds, connectionFeeCents);
     }
 }

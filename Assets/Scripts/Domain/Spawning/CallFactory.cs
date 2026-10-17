@@ -14,7 +14,11 @@ namespace Switchboard.Domain
             double centsPerSecond = caller.CentsPerSecondOverride > 0
                 ? caller.CentsPerSecondOverride
                 : Roll(caller.Type.CentsPerSecond);
-            return new CallRequest(caller, recipient, centsPerSecond, Roll(caller.Type.DurationSeconds), attempt);
+            double durationSeconds = Roll(caller.Type.DurationSeconds);
+            double connectionFeeCents = caller.ConnectionFeeCentsOverride > 0
+                ? caller.ConnectionFeeCentsOverride
+                : Roll(caller.Type.ConnectionFeeCents);
+            return new CallRequest(caller, recipient, centsPerSecond, durationSeconds, connectionFeeCents, attempt);
         }
 
         // Whole numbers keep rates readable on cards and make a finished call pay whole cents.

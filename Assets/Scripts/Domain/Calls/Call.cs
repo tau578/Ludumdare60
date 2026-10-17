@@ -15,6 +15,7 @@ namespace Switchboard.Domain
         public CallEndReason EndReason { get; internal set; }
         public double SecondsLeft { get; internal set; }
         public double CentsEarned { get; internal set; }
+        public bool ConnectionFeePaid { get; internal set; }
         public CordId? Cord { get; internal set; }
     }
 }

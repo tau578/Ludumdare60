@@ -12,6 +12,12 @@ namespace Switchboard.Domain
             return "$" + (cents / 100).ToString("#,0", Invariant) + "." + (cents % 100).ToString("00", Invariant);
         }
 
-        public static string Rate(double centsPerSecond) => centsPerSecond.ToString("0.##", Invariant) + "¢/s";
+        public static string Cents(double cents) => cents.ToString("0.##", Invariant) + "¢";
+
+        public static string Rate(double centsPerSecond) => Cents(centsPerSecond) + "/s";
+
+        // The card's badge: the one-off fee plus the per-second rate, e.g. "10¢ + 5¢/s" (D32).
+        public static string CardRate(double connectionFeeCents, double centsPerSecond) =>
+            connectionFeeCents > 0 ? Cents(connectionFeeCents) + " + " + Rate(centsPerSecond) : Rate(centsPerSecond);
     }
 }

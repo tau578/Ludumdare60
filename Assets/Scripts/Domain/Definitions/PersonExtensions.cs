@@ -4,8 +4,12 @@ namespace Switchboard.Domain
 {
     public static class PersonExtensions
     {
-        public static string FullName(this IPerson person) => $"{person.FirstName} {person.LastName}";
-        public static string ListingName(this IPerson person) => $"{person.LastName}, {person.FirstName}";
+        // A one-word name, such as a service, has no first name.
+        public static string FullName(this IPerson person) =>
+            string.IsNullOrEmpty(person.FirstName) ? person.LastName : $"{person.FirstName} {person.LastName}";
+
+        public static string ListingName(this IPerson person) =>
+            string.IsNullOrEmpty(person.FirstName) ? person.LastName : $"{person.LastName}, {person.FirstName}";
 
         // Ids are the identity of content, so two definitions with one id are one person.
         public static bool IsSamePerson(this IPerson person, IPerson other) =>

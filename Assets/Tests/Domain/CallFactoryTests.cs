@@ -26,6 +26,29 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
+        public void ConnectionFeeIsRolledWithinTheTypeRange()
+        {
+            var factory = new CallFactory(new SeededRandom(5));
+            var fees = new HashSet<double>();
+            for (int i = 0; i < 500; i++)
+            {
+                double fee = factory.Create(world.AdaCaller, world.Basil).ConnectionFeeCents;
+                Assert.That(world.Regular.ConnectionFeeCents.Contains(fee), Is.True);
+                fees.Add(fee);
+            }
+            Assert.That(fees, Is.EquivalentTo(new double[] { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 }));
+        }
+
+        [Test]
+        public void CallerFeeOverrideWinsOverTheTypeRange()
+        {
+            var factory = new CallFactory(new SeededRandom(6));
+            var vip = new FakeCaller(world.Ada, world.Regular, connectionFeeCentsOverride: 40);
+            for (int i = 0; i < 50; i++)
+                Assert.That(factory.Create(vip, world.Basil).ConnectionFeeCents, Is.EqualTo(40));
+        }
+
+        [Test]
         public void RangesWithoutAWholeNumberStillStayWithinTheRange()
         {
             var narrow = new FakeCallerType(new FloatRange(2.2f, 2.8f), new FloatRange(15.1f, 15.9f));

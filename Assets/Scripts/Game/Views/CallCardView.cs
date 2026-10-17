@@ -1,5 +1,4 @@
 using System;
-using Switchboard.Content;
 using Switchboard.Domain;
 using TMPro;
 using UnityEngine;
@@ -8,7 +7,7 @@ using UnityEngine.UI;
 
 namespace Switchboard.Game
 {
-    /// <summary>A view of one call: the ringing card, the ticket while it is in hand or connected, then a stamp.</summary>
+    /// <summary>A view of one call: the ringing card, a speech bubble while it is in hand or connected, then a stamp.</summary>
     public sealed class CallCardView : MonoBehaviour, IPointerClickHandler
     {
         [SerializeField] private Image portrait;
@@ -16,9 +15,9 @@ namespace Switchboard.Game
         [SerializeField] private Graphic ringingPulse;
         [SerializeField] private GameObject stamp;
         [SerializeField] private TMP_Text stampLabel;
-        [SerializeField] private GameObject ticket;
-        [SerializeField] private TMP_Text ticketTitle;
-        [SerializeField] private TMP_Text ticketNames;
+        [SerializeField] private GameObject speechBubble;
+        [SerializeField] private TMP_Text speechLabel;
+        [SerializeField] private FloatingTextView feePopup;
         [SerializeField, Min(0)] private float stampSeconds = 1.5f;
         [SerializeField, Min(0)] private float pulsesPerSecond = 1.5f;
 
@@ -30,15 +29,14 @@ namespace Switchboard.Game
         public event Action<CallCardView> Clicked;
         public Call Call { get; private set; }
 
-        public void Show(Call call)
+        public void Show(Call call, Sprite callerPortrait)
         {
             gameObject.SetActive(true);
             Initialize();
             Call = call;
-            var caller = call.Request.CallerPerson as PersonDefinition;
-            portrait.sprite = caller != null && caller.Portrait != null ? caller.Portrait : defaultPortrait;
-            rateLabel.text = MoneyFormat.Rate(call.Request.CentsPerSecond);
-            ticketNames.text = $"{call.Request.CallerPerson.FullName()}\nwants {call.Request.Recipient.FullName()}";
+            portrait.sprite = callerPortrait != null ? callerPortrait : defaultPortrait;
+            rateLabel.text = MoneyFormat.CardRate(call.Request.ConnectionFeeCents, call.Request.CentsPerSecond);
+            feePopup.Hide();
             Refresh();
         }
 
@@ -47,18 +45,23 @@ namespace Switchboard.Game
             if (Call == null) return;
             CallState state = Call.State;
             ringingPulse.gameObject.SetActive(state == CallState.Incoming);
-            ticket.SetActive(state == CallState.Taken || state == CallState.Connected);
-            ticketTitle.text = state == CallState.Connected ? "On the line" : "Call in hand";
+            speechBubble.SetActive(state == CallState.Taken || state == CallState.Connected);
+            speechLabel.text = state == CallState.Connected
+                ? "On the line"
+                : $"{Call.Request.CallerPerson.FullName()}\nwants {Call.Request.Recipient.FullName()}";
             stamp.SetActive(state == CallState.Ended);
             if (state != CallState.Ended) return;
             stampLabel.text = StampText(Call);
             stampTimeLeft = stampSeconds;
         }
 
+        public void ShowConnectionFee(double cents) => feePopup.Show("+" + MoneyFormat.Cents(cents));
+
         public void Hide()
         {
             Call = null;
-            ticket.SetActive(false);
+            speechBubble.SetActive(false);
+            feePopup.Hide();
             gameObject.SetActive(false);
         }
 

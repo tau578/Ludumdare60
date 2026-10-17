@@ -5,6 +5,7 @@ namespace Switchboard.Domain
         string Id { get; }
         string DisplayName { get; }
         FloatRange CentsPerSecond { get; }
+        FloatRange ConnectionFeeCents { get; }
         FloatRange DurationSeconds { get; }
     }
 }

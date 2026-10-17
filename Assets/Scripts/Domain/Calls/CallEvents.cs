@@ -32,4 +32,16 @@ namespace Switchboard.Domain
         public Call Call { get; }
         public CallEndReason Reason { get; }
     }
+
+    public readonly struct ConnectionFeePaidArgs
+    {
+        public ConnectionFeePaidArgs(Call call, double cents)
+        {
+            Call = call;
+            Cents = cents;
+        }
+
+        public Call Call { get; }
+        public double Cents { get; }
+    }
 }

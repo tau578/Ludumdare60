@@ -6,7 +6,6 @@ namespace Switchboard.Domain
     public sealed class GameSession
     {
         private readonly GameClock clock = new GameClock();
-        private readonly EarningsService earnings;
         private readonly CallSpawner spawner;
 
         public GameSession(IGameContent content, IRandom random, ISwitchboard switchboard)
@@ -15,7 +14,7 @@ namespace Switchboard.Domain
             Directory = new PhoneDirectory(content.Directory);
             Wallet = new Wallet(content.StartingCents);
             Calls = new CallService();
-            earnings = new EarningsService(Calls, Wallet);
+            Earnings = new EarningsService(Calls, Wallet);
             spawner = new CallSpawner(Calls, new CallFactory(random), Directory, content.Callers, random);
             Desk = new OperatorDesk(Calls, new ConnectionRule(Directory), switchboard);
         }
@@ -24,13 +23,14 @@ namespace Switchboard.Domain
         public PhoneDirectory Directory { get; }
         public Wallet Wallet { get; }
         public CallService Calls { get; }
+        public EarningsService Earnings { get; }
         public OperatorDesk Desk { get; }
 
         public void Tick(double dt)
         {
             if (!(dt > 0)) return;
             clock.Advance(dt);
-            earnings.Tick(dt);
+            Earnings.Tick(dt);
             Calls.Tick(dt);
             spawner.Tick(dt);
         }

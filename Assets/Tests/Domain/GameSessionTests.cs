@@ -53,7 +53,8 @@ namespace Switchboard.Domain.Tests
 
             Advance(call.Request.DurationSeconds + 0.5);
 
-            long expected = 7 + (long)(call.Request.CentsPerSecond * call.Request.DurationSeconds);
+            long expected = 7 + (long)(call.Request.ConnectionFeeCents + call.Request.CentsPerSecond * call.Request.DurationSeconds);
+            Assert.That(call.Request.ConnectionFeeCents, Is.GreaterThan(0));
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.Finished));
             Assert.That(session.Wallet.Cents, Is.EqualTo(expected));
             Assert.That(board.Returned, Is.EqualTo(new[] { new CordId(0) }));

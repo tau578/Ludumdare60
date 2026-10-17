@@ -5,21 +5,40 @@ using UnityEngine;
 
 namespace Switchboard.Content
 {
-    /// <summary>The one asset GameInstaller references; it reaches every other definition.</summary>
+    /// <summary>The one asset GameInstaller references; it reaches every other definition and the people file.</summary>
     [CreateAssetMenu(menuName = "Switchboard/GameConfig")]
-    public sealed class GameConfig : ScriptableObject, IGameContent
+    public sealed class GameConfig : ScriptableObject
     {
         [SerializeField] private long startingCents;
         [SerializeField] private CallerTypeDefinition[] callerTypes = new CallerTypeDefinition[0];
-        [SerializeField] private PersonDefinition[] people = new PersonDefinition[0];
-        [SerializeField] private CallerDefinition[] callers = new CallerDefinition[0];
-        [SerializeField] private PhoneDirectoryDefinition directory;
+        [SerializeField, Tooltip("Assets/Configs/PhoneBook.json, shared with the team's phone book (D31).")]
+        private TextAsset peopleFile;
+        [SerializeField] private PortraitEntry[] portraits = new PortraitEntry[0];
 
         public long StartingCents => startingCents;
         public IReadOnlyList<ICallerType> CallerTypes => callerTypes ?? new CallerTypeDefinition[0];
-        public IReadOnlyList<IPerson> People => people ?? new PersonDefinition[0];
-        public IReadOnlyList<ICaller> Callers => callers ?? new CallerDefinition[0];
-        public IReadOnlyList<IDirectoryEntry> Directory =>
-            directory != null ? directory.Entries : Array.Empty<IDirectoryEntry>();
+
+        public PeopleCatalog LoadPeople(IEnumerable<string> boardJacks) =>
+            PeopleFileLoader.Load(peopleFile != null ? peopleFile.text : null, CallerTypes, HasPortrait, boardJacks);
+
+        public bool HasPortrait(string name) => Portrait(name) != null;
+
+        public Sprite Portrait(string name)
+        {
+            if (portraits == null || string.IsNullOrEmpty(name)) return null;
+            foreach (PortraitEntry entry in portraits)
+                if (entry != null && entry.Name == name) return entry.Sprite;
+            return null;
+        }
+
+        [Serializable]
+        private sealed class PortraitEntry
+        {
+            [SerializeField, Tooltip("The name the people file uses, e.g. caller-01.")] private string name;
+            [SerializeField] private Sprite sprite;
+
+            public string Name => name;
+            public Sprite Sprite => sprite;
+        }
     }
 }
