@@ -282,7 +282,7 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
   - `CallCardView`: pooled.
 - **What the card shows in each state:**
   - Waiting: portrait, type badge, rate (e.g. "5¢/s"), and a countdown ring for types with a response time.
-  - In hand: also the caller's name and the name of the person they want. The ticket in the HUD column shows them on two lines, "Ada Moss" and "wants Basil Thorne", titled "Call in hand", and "On the line" once connected.
+  - In hand: also the caller's name and the name of the person they want. From Step 1b they appear in a speech bubble next to the caller's portrait in the left column: "Ada Moss" / "wants Basil Thorne", and "On the line" once connected. This replaces the Step 1 ticket in the right column.
   - Connected: the cord's colour and the cents earned so far.
   - On hold: an "on hold" label.
   - Ended: a stamp, such as "Paid $1.20", "Wrong number!", "Cut off" or "Missed −$5".

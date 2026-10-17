@@ -303,7 +303,10 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
 4. **Layout.**
    - Remove our `DirectoryListView`, the Directory button and the D-key toggle, from both the prefab and the code.
    - Move the money counter to the top of the right-hand column, above Sergei's `UpgradeShopPanel`, with no overlap.
-   - Move the ticket to free space that doesn't overlap the shop panel, the book or the board. Report where.
+   - **Replace the ticket with a speech bubble** next to the caller's card in the left caller column, pointing at the portrait.
+     - It shows "Florence Abbott" / "wants Ada Moss" while the call is in hand, and "On the line" once connected.
+     - It must not cover the board or other slots' cards.
+     - Remove the old ticket from the right column.
    - Check by taking a screenshot of the merged scene with the book both closed and open.
 5. **Docs and plan notes from Step 1:** `GameInstaller` logs an error if `Level` fails to load.
 
@@ -323,6 +326,7 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
 4. Patch correctly. Money jumps by the fee with a "+10¢" popup, then rises per second. The stamp at the end includes the fee.
 5. A wrong patch adds no money.
 6. Nothing of ours overlaps the upgrade panel or the book. The money counter sits above the upgrade panel.
+7. Taking a call shows a speech bubble next to the caller's portrait on the left, with who's calling and who they want.
 
 **Out of scope:** everything in Step 2.
 
