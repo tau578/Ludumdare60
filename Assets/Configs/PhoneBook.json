@@ -1,0 +1,29 @@
+{
+  "contactsPerPage": 6,
+  "contacts": [
+    { "name": "Билл Эванс", "socket": "A1" },
+    { "name": "Адам Эванс", "socket": "A2" },
+    { "name": "Артур Эванс", "socket": "A3" },
+    { "name": "Кэрол Миллер", "socket": "A4" },
+    { "name": "Анна Браун", "socket": "A5" },
+    { "name": "Джон Смит", "socket": "A6" },
+    { "name": "Эмма Уилсон", "socket": "B1" },
+    { "name": "Джеймс Тейлор", "socket": "B2" },
+    { "name": "Оливия Мур", "socket": "B3" },
+    { "name": "Генри Кларк", "socket": "B4" },
+    { "name": "Элис Уокер", "socket": "B5" },
+    { "name": "Томас Холл", "socket": "B6" },
+    { "name": "Грейс Льюис", "socket": "C1" },
+    { "name": "Джордж Янг", "socket": "C2" },
+    { "name": "Роуз Кинг", "socket": "C3" },
+    { "name": "Эдвард Райт", "socket": "C4" },
+    { "name": "Лили Скотт", "socket": "C5" },
+    { "name": "Фрэнк Грин", "socket": "C6" },
+    { "name": "Мэри Адамс", "socket": "D1" },
+    { "name": "Роберт Бейкер", "socket": "D2" },
+    { "name": "Хелен Картер", "socket": "D3" },
+    { "name": "Чарльз Митчелл", "socket": "D4" },
+    { "name": "Дороти Тернер", "socket": "D5" },
+    { "name": "Уолтер Паркер", "socket": "D6" }
+  ]
+}
