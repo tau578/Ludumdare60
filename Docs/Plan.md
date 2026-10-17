@@ -153,7 +153,8 @@ Follow-ups: <ideas, debts, questions>
 |---|---|---|
 | 1 | First call: take it, patch it, get paid | One call at a time, end to end, with live money |
 | 1b | Connection fee, Sergei's book, layout | Fee on connect; the real phone book shows our people; no overlaps |
-| 2 | A busy switchboard | Several callers, callbacks, hold and disconnect, a dev panel |
+| 2a | Queue, callbacks, dev panel | Several callers, swapping, callbacks, a dev panel |
+| 2b | Hold and resume | Pulled plugs put calls on hold; restore resumes |
 | 3 | The phone book and real cards | Look people up in the book with tabs; readable cards in every state |
 | 4 | Emergencies and fines | Timed emergency calls and fair fines |
 | 5 | Upgrades, shop and the mystery goal | Buy cords and multipliers; save up toward the mystery |
@@ -334,76 +335,94 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
 
 ---
 
-### Step 2: A busy switchboard
+### Step 2a: Queue, callbacks and dev panel
 
-**Goal.** All the rules for regular calls, with several callers at once.
+**Goal.** Several regular callers at once: a queue, swapping, wrong numbers calling back, the busy rule. Plus a dev panel to speed up testing. **Recommended effort:** high.
 
 **Playable result.**
-- Up to 6 callers wait in the left column, and you juggle them with 3 cords.
+- Callers pile up in the left column, one card per slot, never more than 6.
+- You can take any card, and taking another swaps them.
 - Wrong numbers call back later, marked "calling again".
-- Pulling a plug puts the call on hold; putting the plug back resumes it.
-- A dev panel lets you speed things up.
-
-**Before launch.** None. D07 was confirmed on 2026-10-17, so build the OnHold behaviour.
+- Several calls connect and pay at the same time.
+- F1 opens a dev panel.
 
 **Build**
-- **Queue:**
-  - Up to `maxWaitingCalls` (6) waiting cards, in arrival order. `CallQueueView` uses all 6 slots.
-  - Taking a card while another is in hand swaps them (D03).
-  - A call is `Connecting` while a cord is half-patched.
-- **`BusyTracker`** (D18).
-- **`CallbackScheduler`** (Design §5.3):
-  - Uses `callbackDelaySeconds` on the caller type (default 20–40 s).
+- **Queue (D03, D17):**
+  - Every live call (waiting, in hand, connected) has a card in one of the 6 `CallerQueuePanel` slots, in arrival order. `CallQueueView` uses all 6 slots, aligned the same way as slot 0 today.
+  - Nothing spawns while all 6 slots are used.
+  - Taking a card while another is in hand swaps them: the old one goes back to Incoming with its timers running. `CallService.Take` currently refuses; make it swap.
+  - A call is `Connecting` while a cord is half-patched (Design 5.1).
+  - Connected calls keep their card in their slot. The card shows the cord's colour (`CableController.CableColor`, read through the bridge), the cents earned, and the speech bubble's "On the line". The card leaves when the call ends, after its stamp.
+- **`BusyTracker` (D18).** A person in any live call, or with a pending callback, can't be picked.
+- **`CallbackScheduler` (Design 5.3):**
+  - Add `callbackDelaySeconds` to the caller type (default 20–40 s).
+  - A wrong connection schedules a callback for the same request, attempt + 1.
   - A callback card shows a "calling again" badge.
-  - Callbacks wait while the queue is full or a party is busy.
+  - Callbacks wait while all slots are used or a party is busy, and they go ahead of new spawns.
 - **Spawner:**
-  - A `PacingProfile` asset: base interval (default 8 s), jitter ±30%, and a load factor.
-  - No spawn while the queue is at its cap. Callbacks come first.
-- **OnHold** (D07):
-  - The bridge reports the pulled plug, and the call pauses its pay and duration.
-  - If the same pair closes again, the call resumes.
-  - If the plug goes into another jack, or the cord goes back to the tray, the call ends as DisconnectedEarly.
-  - What the bridge sees:
-    - Restore: the team's code snaps the plug back when you click empty space. That comes through `CordBridge` as `OnCircuitClosed` on the same pair while the cord is still bound to the on-hold call, so the desk resumes the call. It is not judged as a new circuit.
-    - Replacing Step 1's cut-off: today `OperatorDesk.OnCircuitOpened` cuts the call off at once. That path becomes Hold.
-- **`LiveCallsView`:** connected and on-hold calls, shown in the right-hand HUD column under the Directory button (Design 4.3). There is no room above the tray. When a call connects, its card leaves the caller slot. Each entry shows:
-  - the portrait
-  - a chip in the cord's colour (`CableController.CableColor`, read through the bridge)
-  - the cents earned
-  - "on hold" when relevant
-- **Stamps:** "Paid", "Wrong number!", "Cut off". Use only glyphs in the static font atlas (Design 4.3).
-- **Notes from Step 1:**
-  - The top caller slot is partly off-screen. That is the team's panel layout; leave it.
-  - `CallService.Take` currently refuses a second call; make it swap (D03).
-  - `GameInstaller` should log an error if `Level` fails to load. Today it fails silently.
-- **Money counter, larger:** make the font about 15–20% bigger so it fills the shop panel's header strip. If Sergei has made the header taller by then, size the counter to fill that slot.
+  - A `PacingProfile` asset: base interval (default 8 s), jitter ±30%, and a load factor (spawn slower when waiting cards outnumber free cords).
+  - It replaces Step 1's "one call at a time" rule.
+- **Speech bubble:** it belongs to the call in hand. With several cards, it points at the card in hand.
 - **Dev panel** (`Assets/Scripts/Game/DevTools/`, compiled only under `#if UNITY_EDITOR || DEVELOPMENT_BUILD`). Toggle it with F1 or a small corner button. It offers:
   - add $10
   - spawn a call now
   - time ×1 or ×5
-  - show hidden durations
+  - show hidden durations on cards
   - clear calls
+- **Small fix:** `GameInstaller` logs an error if `Level` fails to load (check whether 1b already did this).
+- **Unchanged in 2a:** pulling a plug still cuts the call off (Step 1 behaviour). Hold comes in 2b.
 
 **Tests**
-- The full transition table in Design §5.1, as a table-driven test (without Missed).
-- Swap rules.
-- Entering and leaving Connecting.
-- Callbacks: the delay, waiting while the queue is full or a party is busy, and priority over new spawns.
+- Transitions Incoming ⇄ Taken (swap), Taken ⇄ Connecting, Connecting → Connected or WrongConnection, as a table-driven test.
+- Callbacks: the delay, waiting while slots are full or a party is busy, and priority over spawns.
 - The busy rule.
-- The spawner cap and load factor.
-- OnHold: pay and duration pause; restoring resumes; moving the plug or returning the cord ends the call.
+- The spawner cap, interval and load factor.
 - Several calls paying at the same time.
 
 **Playtest script (you)**
-1. Play `Game.unity` and let 4–6 callers pile up. No more than 6 ever wait.
-2. Take one card, then another. The first goes back and keeps its place.
-3. Patch a wrong number. About 30 s later the same caller rings again, marked "calling again".
-4. Connect three calls at once. Money rises faster, and each live call shows its own earnings.
-5. Pull one plug of a live call. It goes on hold and its earnings freeze. Click empty space: the plug snaps back and the earnings resume.
-6. Pull a plug and click the tray. The call is cut off.
-7. Open the dev panel. Set time to ×5, spawn a call, and add $10.
+1. Play from `Game.unity`. Callers pile up, never more than 6.
+2. Take one card, then another. The bubble moves to the new one, and the first goes back to ringing.
+3. Patch a wrong number. 20–40 s later the same caller rings again, marked "calling again".
+4. Connect three calls at once. Money rises faster, and each connected card shows its cord colour and its own earnings.
+5. F1 opens the dev panel. Try time ×5, spawn a call, add $10, and show durations.
 
-**Out of scope:** the real book, emergencies, upgrades, saves, sounds.
+**Out of scope:** hold (2b), emergencies, upgrades, saves, sounds.
+
+---
+
+### Step 2b: Hold and resume (D07)
+
+**Goal.** Pulling a plug from a live call puts it on hold instead of cutting it off. **Recommended effort:** high.
+
+**Playable result.**
+- Pull one plug of a connected call: its card shows "On hold" and its earnings freeze.
+- Click empty space: the team's restore snaps the plug back, and the call resumes.
+- Plug the pulled end into another jack, or send the cord back to the tray: the call is cut off ("Cut off").
+
+**Build**
+- **OnHold (Design 5.1):**
+  - `OperatorDesk.OnCircuitOpened` on a bound cord puts its call OnHold (instead of cutting it off). Pay and the duration timer pause.
+  - The same pair closing again resumes the call. This is the team's restore, reported by `CordBridge` as `OnCircuitClosed` on the same pair while the cord is still bound to the on-hold call. It is not judged as a new circuit, and the connection fee is not paid again.
+  - The pulled plug going into another jack: the on-hold call ends as DisconnectedEarly, and the new circuit is judged against the call in hand (or refused if none).
+  - The cord going back to the tray: DisconnectedEarly.
+- **Card states:** "On hold" on the card. Stamps "Paid", "Wrong number!" and "Cut off", using only glyphs in the static font atlas (Design 4.3).
+- **Check:** the stale `heldCable` edge case noted in Step 1 no longer matters, or is handled.
+
+**Tests**
+- Hold pauses pay and duration.
+- Restore resumes, without paying the fee again.
+- A pull and re-plug elsewhere ends the call and judges the new circuit.
+- Returning the cord to the tray ends the call.
+- Several calls, with one on hold.
+
+**Playtest script (you)**
+1. Connect a call and let it earn a little.
+2. Pull one of its plugs. The card says "On hold" and its earnings stop.
+3. Click empty space. The plug snaps back and the earnings resume.
+4. Pull a plug again and click the tray. The call is cut off.
+5. Pull a plug and push it into a different jack. The old call is cut off, and the new connection counts as a fresh patch.
+
+**Out of scope:** emergencies, upgrades, saves, sounds.
 
 ---
 

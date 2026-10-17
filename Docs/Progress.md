@@ -5,7 +5,8 @@
 | 1. First call | done | ✅ 2026-10-17 (54 min) | ✅ 72/72 tests, scope clean | ✅ all 9 checks | e6f44e5 |
 | 1b. Fee, book, layout | done | ✅ 2026-10-17 (20 min) | ✅ 91/91 tests, scope clean | ✅ | 60c7a88 |
 | 1c. Money slot in shop header | done | ✅ 2026-10-17 (8 min) | ✅ 91/91 tests | ✅ | 47735c1 |
-| 2. A busy switchboard | not started | | | | |
+| 2a. Queue, callbacks, dev panel | not started | | | | |
+| 2b. Hold and resume | not started | | | | |
 | 3. Phone book and cards | not started | | | | |
 | 4. Emergencies and fines | not started | | | | |
 | 5. Upgrades, shop, goal | not started | | | | |
