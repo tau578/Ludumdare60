@@ -143,6 +143,7 @@ namespace Switchboard.UI
                 handCursor.gameObject.SetActive(handVisible);
                 if (handVisible)
                 {
+                    SwitchboardUISorting.SetLayer(handCursor.gameObject, SwitchboardUISorting.Cursor);
                     RectTransformUtility.ScreenPointToLocalPointInRectangle(area, position, camera, out var local);
                     handCursor.rectTransform.anchoredPosition = local;
                     handCursor.Grabbing = CursorMode == CableCursorMode.Grab;

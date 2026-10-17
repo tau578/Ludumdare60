@@ -28,6 +28,8 @@ namespace Switchboard.UI
         private CableConnection<SocketView> connection;
         private Vector2 pointer;
         private bool pointerInside;
+        private Canvas firstPlugCanvas;
+        private Canvas secondPlugCanvas;
 
         public CablePhase Phase => Connection.Phase;
         public SocketView FirstSocket => Connection.FirstSocket;
@@ -156,6 +158,16 @@ namespace Switchboard.UI
             bool showSecond = secondAttached || (firstAttached && !secondAttached && pointerInside);
             firstPlug.gameObject.SetActive(showFirst);
             secondPlug.gameObject.SetActive(showSecond);
+            if (Application.isPlaying)
+            {
+                if (firstPlugCanvas == null) firstPlugCanvas = SwitchboardUISorting.SetLayer(firstPlug.gameObject, SwitchboardUISorting.Cable);
+                if (secondPlugCanvas == null) secondPlugCanvas = SwitchboardUISorting.SetLayer(secondPlug.gameObject, SwitchboardUISorting.Cable);
+                firstPlugCanvas.sortingOrder = firstAttached ? SwitchboardUISorting.Cable : SwitchboardUISorting.Cursor;
+                secondPlugCanvas.sortingOrder = secondAttached ? SwitchboardUISorting.Cable : SwitchboardUISorting.Cursor;
+                // Attached plugs inherit the cable's position in the main Canvas hierarchy.
+                firstPlugCanvas.overrideSorting = !firstAttached;
+                secondPlugCanvas.overrideSorting = !secondAttached;
+            }
             firstPlug.rectTransform.anchoredPosition = firstAttached ? LocalAnchor(FirstSocket) : pointer;
             secondPlug.rectTransform.anchoredPosition = secondAttached ? LocalAnchor(SecondSocket) : pointer;
 
