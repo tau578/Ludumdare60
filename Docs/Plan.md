@@ -417,7 +417,7 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
   - An on-hold call still holds its caller slot and counts toward the 6-call cap and the busy rule. In the spawner's load formula, count it as neither waiting nor using a free cord? Decide, and document it. Suggested: it uses a cord, and isn't waiting.
   - The card already has a top badge (earnings or "Calling again") and the cord ring. "On hold" can replace the "On the line" bubble text, with the earnings badge frozen.
   - Use `CallEndReason.Cleared` only for the dev panel. The dev panel's "clear calls" must also clear on-hold calls.
-  - **Cosmetic, if cheap:** a ringing card's halo overdraws the rate badge of the card above it. Keep the halo inside the slot band, or draw badges above halos.
+- **Fix (lead, 2026-10-18): the ringing glow covers the price label of the card above.** When several cards ring, a card's amber halo overdraws the rate badge ("9¢ + 5¢/s") of the card above it. Every card's badges must stay fully readable. Either keep the halo inside its slot band, or draw badges above every halo. Check it with a screenshot of a full queue of 6 ringing cards.
 
 **Tests**
 - Hold pauses pay and duration.
@@ -432,6 +432,7 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
 3. Click empty space. The plug snaps back and the earnings resume.
 4. Pull a plug again and click the tray. The call is cut off.
 5. Pull a plug and push it into a different jack. The old call is cut off, and the new connection counts as a fresh patch.
+6. Let the queue fill with ringing cards (dev panel: Call now). Every card's price label stays readable, and no glow covers the card above.
 
 **Out of scope:** emergencies, upgrades, saves, sounds.
 
