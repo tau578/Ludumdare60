@@ -10,6 +10,8 @@ namespace Switchboard.UI
         private readonly Vector2[] points = new Vector2[Segments + 1];
         private Vector2 first, second;
         [SerializeField] private Color insulationColor = new Color32(178, 99, 51, 255);
+        [SerializeField] private float maximumSag = 155f;
+        public float MaximumSag { get => maximumSag; set { maximumSag = Mathf.Max(28, value); SetVerticesDirty(); } }
         public Color InsulationColor { get => insulationColor; set { insulationColor = value; SetVerticesDirty(); } }
 
         public void SetEndpoints(Vector2 a, Vector2 b)
@@ -23,7 +25,7 @@ namespace Switchboard.UI
         protected override void OnPopulateMesh(VertexHelper mesh)
         {
             mesh.Clear();
-            float sag = Mathf.Clamp(Vector2.Distance(first, second) * 0.35f, 28f, 155f);
+            float sag = Mathf.Clamp(Vector2.Distance(first, second) * 0.35f, 28f, maximumSag);
             Vector2 p1 = first + Vector2.down * sag;
             Vector2 p2 = second + Vector2.down * sag;
             for (int i = 0; i <= Segments; i++)

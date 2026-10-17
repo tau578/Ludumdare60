@@ -29,11 +29,11 @@ public class Menu : MonoBehaviour
 
     private void Start()
     {
-        pressStartPanel.SetActive(true);
-        mainMenuPanel.SetActive(false);
+        hasStarted = pressStartPanel == null;
+        if (pressStartPanel != null) pressStartPanel.SetActive(true);
+        mainMenuPanel.SetActive(hasStarted);
         optionsPanel.SetActive(false);
         creditsPanel.SetActive(false);
-        hasStarted = false;
 
         // Initialize toggle and slider values
         if (fullscreenToggle != null)
