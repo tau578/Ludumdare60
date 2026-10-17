@@ -64,7 +64,7 @@ namespace Switchboard.Editor
                 Box("Frame", root, new Vector2(1320, 330), Vector2.zero, new Color32(46, 50, 46, 255));
                 var face = Box("Faceplate", root, new Vector2(1300, 310), Vector2.zero, new Color32(70, 76, 68, 255));
                 face.GetComponent<Image>().raycastTarget = true;
-                Label("Title", root, "ОБЩАЯ ГРОМКОСТЬ", new Vector2(0, 120), 30, new Vector2(650, 45));
+                Label("Title", root, "MASTER", new Vector2(0, 120), 30, new Vector2(650, 45));
                 var fixedSocket = Socket("FixedSocket", root, new Vector2(-530, 8));
                 var choices = new SocketGraphic[5];
                 string[] labels = { "25", "50", "75", "100", "Mute" };

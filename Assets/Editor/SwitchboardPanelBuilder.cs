@@ -152,7 +152,7 @@ namespace Switchboard.Editor
             badge.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
             RectTransform rect = Rect("Text", badge.transform, Vector2.zero, new Vector2(64, 64));
             Text text = rect.gameObject.AddComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.font = AssetDatabase.LoadAssetAtPath<Font>(MenuTypographyBuilder.BodyFontPath);
             text.fontSize = 38;
             text.alignment = TextAnchor.MiddleCenter;
             text.color = new Color32(54, 60, 53, 255);

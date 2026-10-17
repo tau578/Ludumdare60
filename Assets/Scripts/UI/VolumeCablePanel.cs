@@ -13,6 +13,13 @@ namespace Switchboard.UI
         private readonly List<RaycastResult> hits = new List<RaycastResult>();
         private bool originalCursorVisible;
         public VolumeCableSlider[] Rows => rows;
+        public bool OwnsPointerAt(Vector2 position)
+        {
+            if (!isActiveAndEnabled) return false;
+            var canvas = overlay.GetComponentInParent<Canvas>();
+            var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            return AudioVolumeSettings.Patch.HeldCable >= 0 || RectTransformUtility.RectangleContainsScreenPoint((RectTransform)transform, position, camera);
+        }
         public void Configure(VolumeCableSlider[] sliders, HandCursorGraphic cursor, RectTransform graphics)
         {
             rows = sliders; hand = cursor; overlay = graphics;
