@@ -4,6 +4,7 @@
 |---|---|---|---|---|---|
 | 1. First call | done | ✅ 2026-10-17 (54 min) | ✅ 72/72 tests, scope clean | ✅ all 9 checks | e6f44e5 |
 | 1b. Fee, book, layout | playtesting | ✅ 2026-10-17 (20 min) | ✅ 91/91 tests, scope clean | ⏳ | |
+| 1c. Money slot in shop header | playtesting | ✅ 2026-10-17 (8 min) | ✅ 91/91 tests | ⏳ | |
 | 2. A busy switchboard | not started | | | | |
 | 3. Phone book and cards | not started | | | | |
 | 4. Emergencies and fines | not started | | | | |
@@ -295,3 +296,70 @@ Follow-ups:
 - **For Sergei:**
   - `PhoneBook.json` now carries game fields.
   - His `PhoneBookBuilder` points to a missing `Assets/Settings/PhoneBook.json`.
+
+### Step 1c report: 2026-10-17
+Result: done
+
+What changed: the upgrade panel's top now has a 204×96 header plaque. It is empty of buttons and serves as the money counter's slot. The counter fills that plaque, centred, in the same gold bold LiberationSans as before. "$0.00" now shows at 63 pt (it was 40, so about 1.6×). The four "+" buttons sit lower, with tighter spacing. The panel's outer rect is unchanged: 236×860 at (762, 94), so x 1604–1840 and y 204–1064 at 1920×1080. It still clears the board (right edge 1580) and the closed book (top 198).
+
+Panel layout at 1920×1080 (screen px, y up):
+- Header plaque `HeaderSlot`: x 1620–1824, y 952–1048. It sits 8 px inside the faceplate top, in the frame colour (46, 50, 46). A 3 px dark shade line (25, 28, 26) runs along its top, so it reads as recessed. A 2 px highlight (145, 149, 137) runs along its bottom, the same colour as the frame highlight. It has no raycast target.
+- Buttons: 144 px each, 32 px apart (was 48). The first top is at 920, 32 px below the plaque. The last bottom is at 248, 36 px above the faceplate bottom (212).
+
+Money counter:
+- `Hud/MoneyPlate` lost its own dark background, because the plaque is the background now.
+- In the prefab it sits at (762, 460), 204×96, the plaque's reference position.
+- `Amount` auto-sizes from 28 to 64 with margins of 14 px left and right and 8 px top and bottom. "$99,999.99" fits at 31 pt with no overflow (text bounds 178 px of 176 + margins).
+
+Runtime alignment, the same way `CallQueueView` follows the caller slots:
+- `MoneyCounterView` has a new `plate` field and `Bind(wallet, headerSlot)`. Each `LateUpdate`, it reads the slot's world corners (screen px, since both canvases are Screen Space Overlay) and sets the plate's centre and size whenever they change.
+- **Lookup:** `LevelScene.FindShopHeader(level)` searches the Level scene's roots for the object named `UpgradeShopPanel`, then its direct child named `HeaderSlot`. The panel has no component of its own, so this is a name lookup, like `CallerQueuePanel`. If either name is missing, it logs a warning and the counter keeps its fixed prefab position (which still matches at 1920×1080).
+- **Measured in Play Mode:** `MoneyPlate` equals `HeaderSlot` to 0.1 px at four sizes:
+  - 1920×1080
+  - 1366×768 (scale 0.711)
+  - 2560×1440 (scale 1.333)
+  - 2560×1080 (21:9, a 2560-wide canvas): slot x 1940–2144, panel 1924–2160, board right edge 1900, book x 1830–2190 y 12–198.
+
+Files touched (ours):
+- `Assets/Scripts/Game/Views/MoneyCounterView.cs`: `plate` field, `Bind(Wallet, RectTransform)`, `FollowSlot()`.
+- `Assets/Scripts/Game/LevelScene.cs`: `FindShopHeader` plus the two name constants.
+- `Assets/Scripts/Game/GameInstaller.cs`: passes `LevelScene.FindShopHeader(level)` to the counter.
+- `Assets/Prefabs/Game/GameUI.prefab`: the `MoneyPlate` rect, its Image and CanvasRenderer removed, `Amount` size/margins, the `plate` reference.
+- `Docs/Progress.md` (this report).
+
+Team files touched (approved coordinated change, Sergei's panel):
+- `Assets/Prefabs/UI/UpgradeShopPanel.prefab`:
+  - added `HeaderSlot` (with children `HeaderShade` and `HeaderHighlight`) right after `FrameHighlight`
+  - `UpgradeSlots` VerticalLayoutGroup: padding top 0 → 144, spacing 48 → 32, alignment MiddleCenter → UpperCenter
+  - The existing objects' file IDs are unchanged, so `Level.unity`'s instance still resolves.
+- `Assets/Editor/UpgradeShopPanelBuilder.cs`:
+  - new constants `HeaderSize` (204×96), `HeaderY` (366), `SlotsTopPadding` (144) and `SlotSpacing` (32)
+  - `CreatePanelPrefab` builds the plaque and sets the same padding, spacing and alignment
+  - Re-running the builder on a missing prefab gives the same result.
+- `Level.unity`: **not changed.** Its panel instance overrides only the root rect (position 762, 94; size 236×860, the same as the prefab) and the layout-driven button rects (zeros, which the layout group recomputes). Nothing undoes the prefab change. `Game.unity` overrides only the GameUI root and canvas flags, so it wasn't touched either.
+
+Tests: 91/91 EditMode passed. No new tests: this step is layout only, and the alignment is view code.
+
+Console: clean after compiling and after the test run. The Play Mode run logged only MCP tooling lines:
+- the known Metal "memoryless" warnings
+- one "PlayerLoop internal function has been called recursively" error, whose stack trace is entirely inside the MCP `ScreenshotUtility.CaptureCompositedAfterFrame` (a screenshot taken while stepping), not our code
+
+Screenshots (`Temp/Captures/`, taken while stepping):
+- `step-01c-zero.png` (1920×1080): "$0.00" at 63 pt in the plaque, buttons below.
+- `step-01c-large.png` (1920×1080): "$99,999.99" at 31 pt. I set it by calling `Wallet.Earn` through `execute_code` during Play Mode only. No code was added.
+- Extras: `step-01c-qhd.png` (2560×1440) and `step-01c-wide.png` (2560×1080, 21:9). Both show the counter in the plaque.
+
+Other Play Mode checks at 1920×1080, using EventSystem raycasts inside `willRenderCanvases`:
+- Each "+" button centre hits that button first, with no hit from our canvas.
+- The plaque centre hits only Sergei's `Faceplate`, so our counter catches no clicks.
+
+Deviations:
+1. **Runtime alignment rather than fixed position.** A fixed centre-anchored position would line up today, because both canvases use Expand and `WorkArea` is a centred 1920×1080 rect. Following the rect also survives Sergei moving or resizing the panel, and it matches how `CallQueueView` follows the caller slots.
+2. **A second name lookup into Level** (`UpgradeShopPanel/HeaderSlot`). Design §3 lists `CallerQueuePanel` as the only exception to "find by type". Ask Sergei to keep both names.
+3. **Large values shrink.** Auto-size goes from 64 down to 31 pt for "$99,999.99", and to about 28 pt for "$999,999.99". A fixed size that fits five-digit dollars would make "$0.00" small, so auto-size won.
+4. **Wider-aspect test tooling.** To test 21:9, I added a temporary "Step1c temp 21:9" Game view size through `GameViewSizes` reflection. I removed it afterwards and re-selected Full HD (1920×1080). That list is per-user editor state, not project state.
+5. `Level.unity` was not opened on its own this step. The prefab change only adds a raycast-off plaque and moves buttons inside the same panel, so the cord sandbox is unaffected.
+
+Follow-ups:
+- Tell Sergei: his panel now has a `HeaderSlot` plaque that holds our money counter. Keep the names `UpgradeShopPanel` and `HeaderSlot`, and keep the slot free of buttons. The builder constants are at the top of `UpgradeShopPanelBuilder`.
+- Design §4.3 still says the counter sits "above" the shop panel. It now sits in the panel's header slot, so the lead may want to update it (and §3's name-lookup exception).

@@ -14,6 +14,11 @@ namespace Switchboard.Editor
         private const string PanelPath = "Assets/Prefabs/UI/UpgradeShopPanel.prefab";
         private const string ButtonPath = "Assets/Prefabs/UI/UpgradePlaceholderButton.prefab";
         private static readonly Vector2 PanelSize = new Vector2(236, 860);
+        // The header plaque is the money counter's slot (Step 1c); the buttons start below it.
+        private static readonly Vector2 HeaderSize = new Vector2(204, 96);
+        private const float HeaderY = 366;
+        private const int SlotsTopPadding = 144;
+        private const float SlotSpacing = 32;
 
         [MenuItem("Tools/Switchboard/Create Upgrade Shop Panel")]
         public static void CreateUpgradeShopPanel()
@@ -99,10 +104,14 @@ namespace Switchboard.Editor
                 var face = Box("Faceplate", root, PanelSize - new Vector2(16, 16), Vector2.zero, new Color32(70, 76, 68, 255));
                 face.GetComponent<Image>().raycastTarget = true;
                 Box("FrameHighlight", root, new Vector2(228, 3), new Vector2(0, 424), new Color32(145, 149, 137, 255));
+                var header = Box("HeaderSlot", root, HeaderSize, new Vector2(0, HeaderY), new Color32(46, 50, 46, 255));
+                Box("HeaderShade", header, new Vector2(HeaderSize.x, 3), new Vector2(0, HeaderSize.y * .5f - 1.5f), new Color32(25, 28, 26, 255));
+                Box("HeaderHighlight", header, new Vector2(HeaderSize.x, 2), new Vector2(0, 1 - HeaderSize.y * .5f), new Color32(145, 149, 137, 255));
                 var slots = Rect("UpgradeSlots", root, PanelSize);
                 var layout = slots.gameObject.AddComponent<VerticalLayoutGroup>();
-                layout.spacing = 48;
-                layout.childAlignment = TextAnchor.MiddleCenter;
+                layout.padding = new RectOffset(0, 0, SlotsTopPadding, 0);
+                layout.spacing = SlotSpacing;
+                layout.childAlignment = TextAnchor.UpperCenter;
                 layout.childControlWidth = layout.childControlHeight = true;
                 layout.childForceExpandWidth = layout.childForceExpandHeight = false;
                 for (int i = 0; i < 4; i++)

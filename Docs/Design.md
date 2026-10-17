@@ -101,7 +101,9 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 - `SocketView`: `Address` (e.g. `"C4"`), `Row`, `Column`, `PlugAnchor`, `IsOccupied`.
 - The cord input model: click a cord in the tray to pick it up, then click a jack to plug in. Clicking a plugged jack pulls that plug out. If the player pulls one plug of a connected cord and then clicks empty space, the plug snaps back to its jack ("restore", `ReconnectSocket`).
 - Objects in `Level.unity` are found **by component type, never by name**: `CableController`, `SocketView` and `CableInputController`.
-- The one exception is the caller slots, which have no component of their own. They are the children of the `VerticalLayoutGroup` under the object named `CallerQueuePanel`. Ask Sergei to keep that name.
+- Two exceptions are found by name, because they have no component of their own. Ask Sergei to keep these names:
+  - The caller slots: the children of the `VerticalLayoutGroup` under `CallerQueuePanel`.
+  - The money slot: `UpgradeShopPanel/HeaderSlot`, a plaque added in Step 1c with Sergei's panel approved as a coordinated change.
 
 ## 4. Architecture
 
@@ -140,7 +142,7 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 
 ### 4.3 UI layering
 - Our UI lives in `Assets/Prefabs/Game/GameUI.prefab`: a Screen Space Overlay canvas with sorting order 10. Its CanvasScaler matches the team's `SwitchboardCanvas` (Scale With Screen Size, 1920×1080, Expand), so positions line up.
-- **The right-hand column** (right of the board, about x 620–960 in the 1920×1080 reference with the canvas centre at 0) now holds Sergei's upgrade shop panel. Our money counter sits at the top of that column, **above** the shop panel, never overlapping it. Our temporary Directory button and list are removed once Sergei's book is wired in (Step 1b). Anything else of ours (ticket, live calls) must go in free space; check against Sergei's panels before placing it.
+- **The right-hand column** (right of the board, about x 620–960 in the 1920×1080 reference with the canvas centre at 0) now holds Sergei's upgrade shop panel. Our money counter fills the `HeaderSlot` plaque at the top of Sergei's shop panel (Step 1c). It follows the plaque at runtime and auto-sizes from 28 to 64 pt, so "$99,999.99" fits. Our temporary Directory button and list are removed once Sergei's book is wired in (Step 1b). Anything else of ours (ticket, live calls) must go in free space; check against Sergei's panels before placing it.
 - **Text glyphs.** Use only characters that exist in the static LiberationSans SDF atlas. "¢" and "—" are there; "→" is not. A missing glyph makes TextMeshPro write it into the fallback font asset at runtime, which dirties a file under `Assets/TextMesh Pro/`.
 - **Turn off `raycastTarget` on anything that isn't meant to be clicked.** The cord input takes the topmost raycast hit across all canvases, so a stray raycast target over the board or tray blocks cords. Modal overlays (the open book, the shop) block clicks on purpose.
 - Call cards line up with the caller panel's slots by reading the slots' positions at runtime. We never edit the panel prefab.

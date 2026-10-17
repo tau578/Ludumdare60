@@ -10,6 +10,9 @@ namespace Switchboard.Game
     {
         // The caller slots have no component of their own, so they are found under this agreed name.
         private const string CallerPanelName = "CallerQueuePanel";
+        // The shop panel has no component of its own either; the money counter sits in its header plaque.
+        private const string ShopPanelName = "UpgradeShopPanel";
+        private const string ShopHeaderName = "HeaderSlot";
 
         public static List<T> FindAll<T>(Scene scene) where T : Component
         {
@@ -34,6 +37,20 @@ namespace Switchboard.Game
             }
             Debug.LogWarning($"No {CallerPanelName} with a VerticalLayoutGroup was found in {scene.name}.");
             return new RectTransform[0];
+        }
+
+        public static RectTransform FindShopHeader(Scene scene)
+        {
+            if (!scene.IsValid() || !scene.isLoaded) return null;
+            foreach (GameObject root in scene.GetRootGameObjects())
+            {
+                Transform panel = FindByName(root.transform, ShopPanelName);
+                if (panel == null) continue;
+                if (panel.Find(ShopHeaderName) is RectTransform header) return header;
+                break;
+            }
+            Debug.LogWarning($"No {ShopPanelName} with a {ShopHeaderName} was found in {scene.name}.");
+            return null;
         }
 
         private static Transform FindByName(Transform parent, string name)

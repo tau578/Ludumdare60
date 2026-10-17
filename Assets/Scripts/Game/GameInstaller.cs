@@ -50,7 +50,7 @@ namespace Switchboard.Game
             int seed = randomSeed != 0 ? randomSeed : Random.Range(1, int.MaxValue);
             Session = new GameSession(new GameContent(config, people), new SeededRandom(seed), cordBridge);
             cordBridge.Bind(Session.Desk);
-            moneyCounter.Bind(Session.Wallet);
+            moneyCounter.Bind(Session.Wallet, LevelScene.FindShopHeader(level));
             callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, LevelScene.FindCallerSlots(level), PortraitOf);
             loopRunner.Bind(Session);
         }
