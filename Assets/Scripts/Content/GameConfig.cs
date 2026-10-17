@@ -10,12 +10,17 @@ namespace Switchboard.Content
     public sealed class GameConfig : ScriptableObject
     {
         [SerializeField] private long startingCents;
+        [SerializeField, Min(1), Tooltip("Live calls never outnumber the caller panel's slots (D17).")]
+        private int maxWaitingCalls = 6;
+        [SerializeField] private PacingProfile pacing;
         [SerializeField] private CallerTypeDefinition[] callerTypes = new CallerTypeDefinition[0];
         [SerializeField, Tooltip("Assets/Configs/PhoneBook.json, shared with the team's phone book (D31).")]
         private TextAsset peopleFile;
         [SerializeField] private PortraitEntry[] portraits = new PortraitEntry[0];
 
         public long StartingCents => startingCents;
+        public int MaxWaitingCalls => maxWaitingCalls;
+        public IPacingProfile Pacing => pacing != null ? pacing : null;
         public IReadOnlyList<ICallerType> CallerTypes => callerTypes ?? new CallerTypeDefinition[0];
 
         public PeopleCatalog LoadPeople(IEnumerable<string> boardJacks) =>

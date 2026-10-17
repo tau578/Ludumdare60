@@ -23,3 +23,6 @@ MonoBehaviour:
   connectionFeeCents:
     min: 5
     max: 15
+  callbackDelaySeconds:
+    min: 20
+    max: 40

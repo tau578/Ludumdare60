@@ -51,8 +51,15 @@ namespace Switchboard.Game
             Session = new GameSession(new GameContent(config, people), new SeededRandom(seed), cordBridge);
             cordBridge.Bind(Session.Desk);
             moneyCounter.Bind(Session.Wallet, LevelScene.FindShopHeader(level));
-            callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, LevelScene.FindCallerSlots(level), PortraitOf);
+            RectTransform[] callerSlots = LevelScene.FindCallerSlots(level);
+            if (callerSlots.Length < config.MaxWaitingCalls)
+                Debug.LogWarning($"The caller panel has {callerSlots.Length} slots but GameConfig allows {config.MaxWaitingCalls} calls.", config);
+            callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, callerSlots, PortraitOf, cordBridge.ColorOf);
             loopRunner.Bind(Session);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // Added at runtime so no scene or prefab references a type that release builds leave out.
+            gameObject.AddComponent<DevPanel>().Bind(Session, callQueue);
+#endif
         }
 
         private Sprite PortraitOf(IPerson person) => person is PersonRecord record ? config.Portrait(record.Portrait) : null;

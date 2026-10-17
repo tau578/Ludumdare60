@@ -1,38 +1,74 @@
 using System;
+using System.Collections.Generic;
 using Switchboard.Domain;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Switchboard.Game
 {
-    /// <summary>Step 1 queue: one card, laid over the first slot of the team's caller panel (Design 4.3).</summary>
+    /// <summary>
+    /// Every live call has a card over one of the team's caller slots, in arrival order (Design 4.3, 5.4).
+    /// When a card leaves, the cards below it slide up. Ended cards keep their slot while the stamp shows.
+    /// </summary>
     public sealed class CallQueueView : MonoBehaviour
     {
-        [SerializeField] private CallCardView card;
+        [SerializeField, FormerlySerializedAs("card"), Tooltip("The first card; the others are copies made at startup.")]
+        private CallCardView cardTemplate;
         [SerializeField] private RectTransform cardArea;
+        [SerializeField, Min(0), Tooltip("How fast cards slide to a new slot; 0 snaps.")]
+        private float slideSpeed = 14f;
 
+        private readonly List<CallCardView> pool = new List<CallCardView>();
+        private readonly List<CallCardView> shown = new List<CallCardView>();
         private readonly Vector3[] slotCorners = new Vector3[4];
         private CallService calls;
         private OperatorDesk desk;
         private EarningsService earnings;
         private Func<IPerson, Sprite> portraitOf;
+        private Func<CordId, Color> cordColorOf;
         private RectTransform[] slots = new RectTransform[0];
-        private Vector3 alignedMin;
-        private Vector3 alignedMax;
+        private Vector2[] slotCentres = new Vector2[0];
+        private Vector3[] slotMin = new Vector3[0];
+        private Vector3[] slotMax = new Vector3[0];
+        private Vector2 slotSize;
+        private bool showDurations;
+        private bool warnedFull;
+
+        /// <summary>Dev panel: show each call's hidden duration on its card.</summary>
+        public bool ShowDurations
+        {
+            get => showDurations;
+            set
+            {
+                showDurations = value;
+                foreach (CallCardView card in pool) card.ShowDuration = value;
+            }
+        }
 
         public void Bind(CallService callService, OperatorDesk operatorDesk, EarningsService earningsService,
-            RectTransform[] callerSlots, Func<IPerson, Sprite> portraits)
+            RectTransform[] callerSlots, Func<IPerson, Sprite> portraits, Func<CordId, Color> cordColors)
         {
             Unsubscribe();
             calls = callService;
             desk = operatorDesk;
             earnings = earningsService;
             portraitOf = portraits;
+            cordColorOf = cordColors;
             slots = callerSlots ?? new RectTransform[0];
+            slotCentres = new Vector2[slots.Length];
+            slotMin = new Vector3[slots.Length];
+            slotMax = new Vector3[slots.Length];
+            BuildPool(Mathf.Max(1, slots.Length));
             calls.CallAdded += OnCallAdded;
             calls.CallStateChanged += OnCallStateChanged;
             earnings.ConnectionFeePaid += OnConnectionFeePaid;
-            card.Clicked += OnCardClicked;
-            card.Hide();
+            foreach (CallCardView card in pool)
+            {
+                card.Clicked += OnCardClicked;
+                card.Finished += OnCardFinished;
+                card.Hide();
+            }
+            shown.Clear();
         }
 
         private void OnDisable() => Unsubscribe();
@@ -45,40 +81,124 @@ namespace Switchboard.Game
                 calls.CallStateChanged -= OnCallStateChanged;
             }
             if (earnings != null) earnings.ConnectionFeePaid -= OnConnectionFeePaid;
-            if (card != null) card.Clicked -= OnCardClicked;
+            foreach (CallCardView card in pool)
+            {
+                if (card == null) continue;
+                card.Clicked -= OnCardClicked;
+                card.Finished -= OnCardFinished;
+            }
             calls = null;
             earnings = null;
         }
 
-        private void OnCallAdded(CallAddedArgs e) => card.Show(e.Call, portraitOf?.Invoke(e.Call.Request.CallerPerson));
-
-        private void OnCallStateChanged(CallStateChangedArgs e)
+        private void BuildPool(int size)
         {
-            if (e.Call == card.Call) card.Refresh();
+            if (pool.Count == 0) pool.Add(cardTemplate);
+            while (pool.Count < size)
+            {
+                CallCardView copy = Instantiate(cardTemplate, cardTemplate.transform.parent);
+                copy.name = $"{cardTemplate.name} {pool.Count + 1}";
+                pool.Add(copy);
+            }
         }
 
-        private void OnConnectionFeePaid(ConnectionFeePaidArgs e)
+        private void OnCallAdded(CallAddedArgs e)
         {
-            if (e.Call == card.Call) card.ShowConnectionFee(e.Cents);
+            // A stamp still showing gives up its slot to a new call.
+            if (shown.Count >= slots.Length) RemoveOldestEnded();
+            CallCardView card = FreeCard();
+            if (card == null)
+            {
+                if (!warnedFull) Debug.LogWarning("CallQueueView: more live calls than caller slots; check maxWaitingCalls.", this);
+                warnedFull = true;
+                return;
+            }
+            card.ShowDuration = showDurations;
+            card.Show(e.Call, portraitOf?.Invoke(e.Call.Request.CallerPerson), cordColorOf);
+            shown.Add(card);
+            SnapToSlot(card, shown.Count - 1);
         }
 
-        private void OnCardClicked(CallCardView clicked) => desk.TryTake(clicked.Call.Id);
+        private void OnCallStateChanged(CallStateChangedArgs e) => CardOf(e.Call)?.Refresh();
+
+        private void OnConnectionFeePaid(ConnectionFeePaidArgs e) => CardOf(e.Call)?.ShowConnectionFee(e.Cents);
+
+        private void OnCardClicked(CallCardView clicked) => desk?.TryTake(clicked.Call.Id);
+
+        private void OnCardFinished(CallCardView card)
+        {
+            shown.Remove(card);
+            card.Hide();
+        }
+
+        private void RemoveOldestEnded()
+        {
+            for (int i = 0; i < shown.Count; i++)
+            {
+                if (shown[i].Call == null || shown[i].Call.State != CallState.Ended) continue;
+                OnCardFinished(shown[i]);
+                return;
+            }
+        }
+
+        private CallCardView FreeCard()
+        {
+            if (shown.Count >= slots.Length && slots.Length > 0) return null;
+            foreach (CallCardView card in pool)
+                if (card.Call == null) return card;
+            return null;
+        }
+
+        private CallCardView CardOf(Call call)
+        {
+            for (int i = 0; i < shown.Count; i++)
+                if (shown[i].Call == call) return shown[i];
+            return null;
+        }
 
         // The slots are laid out by the team's layout group, possibly a frame late, so keep following them.
         private void LateUpdate()
         {
-            if (slots.Length == 0 || slots[0] == null) return;
-            slots[0].GetWorldCorners(slotCorners);
-            if (slotCorners[0] == alignedMin && slotCorners[2] == alignedMax) return;
-            alignedMin = slotCorners[0];
-            alignedMax = slotCorners[2];
+            if (slots.Length == 0) return;
+            bool moved = MeasureSlots();
+            float blend = slideSpeed > 0 ? 1f - Mathf.Exp(-slideSpeed * Time.unscaledDeltaTime) : 1f;
+            for (int i = 0; i < shown.Count; i++)
+            {
+                var rect = (RectTransform)shown[i].transform;
+                Vector2 target = slotCentres[Mathf.Min(i, slots.Length - 1)];
+                if (moved) rect.sizeDelta = slotSize;
+                Vector2 now = rect.localPosition;
+                rect.localPosition = (now - target).sqrMagnitude < 0.25f ? target : Vector2.Lerp(now, target, blend);
+            }
+        }
 
-            // Both canvases are Screen Space Overlay, so world corners are screen pixels.
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(cardArea, alignedMin, null, out Vector2 min);
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(cardArea, alignedMax, null, out Vector2 max);
-            var cardRect = (RectTransform)card.transform;
-            cardRect.localPosition = (min + max) * 0.5f;
-            cardRect.sizeDelta = max - min;
+        private void SnapToSlot(CallCardView card, int index)
+        {
+            MeasureSlots();
+            var rect = (RectTransform)card.transform;
+            rect.sizeDelta = slotSize;
+            rect.localPosition = slotCentres[Mathf.Min(index, slots.Length - 1)];
+        }
+
+        private bool MeasureSlots()
+        {
+            bool moved = false;
+            for (int i = 0; i < slots.Length; i++)
+            {
+                if (slots[i] == null) continue;
+                slots[i].GetWorldCorners(slotCorners);
+                if (slotCorners[0] == slotMin[i] && slotCorners[2] == slotMax[i]) continue;
+                slotMin[i] = slotCorners[0];
+                slotMax[i] = slotCorners[2];
+                moved = true;
+
+                // Both canvases are Screen Space Overlay, so world corners are screen pixels.
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(cardArea, slotMin[i], null, out Vector2 min);
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(cardArea, slotMax[i], null, out Vector2 max);
+                slotCentres[i] = (min + max) * 0.5f;
+                if (i == 0) slotSize = max - min;
+            }
+            return moved;
         }
     }
 }

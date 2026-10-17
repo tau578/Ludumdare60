@@ -112,5 +112,112 @@ namespace Switchboard.Domain.Tests
             Assert.That(call.State, Is.EqualTo(CallState.Connected));
             Assert.That(board.Returned, Is.Empty);
         }
+
+        [Test]
+        public void FirstPlugPutsTheCallInHandIntoConnectingAndBackWhenTheCordReturns()
+        {
+            Call call = TakeAdaWantsBasil();
+            desk.OnPlugInserted(Cord, TestWorld.A1);
+            Assert.That(call.State, Is.EqualTo(CallState.Connecting));
+            Assert.That(desk.HalfPatched, Is.EqualTo(new[] { Cord }));
+
+            desk.OnCordReturned(Cord);
+            Assert.That(call.State, Is.EqualTo(CallState.Taken));
+            Assert.That(desk.HalfPatched, Is.Empty);
+        }
+
+        [Test]
+        public void TakingACallWhileACordIsHalfPatchedGoesStraightToConnecting()
+        {
+            desk.OnPlugInserted(Cord, TestWorld.A1);
+            Call call = TakeAdaWantsBasil();
+            Assert.That(call.State, Is.EqualTo(CallState.Connecting));
+        }
+
+        [Test]
+        public void SwappingWhileConnectingRingsTheOldCallAgainAndTheNewOneConnects()
+        {
+            Call first = TakeAdaWantsBasil();
+            desk.OnPlugInserted(Cord, TestWorld.A1);
+            Call second = calls.Add(world.AdaWantsBasil());
+
+            Assert.That(desk.TryTake(second.Id), Is.True);
+
+            Assert.That(first.State, Is.EqualTo(CallState.Incoming));
+            Assert.That(second.State, Is.EqualTo(CallState.Connecting));
+            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.B2);
+            Assert.That(second.State, Is.EqualTo(CallState.Connected));
+            Assert.That(first.State, Is.EqualTo(CallState.Incoming));
+        }
+
+        [Test]
+        public void RightPairFromConnectingConnects()
+        {
+            Call call = TakeAdaWantsBasil();
+            desk.OnPlugInserted(Cord, TestWorld.B2);
+            desk.OnCircuitClosed(Cord, TestWorld.B2, TestWorld.A1);
+            Assert.That(call.State, Is.EqualTo(CallState.Connected));
+            Assert.That(desk.HalfPatched, Is.Empty);
+        }
+
+        [Test]
+        public void WrongPairFromConnectingEndsTheCall()
+        {
+            Call call = TakeAdaWantsBasil();
+            desk.OnPlugInserted(Cord, TestWorld.A1);
+            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3);
+            Assert.That(call.EndReason, Is.EqualTo(CallEndReason.WrongConnection));
+            Assert.That(board.Returned, Is.EqualTo(new[] { Cord }));
+        }
+
+        [Test]
+        public void CallInHandStaysConnectingWhileAnotherCordIsStillHalfPatched()
+        {
+            Call call = TakeAdaWantsBasil();
+            desk.OnPlugInserted(Cord, TestWorld.A1);
+            desk.OnPlugInserted(OtherCord, TestWorld.C3);
+            desk.OnCordReturned(OtherCord);
+            Assert.That(call.State, Is.EqualTo(CallState.Connecting));
+        }
+
+        [Test]
+        public void OpeningACircuitWithNoCallLeavesTheCordHalfPatched()
+        {
+            Call call = TakeAdaWantsBasil();
+            desk.OnCircuitOpened(OtherCord, TestWorld.C3, TestWorld.A1);
+            Assert.That(desk.HalfPatched, Is.EqualTo(new[] { OtherCord }));
+            Assert.That(call.State, Is.EqualTo(CallState.Connecting));
+        }
+
+        [Test]
+        public void ReturningHalfPatchedCordsEmptiesTheBoard()
+        {
+            Call call = TakeAdaWantsBasil();
+            desk.OnPlugInserted(Cord, TestWorld.A1);
+            desk.OnPlugInserted(OtherCord, TestWorld.C3);
+
+            desk.ReturnHalfPatchedCords();
+
+            Assert.That(board.Returned, Is.EquivalentTo(new[] { Cord, OtherCord }));
+            Assert.That(desk.HalfPatched, Is.Empty);
+            Assert.That(call.State, Is.EqualTo(CallState.Taken));
+        }
+
+        [Test]
+        public void SeveralCallsHoldTheirOwnCords()
+        {
+            Call first = TakeAdaWantsBasil();
+            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.B2);
+            Call second = calls.Add(new CallRequest(world.AdaCaller, world.Clara, 5, 40));
+            desk.TryTake(second.Id);
+            desk.OnCircuitClosed(OtherCord, TestWorld.C3, TestWorld.A1);
+
+            Assert.That(desk.CallOn(Cord), Is.SameAs(first));
+            Assert.That(desk.CallOn(OtherCord), Is.SameAs(second));
+            calls.Tick(20);
+            Assert.That(first.EndReason, Is.EqualTo(CallEndReason.Finished));
+            Assert.That(second.State, Is.EqualTo(CallState.Connected));
+            Assert.That(board.Returned, Is.EqualTo(new[] { Cord }));
+        }
     }
 }

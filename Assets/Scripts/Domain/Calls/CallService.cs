@@ -14,7 +14,10 @@ namespace Switchboard.Domain
         public event Action<CallStateChangedArgs> CallStateChanged;
         public event Action<CallEndedArgs> CallEnded;
 
+        /// <summary>Every call that hasn't ended, in arrival order.</summary>
         public IReadOnlyList<Call> Live => live;
+
+        /// <summary>The one Taken or Connecting call, if any (D03).</summary>
         public Call InHand { get; private set; }
 
         public Call Find(CallId id)
@@ -22,6 +25,13 @@ namespace Switchboard.Domain
             foreach (Call call in live)
                 if (call.Id == id) return call;
             return null;
+        }
+
+        public bool IsInLiveCall(IPerson person)
+        {
+            for (int i = 0; i < live.Count; i++)
+                if (live[i].Request.Involves(person)) return true;
+            return false;
         }
 
         public Call Add(CallRequest request)
@@ -33,20 +43,42 @@ namespace Switchboard.Domain
             return call;
         }
 
-        // One call in hand at a time; swapping cards comes with the queue in Step 2 (D03).
+        // Taking a card while another is in hand swaps them; the old one rings again with its timers running (D03).
         public bool Take(CallId id)
         {
             Call call = Find(id);
-            if (call == null || call.State != CallState.Incoming || InHand != null) return false;
+            if (call == null || call.State != CallState.Incoming) return false;
+            Call previous = InHand;
+            CallState previousFrom = previous?.State ?? CallState.Incoming;
+            if (previous != null) previous.State = CallState.Incoming;
+            call.State = CallState.Taken;
             InHand = call;
+            if (previous != null) RaiseStateChanged(previous, previousFrom, CallState.Incoming);
+            RaiseStateChanged(call, CallState.Incoming, CallState.Taken);
+            return true;
+        }
+
+        public bool BeginConnecting(CallId id)
+        {
+            Call call = Find(id);
+            if (call == null || call != InHand || call.State != CallState.Taken) return false;
+            ChangeState(call, CallState.Connecting);
+            return true;
+        }
+
+        public bool CancelConnecting(CallId id)
+        {
+            Call call = Find(id);
+            if (call == null || call != InHand || call.State != CallState.Connecting) return false;
             ChangeState(call, CallState.Taken);
             return true;
         }
 
+        // Plug order doesn't matter (D05), so a circuit may close from Taken as well as from Connecting.
         public bool Connect(CallId id)
         {
             Call call = Find(id);
-            if (call == null || call.State != CallState.Taken) return false;
+            if (call == null || (call.State != CallState.Taken && call.State != CallState.Connecting)) return false;
             InHand = null;
             ChangeState(call, CallState.Connected);
             return true;
@@ -88,7 +120,10 @@ namespace Switchboard.Domain
         {
             CallState from = call.State;
             call.State = to;
-            CallStateChanged?.Invoke(new CallStateChangedArgs(call, from, to));
+            RaiseStateChanged(call, from, to);
         }
+
+        private void RaiseStateChanged(Call call, CallState from, CallState to) =>
+            CallStateChanged?.Invoke(new CallStateChangedArgs(call, from, to));
     }
 }

@@ -24,5 +24,11 @@ namespace Switchboard.Domain
         public double ConnectionFeeCents { get; }
         public int Attempt { get; }
         public IPerson CallerPerson => Caller.Person;
+
+        public bool Involves(IPerson person) => CallerPerson.IsSamePerson(person) || Recipient.IsSamePerson(person);
+
+        // A callback is the same request again: same people, rate, fee and duration (Design 5.1).
+        public CallRequest Again() =>
+            new CallRequest(Caller, Recipient, CentsPerSecond, DurationSeconds, ConnectionFeeCents, Attempt + 1);
     }
 }

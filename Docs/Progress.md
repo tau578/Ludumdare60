@@ -5,7 +5,7 @@
 | 1. First call | done | ✅ 2026-10-17 (54 min) | ✅ 72/72 tests, scope clean | ✅ all 9 checks | e6f44e5 |
 | 1b. Fee, book, layout | done | ✅ 2026-10-17 (20 min) | ✅ 91/91 tests, scope clean | ✅ | 60c7a88 |
 | 1c. Money slot in shop header | done | ✅ 2026-10-17 (8 min) | ✅ 91/91 tests | ✅ | 47735c1 |
-| 2a. Queue, callbacks, dev panel | not started | | | | |
+| 2a. Queue, callbacks, dev panel | done | ✅ 2026-10-17 (24 min) | ✅ 156/156 tests, scope clean | ✅ | |
 | 2b. Hold and resume | not started | | | | |
 | 3. Phone book and cards | not started | | | | |
 | 4. Emergencies and fines | not started | | | | |
@@ -367,3 +367,215 @@ Follow-ups:
 
 #### Steps 1b and 1c playtest (lead, 2026-10-17)
 - All checks passed. Both steps are pushed.
+
+### Step 2a report: 2026-10-17
+Result: done
+
+Playable now: Press Play in `Game.unity` (or start from `MainMenu`). The first caller rings after about 2 s. More callers then ring about every 8 s (±30 %), one card per caller slot, never more than 6 live calls; connected calls count too. Click any ringing card to take it. Taking another card swaps them: the old card rings again, and the speech bubble moves to the new one. Plugging the first end of a cord puts the call in hand into Connecting. A wrong patch shows "Wrong number!", and the same caller rings again 20–40 s later with a "Calling again" badge. Several calls can be connected at once. Each connected card shows a ring in its cord's colour, its own earnings ("$0.29") and an "On the line" bubble. F1 or the small "Dev" button in the top-right corner opens the dev panel.
+
+How to test: the Plan's Step 2a playtest script, with these notes:
+1. The dev panel is a narrow column of small buttons at the far right edge, right of the shop panel: Close, + $10, Call now, Speed ×5 (or ×1), Show times (or Hide times), Clear calls. While the panel is closed and time is ×5, the corner button reads "Dev ×5".
+2. "Show times" puts the hidden duration on every card. Waiting cards show the full duration; connected cards count down.
+3. When a card leaves (after its stamp), the cards below it slide up one slot, so the column always stays in arrival order.
+
+Created:
+- **Domain:**
+  - `Callbacks/CallbackScheduler.cs` (plus the `PendingCallback` struct)
+  - `Spawning/BusyTracker.cs`, `Spawning/PacingSettings.cs` (plain defaults: 2 / 8 / 0.3 / 0.5)
+  - `Definitions/IPacingProfile.cs`
+  - `Common/RandomExtensions.cs` (`IRandom.Between`)
+- **Content:** `PacingProfile.cs` (ScriptableObject: `firstCallDelaySeconds` 2, `baseIntervalSeconds` 8, `intervalJitter` 0.3, `loadFactor` 0.5).
+- **Game:** `DevTools/DevPanel.cs`. The whole file is inside `#if UNITY_EDITOR || DEVELOPMENT_BUILD`.
+- **Assets:** `Assets/Content/Pacing/Default.asset`.
+- **Tests:** `CallTransitionTests.cs`, `CallbackSchedulerTests.cs`, `BusyTrackerTests.cs`.
+
+Changed:
+- **Domain:**
+  - `CallService`:
+    - `Take` swaps (D03). The old call goes back to Incoming, and both state changes are raised after both states are set.
+    - New `BeginConnecting` (Taken → Connecting) and `CancelConnecting` (Connecting → Taken).
+    - `Connect` accepts Taken or Connecting.
+    - New `IsInLiveCall(person)`.
+  - `CallRequest`: `Involves(person)` and `Again()` (the same request, attempt + 1).
+  - `CallEndReason.Cleared = 5`.
+  - `ICallerType.CallbackDelaySeconds`; `IGameContent.MaxWaitingCalls` and `Pacing`.
+  - `OperatorDesk`:
+    - tracks half-patched cords from the bridge's reports
+    - keeps the call in hand in Connecting exactly while any cord is half-patched, including straight after a take
+    - new `HalfPatched` list and `ReturnHalfPatchedCords()`
+    - Pulling a plug still cuts the call off, as in Step 1.
+  - `CallSpawner` rewritten (pacing, cap, busy rule, `TrySpawn`, `Load`, `NextInterval`).
+  - `GameSession`:
+    - builds the scheduler, the busy tracker and the spawner
+    - tick order: clock, earnings, calls, callbacks, spawner
+    - new `ClearCalls()`
+    - exposes `Callbacks`, `Busy` and `Spawner`
+- **Content:**
+  - `CallerTypeDefinition.callbackDelaySeconds` (default 20–40).
+  - `GameConfig`: `maxWaitingCalls` (6) and `pacing`.
+  - `GameContent` passes both through.
+- **Game:**
+  - `CordBridge.ColorOf(CordId)` returns `CableController.CableColor`, for presentation only.
+  - `CallQueueView` rewritten. At bind it makes one card per slot by copying the template card. Cards are laid over all 6 slots in arrival order and slide up when a card leaves. `ShowDurations` is a property the dev panel sets.
+  - `CallCardView`:
+    - the bubble shows while the call is Taken, Connecting or Connected
+    - cord ring, callback badge, earnings badge and dev duration badge
+    - a `Finished` event when the stamp ends
+    - Cleared calls leave at once.
+    - Earnings and durations are polled in `LateUpdate`, and their text changes only when the shown number changes.
+  - `GameInstaller`:
+    - passes `cordBridge.ColorOf` to the queue
+    - warns if the panel has fewer slots than `maxWaitingCalls`
+    - adds `DevPanel` at runtime inside the `#if`, so no prefab or scene references a dev-only type
+- **Assets:**
+  - `Regular.asset`: `callbackDelaySeconds` 20–40.
+  - `GameConfig.asset`: `maxWaitingCalls` 6, `pacing` → `Pacing/Default`.
+- **Tests:** `Fakes` (a `Crowd(n)` helper; caller-type callback delay; content cap and pacing; a settable `CordCount`), `CallServiceTests`, `CallSpawnerTests` (rewritten), `OperatorDeskTests`, `EarningsServiceTests`, `GameSessionTests`.
+
+Scene and prefab changes:
+- **`GameUI.prefab`:**
+  - New objects under `Calls/CallCard`, all with `raycastTarget` off:
+    - `CordRing`: a Knob circle behind the portrait, 34 px larger than the card, tinted with the cord colour at runtime.
+    - `CallbackBadge`: "Calling again" in amber.
+    - `EarningsBadge`: gold money text.
+    - `DurationBadge`: centred over the portrait, 84×34, for the dev panel.
+    - The two top badges are 140×30, centred 30 px below the card's top, so they stay inside the card and clear of the rate badge of the card above.
+  - Sibling order: RingingPulse, CordRing, Portrait, RateBadge, CallbackBadge, EarningsBadge, DurationBadge, Stamp, SpeechBubble, FeePopup.
+  - `CallQueueView.card` was renamed to `cardTemplate` (with `FormerlySerializedAs`), and `slideSpeed` 14 was added.
+- **`Game.unity`:** not changed; its overrides don't touch the renamed field.
+- **Team scenes:** `Level.unity` was opened alone for the sandbox check and closed without saving; it was never dirty. `MainMenu.unity` and `SampleScene.unity` were not opened. The test runner did not re-save `SampleScene`. `git status` shows no team file, ProjectSettings, Packages or `PhoneBook.json` change. `runInBackground` is still 0.
+
+Tests: 156/156 EditMode (91 before, 65 new):
+- CallTransitionTests: 28
+  - 25 matrix cases (6 verbs × 5 states, table-driven with `TestCaseSource`), including the refusals
+  - swap from Taken and from Connecting
+  - taking a card leaves connected calls alone
+- CallbackSchedulerTests: 11
+  - the delay and the same request with attempt + 1
+  - the delay rolled within the range
+  - only WrongConnection calls back (4 cases)
+  - waits while every slot is used
+  - waits while a party is on another call (the constructed guard case)
+  - due order, and a blocked callback doesn't hold the others back
+  - callbacks go ahead of spawns
+  - Clear
+- BusyTrackerTests: 6 (busy in Incoming, Taken, Connecting and Connected; free after the end; a pending callback makes both parties busy)
+- CallSpawnerTests: 12 (7 more than Step 1)
+  - the first-call delay and the base interval
+  - jitter bounds
+  - load values and the load factor stretching intervals (20 s, then 30 s for a 10 s base)
+  - the cap (6 and 4) and connected calls counting toward it
+  - no busy person picked over 4,000 ticks
+  - an attempt with nobody free is skipped quietly and retried
+  - pending-callback people are not picked
+  - callers missing from the directory never call
+- OperatorDeskTests: 9 more
+  - first plug → Connecting, and back when the cord returns
+  - taking a call while a cord is half-patched → Connecting
+  - swapping while Connecting
+  - right and wrong pairs from Connecting
+  - stays Connecting while another cord is half-patched
+  - an opened circuit with no call stays half-patched
+  - `ReturnHalfPatchedCords`
+  - several calls each hold their own cord
+- EarningsServiceTests: 1 (three calls at 3, 5 and 7 ¢/s pay together, exactly 340 ¢ in all)
+- GameSessionTests: 3 (the queue piles up to 6 and stops; a wrong number calls back through the session; `ClearCalls` ends everything as Cleared, with no pay, no callbacks, cords returned and half-patched cords returned)
+
+Console: clean. There were no errors or warnings from our code while compiling, in both test runs, or in the Play Mode runs. The only lines were the known MCP noise: the Metal "memoryless" lines from screenshots, and one MCP WebSocket line during a domain reload.
+
+Screenshots (`Temp/Captures/`, taken while paused or stepping):
+- `step-02a.png` (main): three connected calls with red, blue and yellow cord rings, earnings $0.29, $0.25 and $0.24, "On the line" bubbles, the wallet at $0.78 (= 29 + 25 + 24), and two ringing cards below.
+- `step-02a-full-queue.png`: 6 ringing cards; the cap held for about 100 s of game time.
+- `step-02a-callback.png`: a "Calling again" card.
+- `step-02a-dev-panel.png`: the open dev panel and durations on the cards.
+- `step-02a-book-open.png`: the open book over the board, with 6 cards and a names bubble.
+- `step-02a-before.png`: the layout before this step.
+
+Checked in Play Mode with real EventSystem raycasts and `CableInputController.ProcessPointer`, one action per rendered frame, inside `Canvas.willRenderCanvases`, with a temporary `Time.timeScale` reset to 1 afterwards:
+- **Queue:**
+  - Callers rang at about 2, 10 and 19 s, all six with different people (busy rule).
+  - Load rose to 2 and 2.5 as the queue filled.
+  - The queue reached 6 at about 66 s and stayed at 6 until about 162 s.
+  - Cards line up with `CallerSlot_01`…`_06` exactly: x 178–336, y 903–1062 down to 34–193.
+- **Swap:** take card 2, then card 3. Card 2 went back to Incoming with no bubble; card 3 is Taken with the bubble "Ada Moss / wants Norman Tulley".
+- **Connecting:** after the first plug the call in hand went Taken → Connecting, and to Connected on the right second jack.
+- **Wrong patch:** "Wrong number!", a pending callback due 35 s later (inside 20–40). At the due time it rang as a new call (attempt 2) with the same people, rate and fee, showing "Calling again".
+- **Three at once:** three calls on cords 0, 1 and 2, each card in its own cord colour with its own earnings. The wallet always equalled the floor of the three calls' total (33, 65 and 78 ¢ at three checks).
+- **Bubbles:** every bubble sits at x 16–140, inside its own card's vertical band; for example the card at y 903–1062 has its bubble at y 912–1052.
+- **Dev panel actions:**
+  - + $10: 406 → 1406 ¢.
+  - Call now: 4 → 5 calls. It respects the cap and the busy rule, because it is the spawner's `TrySpawn`.
+  - Show times works.
+  - Speed ×5 set `timeScale` 5; leaving Play Mode set it back to 1, through `OnDisable`.
+  - Clear calls: with one call connected and one Connecting on a half-patched real cord, all three cables went back to Ready, the live list and the pending callbacks were empty, the wallet was unchanged, and every card left. The cord controller held no stale cable afterwards.
+- **Layering:** with the book open, raycasts at five points over `OpenBook` (x 1050–1870, y 16–540) all hit `OpenBook`, and every card centre still hits its own portrait. Nothing of ours overlaps the book, so `GameUI` stays at sorting order 10.
+- **`Level.unity` alone:** one scene, no `GameInstaller` and no `DevPanel`; a sandbox patch A1–F6 stays Connected.
+
+Deviations from Design/Plan:
+1. **No `LiveCallsView`** (orchestrator decision 1). Connected calls keep their card in their caller slot. Design 5.4's `LiveCallsView` is superseded.
+2. **`CallEndReason.Cleared = 5`** is new. The dev panel's "clear calls" needed an ending that pays nothing, fines nothing (Step 4) and never calls back; `DisconnectedEarly` would be fined in Step 4. Cleared cards leave at once, without a stamp.
+3. **`CallService.CancelConnecting`** (Connecting → Taken) is a new verb next to Design 5.1's list. `BeginConnecting` and `CancelConnecting` only act on the call in hand.
+4. **Spawner pacing** (decision 6, my formula):
+   - `load = 1 + loadFactor × max(0, waiting − freeCords)`, where waiting is the live calls that aren't Connected, and freeCords is `CordCount` minus the connected calls.
+   - The timer runs at `dt / load`, so the stretch applies live and eases as soon as the player catches up.
+   - Each interval is `base × U(1 − jitter, 1 + jitter)`, at least 0.1 s.
+   - An attempt that finds no room, or no free caller and recipient, is skipped, and the next attempt comes a fresh interval later. Calls never queue up "owed".
+   - `PacingProfile` also holds `firstCallDelaySeconds` (2).
+5. **Slots** (decision 3):
+   - Every live call holds a slot, in arrival order.
+   - When a card leaves after its stamp, the cards below slide up, using an exponential lerp on unscaled time.
+   - If a new call needs a slot while a stamp is still showing, the oldest stamp is cut short and gives up its slot.
+6. **Callbacks:** due callbacks ring in due order. One that is blocked because a party is busy is skipped for now, and later due ones may still ring. Room is the same cap of 6 live calls.
+7. **Fallbacks:** `GameSession` uses 6 calls when `MaxWaitingCalls` ≤ 0, and `PacingSettings.Default` when no profile is set.
+8. **Dev panel is IMGUI**, at the far right edge (x about 1843–1917 at 1920×1080, from the top down to y about 800 px), clear of the board, the tray, the shop buttons and the open book.
+   - IMGUI doesn't block uGUI raycasts. A click on a dev button therefore also reaches the cord input as an "empty space" click, so a held cord would restore or go back to the tray. Nothing clickable of Sergei's is under the column.
+   - "×" is drawn by IMGUI's own font, not TMP.
+9. **Card visuals:**
+   - The connected cord colour is a ring around the portrait. Earnings ("$0.29") and "Calling again" share the top badge position; they never show together, because a callback card in Connected shows earnings.
+   - Every connected card shows an "On the line" bubble (decision 8).
+10. **F1 and the real IMGUI button clicks were not driven by me.** The project uses `editorInputBehaviorInPlayMode = PointersAndKeyboardsRespectGameViewFocus`, so keyboard events queued while the Game view isn't focused go to the editor, not to Play Mode. I opened the panel through its field for the screenshot and ran each button's action through the same call the button makes. The lead's playtest covers the real F1 and clicks.
+
+Follow-ups:
+- **Step 2b (hold):** `OnCircuitOpened` on a bound cord still ends the call. Once it puts the call on hold, decide whether that cord's single plug counts as half-patched for the call in hand; I'd say no, since the cord belongs to the on-hold call. Today the desk only marks a cord half-patched when no call is bound to it.
+- **Ringing halos** (the big amber pulse) of neighbouring ringing cards touch in the 15 px gap between slots, and the top one is clipped by the screen edge, as before. This is cosmetic.
+- **Pool of people:** with 12 people each live call uses two, so pending callbacks (which keep both parties busy) can hold the queue below 6. This is expected under D18; pacing in Step 7 may want more people.
+- **Plan §4 notes:**
+  - `execute_code` compiles with CodeDom (C# 6): no local functions, and `Object` is ambiguous (write `UnityEngine.Object`).
+  - `manage_camera screenshot` adds "-1" to the name when the file exists, instead of overwriting it.
+  - Simulated keyboard input doesn't reach Play Mode unless the Game view has focus (see deviation 10).
+- **Design 5.2** says nothing spawns while the "queue" holds 6 cards. The cap now counts all live calls, connected ones included (decision 3).
+
+#### Step 2a verification (orchestrator, 2026-10-18)
+- **Tests:** an independent EditMode run passed 156/156. The console is clean (0 errors, 0 warnings).
+- **Scope:**
+  - Only our folders changed: Domain, Content, Game, Tests/Domain, Content assets and `GameUI.prefab`.
+  - No team file changed. No scene was re-saved; `Game.unity` is unchanged on disk.
+  - ProjectSettings, Packages and `PhoneBook.json` are untouched.
+- **Code review:**
+  - The tick order is right, and callbacks tick before the spawner, so they ring first.
+  - A swap from Connecting is handled.
+  - The desk keeps the call in hand in sync with half-patched cords.
+  - Events are raised after state changes.
+  - `ClearCalls` pays, fines and calls back nothing.
+  - The dev panel file is wholly inside `#if UNITY_EDITOR || DEVELOPMENT_BUILD`, and `GameInstaller` adds it at runtime.
+  - No LINQ or name lookups in the views.
+- **Screenshots:**
+  - `step-02a.png`: three connected cards with red, blue and yellow rings and their own earnings, which sum to the wallet ($0.78).
+  - `step-02a-full-queue.png`: 6 ringing cards.
+  - `step-02a-callback.png`: a "Calling again" badge.
+  - `step-02a-dev-panel.png`: the panel and the duration badges.
+- **Found in review (cosmetic, for the playtest):** a ringing card's amber halo overdraws the rate badge of the card above it, so "9¢ + 5¢/s" is partly hidden when several cards ring. The agent noted the halos touching; the badge being covered is the visible effect.
+- **Not done by the orchestrator:** a separate Play Mode run, for the same reason as Step 1. The real F1 press and the dev button clicks are left to the lead's playtest (agent deviation 10).
+- **Accepted deviations,** recorded in Design.md:
+  - 1: no `LiveCallsView`.
+  - 2: `Cleared = 5`.
+  - 3: `CancelConnecting`.
+  - 4: the pacing formula.
+  - 5: slots slide up, and stamps are cut short.
+  - 6: a blocked callback is skipped for now.
+  - 8: an IMGUI dev panel.
+  - 9: the cord ring.
+
+#### Step 2a playtest (lead, 2026-10-18)
+- Everything works as expected, including the dev panel. The lead asked to commit and push.
+- **Docs:** Design.md (status, 5.1 `Cleared` and `CancelConnecting`, 5.2 pacing and cap, 5.3 callbacks, 5.4 cards, 6.1 `PacingProfile`) and Plan.md (2b notes, §4 lessons) were updated.

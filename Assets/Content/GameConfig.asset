@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: GameConfig
   m_EditorClassIdentifier: Switchboard.Content::Switchboard.Content.GameConfig
   startingCents: 0
+  maxWaitingCalls: 6
+  pacing: {fileID: 11400000, guid: dd81c1612abd847569593a27c48b3706, type: 2}
   callerTypes:
   - {fileID: 11400000, guid: 4bef3ba27d35f481cb8d2a5c7c95dc32, type: 2}
   peopleFile: {fileID: 4900000, guid: 2b056d57ca6ba034fba544a4e3f87de2, type: 3}

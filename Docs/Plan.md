@@ -100,6 +100,10 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Screenshot | `manage_camera` `screenshot` with `include_image: true` and `output_folder: "Temp/Captures"`. Temp is git-ignored; never save screenshots under `Assets/`. Take screenshots while Play Mode is paused or being stepped: captures during free-running play can come out blank. |
 | Play Mode while Unity is in the background | Run In Background is off, so Play Mode stops advancing whenever Unity isn't the front window. Step 1 learned this. To drive frames:<br>1. From `execute_code`, add a self-removing `EditorApplication.update` callback that calls `EditorApplication.Step()`.<br>2. Optionally set `Time.captureDeltaTime`, for example to 0.05.<br>3. Set it back to 0 afterwards.<br>**Never set `Application.runInBackground` in the editor: it writes PlayerSettings.**<br>`Time.captureDeltaTime` seemed to have no effect while stepping. To speed up long calls, set `Time.timeScale` temporarily and reset it to 1 afterwards.<br>`GameObject.Find` also returns inactive objects, so check `activeInHierarchy`. |
 | Simulate input (cards, buttons, cords) | `execute_code` runs outside the player loop, where `Screen` has the size of an editor view, so raycasts made from it miss.<br>1. Queue a one-shot `Canvas.willRenderCanvases` handler.<br>2. Inside it, run the clicks, using EventSystem raycasts or `CableInputController.ProcessPointer(screenPosition, true)`. The team built that method for integration checks.<br>3. Pass results back through `SessionState`, and remove the handler and its keys afterwards. |
+| `execute_code` quirks (2a) | It compiles with CodeDom (C# 6): no local functions, and `Object` is ambiguous, so write `UnityEngine.Object`. |
+| Keyboard in Play Mode (2a) | The project uses `PointersAndKeyboardsRespectGameViewFocus`, so simulated keys (e.g. F1) don't reach Play Mode unless the Game view has focus. Call the action through the same method the key uses, and leave the real key press to the lead's playtest. |
+| Screenshot names (2a) | `manage_camera screenshot` adds "-1" to the name instead of overwriting an existing file. Delete the old file first if the name matters. |
+| Dev panel (2a) | F1 or the "Dev" button in the top-right corner: + $10, Call now, Speed ×5/×1, Show/Hide times, Clear calls. Editor and development builds only. Its IMGUI clicks also reach the cord input as "empty space" clicks. |
 
 ## 5. Definition of done (every step)
 - [ ] The project compiles. The console has no errors and no new warnings from our code.
@@ -408,6 +412,12 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
   - The cord going back to the tray: DisconnectedEarly.
 - **Card states:** "On hold" on the card. Stamps "Paid", "Wrong number!" and "Cut off", using only glyphs in the static font atlas (Design 4.3).
 - **Check:** the stale `heldCable` edge case noted in Step 1 no longer matters, or is handled.
+- **Notes from 2a:**
+  - `OperatorDesk` now tracks half-patched cords and keeps the call in hand Connecting while any exists. Today it marks a cord half-patched in `OnCircuitOpened` only when no call is bound to it. Keep that: the single plug of an on-hold call's cord does **not** count as half-patched for the call in hand, because the cord belongs to the on-hold call.
+  - An on-hold call still holds its caller slot and counts toward the 6-call cap and the busy rule. In the spawner's load formula, count it as neither waiting nor using a free cord? Decide, and document it. Suggested: it uses a cord, and isn't waiting.
+  - The card already has a top badge (earnings or "Calling again") and the cord ring. "On hold" can replace the "On the line" bubble text, with the earnings badge frozen.
+  - Use `CallEndReason.Cleared` only for the dev panel. The dev panel's "clear calls" must also clear on-hold calls.
+  - **Cosmetic, if cheap:** a ringing card's halo overdraws the rate badge of the card above it. Keep the halo inside the slot band, or draw badges above halos.
 
 **Tests**
 - Hold pauses pay and duration.

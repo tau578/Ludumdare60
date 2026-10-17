@@ -74,14 +74,24 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void OnlyOneCallIsInHandAtATime()
+        public void TakingAnotherCardSwapsTheCallInHand()
         {
+            var changes = new List<(Call call, CallState from, CallState to)>();
             Call first = calls.Add(world.AdaWantsBasil());
             Call second = calls.Add(world.AdaWantsBasil());
             calls.Take(first.Id);
-            Assert.That(calls.Take(second.Id), Is.False);
-            Assert.That(second.State, Is.EqualTo(CallState.Incoming));
-            Assert.That(calls.InHand, Is.SameAs(first));
+            calls.CallStateChanged += e => changes.Add((e.Call, e.From, e.To));
+
+            Assert.That(calls.Take(second.Id), Is.True);
+
+            Assert.That(first.State, Is.EqualTo(CallState.Incoming));
+            Assert.That(second.State, Is.EqualTo(CallState.Taken));
+            Assert.That(calls.InHand, Is.SameAs(second));
+            Assert.That(changes, Is.EqualTo(new[]
+            {
+                (first, CallState.Taken, CallState.Incoming),
+                (second, CallState.Incoming, CallState.Taken)
+            }));
         }
 
         [Test]

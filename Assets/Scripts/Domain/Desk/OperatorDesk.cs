@@ -9,6 +9,8 @@ namespace Switchboard.Domain
         private readonly CallService calls;
         private readonly ConnectionRule rule;
         private readonly ISwitchboard switchboard;
+        private readonly List<CordId> halfPatched = new List<CordId>();
+        private readonly List<CordId> returning = new List<CordId>();
 
         public OperatorDesk(CallService calls, ConnectionRule rule, ISwitchboard switchboard)
         {
@@ -18,7 +20,16 @@ namespace Switchboard.Domain
             calls.CallEnded += OnCallEnded;
         }
 
-        public bool TryTake(CallId id) => calls.Take(id);
+        /// <summary>Cords with exactly one plug in, as reported by the board.</summary>
+        public IReadOnlyList<CordId> HalfPatched => halfPatched;
+
+        // A call taken while a cord is already half-patched goes straight to Connecting (Design 5.1).
+        public bool TryTake(CallId id)
+        {
+            if (!calls.Take(id)) return false;
+            SyncCallInHand();
+            return true;
+        }
 
         public Call CallOn(CordId cord)
         {
@@ -28,10 +39,52 @@ namespace Switchboard.Domain
             return null;
         }
 
-        // Half-patched cords only matter once calls can be Connecting (Step 2).
-        public void OnPlugInserted(CordId cord, JackId jack) { }
+        public void OnPlugInserted(CordId cord, JackId jack)
+        {
+            SetHalfPatched(cord, true);
+            SyncCallInHand();
+        }
 
         public void OnCircuitClosed(CordId cord, JackId a, JackId b)
+        {
+            SetHalfPatched(cord, false);
+            Judge(cord, a, b);
+            SyncCallInHand();
+        }
+
+        // Until hold arrives in Step 2b (D07), a pulled plug cuts the call off and its cord goes back to the tray.
+        public void OnCircuitOpened(CordId cord, JackId stillIn, JackId pulled)
+        {
+            Call call = CallOn(cord);
+            if (call != null)
+            {
+                calls.End(call.Id, CallEndReason.DisconnectedEarly);
+                return;
+            }
+            SetHalfPatched(cord, true);
+            SyncCallInHand();
+        }
+
+        public void OnCordReturned(CordId cord)
+        {
+            SetHalfPatched(cord, false);
+            Call call = CallOn(cord);
+            if (call != null) calls.End(call.Id, CallEndReason.DisconnectedEarly);
+            SyncCallInHand();
+        }
+
+        /// <summary>Sends every half-patched cord back to the tray (the dev panel's "clear calls").</summary>
+        public void ReturnHalfPatchedCords()
+        {
+            returning.Clear();
+            returning.AddRange(halfPatched);
+            halfPatched.Clear();
+            foreach (CordId cord in returning) switchboard.ReturnToTray(cord);
+            returning.Clear();
+            SyncCallInHand();
+        }
+
+        private void Judge(CordId cord, JackId a, JackId b)
         {
             Call call = calls.InHand;
             if (call == null)
@@ -49,15 +102,20 @@ namespace Switchboard.Domain
             switchboard.ReturnToTray(cord);
         }
 
-        // Until hold arrives in Step 2 (D07), any pulled plug cuts the call off.
-        public void OnCircuitOpened(CordId cord, JackId stillIn, JackId pulled) => CutOff(cord);
-
-        public void OnCordReturned(CordId cord) => CutOff(cord);
-
-        private void CutOff(CordId cord)
+        // The call in hand is Connecting exactly while some cord is half-patched.
+        private void SyncCallInHand()
         {
-            Call call = CallOn(cord);
-            if (call != null) calls.End(call.Id, CallEndReason.DisconnectedEarly);
+            Call call = calls.InHand;
+            if (call == null) return;
+            if (halfPatched.Count > 0 && call.State == CallState.Taken) calls.BeginConnecting(call.Id);
+            else if (halfPatched.Count == 0 && call.State == CallState.Connecting) calls.CancelConnecting(call.Id);
+        }
+
+        private void SetHalfPatched(CordId cord, bool value)
+        {
+            int index = halfPatched.IndexOf(cord);
+            if (value && index < 0) halfPatched.Add(cord);
+            else if (!value && index >= 0) halfPatched.RemoveAt(index);
         }
 
         private void OnCallEnded(CallEndedArgs e)

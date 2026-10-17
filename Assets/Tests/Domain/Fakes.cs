@@ -20,11 +20,13 @@ namespace Switchboard.Domain.Tests
 
     internal sealed class FakeCallerType : ICallerType
     {
-        public FakeCallerType(FloatRange centsPerSecond, FloatRange durationSeconds, FloatRange connectionFeeCents = default)
+        public FakeCallerType(FloatRange centsPerSecond, FloatRange durationSeconds, FloatRange connectionFeeCents = default,
+            FloatRange? callbackDelaySeconds = null)
         {
             CentsPerSecond = centsPerSecond;
             DurationSeconds = durationSeconds;
             ConnectionFeeCents = connectionFeeCents;
+            CallbackDelaySeconds = callbackDelaySeconds ?? new FloatRange(20, 40);
         }
 
         public string Id => "type.regular";
@@ -32,6 +34,7 @@ namespace Switchboard.Domain.Tests
         public FloatRange CentsPerSecond { get; }
         public FloatRange ConnectionFeeCents { get; }
         public FloatRange DurationSeconds { get; }
+        public FloatRange CallbackDelaySeconds { get; }
     }
 
     internal sealed class FakeCaller : ICaller
@@ -69,6 +72,8 @@ namespace Switchboard.Domain.Tests
     internal sealed class FakeContent : IGameContent
     {
         public long StartingCents { get; set; }
+        public int MaxWaitingCalls { get; set; } = 6;
+        public IPacingProfile Pacing { get; set; } = PacingSettings.Default;
         public IReadOnlyList<ICallerType> CallerTypes { get; set; } = Array.Empty<ICallerType>();
         public IReadOnlyList<IPerson> People { get; set; } = Array.Empty<IPerson>();
         public IReadOnlyList<ICaller> Callers { get; set; } = Array.Empty<ICaller>();
@@ -79,7 +84,7 @@ namespace Switchboard.Domain.Tests
     {
         public List<CordId> Returned { get; } = new List<CordId>();
         public List<CordId> Refused { get; } = new List<CordId>();
-        public int CordCount => 3;
+        public int CordCount { get; set; } = 3;
 
         public void ReturnToTray(CordId cord) => Returned.Add(cord);
         public void Refuse(CordId cord) => Refused.Add(cord);
@@ -125,5 +130,36 @@ namespace Switchboard.Domain.Tests
 
         public CallRequest AdaWantsBasil(double centsPerSecond = 5, double durationSeconds = 20, double connectionFeeCents = 0) =>
             new CallRequest(AdaCaller, Basil, centsPerSecond, durationSeconds, connectionFeeCents);
+    }
+
+    /// <summary>Any number of regular callers: Person N1 on jack J1, Person N2 on J2, and so on.</summary>
+    internal sealed class Crowd
+    {
+        public Crowd(int count, FloatRange? callbackDelaySeconds = null)
+        {
+            Regular = new FakeCallerType(new FloatRange(3, 8), new FloatRange(15, 30), new FloatRange(5, 15), callbackDelaySeconds);
+            var people = new IPerson[count];
+            var callers = new ICaller[count];
+            var entries = new IDirectoryEntry[count];
+            for (int i = 0; i < count; i++)
+            {
+                people[i] = new FakePerson("Person", "N" + (i + 1));
+                callers[i] = new FakeCaller(people[i], Regular);
+                entries[i] = new FakeDirectoryEntry(people[i], "J" + (i + 1));
+            }
+            People = people;
+            Callers = callers;
+            Directory = new PhoneDirectory(entries);
+            Content = new FakeContent { CallerTypes = new ICallerType[] { Regular }, People = people, Callers = callers, Directory = entries };
+        }
+
+        public FakeCallerType Regular { get; }
+        public IReadOnlyList<IPerson> People { get; }
+        public IReadOnlyList<ICaller> Callers { get; }
+        public PhoneDirectory Directory { get; }
+        public FakeContent Content { get; }
+
+        public CallRequest Request(int caller, int recipient, double centsPerSecond = 5, double durationSeconds = 20) =>
+            new CallRequest(Callers[caller], People[recipient], centsPerSecond, durationSeconds);
     }
 }

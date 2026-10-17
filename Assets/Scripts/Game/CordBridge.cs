@@ -48,6 +48,13 @@ namespace Switchboard.Game
             ReturnToTray(cord);
         }
 
+        // Presentation only: the domain never sees colours.
+        public Color ColorOf(CordId cord)
+        {
+            CableController cable = CableAt(cord);
+            return cable != null ? cable.CableColor : Color.white;
+        }
+
         private CableController CableAt(CordId cord) =>
             cord.Index >= 0 && cord.Index < cables.Length ? cables[cord.Index] : null;
 

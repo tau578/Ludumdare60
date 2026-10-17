@@ -15,7 +15,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), team coordination (§8) and the step briefs (§9).
 3. `Docs/Design.md`: the source of truth for game rules, architecture, ownership and decisions D01–D33. If the code or a brief disagrees with it, stop and ask; don't improvise.
 
-**Next step:** see the first "not started" row in `Docs/Progress.md`. As of 2026-10-17 that is **Step 2a: queue, callbacks and dev panel**, followed by 2b: hold and resume.
+**Next step:** see the first "not started" row in `Docs/Progress.md`. As of 2026-10-18 that is **Step 2b: hold and resume**, followed by Step 3.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).

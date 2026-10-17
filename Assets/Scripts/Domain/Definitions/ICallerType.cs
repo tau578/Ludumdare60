@@ -7,5 +7,6 @@ namespace Switchboard.Domain
         FloatRange CentsPerSecond { get; }
         FloatRange ConnectionFeeCents { get; }
         FloatRange DurationSeconds { get; }
+        FloatRange CallbackDelaySeconds { get; }
     }
 }

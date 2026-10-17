@@ -12,11 +12,14 @@ namespace Switchboard.Content
         [SerializeField] private FloatRange durationSeconds = new FloatRange(15, 30);
         [SerializeField, Tooltip("Paid once when a call connects correctly (D32).")]
         private FloatRange connectionFeeCents = new FloatRange(5, 15);
+        [SerializeField, Tooltip("Seconds until a wrongly connected caller rings again.")]
+        private FloatRange callbackDelaySeconds = new FloatRange(20, 40);
 
         public string Id => id;
         public string DisplayName => displayName;
         public FloatRange CentsPerSecond => centsPerSecond;
         public FloatRange ConnectionFeeCents => connectionFeeCents;
         public FloatRange DurationSeconds => durationSeconds;
+        public FloatRange CallbackDelaySeconds => callbackDelaySeconds;
     }
 }

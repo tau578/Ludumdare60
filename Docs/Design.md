@@ -10,6 +10,7 @@ Last updated 2026-10-17 · Plan: [Plan.md](Plan.md) · Progress: [Progress.md](P
 |---|---|---|
 | 1 | Done (`e6f44e5`) | One call at a time, through Incoming → Taken → Connected → Ended. See below. |
 | 1b + 1c | Done (`60c7a88`, `47735c1`) | Connection fee (D32); one people file `PhoneBook.json`, read by Sergei's book and by us (D31); the money counter in the header strip of Sergei's shop panel; a speech bubble left of the caller card; a "+N¢" popup; the temporary Directory list removed. `GameConfig` references the JSON; a plain `GameContent` class implements `IGameContent`. |
+| 2a | Done (2026-10-18) | Up to 6 live calls, one card per caller slot. Taking a card swaps (D03). Connecting while a cord is half-patched. `BusyTracker` (D18), `CallbackScheduler` with "Calling again" cards, and a `PacingProfile`-driven spawner. Connected cards stay in their slot with a cord-colour ring and their own earnings. A dev panel (F1). Pulling a plug still cuts the call off until 2b. |
 
 What Step 1 built:
 - **Operator desk.** A right pair connects the call. A wrong pair ends it as "Wrong number!". Patching with no call in hand is refused. Pulling a plug cuts the call off (temporary until D07 in Step 2).
@@ -196,10 +197,13 @@ The step that introduces each part is shown in brackets.
   - `CallState`, `CallEndReason`, `CallService`.
 - **`CallService`** owns the live calls in arrival order, the one call in hand, and the timers. It knows nothing about cords, money or UI.
 - **Events:** `CallAdded`, `CallStateChanged(call, from, to)`, `CallEnded(call, reason)`.
-- **Implementation:** an enum plus guarded methods (`Take`, `BeginConnecting`, `Connect`, `Hold`, `Resume`, `End(reason)`). Illegal transitions return `false`, and a table-driven test covers the whole matrix.
+- **Implementation:** an enum plus guarded methods (`Take`, `BeginConnecting`, `CancelConnecting`, `Connect`, `Hold`, `Resume`, `End(reason)`). Illegal transitions return `false`, and a table-driven test covers the whole matrix.
+  - `BeginConnecting` and `CancelConnecting` act only on the call in hand.
+  - `OperatorDesk` drives them from the half-patched cords it tracks: the call in hand is Connecting exactly while some cord has one plug in.
 - **Enums:**
   - `CallState { Incoming = 0, Taken = 1, Connecting = 2, Connected = 3, OnHold = 4, Ended = 5 }`
-  - `CallEndReason { None = 0, Finished = 1, WrongConnection = 2, DisconnectedEarly = 3, Missed = 4 }`
+  - `CallEndReason { None = 0, Finished = 1, WrongConnection = 2, DisconnectedEarly = 3, Missed = 4, Cleared = 5 }`
+  - `Cleared` is used only by the dev panel's "clear calls". It pays nothing, fines nothing and never calls back, and the card leaves without a stamp.
 - A scheduled callback is **not** a state of the old call. The scheduler keeps the request and later creates a new `Call` with a new id and attempt + 1.
 
 ```
@@ -259,12 +263,20 @@ In the diagram, HungUp means `Ended` with reason `WrongConnection`, and Finished
   - `BusyTracker`
   - `PacingProfile` (content)
   - `IRandom`, seeded so runs are reproducible
-- **When.** `next = now + interval(progress) × load × jitter`, where `load` rises with waiting cards per free cord. Nothing spawns while the queue holds `maxWaitingCalls` cards (D17). Step 1 is simpler: a new call appears about 2 s after the previous one ends, with one call at a time.
+- **When** (built in 2a):
+  - Each interval is `base × U(1 − jitter, 1 + jitter)`, at least 0.1 s. The first call comes after `firstCallDelaySeconds`.
+  - The countdown runs at `dt / load`, where `load = 1 + loadFactor × max(0, waiting − freeCords)`:
+    - waiting = live calls that aren't Connected
+    - freeCords = cord count − connected calls
+    - So the stretch applies live and eases as soon as the player catches up.
+  - An attempt with no room, or with no free caller and recipient, is skipped. The next one comes a fresh interval later, and skipped calls are never made up.
+  - **Cap (D17):** nothing spawns while `maxWaitingCalls` (6) calls are live. Every live call counts, connected ones included, because each one holds a caller slot.
+  - Step 7 makes `base` depend on progress.
 - **Which type.** A weighted pick at the current progress, respecting each type's `maxSimultaneous`.
 - **Who.**
   - The caller is a weighted pick among callers on unlocked lines who aren't busy.
   - The recipient comes from the type's recipient rule: any subscriber, or people with a tag. They must be unlocked, not busy, and not the caller.
-- **Busy (D18).** Anyone in a waiting, in-hand, connected or on-hold call, or with a pending callback, can't be picked.
+- **Busy (D18).** Anyone in a waiting, in-hand, connected or on-hold call can't be picked. Both the caller and the recipient of a pending callback can't be picked either.
 - **Progress** = lifetime earnings ÷ the goal's price (D19). `PacingProfile` curves turn it into the spawn interval and the type weights.
 - **Opening calls.** The first few calls of a new game are scripted and double as the tutorial [7].
 - **Idle guard (D16).** After 60 s without player input, types that carry fines stop spawning [4].
@@ -275,18 +287,23 @@ In the diagram, HungUp means `Ended` with reason `WrongConnection`, and Finished
 - `Missed` and `DisconnectedEarly` schedule one only if the type's flags say so (D10).
 - The delay is rolled from the type's callback delay range.
 
-Due callbacks enter the queue in due order when there's room; otherwise they wait. They go ahead of new spawns. A plain list is enough.
+Due callbacks enter the queue in due order when there's room; otherwise they wait. They go ahead of new spawns, because the scheduler ticks before the spawner. A plain list is enough.
+- A callback keeps the original request: the same caller, recipient, rate, fee and duration, with attempt + 1. Its card shows a "Calling again" badge.
+- A due callback whose party is in a live call is skipped for now, and later due callbacks may still ring.
+- With 12 people, pending callbacks can hold the queue below 6. This is expected under D18.
 
 ### 5.4 Call cards [1 minimal, 2 queue, 3 full]
 - A card is a view of one `Call`. There is no separate card model.
 - **Classes** (Game layer):
-  - `CallQueueView`: waiting cards plus the one in hand, in arrival order, laid over the caller panel's slots.
-  - `LiveCallsView`: connected and on-hold calls.
+  - `CallQueueView`: one card per live call (waiting, in hand, connected), in arrival order, laid over the caller panel's 6 slots.
+    - When a card leaves after its stamp, the cards below slide up.
+    - If a new call needs a slot while a stamp is still showing, the oldest stamp is cut short.
+  - ~~`LiveCallsView`~~: superseded in 2a. The right-hand column is Sergei's shop, so connected calls keep their card in their slot.
   - `CallCardView`: pooled.
 - **What the card shows in each state:**
   - Waiting: portrait, type badge, rate (e.g. "5¢/s"), and a countdown ring for types with a response time.
   - In hand: also the caller's name and the name of the person they want. From Step 1b they appear in a speech bubble next to the caller's portrait in the left column: "Ada Moss" / "wants Basil Thorne", and "On the line" once connected. This replaces the Step 1 ticket in the right column.
-  - Connected: the cord's colour and the cents earned so far.
+  - Connected: the cord's colour (a ring around the portrait, read through `CordBridge.ColorOf`), the cents earned so far (a top badge), and an "On the line" bubble. Waiting cards show no bubble.
   - On hold: an "on hold" label.
   - Ended: a stamp, such as "Paid $1.20", "Wrong number!", "Cut off" or "Missed −$5".
 
@@ -421,7 +438,7 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
 | `CallerDefinition` | `id`, `person`, `type`, `weight`, optional `centsPerSecondOverride` [1]; optional favourite recipients [7] | The "caller config". This is how some callers become worth much more. |
 | ~~`PersonDefinition`~~, ~~`CallerDefinition`~~, ~~`PhoneDirectoryDefinition`~~ | Replaced in Step 1b by `Assets/Configs/PhoneBook.json` (D31). | Loaded and validated at startup. Errors are logged clearly, and a test runs the same check. |
 | `PhoneDirectoryDefinition` | entries `{ person, jackLabel }` | Jack labels are the `SocketView.Address` values, A1–F6. |
-| `PacingProfile` | base interval, jitter, load factor [2]; curves by progress, opening calls, idle timeout [7] | |
+| `PacingProfile` | base interval, jitter, load factor, first-call delay [2]; curves by progress, opening calls, idle timeout [7] | `Assets/Content/Pacing/Default.asset`: 2 s first call, 8 s base, ±30 % jitter, load factor 0.5. Referenced by `GameConfig`. |
 | `BoardLayoutDefinition` | sections: which jack labels each unlocks [7] | |
 | `UpgradeDefinition` | as described in 5.9 [5] | Extra Cord and Earnings Multiplier [5], Bigger Board [7], Mystery [5]. |
 | `UpgradeEffect` subclasses | depend on the effect [5] | `MysteryPlaceholderEffect` for now. |
