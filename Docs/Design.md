@@ -36,7 +36,7 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 
 ### Rules
 - **Cards.** Several can wait at once. They can't be skipped or dismissed. Regular calls wait as long as needed. Regular callers only hang up after a wrong connection.
-- **Earnings** = seconds connected × caller's rate per second × earnings multiplier.
+- **Earnings** = (one-off connection fee + seconds connected × caller's rate per second) × earnings multiplier (D32).
   - The multiplier starts at 1.
   - Several calls pay at the same time.
   - No money is lost to rounding.
@@ -89,6 +89,7 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 | Cord and board code:<br>`Assets/Scripts/UI/`, `Assets/Scripts/Cables/`, `Assets/Editor/`, `Assets/Tests/Editor/` | Sergei | **Read-only.** Use only the public members listed below. Any change is a coordinated change, agreed with the project lead first. |
 | `Assets/Scenes/Level.unity` and the existing prefabs in `Assets/Prefabs/` and `Assets/Prefabs/UI/` | Sergei | **Read-only.** Our systems load `Level.unity` additively (see 4.2). |
 | `Assets/Sprites/`, `Assets/Audio/` | Mia (art) and Sergei | **Read-only.** Our assets may reference these files. |
+| Sergei's UI components (built after Step 1): phone book (`PhoneBookView`, `Configs/PhoneBook.json`), upgrade shop panel, `MainMenu.unity` and `Assets/Tools/rodrigo_menu_tools`, volume panel | Sergei | **Read-only.** We wire them to our rules (D30). A hook we need in his code is a coordinated change. |
 | Everything listed in section 4 as ours | The project lead, through agents | Agents create and change these files. |
 
 **Public members we rely on.** If any of these change, `CordBridge` breaks, so tell the team before relying on more.
@@ -138,7 +139,7 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 
 ### 4.3 UI layering
 - Our UI lives in `Assets/Prefabs/Game/GameUI.prefab`: a Screen Space Overlay canvas with sorting order 10. Its CanvasScaler matches the team's `SwitchboardCanvas` (Scale With Screen Size, 1920×1080, Expand), so positions line up.
-- **The right-hand column is our HUD column** (built in Step 1): the free strip right of the board, about x 620–960 in the 1920×1080 reference with the canvas centre at 0. It holds the money counter, the ticket and the Directory button, and it is where later HUD pieces go: live calls (Step 2) and the shop tab (Step 5).
+- **The right-hand column** (right of the board, about x 620–960 in the 1920×1080 reference with the canvas centre at 0) now holds Sergei's upgrade shop panel. Our money counter sits at the top of that column, **above** the shop panel, never overlapping it. Our temporary Directory button and list are removed once Sergei's book is wired in (Step 1b). Anything else of ours (ticket, live calls) must go in free space; check against Sergei's panels before placing it.
 - **Text glyphs.** Use only characters that exist in the static LiberationSans SDF atlas. "¢" and "—" are there; "→" is not. A missing glyph makes TextMeshPro write it into the fallback font asset at runtime, which dirties a file under `Assets/TextMesh Pro/`.
 - **Turn off `raycastTarget` on anything that isn't meant to be clicked.** The cord input takes the topmost raycast hit across all canvases, so a stray raycast target over the board or tray blocks cords. Modal overlays (the open book, the shop) block clicks on purpose.
 - Call cards line up with the caller panel's slots by reading the slots' positions at runtime. We never edit the panel prefab.
@@ -529,6 +530,10 @@ Statuses:
 | D26 | Hosting target (itch.io, own site, …). It affects storage and compression settings. | open | 6 |
 | D27 | Currency, number scale, and target time to the mystery upgrade. Placeholder numbers until then. | open | 10 |
 | D28 | Touch input in the cord code (`Pointer.current`). This is the cord owner's change. | coordinate | 6 |
+| D30 | Division of work: Sergei builds the UI components (phone book, shop panel, main menu, visuals); our agents build the rules and data, and wire his components to them. Steps 3, 5 and 6 become wiring steps. | decided (lead, 2026-10-17) | 1b |
+| D31 | One phone directory. Our people data (`PhoneDirectoryDefinition` + `PersonDefinition`) is the single source. Sergei's book only displays names and jack labels from it. Portraits appear on the call card in the left caller column, not in the book. Names are in English. | decided (lead, 2026-10-17) | 1b |
+| D32 | Connection fee. On a correct connection the caller pays a one-off fee, then the per-second rate. The fee comes from a range on the caller type, with an optional per-caller override (the same simple config as the rate; no tiers). It is paid once per call: not on a wrong connection, not again after hold and resume. The multiplier applies: earnings = (fee + seconds × rate) × multiplier. The card shows both, e.g. "10¢ + 5¢/s". The "Paid" stamp includes the fee, and "+10¢" pops up on connection. | decided (lead, 2026-10-17) | 1b |
+| D33 | Scene flow: `MainMenu` → `Game` → `Level` (build indices 0, 1, 2). Sergei's menu loads the next build index, which is `Game`; `Game` loads `Level` additively. | decided (merge, 2026-10-17) | 1b |
 | D29 | Merge into one scene. The `Game.unity` + `Level.unity` split is temporary; it keeps Sergei's actively edited scene conflict-free. Once his cord work settles, and with his agreement, move the `Game` object and the `GameUI` prefab into one scene, then remove `Game.unity` and the additive loading. Do it at the latest before the first Web build. | decided (lead, 2026-10-17) | 6 |
 
 ## 11. Glossary

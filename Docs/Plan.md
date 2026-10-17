@@ -150,6 +150,7 @@ Follow-ups: <ideas, debts, questions>
 | # | Step | Playable result |
 |---|---|---|
 | 1 | First call: take it, patch it, get paid | One call at a time, end to end, with live money |
+| 1b | Connection fee, Sergei's book, layout | Fee on connect; the real phone book shows our people; no overlaps |
 | 2 | A busy switchboard | Several callers, callbacks, hold and disconnect, a dev panel |
 | 3 | The phone book and real cards | Look people up in the book with tabs; readable cards in every state |
 | 4 | Emergencies and fines | Timed emergency calls and fair fines |
@@ -262,6 +263,59 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
 
 ---
 
+### Step 1b: Connection fee, Sergei's book, layout fixes
+
+**Goal.** Add the connection fee (D32), show our directory in Sergei's phone book (D30, D31), and fix the overlaps found in the Step 1 playtest.
+
+**Playable result.**
+- A ringing card shows "10¢ + 5¢/s".
+- Connecting it correctly adds the fee at once, with a "+10¢" popup, then money rises per second. The "Paid" stamp includes the fee.
+- Sergei's phone book lists our 12 people with their jacks, in English. Our temporary Directory button and list are gone.
+- The money counter sits above Sergei's upgrade panel, and nothing of ours overlaps his UI.
+
+**Before launch.** The book hook described below must be agreed with Sergei. **Recommended effort:** high.
+
+**Build**
+1. **Fee: domain and content.**
+   - `CallerTypeDefinition` gets `connectionFeeCents` (a `FloatRange`, default 5–15). `CallerDefinition` gets an optional `connectionFeeCentsOverride` (0 = use the type).
+   - `CallFactory` rolls the fee like the rate. `CallRequest` gets `ConnectionFeeCents`.
+   - The fee is paid once, in the wallet, at the moment `OperatorDesk` connects the call correctly. It is multiplied by the earnings multiplier (still the constant 1). `Call.CentsEarned` includes it.
+   - Wrong connections pay nothing. Paying must not depend on the tick order.
+   - `MoneyFormat` gets a format for the card: `10¢ + 5¢/s`.
+2. **Fee: UI.**
+   - The card's rate badge shows fee plus rate.
+   - A "+10¢" popup on connection: simple, pooled or reused, fading over about 1 s, near the money counter or the card.
+3. **Sergei's book shows our directory** (coordinated change):
+   - Add one public method to `Assets/Scripts/UI/PhoneBookView.cs`, e.g. `public void SetContacts(PhoneBookContact[] contacts)`. It replaces `directory.contacts`, keeps `contactsPerPage`, resets to spread 0 and refreshes the pages. That's about 5 lines, and nothing else in his files changes.
+   - `GameInstaller` finds the `PhoneBookView` in `Level` by type, builds `PhoneBookContact { name = "Ada Moss", socket = "C3" }` entries from `PhoneDirectory.ListedEntries` (sorted by surname, as now), and calls `SetContacts`.
+   - Leave `Configs/PhoneBook.json` untouched. Our data simply replaces it at runtime.
+4. **Layout.**
+   - Remove our `DirectoryListView`, the Directory button and the D-key toggle, from both the prefab and the code.
+   - Move the money counter to the top of the right-hand column, above Sergei's `UpgradeShopPanel`, with no overlap.
+   - Move the ticket to free space that doesn't overlap the shop panel, the book or the board. Report where.
+   - Check by taking a screenshot of the merged scene with the book both closed and open.
+5. **Docs and plan notes from Step 1:** `GameInstaller` logs an error if `Level` fails to load.
+
+**Tests**
+- Fee within its range, and the override wins.
+- Fee paid exactly once on a correct connection.
+- No fee on a wrong connection.
+- Multiplier applied to the fee.
+- A finished call earns fee + duration × rate.
+- Card text format.
+
+**Playtest script (you)**
+1. Start from `MainMenu`: Play, then Start. You land in the game, and the board, cords and book appear.
+2. A ringing card shows a fee and a rate, e.g. "10¢ + 5¢/s".
+3. Take it and open Sergei's book. It lists our English names with jacks, and both names from the ticket are in it.
+4. Patch correctly. Money jumps by the fee with a "+10¢" popup, then rises per second. The stamp at the end includes the fee.
+5. A wrong patch adds no money.
+6. Nothing of ours overlaps the upgrade panel or the book. The money counter sits above the upgrade panel.
+
+**Out of scope:** everything in Step 2.
+
+---
+
 ### Step 2: A busy switchboard
 
 **Goal.** All the rules for regular calls, with several callers at once.
@@ -334,7 +388,7 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
 
 ---
 
-### Step 3: The phone book and real cards (outline)
+### Step 3: Real cards (outline). The book itself was wired in Step 1b; this step polishes it with Sergei.
 - **Book:** `DirectoryBookView` (Design §5.7). The book on the desk opens an overlay with:
   - pages
   - A–Z tabs
@@ -370,7 +424,7 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
   - Emergencies feel urgent but fair.
   - Leaving the game idle for 2 minutes doesn't drain your money.
 
-### Step 5: Upgrades, shop and the mystery goal (outline)
+### Step 5: Upgrades, shop and the mystery goal (outline). Wire Sergei's `UpgradeShopPanel` to our `UpgradeService` instead of building our own `ShopView` (D30).
 - **Stats and upgrades:**
   - `StatSheet`, `UpgradeService`, `UpgradeDefinition`, `StatModifier` and `UpgradeEffect` (Design §5.9).
   - Assets: Extra Cord, Earnings Multiplier, and Mystery (`isGoal`, with `MysteryPlaceholderEffect`).
@@ -392,7 +446,7 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
   - Watch the savings bar fill.
   - Buy the mystery and see "to be continued".
 
-### Step 6: Saves, Boot scene, first Web build (outline)
+### Step 6: Saves and first Web build (outline). Sergei's `MainMenu` is the start screen: it replaces our planned `Boot.unity` and doubles as the tap-to-start audio unlock (D30, D33).
 - **Saving:**
   - `SaveData` with a version number and migrations; `SaveService`.
   - `PlayerPrefsStorage` and `BrowserStorage` (a `.jslib` writing `localStorage`, plus a backup key).

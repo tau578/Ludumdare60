@@ -2,7 +2,8 @@
 
 | Step | Status | Built | Verified | Playtested | Commit |
 |---|---|---|---|---|---|
-| 1. First call | done | ✅ 2026-10-17 (54 min) | ✅ 72/72 tests, scope clean | ✅ all 9 checks | see git log |
+| 1. First call | done | ✅ 2026-10-17 (54 min) | ✅ 72/72 tests, scope clean | ✅ all 9 checks | e6f44e5 |
+| 1b. Fee, book, layout | not started | | | | |
 | 2. A busy switchboard | not started | | | | |
 | 3. Phone book and cards | not started | | | | |
 | 4. Emergencies and fines | not started | | | | |
@@ -151,3 +152,23 @@ Follow-ups:
 #### Step 1 playtest (lead, 2026-10-17)
 - All 9 checks passed.
 - **New request: a connection fee.** On a correct connection, the caller pays a fixed amount once, then the per-second rate. This is not in the original spec. It is planned as Step 1b, before Step 2.
+
+#### After Step 1 (orchestrator, 2026-10-17)
+- **Commit:** Step 1 committed as `e6f44e5`, then merged with 9 teammate commits (`8af640d`, no conflicts).
+- **TextMeshPro:** Sergei had also imported it. His copy has the same asset GUIDs, so our duplicate was dropped before the merge.
+- **After the merge:** compiles cleanly, 72/72 EditMode tests pass.
+- **New team work that overlaps the plan:**
+  - Phone book: `PhoneBookView` with `Configs/PhoneBook.json`, 24 contacts on A1–D6. Overlaps Step 3 and our directory data.
+  - Upgrade shop panel: overlaps Step 5.
+  - Main menu scene and menu tools: overlap the Step 6 Boot scene.
+  - A sorting helper: book pages at sort order 10, held plug and cursor at 20.
+  - The division of work needs agreeing with the lead and Sergei before Step 3.
+
+#### Decisions after the Step 1 playtest (lead, 2026-10-17)
+- Recorded in Design.md as D30–D33:
+  - D30: Sergei builds the UI, we build the rules and wire his components.
+  - D31: one directory (our data, shown in his book, English names, portraits on the card).
+  - D32: connection fee, kept as simple config.
+  - D33: scene flow `MainMenu` → `Game` → `Level`.
+- **Second merge (`9881486`):** the only conflict was the build list. Resolved to `MainMenu` (0), `Game` (1), `Level` (2), because his menu loads the next build index.
+- **Playtest overlaps:** our money counter, ticket and Directory button overlapped Sergei's upgrade panel. Step 1b fixes this and replaces our Directory list with his book.
