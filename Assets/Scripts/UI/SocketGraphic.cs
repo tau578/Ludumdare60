@@ -8,6 +8,18 @@ namespace Switchboard.UI
     public sealed class SocketGraphic : MaskableGraphic, ICanvasRaycastFilter
     {
         private const int Segments = 64;
+        [SerializeField, Min(1f)] private float hitRadiusScale = 1f;
+        public float HitRadiusScale
+        {
+            get => hitRadiusScale;
+            set
+            {
+                hitRadiusScale = Mathf.Max(1f, value);
+                // Expand the rectangular raycast gate as well as the circular hit filter.
+                Vector2 padding = rectTransform.rect.size * ((hitRadiusScale - 1f) * -.5f);
+                raycastPadding = new Vector4(padding.x, padding.y, padding.x, padding.y);
+            }
+        }
         private bool highlighted;
         private bool blockedHighlight;
         public bool IsHighlighted => highlighted;
@@ -65,7 +77,7 @@ namespace Switchboard.UI
                     rectTransform, screenPoint, eventCamera, out Vector2 localPoint))
                 return false;
             Rect rect = rectTransform.rect;
-            float radius = Mathf.Min(rect.width, rect.height) * 0.44f;
+            float radius = Mathf.Min(rect.width, rect.height) * 0.44f * hitRadiusScale;
             return (localPoint - rect.center).sqrMagnitude <= radius * radius;
         }
 

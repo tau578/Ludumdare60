@@ -132,9 +132,9 @@ namespace Switchboard.Editor
         {
             var root = Rect(name, parent, new Vector2(400, 492));
             root.anchoredPosition = new Vector2(x, 0);
-            Label("Heading", root, "АБОНЕНТЫ", new Vector2(0, 211), new Vector2(330, 34), 24, FontStyle.Bold, TextAnchor.MiddleCenter);
-            Label("NameHeading", root, "Имя", new Vector2(-42, 162), new Vector2(242, 28), 18, FontStyle.Italic, TextAnchor.MiddleLeft);
-            Label("SocketHeading", root, "Гнездо", new Vector2(125, 162), new Vector2(76, 28), 18, FontStyle.Italic, TextAnchor.MiddleRight);
+            Label("Heading", root, "CONTACTS", new Vector2(0, 211), new Vector2(330, 34), 24, FontStyle.Bold, TextAnchor.MiddleCenter);
+            Label("NameHeading", root, "Name", new Vector2(-42, 162), new Vector2(242, 28), 18, FontStyle.Italic, TextAnchor.MiddleLeft);
+            Label("SocketHeading", root, "Socket", new Vector2(125, 162), new Vector2(76, 28), 18, FontStyle.Italic, TextAnchor.MiddleRight);
             var entries = Rect("Entries", root, new Vector2(326, 326));
             entries.anchoredPosition = new Vector2(0, -30);
             var template = Rect("ContactTemplate", entries, new Vector2(326, 50));
@@ -154,7 +154,7 @@ namespace Switchboard.Editor
             row.Configure(nameLabel, addressLabel);
             template.gameObject.SetActive(false);
             var number = Label("PageNumber", root, "", new Vector2(0, -223), new Vector2(80, 26), 18, FontStyle.Normal, TextAnchor.MiddleCenter);
-            var empty = Label("EmptyMessage", root, "Нет контактов", new Vector2(0, 50), new Vector2(300, 50), 22, FontStyle.Italic, TextAnchor.MiddleCenter);
+            var empty = Label("EmptyMessage", root, "No contacts", new Vector2(0, 50), new Vector2(300, 50), 22, FontStyle.Italic, TextAnchor.MiddleCenter);
             empty.gameObject.SetActive(false);
             var page = root.gameObject.AddComponent<PhoneBookPageView>();
             page.Configure(entries, row, number, empty);
@@ -186,10 +186,10 @@ namespace Switchboard.Editor
             var rect = Rect(name, parent, size);
             rect.anchoredPosition = position;
             var label = rect.gameObject.AddComponent<Text>();
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.font = AssetDatabase.LoadAssetAtPath<Font>(name == "Heading" ? MenuTypographyBuilder.HeadingFontPath : MenuTypographyBuilder.BodyFontPath);
             label.text = value;
             label.fontSize = fontSize;
-            label.fontStyle = style;
+            label.fontStyle = FontStyle.Normal;
             label.alignment = alignment;
             label.color = new Color32(44, 48, 42, 255);
             label.horizontalOverflow = HorizontalWrapMode.Wrap;

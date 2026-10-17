@@ -44,7 +44,7 @@ namespace Switchboard.UI
             }
             catch (System.ArgumentException ex)
             {
-                configError = "Ошибка конфигурации";
+                configError = "Configuration error";
                 Debug.LogWarning($"Phone book: {ex.Message}", this);
             }
             CurrentSpreadIndex = 0;

@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 7752270616080070070}
   - component: {fileID: 2646949178535164421}
   - component: {fileID: 3639762107918942393}
+  - component: {fileID: 1193999923503207209}
   m_Layer: 5
   m_Name: CableInteraction
   m_TagString: Untagged
@@ -150,15 +151,30 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.CableController
   preventSameSocketConnection: 1
-  socketContainer: {fileID: 0}
   interactionArea: {fileID: 7752270616080070070}
   wire: {fileID: 2889374663195785648}
   firstPlug: {fileID: 3188798466887169480}
   secondPlug: {fileID: 3220935975976075992}
+  trayCableView: {fileID: 0}
+  cableColor: {r: 0.69803923, g: 0.3882353, b: 0.2, a: 1}
   audioSource: {fileID: 2646949178535164421}
   insertSound: {fileID: 8300000, guid: d62cbd4ee2f386042ba40e3cb5be364f, type: 3}
   removeSound: {fileID: 8300000, guid: 9d6a47065b57f364fa4f6684a682a686, type: 3}
   blockedSound: {fileID: 8300000, guid: 2d95309e87e6b264b9f25859f5158a74, type: 3}
+--- !u!114 &1193999923503207209
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 80764334972153685}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa4bceaefd146de49a490d52e2ba7390, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.AudioChannelSource
+  channel: 2
+  baseVolume: 0.6
 --- !u!1 &311595538540280149
 GameObject:
   m_ObjectHideFlags: 0
@@ -356,3 +372,5 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
+  insulationColor: {r: 0.69803923, g: 0.3882353, b: 0.2, a: 1}
+  maximumSag: 155

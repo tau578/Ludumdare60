@@ -44,7 +44,7 @@ namespace Switchboard.UI
                 rows[i].Show(config.contacts[start + i], fontSize);
             }
             pageNumber.text = (pageIndex + 1).ToString();
-            emptyMessage.text = message ?? "Нет контактов";
+            emptyMessage.text = message ?? "No contacts";
             emptyMessage.gameObject.SetActive(pageIndex == 0 && config.contacts.Length == 0);
         }
     }

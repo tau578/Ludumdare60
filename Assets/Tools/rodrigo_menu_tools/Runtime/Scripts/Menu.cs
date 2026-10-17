@@ -27,13 +27,29 @@ public class Menu : MonoBehaviour
 
     private bool hasStarted = false;
 
+    private void Awake()
+    {
+        // Mouse-driven buttons highlight only while hovered, never because of selection.
+        foreach (var button in GetComponentsInChildren<Button>(true))
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+        ClearSelection();
+    }
+
+    private static void ClearSelection()
+    {
+        if (EventSystem.current == null) return;
+        EventSystem.current.firstSelectedGameObject = null;
+        EventSystem.current.SetSelectedGameObject(null);
+    }
+
     private void Start()
     {
-        pressStartPanel.SetActive(true);
-        mainMenuPanel.SetActive(false);
+        hasStarted = pressStartPanel == null;
+        if (pressStartPanel != null) pressStartPanel.SetActive(true);
+        mainMenuPanel.SetActive(hasStarted);
         optionsPanel.SetActive(false);
         creditsPanel.SetActive(false);
-        hasStarted = false;
+        ClearSelection();
 
         // Initialize toggle and slider values
         if (fullscreenToggle != null)
@@ -48,8 +64,7 @@ public class Menu : MonoBehaviour
         if (!hasStarted && IsAnyInput())
         {
             pressStartPanel.SetActive(false);
-            EventSystem.current.SetSelectedGameObject(null);
-            EventSystem.current.SetSelectedGameObject(MainMenuFirstButton);
+            ClearSelection();
             mainMenuPanel.SetActive(true);
             hasStarted = true;
         }
@@ -83,32 +98,28 @@ public class Menu : MonoBehaviour
 
     public void onOptionsButtonClick()
     {
-        EventSystem.current.SetSelectedGameObject(null);
-        EventSystem.current.SetSelectedGameObject(OptionsFirstButton);
+        ClearSelection();
         mainMenuPanel.SetActive(false);
         optionsPanel.SetActive(true);
     }
 
     public void onCreditsButtonClick()
     {
-        EventSystem.current.SetSelectedGameObject(null);
-        EventSystem.current.SetSelectedGameObject(CreditsFirstButton);
+        ClearSelection();
         mainMenuPanel.SetActive(false);
         creditsPanel.SetActive(true);
     }
 
     public void onCloseOptionsButtonClick()
     {
-        EventSystem.current.SetSelectedGameObject(null);
-        EventSystem.current.SetSelectedGameObject(MainMenuSecondButton);
+        ClearSelection();
         optionsPanel.SetActive(false);
         mainMenuPanel.SetActive(true);
     }
 
     public void onCloseCreditsButtonClick()
     {
-        EventSystem.current.SetSelectedGameObject(null);
-        EventSystem.current.SetSelectedGameObject(MainMenuThirdButton);
+        ClearSelection();
         creditsPanel.SetActive(false);
         mainMenuPanel.SetActive(true);
     }
