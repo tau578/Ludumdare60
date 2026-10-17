@@ -14,6 +14,20 @@ namespace Switchboard.Editor
     {
         private const string PrefabPath = "Assets/Prefabs/UI/PhoneBook.prefab";
 
+        [MenuItem("Tools/Switchboard/Update Phone Book Directory")]
+        public static void UpdateDirectory()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Exit Play Mode first.");
+            var root = PrefabUtility.LoadPrefabContents(PrefabPath);
+            try
+            {
+                ConfigureDirectory(root.GetComponent<PhoneBookView>());
+                PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
         [MenuItem("Tools/Switchboard/Update Phone Book Layers")]
         public static void UpdateBookLayers()
         {
@@ -78,7 +92,9 @@ namespace Switchboard.Editor
                 var left = Page("LeftPage", opened, pageSprite, new Vector2(-200, 0));
                 left.localScale = new Vector3(-1, 1, 1);
                 Page("RightPage", opened, pageSprite, new Vector2(200, 0));
-                root.gameObject.AddComponent<PhoneBookView>().Configure(closedButton, openButton);
+                var view = root.gameObject.AddComponent<PhoneBookView>();
+                view.Configure(closedButton, openButton);
+                ConfigureDirectory(view);
                 return PrefabUtility.SaveAsPrefabAsset(root.gameObject, PrefabPath);
             }
             finally { Object.DestroyImmediate(root.gameObject); }
@@ -88,6 +104,99 @@ namespace Switchboard.Editor
         {
             SwitchboardUISorting.SetLayer(root, SwitchboardUISorting.Book);
             if (root.GetComponent<GraphicRaycaster>() == null) root.AddComponent<GraphicRaycaster>();
+        }
+
+        private static void ConfigureDirectory(PhoneBookView view)
+        {
+            var opened = view.transform.Find("OpenBook");
+            if (opened.Find("Directory") != null)
+            {
+                foreach (var fold in opened.GetComponentsInChildren<PageFoldGraphic>(true))
+                    if (fold.GetComponent<CanvasRenderer>() == null) fold.gameObject.AddComponent<CanvasRenderer>();
+                return;
+            }
+            var config = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Settings/PhoneBook.json");
+            if (config == null) throw new InvalidOperationException("PhoneBook.json was not found.");
+            // Text is separate from the mirrored artwork on LeftPage.
+            var content = Rect("Directory", opened, new Vector2(800, 492));
+            var left = DirectoryPage("LeftDirectoryPage", content, -200);
+            var right = DirectoryPage("RightDirectoryPage", content, 200);
+            var previous = PageCorner("PreviousSpread", content, true);
+            var next = PageCorner("NextSpread", content, false);
+            view.ConfigureDirectory(config, left, right, previous, next);
+            previous.gameObject.SetActive(false);
+            next.gameObject.SetActive(false);
+        }
+
+        private static PhoneBookPageView DirectoryPage(string name, Transform parent, float x)
+        {
+            var root = Rect(name, parent, new Vector2(400, 492));
+            root.anchoredPosition = new Vector2(x, 0);
+            Label("Heading", root, "АБОНЕНТЫ", new Vector2(0, 211), new Vector2(330, 34), 24, FontStyle.Bold, TextAnchor.MiddleCenter);
+            Label("NameHeading", root, "Имя", new Vector2(-42, 162), new Vector2(242, 28), 18, FontStyle.Italic, TextAnchor.MiddleLeft);
+            Label("SocketHeading", root, "Гнездо", new Vector2(125, 162), new Vector2(76, 28), 18, FontStyle.Italic, TextAnchor.MiddleRight);
+            var entries = Rect("Entries", root, new Vector2(326, 326));
+            entries.anchoredPosition = new Vector2(0, -30);
+            var template = Rect("ContactTemplate", entries, new Vector2(326, 50));
+            var nameLabel = Label("Name", template, "", Vector2.zero, Vector2.zero, 22, FontStyle.Normal, TextAnchor.MiddleLeft);
+            nameLabel.rectTransform.anchorMin = Vector2.zero;
+            nameLabel.rectTransform.anchorMax = new Vector2(.76f, 1);
+            nameLabel.rectTransform.offsetMin = Vector2.zero;
+            nameLabel.rectTransform.offsetMax = new Vector2(-8, 0);
+            nameLabel.resizeTextForBestFit = true;
+            nameLabel.resizeTextMinSize = 12;
+            nameLabel.resizeTextMaxSize = 22;
+            var addressLabel = Label("Socket", template, "", Vector2.zero, Vector2.zero, 22, FontStyle.Bold, TextAnchor.MiddleRight);
+            addressLabel.rectTransform.anchorMin = new Vector2(.76f, 0);
+            addressLabel.rectTransform.anchorMax = Vector2.one;
+            addressLabel.rectTransform.offsetMin = addressLabel.rectTransform.offsetMax = Vector2.zero;
+            var row = template.gameObject.AddComponent<PhoneBookContactRow>();
+            row.Configure(nameLabel, addressLabel);
+            template.gameObject.SetActive(false);
+            var number = Label("PageNumber", root, "", new Vector2(0, -223), new Vector2(80, 26), 18, FontStyle.Normal, TextAnchor.MiddleCenter);
+            var empty = Label("EmptyMessage", root, "Нет контактов", new Vector2(0, 50), new Vector2(300, 50), 22, FontStyle.Italic, TextAnchor.MiddleCenter);
+            empty.gameObject.SetActive(false);
+            var page = root.gameObject.AddComponent<PhoneBookPageView>();
+            page.Configure(entries, row, number, empty);
+            return page;
+        }
+
+        private static Button PageCorner(string name, Transform parent, bool left)
+        {
+            var rect = Rect(name, parent, new Vector2(60, 60));
+            rect.anchoredPosition = new Vector2(left ? -370 : 370, -216);
+            var fold = rect.gameObject.AddComponent<PageFoldGraphic>();
+            fold.LeftCorner = left;
+            fold.raycastTarget = true;
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = fold;
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            var colors = button.colors;
+            colors.normalColor = colors.selectedColor = Color.white;
+            colors.highlightedColor = new Color(1, .93f, .69f, 1);
+            colors.pressedColor = new Color(.78f, .73f, .56f, 1);
+            colors.fadeDuration = .08f;
+            button.colors = colors;
+            return button;
+        }
+
+        private static Text Label(string name, Transform parent, string value, Vector2 position,
+            Vector2 size, int fontSize, FontStyle style, TextAnchor alignment)
+        {
+            var rect = Rect(name, parent, size);
+            rect.anchoredPosition = position;
+            var label = rect.gameObject.AddComponent<Text>();
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.text = value;
+            label.fontSize = fontSize;
+            label.fontStyle = style;
+            label.alignment = alignment;
+            label.color = new Color32(44, 48, 42, 255);
+            label.horizontalOverflow = HorizontalWrapMode.Wrap;
+            label.verticalOverflow = VerticalWrapMode.Truncate;
+            label.supportRichText = false;
+            label.raycastTarget = false;
+            return label;
         }
 
         private static Sprite Sprite(string name)
