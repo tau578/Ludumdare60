@@ -150,7 +150,7 @@ RectTransform:
   - {fileID: 883216348}
   - {fileID: 1277714949}
   - {fileID: 1249621249}
-  - {fileID: 1170777814}
+  - {fileID: 493724758}
   m_Father: {fileID: 728895022}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -158,6 +158,197 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 1920, y: 1080}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &493724757
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 493724758}
+  - component: {fileID: 493724759}
+  m_Layer: 5
+  m_Name: CableInteraction
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &493724758
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 493724757}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1170777814}
+  - {fileID: 550658868}
+  - {fileID: 978387884}
+  - {fileID: 1294799909}
+  m_Father: {fileID: 199244643}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &493724759
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 493724757}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37895c7c5aee4564c955991e26c6580f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.CableInputController
+  tray: {fileID: 1249621249}
+  handCursor: {fileID: 1294799910}
+  cables:
+  - {fileID: 1281603624}
+  - {fileID: 550658869}
+  - {fileID: 978387885}
+--- !u!1001 &550658867
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 493724758}
+    m_Modifications:
+    - target: {fileID: 80764334972153685, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_Name
+      value: Cable_02
+      objectReference: {fileID: 0}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: cableColor.b
+      value: 0.8627451
+      objectReference: {fileID: 0}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: cableColor.g
+      value: 0.6509804
+      objectReference: {fileID: 0}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: cableColor.r
+      value: 0.30588236
+      objectReference: {fileID: 0}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: trayCableView
+      value: 
+      objectReference: {fileID: 1249621254}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: trayCableImage
+      value: 
+      objectReference: {fileID: 1249621252}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_Pivot.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_Pivot.y
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+--- !u!224 &550658868 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+  m_PrefabInstance: {fileID: 550658867}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &550658869 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+  m_PrefabInstance: {fileID: 550658867}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9288c35bd52d6384d81deda685433bee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.CableController
 --- !u!1 &728895018
 GameObject:
   m_ObjectHideFlags: 0
@@ -566,6 +757,139 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 8879706377604455470, guid: cdfbcbab24f37ab48a9588cd89bdf1cf, type: 3}
   m_PrefabInstance: {fileID: 883216347}
   m_PrefabAsset: {fileID: 0}
+--- !u!1001 &978387883
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 493724758}
+    m_Modifications:
+    - target: {fileID: 80764334972153685, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_Name
+      value: Cable_03
+      objectReference: {fileID: 0}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: cableColor.b
+      value: 0.28235295
+      objectReference: {fileID: 0}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: cableColor.g
+      value: 0.7372549
+      objectReference: {fileID: 0}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: cableColor.r
+      value: 0.9019608
+      objectReference: {fileID: 0}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: trayCableView
+      value: 
+      objectReference: {fileID: 1249621253}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: trayCableImage
+      value: 
+      objectReference: {fileID: 1249621251}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_Pivot.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_Pivot.y
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+--- !u!224 &978387884 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+  m_PrefabInstance: {fileID: 978387883}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &978387885 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+  m_PrefabInstance: {fileID: 978387883}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9288c35bd52d6384d81deda685433bee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.CableController
 --- !u!224 &1170777814 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
@@ -684,6 +1008,61 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+--- !u!114 &1249621251 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1041527128493756153, guid: a9a827f3a2a9c8a4bb0555d849d4586f, type: 3}
+  m_PrefabInstance: {fileID: 1249621248}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+--- !u!114 &1249621252 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7049126958293972196, guid: a9a827f3a2a9c8a4bb0555d849d4586f, type: 3}
+  m_PrefabInstance: {fileID: 1249621248}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+--- !u!114 &1249621253 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1488032222919628513, guid: a9a827f3a2a9c8a4bb0555d849d4586f, type: 3}
+  m_PrefabInstance: {fileID: 1249621248}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7b0c9d52d140e2418c2693aa64fddf6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.StoredCableView
+--- !u!114 &1249621254 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4571985001599788121, guid: a9a827f3a2a9c8a4bb0555d849d4586f, type: 3}
+  m_PrefabInstance: {fileID: 1249621248}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7b0c9d52d140e2418c2693aa64fddf6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.StoredCableView
+--- !u!114 &1249621255 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7623044792561633076, guid: a9a827f3a2a9c8a4bb0555d849d4586f, type: 3}
+  m_PrefabInstance: {fileID: 1249621248}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7b0c9d52d140e2418c2693aa64fddf6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.StoredCableView
 --- !u!1001 &1277714948
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1938,6 +2317,82 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 936863504576653455, guid: dc222a2e18782f343b149fd9f83c0740, type: 3}
   m_PrefabInstance: {fileID: 1277714948}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1281603624 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+  m_PrefabInstance: {fileID: 2989055979843337058}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9288c35bd52d6384d81deda685433bee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.CableController
+--- !u!1 &1294799908
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1294799909}
+  - component: {fileID: 1294799911}
+  - component: {fileID: 1294799910}
+  m_Layer: 5
+  m_Name: HandCursor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &1294799909
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1294799908}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 493724758}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 64, y: 64}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1294799910
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1294799908}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b1abc7df6d73b947a7a118bf8f67d86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.HandCursorGraphic
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!222 &1294799911
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1294799908}
+  m_CullTransparentMesh: 1
 --- !u!1 &2108551119
 GameObject:
   m_ObjectHideFlags: 0
@@ -2023,12 +2478,28 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 199244643}
+    m_TransformParent: {fileID: 493724758}
     m_Modifications:
     - target: {fileID: 80764334972153685, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
       propertyPath: m_Name
-      value: CableInteraction
+      value: Cable_01
       objectReference: {fileID: 0}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: cableColor.b
+      value: 0.3019608
+      objectReference: {fileID: 0}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: cableColor.g
+      value: 0.3764706
+      objectReference: {fileID: 0}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: cableColor.r
+      value: 0.85490197
+      objectReference: {fileID: 0}
+    - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
+      propertyPath: trayCableView
+      value: 
+      objectReference: {fileID: 1249621255}
     - target: {fileID: 3639762107918942393, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
       propertyPath: trayCableImage
       value: 
@@ -2087,19 +2558,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 96
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7752270616080070070, guid: c12bc63383ef2d349a298c6c6103e9bf, type: 3}
       propertyPath: m_AnchoredPosition.y

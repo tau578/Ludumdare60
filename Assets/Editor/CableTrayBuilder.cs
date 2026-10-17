@@ -14,7 +14,6 @@ namespace Switchboard.Editor
     {
         private const string PrefabPath = "Assets/Prefabs/UI/CableTray.prefab";
         private const string SpritePath = "Assets/Sprites/tray/tray.png";
-        private const string StoredCableSpritePath = "Assets/Sprites/cables/cable_stored.png";
 
         [MenuItem("Tools/Switchboard/Create Cable Tray")]
         public static void CreateCableTray()
@@ -30,8 +29,8 @@ namespace Switchboard.Editor
             Transform existing = area.Find("CableTray");
             if (existing != null)
             {
-                EnsureStoredCable((RectTransform)existing);
-                BindCableImage(area);
+                EnsureStoredCables((RectTransform)existing);
+                BindCableViews(area);
                 EditorSceneManager.MarkSceneDirty(scene);
                 Selection.activeGameObject = existing.gameObject;
                 return;
@@ -53,8 +52,8 @@ namespace Switchboard.Editor
                     Image image = source.GetComponent<Image>();
                     image.sprite = sprite;
                     image.preserveAspect = true;
-                    image.raycastTarget = false;
-                    EnsureStoredCable(rect);
+                    image.raycastTarget = true;
+                    EnsureStoredCables(rect);
                     prefab = PrefabUtility.SaveAsPrefabAsset(source, PrefabPath);
                 }
                 finally { Object.DestroyImmediate(source); }
@@ -76,42 +75,92 @@ namespace Switchboard.Editor
             Transform cable = area.Find("CableInteraction");
             if (cable != null) trayRect.SetSiblingIndex(cable.GetSiblingIndex());
             PrefabUtility.RecordPrefabInstancePropertyModifications(trayRect);
-            EnsureStoredCable(trayRect);
-            BindCableImage(area);
+            EnsureStoredCables(trayRect);
+            BindCableViews(area);
             Undo.RegisterCreatedObjectUndo(tray, "Add cable tray");
             EditorSceneManager.MarkSceneDirty(scene);
             Selection.activeGameObject = tray;
         }
 
-        public static Image EnsureStoredCable(RectTransform tray)
+        public static StoredCableView[] EnsureStoredCables(RectTransform tray)
         {
-            Transform existing = tray.Find("StoredCable");
-            if (existing != null) return existing.GetComponent<Image>();
-            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(StoredCableSpritePath);
-            if (sprite == null) throw new InvalidOperationException("The stored cable sprite was not found.");
-            var go = new GameObject("StoredCable", typeof(RectTransform), typeof(Image));
-            go.layer = LayerMask.NameToLayer("UI");
-            RectTransform rect = (RectTransform)go.transform;
-            rect.SetParent(tray, false);
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(336, 126);
-            rect.anchoredPosition = new Vector2(0, -140);
-            Image image = go.GetComponent<Image>();
-            image.sprite = sprite;
-            image.preserveAspect = true;
-            image.raycastTarget = false;
-            return image;
+            tray.GetComponent<Image>().raycastTarget = true;
+            Transform legacy = tray.Find("StoredCable");
+            if (legacy != null) legacy.name = "StoredCable_01";
+            var views = new StoredCableView[CableBuilder.CableCount];
+            for (int i = 0; i < views.Length; i++)
+            {
+                string name = $"StoredCable_{i + 1:00}";
+                Transform existing = tray.Find(name);
+                var go = existing != null ? existing.gameObject : new GameObject(name, typeof(RectTransform), typeof(Image));
+                go.layer = LayerMask.NameToLayer("UI");
+                RectTransform rect = (RectTransform)go.transform;
+                if (existing == null) rect.SetParent(tray, false);
+                rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.sizeDelta = new Vector2(252, 94.5f);
+                rect.anchoredPosition = new Vector2((i - (views.Length - 1) * 0.5f) * 270, -140);
+                Image image = go.GetComponent<Image>();
+                image.sprite = null;
+                image.color = Color.clear;
+                image.raycastTarget = true;
+                image.enabled = true;
+                RectTransform preview = Child("Preview", rect);
+                preview.sizeDelta = new Vector2(560, 210);
+                preview.localScale = Vector3.one * .45f;
+                var wireRect = Child("Wire", preview);
+                var wire = wireRect.GetComponent<CableGraphic>() ?? wireRect.gameObject.AddComponent<CableGraphic>();
+                wire.raycastTarget = false;
+                var first = PreviewPlug("FirstPlug", preview, new Vector2(-200, 92));
+                var second = PreviewPlug("SecondPlug", preview, new Vector2(200, 92));
+                var view = go.GetComponent<StoredCableView>() ?? go.AddComponent<StoredCableView>();
+                view.Configure(preview, wire, first, second);
+                view.SetCableColor(CableBuilder.CableColors[i]);
+                view.SetAvailable(true);
+                views[i] = view;
+            }
+            return views;
         }
 
-        public static void BindCableImage(RectTransform area)
+        private static RectTransform Child(string name, RectTransform parent)
         {
-            CableController cable = area.Find("CableInteraction")?.GetComponent<CableController>();
-            Image image = area.Find("CableTray/StoredCable")?.GetComponent<Image>();
-            if (cable == null || image == null) return;
-            Undo.RecordObject(cable, "Assign tray cable image");
-            cable.SetTrayCableImage(image);
-            PrefabUtility.RecordPrefabInstancePropertyModifications(cable);
+            var rect = parent.Find(name) as RectTransform;
+            if (rect == null)
+            {
+                rect = (RectTransform)new GameObject(name, typeof(RectTransform)).transform;
+                rect.SetParent(parent, false);
+            }
+            rect.gameObject.layer = LayerMask.NameToLayer("UI");
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(.5f, .5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(560, 210);
+            return rect;
+        }
+
+        private static PlugGraphic PreviewPlug(string name, RectTransform parent, Vector2 position)
+        {
+            var rect = Child(name, parent);
+            rect.pivot = new Vector2(.5f, 1);
+            rect.sizeDelta = new Vector2(36, 68);
+            rect.anchoredPosition = position;
+            var plug = rect.GetComponent<PlugGraphic>() ?? rect.gameObject.AddComponent<PlugGraphic>();
+            plug.raycastTarget = false;
+            return plug;
+        }
+
+        public static void BindCableViews(RectTransform area)
+        {
+            Transform root = area.Find("CableInteraction");
+            RectTransform tray = area.Find("CableTray") as RectTransform;
+            if (root == null || tray == null) return;
+            StoredCableView[] views = EnsureStoredCables(tray);
+            CableController[] cables = root.GetComponentsInChildren<CableController>(true).OrderBy(c => c.name).ToArray();
+            for (int i = 0; i < Mathf.Min(cables.Length, views.Length); i++)
+            {
+                Undo.RecordObject(cables[i], "Assign tray cable image");
+                cables[i].SetTrayCableView(views[i]);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(cables[i]);
+            }
         }
     }
 }

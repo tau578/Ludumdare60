@@ -24,7 +24,7 @@ namespace Switchboard.UI
             Box(mesh, 10, -49, 4, 22, Color.Lerp(sleeveColor, Color.black, 0.35f));
             Box(mesh, -9, -58, 18, 9, new Color32(52, 49, 39, 255));
             for (int i = 0; i < 3; i++) Box(mesh, -10, -51 - i * 3, 20, 1.2f, new Color32(116, 108, 85, 255));
-            Box(mesh, -4, -65, 8, 8, new Color32(96, 66, 39, 255));
+            Box(mesh, -4, -65, 8, 8, Color.Lerp(sleeveColor, Color.black, 0.35f));
         }
 
         private void Box(VertexHelper mesh, float x, float y, float width, float height, Color tint)

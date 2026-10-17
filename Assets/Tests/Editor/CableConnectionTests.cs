@@ -6,6 +6,53 @@ namespace Switchboard.Tests
     public sealed class CableConnectionTests
     {
         [Test]
+        public void PickingUpHidesStockBeforeAnyPlugIsInserted()
+        {
+            var wire = new CableConnection<string>();
+            Assert.That(wire.TryPickUp(), Is.True);
+            Assert.That(wire.Phase, Is.EqualTo(CablePhase.Held));
+            Assert.That(wire.IsInTray, Is.False);
+            Assert.That(wire.FirstSocket, Is.Null);
+            Assert.That(wire.SecondSocket, Is.Null);
+            Assert.That(wire.TryPickUp(), Is.False);
+            Assert.That(wire.TryReturnToTray(), Is.True);
+            Assert.That(wire.IsInTray, Is.True);
+        }
+
+        [TestCase("A1", "B2")]
+        [TestCase("B2", "A1")]
+        public void ReturningALooseCableClearsItsRemainingEnd(string removed, string remaining)
+        {
+            var wire = new CableConnection<string>();
+            wire.TryPickUp(); wire.TryInsert("A1"); wire.TryInsert("B2");
+            Assert.That(wire.TryReturnToTray(), Is.False);
+            Assert.That(wire.TryPickUp(), Is.False);
+            Assert.That(wire.Phase, Is.EqualTo(CablePhase.Connected));
+            wire.TryRemove(removed);
+            Assert.That(wire.Contains(remaining), Is.True);
+            Assert.That(wire.TryReturnToTray(), Is.True);
+            Assert.That(wire.IsInTray, Is.True);
+            Assert.That(wire.FirstSocket, Is.Null);
+            Assert.That(wire.SecondSocket, Is.Null);
+            Assert.That(wire.TryPickUp(), Is.True);
+            Assert.That(wire.TryInsert("C3"), Is.True);
+        }
+
+        [Test]
+        public void CancelledPickupDoesNotChangeOtherCables()
+        {
+            var first = new CableConnection<string>();
+            var second = new CableConnection<string>();
+            var third = new CableConnection<string>();
+            first.TryPickUp(); first.TryInsert("A1"); first.TryInsert("B2");
+            second.TryPickUp(); third.TryPickUp(); third.TryInsert("C3");
+            second.TryReturnToTray();
+            Assert.That(first.Phase, Is.EqualTo(CablePhase.Connected));
+            Assert.That(second.IsInTray, Is.True);
+            Assert.That(third.Phase, Is.EqualTo(CablePhase.OneEndConnected));
+        }
+
+        [Test]
         public void TrayHidesAsSoonAsTheFirstEndIsConnected()
         {
             var wire = new CableConnection<string>();

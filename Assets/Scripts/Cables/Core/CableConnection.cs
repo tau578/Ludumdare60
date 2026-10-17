@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace Switchboard.Cables
 {
-    public enum CablePhase { Ready, OneEndConnected, Connected }
+    public enum CablePhase { Ready, OneEndConnected, Connected, Held }
 
     /// <summary>The connection rules, independent of UI, input and sound.</summary>
     public sealed class CableConnection<TSocket> where TSocket : class
@@ -20,6 +20,20 @@ namespace Switchboard.Cables
 
         public bool Contains(TSocket socket) => socket != null &&
             (Same(FirstSocket, socket) || Same(SecondSocket, socket));
+
+        public bool TryPickUp()
+        {
+            if (Phase != CablePhase.Ready) return false;
+            Phase = CablePhase.Held;
+            return true;
+        }
+
+        public bool TryReturnToTray()
+        {
+            if (Phase == CablePhase.Connected) return false;
+            Reset();
+            return true;
+        }
 
         public bool CanInsert(TSocket socket)
         {

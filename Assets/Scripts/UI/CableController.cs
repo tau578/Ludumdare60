@@ -1,7 +1,5 @@
 using Switchboard.Cables;
 using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.UI;
 
 namespace Switchboard.UI
 {
@@ -14,12 +12,12 @@ namespace Switchboard.UI
         private bool preventSameSocketConnection = true;
 
         [Header("UI")]
-        [SerializeField] private RectTransform socketContainer;
         [SerializeField] private RectTransform interactionArea;
         [SerializeField] private CableGraphic wire;
         [SerializeField] private PlugGraphic firstPlug;
         [SerializeField] private PlugGraphic secondPlug;
-        [SerializeField] private Image trayCableImage;
+        [SerializeField] private StoredCableView trayCableView;
+        [SerializeField] private Color cableColor = new Color32(178, 99, 51, 255);
 
         [Header("Sound")]
         [SerializeField] private AudioSource audioSource;
@@ -28,25 +26,24 @@ namespace Switchboard.UI
         [SerializeField] private AudioClip blockedSound;
 
         private CableConnection<SocketView> connection;
-        private SocketView[] sockets;
         private SocketView hoveredSocket;
         private Vector2 pointer;
         private bool pointerInside;
-        private bool cursorWasVisible;
-        private bool ownsCursor;
 
         public CablePhase Phase => Connection.Phase;
         public SocketView FirstSocket => Connection.FirstSocket;
         public SocketView SecondSocket => Connection.SecondSocket;
         public bool IsInTray => Connection.IsInTray;
+        public Color CableColor => cableColor;
+        public StoredCableView TrayView => trayCableView;
+        public bool IsPointerVisible => pointerInside && Phase != CablePhase.Connected;
         private CableConnection<SocketView> Connection => connection ??
             (connection = new CableConnection<SocketView>(preventSameSocketConnection));
 
-        public void Configure(RectTransform board, RectTransform area, CableGraphic cable,
+        public void Configure(RectTransform area, CableGraphic cable,
             PlugGraphic plugA, PlugGraphic plugB, AudioSource sound,
             AudioClip insert, AudioClip remove, AudioClip blocked)
         {
-            socketContainer = board;
             interactionArea = area;
             wire = cable;
             firstPlug = plugA;
@@ -55,47 +52,65 @@ namespace Switchboard.UI
             insertSound = insert;
             removeSound = remove;
             blockedSound = blocked;
+            ApplyColor();
         }
 
         private void OnEnable()
         {
             if (!Application.isPlaying) return;
             connection = new CableConnection<SocketView>(preventSameSocketConnection);
-            RefreshTrayImage();
-            if (socketContainer == null) return;
-            sockets = socketContainer.GetComponentsInChildren<SocketView>(true);
-            foreach (SocketView socket in sockets)
-            {
-                socket.Clicked += HandleSocketClick;
-                socket.HoverChanged += HandleHover;
-            }
-            cursorWasVisible = Cursor.visible;
-            ownsCursor = true;
+            if (trayCableView != null) trayCableView.Bind(this);
+            ApplyColor();
+            RefreshVisuals();
         }
 
-        private void Update()
+        public void SetCableColor(Color value)
         {
-            if (interactionArea == null) return;
-            if (Mouse.current != null && Application.isFocused)
-                UpdatePointer(Mouse.current.position.ReadValue());
-            else { pointerInside = false; RefreshVisuals(); }
-            if (ownsCursor) Cursor.visible = !pointerInside || Phase == CablePhase.Connected;
+            cableColor = value;
+            ApplyColor();
         }
 
-        public void UpdatePointer(Vector2 screenPosition)
+        private void ApplyColor()
+        {
+            if (wire != null) wire.InsulationColor = cableColor;
+            if (firstPlug != null) firstPlug.SleeveColor = cableColor;
+            if (secondPlug != null) secondPlug.SleeveColor = cableColor;
+            if (trayCableView != null) trayCableView.SetCableColor(cableColor);
+        }
+
+        public bool TryPickUp()
+        {
+            if (!Connection.TryPickUp()) return false;
+            RefreshVisuals();
+            return true;
+        }
+
+        public bool TryReturnToTray()
+        {
+            SocketView first = FirstSocket, second = SecondSocket;
+            if (!Connection.TryReturnToTray()) return false;
+            if (first != null) first.Release(this);
+            if (second != null) second.Release(this);
+            if (first != null || second != null) PlaySound(removeSound, 1f, 0.65f);
+            pointerInside = false;
+            RefreshVisuals();
+            return true;
+        }
+
+        public void UpdatePointer(Vector2 screenPosition, bool selected = true)
         {
             if (interactionArea == null) return;
             Canvas canvas = interactionArea.GetComponentInParent<Canvas>();
             Camera camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-            pointerInside = RectTransformUtility.RectangleContainsScreenPoint(interactionArea, screenPosition, camera);
+            pointerInside = selected && RectTransformUtility.RectangleContainsScreenPoint(interactionArea, screenPosition, camera);
             RectTransformUtility.ScreenPointToLocalPointInRectangle(interactionArea, screenPosition, camera, out pointer);
             RefreshVisuals();
         }
 
-        public void HandleSocketClick(SocketView socket)
+        public void HidePointer()
         {
-            if (Connection.Contains(socket)) TryRemove(socket);
-            else TryInsert(socket);
+            pointerInside = false;
+            RefreshVisuals();
         }
 
         public bool TryInsert(SocketView socket)
@@ -120,15 +135,13 @@ namespace Switchboard.UI
 
         private bool Reject()
         {
-            PlaySound(blockedSound, 1f, 0.3f);
+            PlayBlockedFeedback();
             return false;
         }
 
-        private void HandleHover(SocketView socket, bool entered)
-        {
-            if (entered) hoveredSocket = socket;
-            else if (hoveredSocket == socket) hoveredSocket = null;
-        }
+        public void PlayBlockedFeedback() => PlaySound(blockedSound, 1f, 0.3f);
+
+        public void SetHoveredSocket(SocketView socket) => hoveredSocket = socket;
 
         private void RefreshVisuals()
         {
@@ -136,7 +149,7 @@ namespace Switchboard.UI
             if (wire == null || firstPlug == null || secondPlug == null) return;
             bool firstAttached = FirstSocket != null;
             bool secondAttached = SecondSocket != null;
-            bool showFirst = firstAttached || (pointerInside && (Phase == CablePhase.Ready || secondAttached));
+            bool showFirst = firstAttached || (pointerInside && (Phase == CablePhase.Held || secondAttached));
             bool showSecond = secondAttached || (firstAttached && !secondAttached && pointerInside);
             firstPlug.gameObject.SetActive(showFirst);
             secondPlug.gameObject.SetActive(showSecond);
@@ -148,7 +161,7 @@ namespace Switchboard.UI
             firstPlug.color = firstAttached ? Color.white : freeColor;
             secondPlug.color = secondAttached ? Color.white : freeColor;
 
-            wire.enabled = Phase != CablePhase.Ready;
+            wire.enabled = firstAttached || secondAttached;
             if (wire.enabled)
                 wire.SetEndpoints(firstPlug.rectTransform.anchoredPosition + firstPlug.TailOffset,
                     secondPlug.rectTransform.anchoredPosition + secondPlug.TailOffset);
@@ -156,15 +169,16 @@ namespace Switchboard.UI
 
         private Vector2 LocalAnchor(SocketView socket) => interactionArea.InverseTransformPoint(socket.PlugAnchor.position);
 
-        public void SetTrayCableImage(Image image)
+        public void SetTrayCableView(StoredCableView view)
         {
-            trayCableImage = image;
+            trayCableView = view;
+            if (view != null) { view.Bind(this); view.SetCableColor(cableColor); }
             RefreshTrayImage();
         }
 
         private void RefreshTrayImage()
         {
-            if (trayCableImage != null) trayCableImage.enabled = Connection.IsInTray;
+            if (trayCableView != null) trayCableView.SetAvailable(Connection.IsInTray);
         }
 
         private void PlaySound(AudioClip clip, float pitch, float volume)
@@ -174,20 +188,8 @@ namespace Switchboard.UI
             audioSource.PlayOneShot(clip, volume);
         }
 
-        private void OnApplicationFocus(bool focused)
-        {
-            if (!focused && ownsCursor) Cursor.visible = cursorWasVisible;
-        }
-
         private void OnDisable()
         {
-            if (sockets != null)
-                foreach (SocketView socket in sockets)
-                {
-                    if (socket == null) continue;
-                    socket.Clicked -= HandleSocketClick;
-                    socket.HoverChanged -= HandleHover;
-                }
             if (connection != null)
             {
                 if (connection.FirstSocket != null) connection.FirstSocket.Release(this);
@@ -198,10 +200,8 @@ namespace Switchboard.UI
             if (wire != null) wire.enabled = false;
             if (firstPlug != null) firstPlug.gameObject.SetActive(false);
             if (secondPlug != null) secondPlug.gameObject.SetActive(false);
-            if (ownsCursor) Cursor.visible = cursorWasVisible;
-            ownsCursor = false;
+            pointerInside = false;
             hoveredSocket = null;
-            sockets = null;
         }
     }
 }

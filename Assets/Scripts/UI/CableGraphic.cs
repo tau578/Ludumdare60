@@ -9,6 +9,8 @@ namespace Switchboard.UI
         private const int Segments = 48;
         private readonly Vector2[] points = new Vector2[Segments + 1];
         private Vector2 first, second;
+        [SerializeField] private Color insulationColor = new Color32(178, 99, 51, 255);
+        public Color InsulationColor { get => insulationColor; set { insulationColor = value; SetVerticesDirty(); } }
 
         public void SetEndpoints(Vector2 a, Vector2 b)
         {
@@ -31,9 +33,9 @@ namespace Switchboard.UI
                 points[i] = u * u * u * first + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * second;
             }
             Strip(mesh, 6.5f, new Vector2(2, -3), new Color32(16, 19, 17, 150));
-            Strip(mesh, 4.5f, Vector2.zero, new Color32(39, 29, 22, 255));
-            Strip(mesh, 2.6f, new Vector2(0, 0.5f), new Color32(133, 88, 49, 255));
-            Strip(mesh, 0.7f, new Vector2(0, 1.5f), new Color32(189, 139, 82, 220));
+            Strip(mesh, 4.5f, Vector2.zero, Color.Lerp(insulationColor, Color.black, 0.65f));
+            Strip(mesh, 2.6f, new Vector2(0, 0.5f), insulationColor);
+            Strip(mesh, 0.7f, new Vector2(0, 1.5f), Color.Lerp(insulationColor, Color.white, 0.35f));
         }
 
         private void Strip(VertexHelper mesh, float halfWidth, Vector2 offset, Color tint)
