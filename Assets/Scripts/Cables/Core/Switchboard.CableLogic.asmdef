@@ -1,0 +1,5 @@
+{
+    "name": "Switchboard.CableLogic",
+    "rootNamespace": "Switchboard.Cables",
+    "noEngineReferences": true
+}

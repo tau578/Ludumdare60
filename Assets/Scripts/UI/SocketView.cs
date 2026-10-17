@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -6,17 +7,35 @@ namespace Switchboard.UI
     /// <summary>Socket identity and attachment point for a future cable plug.</summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(SocketGraphic))]
-    public sealed class SocketView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+    public sealed class SocketView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
     {
         [SerializeField, Min(0)] private int row;
         [SerializeField, Min(0)] private int column;
         [SerializeField] private RectTransform plugAnchor;
         [SerializeField] private SocketGraphic socketGraphic;
+        private CableController occupyingCable;
+
+        public event Action<SocketView> Clicked;
+        public event Action<SocketView, bool> HoverChanged;
 
         public int Row => row;
         public int Column => column;
         public string Address => $"{(char)('A' + row)}{column + 1}";
         public RectTransform PlugAnchor => plugAnchor;
+        public bool IsOccupied => occupyingCable != null;
+        public CableController OccupyingCable => occupyingCable;
+
+        public bool TryOccupy(CableController cable)
+        {
+            if (cable == null || IsOccupied) return false;
+            occupyingCable = cable;
+            return true;
+        }
+
+        public void Release(CableController cable)
+        {
+            if (occupyingCable == cable) occupyingCable = null;
+        }
 
         public void Configure(int rowIndex, int columnIndex, RectTransform anchor)
         {
@@ -27,8 +46,22 @@ namespace Switchboard.UI
             gameObject.name = $"Socket_{Address}";
         }
 
-        public void OnPointerEnter(PointerEventData eventData) => Graphic.SetHighlighted(true);
-        public void OnPointerExit(PointerEventData eventData) => Graphic.SetHighlighted(false);
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            if (eventData.button == PointerEventData.InputButton.Left) Clicked?.Invoke(this);
+        }
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            Graphic.SetHighlighted(true);
+            HoverChanged?.Invoke(this, true);
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            Graphic.SetHighlighted(false);
+            HoverChanged?.Invoke(this, false);
+        }
 
         private SocketGraphic Graphic => socketGraphic != null
             ? socketGraphic : socketGraphic = GetComponent<SocketGraphic>();
