@@ -23,10 +23,11 @@ Design: [Design.md](Design.md) · Progress: [Progress.md](Progress.md)
    - In `Progress.md`: the step's status, verification notes and playtest notes.
    - In `Design.md`: mark what is now built, and record any new decisions or accepted deviations.
    - In `Plan.md`: turn the next step's outline into a full brief, using what this step taught us.
-7. **Commit (orchestrator, after your OK).** One commit per step, including the doc updates, with no AI attribution lines. You push, or tell the orchestrator to.
+7. **Commit and push only when the lead asks.** One commit per step, including the doc updates, with no AI attribution lines. A playtest OK alone is not a request to commit or push.
 8. **Next step.**
 
 Ground rules:
+- **Every step and every fix pass is built by a subagent.** The main session (orchestrator) only prepares, launches, verifies and updates docs; it never implements a step itself.
 - **One agent at a time.** There is a single Unity editor. Parallel agents would fight over compilation and Play Mode.
 - **No git worktrees.** The editor is tied to this folder.
 - **Don't touch Unity while an agent works.** Save your own changes before a step starts.
@@ -143,7 +144,7 @@ Follow-ups: <ideas, debts, questions>
 | Before Step 5 | A way to add cords at runtime: a cable prefab plus a tray slot, and a way to register them with `CableInputController` and the tray. | Sergei |
 | Before Step 6 | Touch input in the cord code: use `Pointer.current` instead of `Mouse.current` in `CableInputController.Update`, and hide the hand cursor on touch. | Sergei |
 | Before Step 6, or earlier if Sergei's cord work settles | Merge into one scene (D29). Agree a time when Sergei isn't editing `Level.unity`; the merge itself takes about 5 minutes. | Sergei |
-| Soon (lead asked) | Make the upgrade panel's top header about 90–100 px tall, without buttons, styled as the money-counter slot. Our counter then grows to fill it. | Sergei |
+| Done in Step 1c (lead approved) | The upgrade panel's top header is now a 96 px `HeaderSlot` plaque holding our money counter. Sergei keeps the names `UpgradeShopPanel` and `HeaderSlot`. | Sergei |
 | Before Step 7 | Decide how locked board sections look: cover plates in our overlay, or a change to the board prefab. | Sergei, Mia |
 | Before Step 8 | Sound effects (ring, alarm, coins, paid, fine, hang-up): find them or generate them. | Mia, team |
 
