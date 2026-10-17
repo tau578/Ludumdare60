@@ -1,0 +1,5 @@
+{
+    "name": "Switchboard.Content",
+    "rootNamespace": "Switchboard.Content",
+    "references": ["Switchboard.Domain"]
+}

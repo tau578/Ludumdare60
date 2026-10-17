@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb3428b846a36446caba683d5e3c2648, type: 3}
+  m_Name: IvyCrandall
+  m_EditorClassIdentifier: Switchboard.Content::Switchboard.Content.PersonDefinition
+  id: person.ivy-crandall
+  firstName: Ivy
+  lastName: Crandall
+  portrait: {fileID: -1696921312614389593, guid: 00a1866ea753ef047a7ebe544af54fde, type: 3}
+  tags: []

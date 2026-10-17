@@ -1,0 +1,8 @@
+{
+    "name": "Switchboard.Domain.Tests",
+    "rootNamespace": "Switchboard.Domain.Tests",
+    "references": ["Switchboard.Domain", "Switchboard.Content"],
+    "includePlatforms": ["Editor"],
+    "optionalUnityReferences": ["TestAssemblies"],
+    "autoReferenced": false
+}

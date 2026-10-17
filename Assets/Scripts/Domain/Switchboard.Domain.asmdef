@@ -1,0 +1,5 @@
+{
+    "name": "Switchboard.Domain",
+    "rootNamespace": "Switchboard.Domain",
+    "noEngineReferences": true
+}

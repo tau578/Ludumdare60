@@ -1,0 +1,35 @@
+namespace Switchboard.Domain
+{
+    public readonly struct CallAddedArgs
+    {
+        public CallAddedArgs(Call call) => Call = call;
+
+        public Call Call { get; }
+    }
+
+    public readonly struct CallStateChangedArgs
+    {
+        public CallStateChangedArgs(Call call, CallState from, CallState to)
+        {
+            Call = call;
+            From = from;
+            To = to;
+        }
+
+        public Call Call { get; }
+        public CallState From { get; }
+        public CallState To { get; }
+    }
+
+    public readonly struct CallEndedArgs
+    {
+        public CallEndedArgs(Call call, CallEndReason reason)
+        {
+            Call = call;
+            Reason = reason;
+        }
+
+        public Call Call { get; }
+        public CallEndReason Reason { get; }
+    }
+}
