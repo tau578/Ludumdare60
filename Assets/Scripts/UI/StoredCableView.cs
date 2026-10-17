@@ -12,8 +12,11 @@ namespace Switchboard.UI
         [SerializeField] private PlugGraphic firstPlug;
         [SerializeField] private PlugGraphic secondPlug;
         private Image hitArea;
+        private Outline[] hoverOutlines;
+        private bool highlighted;
         public CableController Cable { get; private set; }
         public bool Available => HitArea.enabled && (Cable == null || Cable.IsInTray);
+        public bool IsHighlighted => highlighted;
         private Image HitArea => hitArea != null ? hitArea : hitArea = GetComponent<Image>();
 
         public void Configure(RectTransform visual, CableGraphic line, PlugGraphic first, PlugGraphic second)
@@ -44,8 +47,34 @@ namespace Switchboard.UI
 
         public void SetAvailable(bool available)
         {
+            if (!available) SetHighlighted(false);
             HitArea.enabled = available;
             if (preview != null) preview.gameObject.SetActive(available);
         }
+
+        public void SetHighlighted(bool value)
+        {
+            value = value && Available && isActiveAndEnabled;
+            if (highlighted == value) return;
+            highlighted = value;
+            if (value && hoverOutlines == null)
+            {
+                hoverOutlines = new[] { CreateOutline(wire), CreateOutline(firstPlug), CreateOutline(secondPlug) };
+            }
+            if (hoverOutlines != null)
+                foreach (var outline in hoverOutlines) if (outline != null) outline.enabled = value;
+        }
+
+        private static Outline CreateOutline(Graphic graphic)
+        {
+            if (graphic == null) return null;
+            var outline = graphic.gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color(1f, .94f, .72f, .85f);
+            outline.effectDistance = new Vector2(4, -4);
+            outline.useGraphicAlpha = true;
+            return outline;
+        }
+
+        private void OnDisable() => SetHighlighted(false);
     }
 }

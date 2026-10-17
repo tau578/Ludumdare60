@@ -20,6 +20,7 @@ namespace Switchboard.UI
         private EventSystem eventSystem;
         private CableController heldCable;
         private SocketView hoveredSocket;
+        private StoredCableView hoveredStoredCable;
         private bool cursorWasVisible;
         private bool ownsCursor;
         public CableController ActiveCable => Usable(heldCable) ? heldCable : null;
@@ -122,6 +123,10 @@ namespace Switchboard.UI
             if (hoveredSocket != null) hoveredSocket.SetPointerState(true, selected != null);
             CursorMode = selected != null ? CableCursorMode.Plug :
                 stored != null && stored.Available && Owns(stored.Cable) ? CableCursorMode.Grab : CableCursorMode.Pointing;
+            var highlightedStock = CursorMode == CableCursorMode.Grab ? stored : null;
+            if (hoveredStoredCable != highlightedStock && hoveredStoredCable != null) hoveredStoredCable.SetHighlighted(false);
+            hoveredStoredCable = highlightedStock;
+            if (hoveredStoredCable != null) hoveredStoredCable.SetHighlighted(true);
             if (selected != null) selected.transform.SetAsLastSibling();
             foreach (var cable in cables)
             {
@@ -158,6 +163,8 @@ namespace Switchboard.UI
         {
             if (hoveredSocket != null) hoveredSocket.SetPointerState(false, false);
             hoveredSocket = null;
+            if (hoveredStoredCable != null) hoveredStoredCable.SetHighlighted(false);
+            hoveredStoredCable = null;
             foreach (var cable in cables) if (cable != null) cable.HidePointer();
             if (handCursor != null) handCursor.gameObject.SetActive(false);
             if (ownsCursor) Cursor.visible = cursorWasVisible;
