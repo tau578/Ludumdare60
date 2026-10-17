@@ -273,7 +273,7 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
 - Sergei's phone book lists our 12 people with their jacks, in English. Our temporary Directory button and list are gone.
 - The money counter sits above Sergei's upgrade panel, and nothing of ours overlaps his UI.
 
-**Before launch.** The book hook described below must be agreed with Sergei. **Recommended effort:** high.
+**Before launch.** Tell Sergei that `PhoneBook.json` now holds the game's caller data, with English names. **Recommended effort:** high.
 
 **Build**
 1. **Fee: domain and content.**
@@ -285,10 +285,21 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
 2. **Fee: UI.**
    - The card's rate badge shows fee plus rate.
    - A "+10¢" popup on connection: simple, pooled or reused, fading over about 1 s, near the money counter or the card.
-3. **Sergei's book shows our directory** (coordinated change):
-   - Add one public method to `Assets/Scripts/UI/PhoneBookView.cs`, e.g. `public void SetContacts(PhoneBookContact[] contacts)`. It replaces `directory.contacts`, keeps `contactsPerPage`, resets to spread 0 and refreshes the pages. That's about 5 lines, and nothing else in his files changes.
-   - `GameInstaller` finds the `PhoneBookView` in `Level` by type, builds `PhoneBookContact { name = "Ada Moss", socket = "C3" }` entries from `PhoneDirectory.ListedEntries` (sorted by surname, as now), and calls `SetContacts`.
-   - Leave `Configs/PhoneBook.json` untouched. Our data simply replaces it at runtime.
+3. **One people file** (D31). No change to Sergei's code is needed.
+   - Rewrite `Assets/Configs/PhoneBook.json` with our 12 people in English: the names from Step 1, their jacks, and portraits `caller-01`…`caller-12`. Keep his format and add fields:
+     `{ "name": "Ada Moss", "socket": "C3", "portrait": "caller-01", "type": "type.regular", "rate": 0, "fee": 0 }`.
+     Keep `contactsPerPage`, and keep the contacts sorted by surname, since the book shows them in file order.
+   - `GameConfig` references that `TextAsset` and holds a portrait list (sprite name → `Sprite`).
+   - Add a loader in Content or Game that parses the file with `JsonUtility` into Domain data. Each person's surname is the last word of `name`.
+   - Validation on load, with clear `Debug.LogError` messages:
+     - jack exists on the board and is unique
+     - portrait found
+     - call type id known
+     - name not empty
+   - Add an EditMode test that validates the real file.
+   - Delete the Step 1 assets under `Assets/Content/People`, `Assets/Content/Callers` and `PhoneDirectory.asset`, and the `PersonDefinition`, `CallerDefinition`, `PhoneDirectoryDefinition` and `DirectoryEntry` classes. Keep `CallerTypeDefinition` and `GameConfig`. Domain stays on its interfaces.
+   - Sergei's book then shows the same people our calls use, because it reads the same file.
+
 4. **Layout.**
    - Remove our `DirectoryListView`, the Directory button and the D-key toggle, from both the prefab and the code.
    - Move the money counter to the top of the right-hand column, above Sergei's `UpgradeShopPanel`, with no overlap.
@@ -297,6 +308,7 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
 5. **Docs and plan notes from Step 1:** `GameInstaller` logs an error if `Level` fails to load.
 
 **Tests**
+- People file: parses, all 12 entries are valid, and invalid entries (unknown jack, duplicate jack, unknown portrait, unknown type) are reported.
 - Fee within its range, and the override wins.
 - Fee paid exactly once on a correct connection.
 - No fee on a wrong connection.
