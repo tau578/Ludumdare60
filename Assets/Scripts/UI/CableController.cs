@@ -1,6 +1,7 @@
 using Switchboard.Cables;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 namespace Switchboard.UI
 {
@@ -18,6 +19,7 @@ namespace Switchboard.UI
         [SerializeField] private CableGraphic wire;
         [SerializeField] private PlugGraphic firstPlug;
         [SerializeField] private PlugGraphic secondPlug;
+        [SerializeField] private Image trayCableImage;
 
         [Header("Sound")]
         [SerializeField] private AudioSource audioSource;
@@ -36,6 +38,7 @@ namespace Switchboard.UI
         public CablePhase Phase => Connection.Phase;
         public SocketView FirstSocket => Connection.FirstSocket;
         public SocketView SecondSocket => Connection.SecondSocket;
+        public bool IsInTray => Connection.IsInTray;
         private CableConnection<SocketView> Connection => connection ??
             (connection = new CableConnection<SocketView>(preventSameSocketConnection));
 
@@ -58,6 +61,7 @@ namespace Switchboard.UI
         {
             if (!Application.isPlaying) return;
             connection = new CableConnection<SocketView>(preventSameSocketConnection);
+            RefreshTrayImage();
             if (socketContainer == null) return;
             sockets = socketContainer.GetComponentsInChildren<SocketView>(true);
             foreach (SocketView socket in sockets)
@@ -128,6 +132,7 @@ namespace Switchboard.UI
 
         private void RefreshVisuals()
         {
+            RefreshTrayImage();
             if (wire == null || firstPlug == null || secondPlug == null) return;
             bool firstAttached = FirstSocket != null;
             bool secondAttached = SecondSocket != null;
@@ -150,6 +155,17 @@ namespace Switchboard.UI
         }
 
         private Vector2 LocalAnchor(SocketView socket) => interactionArea.InverseTransformPoint(socket.PlugAnchor.position);
+
+        public void SetTrayCableImage(Image image)
+        {
+            trayCableImage = image;
+            RefreshTrayImage();
+        }
+
+        private void RefreshTrayImage()
+        {
+            if (trayCableImage != null) trayCableImage.enabled = Connection.IsInTray;
+        }
 
         private void PlaySound(AudioClip clip, float pitch, float volume)
         {
@@ -178,6 +194,7 @@ namespace Switchboard.UI
                 if (connection.SecondSocket != null) connection.SecondSocket.Release(this);
                 connection.Reset();
             }
+            RefreshTrayImage();
             if (wire != null) wire.enabled = false;
             if (firstPlug != null) firstPlug.gameObject.SetActive(false);
             if (secondPlug != null) secondPlug.gameObject.SetActive(false);

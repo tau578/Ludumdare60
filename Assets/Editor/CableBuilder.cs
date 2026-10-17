@@ -18,7 +18,11 @@ namespace Switchboard.Editor
             Scene scene = SceneManager.GetActiveScene();
             GameObject canvas = scene.GetRootGameObjects().Single(go => go.name == "SwitchboardCanvas");
             RectTransform area = (RectTransform)canvas.transform.Find("WorkArea");
-            if (area.Find("CableInteraction") != null) return;
+            if (area.Find("CableInteraction") != null)
+            {
+                CableTrayBuilder.BindCableImage(area);
+                return;
+            }
 
             RectTransform root = Rect("CableInteraction", area);
             root.anchorMin = Vector2.zero;
@@ -45,6 +49,7 @@ namespace Switchboard.Editor
                 AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Cable/PlugInsert.wav"),
                 AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Cable/PlugRemove.wav"),
                 AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Cable/PlugBlocked.wav"));
+            CableTrayBuilder.BindCableImage(area);
             Undo.RegisterCreatedObjectUndo(root.gameObject, "Add cable interaction");
             Selection.activeGameObject = root.gameObject;
             EditorSceneManager.MarkSceneDirty(scene);

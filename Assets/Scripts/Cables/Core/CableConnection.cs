@@ -11,6 +11,7 @@ namespace Switchboard.Cables
         public TSocket FirstSocket { get; private set; }
         public TSocket SecondSocket { get; private set; }
         public bool PreventSameSocketConnection { get; }
+        public bool IsInTray => Phase == CablePhase.Ready;
 
         public CableConnection(bool preventSameSocketConnection = true)
         {

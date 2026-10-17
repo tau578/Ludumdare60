@@ -6,6 +6,64 @@ namespace Switchboard.Tests
     public sealed class CableConnectionTests
     {
         [Test]
+        public void TrayHidesAsSoonAsTheFirstEndIsConnected()
+        {
+            var wire = new CableConnection<string>();
+            Assert.That(wire.IsInTray, Is.True);
+            wire.TryInsert("A1");
+            Assert.That(wire.IsInTray, Is.False);
+            Assert.That(wire.TryInsert("A1"), Is.False);
+            Assert.That(wire.IsInTray, Is.False);
+            wire.TryInsert("B2");
+            Assert.That(wire.IsInTray, Is.False);
+        }
+
+        [TestCase("A1", "B2")]
+        [TestCase("B2", "A1")]
+        public void TrayStaysEmptyWhileEitherEndIsBeingMoved(string removed, string remaining)
+        {
+            var wire = new CableConnection<string>();
+            wire.TryInsert("A1");
+            wire.TryInsert("B2");
+            wire.TryRemove(removed);
+            Assert.That(wire.IsInTray, Is.False);
+            Assert.That(wire.TryInsert(remaining), Is.False);
+            Assert.That(wire.TryRemove("F6"), Is.False);
+            Assert.That(wire.IsInTray, Is.False);
+            wire.TryInsert("C3");
+            Assert.That(wire.IsInTray, Is.False);
+            wire.TryRemove("C3");
+            Assert.That(wire.IsInTray, Is.False);
+            wire.TryRemove(remaining);
+            Assert.That(wire.IsInTray, Is.True);
+            wire.TryInsert("D4");
+            Assert.That(wire.IsInTray, Is.False);
+            wire.TryInsert("E5");
+            Assert.That(wire.IsInTray, Is.False);
+        }
+
+        [Test]
+        public void CancellingTheInitialFirstPlugReturnsTheCableToTheTray()
+        {
+            var wire = new CableConnection<string>();
+            wire.TryInsert("A1");
+            wire.TryRemove("A1");
+            Assert.That(wire.IsInTray, Is.True);
+            Assert.That(wire.Phase, Is.EqualTo(CablePhase.Ready));
+        }
+
+        [Test]
+        public void ResetRestoresTheCableInTheTray()
+        {
+            var wire = new CableConnection<string>();
+            wire.TryInsert("A1");
+            wire.TryInsert("B2");
+            wire.TryRemove("A1");
+            wire.Reset();
+            Assert.That(wire.IsInTray, Is.True);
+        }
+
+        [Test]
         public void FirstThenSecondPlugConnectsTwoDistinctSockets()
         {
             var wire = new CableConnection<string>();
