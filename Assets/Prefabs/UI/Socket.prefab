@@ -102,6 +102,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
+  faceSprite: {fileID: 577195655271376678, guid: ba2171a54d90fab48b723ea54688e36b, type: 3}
+  hitRadiusScale: 1
 --- !u!114 &1561769052244426498
 MonoBehaviour:
   m_ObjectHideFlags: 0

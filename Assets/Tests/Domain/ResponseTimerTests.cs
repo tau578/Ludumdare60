@@ -41,7 +41,7 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void KeepsCountingWhileSwappedBackToTheQueue()
+        public void KeepsCountingAfterAnotherOrderIsAccepted()
         {
             Call emergency = calls.Add(world.EmergencyRequest(0));
             Call regular = calls.Add(new CallRequest(world.Callers[1], world.People[2], 5, 20));
@@ -50,7 +50,8 @@ namespace Switchboard.Domain.Tests
 
             calls.Tick(10);
 
-            Assert.That(emergency.State, Is.EqualTo(CallState.Incoming));
+            Assert.That(emergency.State, Is.EqualTo(CallState.Taken));
+            Assert.That(regular.State, Is.EqualTo(CallState.Taken));
             Assert.That(emergency.ResponseSecondsLeft, Is.EqualTo(20).Within(1e-9));
         }
 
@@ -107,7 +108,7 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void MissingTheCallInHandLeavesNothingInHandAndTheHalfPatchedCordIsRefused()
+        public void MissingAnOrderDoesNotRemoveOrRefuseItsWire()
         {
             Call call = calls.Add(world.EmergencyRequest(0));
             desk.TryTake(call.Id);
@@ -125,13 +126,13 @@ namespace Switchboard.Domain.Tests
 
             desk.OnCircuitClosed(new CordId(0), caller, Jack(call.Request.Recipient));
 
-            Assert.That(board.Refused, Is.EqualTo(new[] { new CordId(0) }));
+            Assert.That(board.Refused, Is.Empty);
             Assert.That(desk.HalfPatched, Is.Empty);
             Assert.That(desk.CallOn(new CordId(0)), Is.Null);
         }
 
         [Test]
-        public void ANewCallTakenAfterAMissStillSeesTheHalfPatchedCord()
+        public void AnUnrelatedNewCallAfterAMissDoesNotUseTheOldHalfCord()
         {
             Call missed = calls.Add(world.EmergencyRequest(0));
             desk.TryTake(missed.Id);
@@ -141,7 +142,7 @@ namespace Switchboard.Domain.Tests
 
             desk.TryTake(next.Id);
 
-            Assert.That(next.State, Is.EqualTo(CallState.Connecting));
+            Assert.That(next.State, Is.EqualTo(CallState.Taken));
         }
 
         [Test]

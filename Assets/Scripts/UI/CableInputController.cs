@@ -130,10 +130,11 @@ namespace Switchboard.UI
             SocketView socket = target != null ? target.GetComponentInParent<SocketView>() : null;
             StoredCableView stored = target != null ? target.GetComponentInParent<StoredCableView>() : null;
             bool overTray = target != null && tray != null && target.transform.IsChildOf(tray);
+            bool overCall = target != null && target.GetComponentInParent<Switchboard.Game.CallCardView>() != null;
             if (leftPressed)
             {
                 if (socket != null) HandleSocketClick(socket);
-                else if (ActiveCable != null)
+                else if (ActiveCable != null && !overCall)
                 {
                     if (heldCable.Phase == CablePhase.Held || overTray)
                     {

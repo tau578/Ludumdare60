@@ -57,7 +57,7 @@ namespace Switchboard.Domain.Tests
             Assert.That(call.Request.ConnectionFeeCents, Is.GreaterThan(0));
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.Finished));
             Assert.That(session.Wallet.Cents, Is.EqualTo(expected));
-            Assert.That(board.Returned, Is.EqualTo(new[] { new CordId(0) }));
+            Assert.That(board.Returned, Is.Empty);
         }
 
         [Test]
@@ -84,7 +84,7 @@ namespace Switchboard.Domain.Tests
             JackId callerJack = session.Directory.JackOf(call.Request.CallerPerson);
             JackId wrongJack = callerJack == TestWorld.A1 ? TestWorld.B2 : TestWorld.A1;
             if (wrongJack == session.Directory.JackOf(call.Request.Recipient)) wrongJack = TestWorld.C3;
-            session.Desk.OnCircuitClosed(new CordId(1), callerJack, wrongJack);
+            session.Desk.OnCircuitClosed(new CordId(1), callerJack, wrongJack, callerJack);
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.WrongConnection));
 
             Advance(19.9);
@@ -111,7 +111,7 @@ namespace Switchboard.Domain.Tests
                 crowded.Directory.JackOf(connected.Request.Recipient));
             Call wrong = crowded.Calls.Live[1];
             crowded.Desk.TryTake(wrong.Id);
-            crowded.Desk.OnCircuitClosed(new CordId(1), new JackId("J1"), new JackId("J99"));
+            crowded.Desk.OnCircuitClosed(new CordId(1), crowded.Directory.JackOf(wrong.Request.CallerPerson), new JackId("J99"), crowded.Directory.JackOf(wrong.Request.CallerPerson));
             Assert.That(crowded.Callbacks.Pending.Count, Is.EqualTo(1));
             crowded.Desk.TryTake(crowded.Calls.Live[1].Id);
             crowded.Desk.OnPlugInserted(new CordId(2), new JackId("J5"));
@@ -128,7 +128,7 @@ namespace Switchboard.Domain.Tests
             Assert.That(crowded.Callbacks.Pending, Is.Empty);
             Assert.That(reasons, Has.All.EqualTo(CallEndReason.Cleared));
             Assert.That(reasons.Count, Is.GreaterThanOrEqualTo(3));
-            Assert.That(board.Returned, Is.EquivalentTo(new[] { new CordId(0), new CordId(2) }));
+            Assert.That(board.Returned, Is.EquivalentTo(new[] { new CordId(0), new CordId(1), new CordId(2) }));
             Assert.That(crowded.Desk.HalfPatched, Is.Empty);
             Assert.That(crowded.Wallet.Cents, Is.EqualTo(cents));
             crowded.Tick(0.05);

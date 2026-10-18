@@ -126,7 +126,7 @@ namespace Switchboard.Domain.Tests
 
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.Finished));
             Assert.That(wallet.Cents, Is.EqualTo(10 + 5 * 20));
-            Assert.That(board.Returned, Is.EqualTo(new[] { Cord }));
+            Assert.That(board.Returned, Is.Empty);
         }
 
         [Test]
@@ -143,16 +143,16 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void ReplugElsewhereWithNoCallInHandCutsTheCallOffAndRefusesTheNewCircuit()
+        public void ReplugElsewhereCutsTheCallOffAndKeepsTheNewCircuit()
         {
             Call call = ConnectAdaToBasil();
             desk.OnCircuitOpened(Cord, TestWorld.A1, TestWorld.B2);
-            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3);
+            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3, TestWorld.A1);
 
             Assert.That(call.State, Is.EqualTo(CallState.Ended));
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.DisconnectedEarly));
-            Assert.That(board.Refused, Is.EqualTo(new[] { Cord }));
-            Assert.That(board.Returned, Is.Empty, "the refusal alone sends the cord back");
+            Assert.That(board.Refused, Is.Empty);
+            Assert.That(board.Returned, Is.Empty, "the player owns the physical wiring");
             Assert.That(desk.CallOn(Cord), Is.Null);
         }
 
@@ -166,7 +166,7 @@ namespace Switchboard.Domain.Tests
             Call fresh = TakeClaraCall(world.Ada);
             Assert.That(fresh.State, Is.EqualTo(CallState.Taken), "the on-hold cord isn't half-patched for the call in hand");
 
-            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3);
+            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3, TestWorld.A1);
 
             Assert.That(held.EndReason, Is.EqualTo(CallEndReason.DisconnectedEarly));
             Assert.That(fresh.State, Is.EqualTo(CallState.Connected));
@@ -178,18 +178,18 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void ReplugElsewhereOnAWrongPairForTheCallInHandIsAWrongNumber()
+        public void ReplugOneEndCutsOffHeldCallButDoesNotFailANewerOrder()
         {
             Call held = ConnectAdaToBasil();
             desk.OnCircuitOpened(Cord, TestWorld.A1, TestWorld.B2);
             Call fresh = TakeClaraCall(world.Basil);
 
-            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3);
+            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3, TestWorld.A1);
 
             Assert.That(held.EndReason, Is.EqualTo(CallEndReason.DisconnectedEarly));
-            Assert.That(fresh.EndReason, Is.EqualTo(CallEndReason.WrongConnection));
-            Assert.That(board.Returned, Is.EqualTo(new[] { Cord }));
-            Assert.That(ended.Count, Is.EqualTo(2));
+            Assert.That(fresh.State, Is.EqualTo(CallState.Taken));
+            Assert.That(board.Returned, Is.Empty);
+            Assert.That(ended.Count, Is.EqualTo(1));
             Assert.That(ended[0].Call, Is.SameAs(held));
         }
 
@@ -220,7 +220,7 @@ namespace Switchboard.Domain.Tests
             Call next = TakeClaraCall(world.Ada);
             desk.OnPlugInserted(Cord, TestWorld.A1);
             Assert.That(next.State, Is.EqualTo(CallState.Connecting));
-            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.B2);
+            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.B2, TestWorld.A1);
             Assert.That(next.EndReason, Is.EqualTo(CallEndReason.WrongConnection), "judged, not mistaken for a restore");
         }
 
@@ -241,7 +241,7 @@ namespace Switchboard.Domain.Tests
             Assert.That(other.CentsEarned, Is.EqualTo(24).Within(1e-9));
             Assert.That(held.State, Is.EqualTo(CallState.OnHold));
             Assert.That(held.CentsEarned, Is.EqualTo(heldEarned));
-            Assert.That(board.Returned, Is.EqualTo(new[] { OtherCord }));
+            Assert.That(board.Returned, Is.Empty);
             Assert.That(desk.CallOn(Cord), Is.SameAs(held));
         }
 

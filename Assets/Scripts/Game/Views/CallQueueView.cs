@@ -38,8 +38,19 @@ namespace Switchboard.Game
         private Vector2 slotSize;
         private bool showDurations;
         private bool warnedFull;
+        private Action synchronizeBoard;
 
         /// <summary>Dev panel: show each call's hidden duration on its card.</summary>
+        public bool HasSpeakingCaller
+        {
+            get
+            {
+                foreach (CallCardView card in shown)
+                    if (card != null && card.IsGivingTask) return true;
+                return false;
+            }
+        }
+
         public bool ShowDurations
         {
             get => showDurations;
@@ -52,11 +63,13 @@ namespace Switchboard.Game
 
         public void Bind(CallService callService, OperatorDesk operatorDesk, EarningsService earningsService,
             PenaltyService penaltyService, RectTransform[] callerSlots, Func<IPerson, Sprite> portraits,
-            Func<CordId, Color> cordColors, Func<ICallerType, CallCardStyle> cardStyles, Notepad notes = null)
+            Func<CordId, Color> cordColors, Func<ICallerType, CallCardStyle> cardStyles, Notepad notes = null,
+            Action syncBoard = null)
         {
             Unsubscribe();
             calls = callService;
             desk = operatorDesk;
+            synchronizeBoard = syncBoard;
             earnings = earningsService;
             penalties = penaltyService;
             notepad = notes;
@@ -149,7 +162,15 @@ namespace Switchboard.Game
 
         private void OnCardClicked(CallCardView clicked)
         {
-            if (desk == null || !desk.TryTake(clicked.Call.Id)) return;
+            if (desk == null || clicked.Call == null || clicked.Call.State == CallState.Ended) return;
+            bool newOrder = clicked.Call.State == CallState.Incoming;
+            if (newOrder)
+            {
+                synchronizeBoard?.Invoke();
+                if (!desk.TryTake(clicked.Call.Id)) return;
+            }
+            foreach (CallCardView card in shown) card.SetDetailsVisible(card == clicked);
+            if (!newOrder) return;
             clicked.PlayPress();
             if (takeSound != null) takeSound.Play();
         }

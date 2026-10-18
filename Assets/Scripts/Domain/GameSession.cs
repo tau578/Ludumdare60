@@ -80,7 +80,7 @@ namespace Switchboard.Domain
         {
             Callbacks.Clear();
             while (Calls.Live.Count > 0) Calls.End(Calls.Live[Calls.Live.Count - 1].Id, CallEndReason.Cleared);
-            Desk.ReturnHalfPatchedCords();
+            Desk.ReturnAllCords();
         }
     }
 }

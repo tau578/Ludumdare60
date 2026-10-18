@@ -101,7 +101,7 @@ namespace Switchboard.Domain.Tests
             desk.TryTake(call.Id);
 
             desk.OnCircuitClosed(new CordId(0), world.Directory.JackOf(call.Request.CallerPerson),
-                world.Directory.JackOf(world.Services[1]));
+                world.Directory.JackOf(world.Services[1]), world.Directory.JackOf(call.Request.CallerPerson));
 
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.WrongConnection));
             Assert.That(wallet.Cents, Is.EqualTo(800));

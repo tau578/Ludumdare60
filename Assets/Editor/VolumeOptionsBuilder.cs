@@ -58,20 +58,20 @@ namespace Switchboard.Editor
             var cablePrefab = PrefabUtility.LoadPrefabContents("Assets/Prefabs/CableInteraction.prefab");
             try
             {
-                foreach (var source in cablePrefab.GetComponentsInChildren<AudioSource>(true)) Bind(source, AudioVolumeChannel.Sfx);
+                foreach (var source in cablePrefab.GetComponentsInChildren<AudioSource>(true)) Bind(source, AudioVolumeChannel.Sfx, 1f);
                 PrefabUtility.SaveAsPrefabAsset(cablePrefab, "Assets/Prefabs/CableInteraction.prefab");
             }
             finally { PrefabUtility.UnloadPrefabContents(cablePrefab); }
             EditorSceneManager.MarkSceneDirty(scene);
         }
 
-        static void Bind(AudioSource source, AudioVolumeChannel channel)
+        static void Bind(AudioSource source, AudioVolumeChannel channel, float baseVolume = .6f)
         {
             if (source == null) return;
             var binding = source.GetComponent<AudioChannelSource>();
             if (binding == null) binding = source.gameObject.AddComponent<AudioChannelSource>();
-            source.volume = .6f;
-            binding.Configure(channel, .6f);
+            source.volume = baseVolume;
+            binding.Configure(channel, baseVolume);
             PrefabUtility.RecordPrefabInstancePropertyModifications(source);
             PrefabUtility.RecordPrefabInstancePropertyModifications(binding);
         }

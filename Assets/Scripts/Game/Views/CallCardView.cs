@@ -4,6 +4,7 @@ using Switchboard.Domain;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace Switchboard.Game
@@ -17,7 +18,6 @@ namespace Switchboard.Game
     {
         [SerializeField] private Image portrait;
         [SerializeField] private TMP_Text rateLabel;
-        [SerializeField] private Graphic ringingPulse;
         [SerializeField] private GameObject stamp;
         [SerializeField] private TMP_Text stampLabel;
         [SerializeField] private Outline stampOutline;
@@ -56,7 +56,6 @@ namespace Switchboard.Game
         private GameObject durationBadge;
         [SerializeField] private TMP_Text durationLabel;
         [SerializeField, Min(0)] private float stampSeconds = 1.5f;
-        [SerializeField, Min(0)] private float pulsesPerSecond = 1.5f;
         [SerializeField, Tooltip("Squashes and bounces when a click takes the call.")]
         private RectTransform pressTarget;
         [SerializeField, Tooltip("A white copy of the portrait that flashes on the press.")]
@@ -64,13 +63,25 @@ namespace Switchboard.Game
         [SerializeField, Min(0.01f)] private float pressSeconds = 0.2f;
         [SerializeField, Range(0, 1)] private float pressFlashAlpha = 0.45f;
 
+        [SerializeField] private Color newOrderInk = new Color32(123, 82, 32, 255);
+        [SerializeField, FormerlySerializedAs("newOrderPopSeconds"), Min(.05f)] private float stampPopSeconds = .38f;
+        [SerializeField, FormerlySerializedAs("newOrderOvershoot"), Range(1, 1.4f)] private float stampOvershoot = 1.16f;
+        [SerializeField, Min(.01f)] private float stampExitSeconds = .22f;
+        private RectTransform stampRect;
+        private CanvasGroup stampGroup;
+        private StampExitAnimation stampExit;
+        private bool endingStampExit;
+        private bool finishedRaised;
+        private Vector2 stampSize;
+        private Vector3 stampScale;
+        private bool showingStamp;
+        private CallState shownStampState;
+        private float stampPopTime = -1;
         private Sprite defaultPortrait;
-        private Color pulseColor;
         private Color earningsColor;
         private Color rateOutlineColor;
         private Color typeBadgeColor;
         private Color ringColor;
-        private Color haloColor;
         private Vector2 callbackBadgePosition;
         private float shownRingFill = -1;
         private bool ringWasUrgent;
@@ -82,14 +93,17 @@ namespace Switchboard.Game
         private readonly TypingReveal typing = new TypingReveal();
         private string typedText;
         private float pressTime = -1;
+        private bool detailsVisible;
 
         public event Action<CallCardView> Clicked;
 
-        /// <summary>Raised when the stamp has shown long enough and the card can leave its slot.</summary>
+        /// <summary>Raised after the status stamp's display time and exit animation finish.</summary>
         public event Action<CallCardView> Finished;
 
         public Call Call { get; private set; }
         public bool ShowDuration { get; set; }
+        public bool IsSpeechBubbleVisible => Call != null && speechBubble != null && speechBubble.activeInHierarchy;
+        public bool IsGivingTask => IsSpeechBubbleVisible && (Call.State == CallState.Taken || Call.State == CallState.Connecting);
 
         public void Show(Call call, Sprite callerPortrait, Func<CordId, Color> cordColorOf, CallCardStyle style)
         {
@@ -106,6 +120,9 @@ namespace Switchboard.Game
             shownCents = -1;
             shownSeconds = -1;
             typedText = null;
+            detailsVisible = false;
+            ResetStamp();
+            finishedRaised = false;
             StopPress();
             Refresh();
         }
@@ -120,7 +137,6 @@ namespace Switchboard.Game
             bool onCord = state == CallState.Connected || onHold;
 
             bool waiting = state == CallState.Incoming || inHand;
-            ringingPulse.gameObject.SetActive(state == CallState.Incoming);
             // The type badge sits on top while the call waits; once connected the earnings take that place.
             bool showTypeBadge = waiting && typeBadge != null && !string.IsNullOrEmpty(typeBadgeLabel.text);
             if (typeBadge != null) typeBadge.SetActive(showTypeBadge);
@@ -134,20 +150,36 @@ namespace Switchboard.Game
             if (onCord && Call.Cord is CordId cord && cordColors != null) cordRing.color = Faded(cordColors(cord), onHold);
             earningsLabel.color = Faded(earningsColor, onHold);
 
-            speechBubble.SetActive(inHand || onCord);
-            if (inHand || onCord)
+            bool showSpeech = detailsVisible && (inHand || onCord);
+            speechBubble.SetActive(showSpeech);
+            if (showSpeech)
                 Say(onHold ? "On hold"
                     : onCord ? "On the line"
                     : InHandText());
             else typedText = null;
 
-            stamp.SetActive(state == CallState.Ended);
-            if (state != CallState.Ended) return;
+            if (state == CallState.Incoming)
+            {
+                ShowStamp(state);
+                stampLabel.text = "New order!";
+                stampLabel.color = stampOutline.effectColor = newOrderInk;
+                return;
+            }
+            if (state != CallState.Ended)
+            {
+                DismissStamp();
+                return;
+            }
             durationBadge.SetActive(false);
             feePopup.Hide();
             // Cleared calls leave at once; the others show what happened for a moment.
-            stampTimeLeft = Call.EndReason == CallEndReason.Cleared ? 0 : stampSeconds;
-            stamp.SetActive(stampTimeLeft > 0);
+            if (Call.EndReason == CallEndReason.Cleared || stampSeconds <= 0)
+            {
+                ResetStamp();
+                stampTimeLeft = 0;
+                return;
+            }
+            if (!endingStampExit && ShowStamp(state)) stampTimeLeft = stampSeconds;
             RefreshStamp();
         }
 
@@ -175,6 +207,13 @@ namespace Switchboard.Game
 
         public void ShowConnectionFee(double cents) => feePopup.Show("+" + MoneyFormat.Cents(cents));
 
+        public void SetDetailsVisible(bool visible)
+        {
+            if (detailsVisible == visible) return;
+            detailsVisible = visible;
+            Refresh();
+        }
+
         /// <summary>A quick squash, bounce and brighten for a click that took the call.</summary>
         public void PlayPress()
         {
@@ -191,6 +230,9 @@ namespace Switchboard.Game
             cordColors = null;
             speechBubble.SetActive(false);
             typedText = null;
+            // A full queue may reuse this card before its normal lifetime ends.
+            // Let its stamp finish independently, without delaying the new call.
+            DismissStamp();
             StopPress();
             feePopup.Hide();
             gameObject.SetActive(false);
@@ -198,7 +240,7 @@ namespace Switchboard.Game
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (eventData.button == PointerEventData.InputButton.Left && Call != null && Call.State == CallState.Incoming)
+            if (eventData.button == PointerEventData.InputButton.Left && Call != null && Call.State != CallState.Ended)
                 Clicked?.Invoke(this);
         }
 
@@ -207,7 +249,15 @@ namespace Switchboard.Game
             if (initialized) return;
             initialized = true;
             defaultPortrait = portrait.sprite;
-            pulseColor = ringingPulse.color;
+            stampRect = (RectTransform)stamp.transform;
+            stampSize = stampRect.rect.size;
+            stampScale = stamp.transform.localScale;
+            stampGroup = stamp.GetComponent<CanvasGroup>();
+            if (stampGroup == null) stampGroup = stamp.AddComponent<CanvasGroup>();
+            stampGroup.blocksRaycasts = false;
+            stampGroup.interactable = false;
+            stampExit = stamp.GetComponent<StampExitAnimation>();
+            if (stampExit == null) stampExit = stamp.AddComponent<StampExitAnimation>();
             earningsColor = earningsLabel.color;
             if (rateOutline != null) rateOutlineColor = rateOutline.effectColor;
             if (typeBadgeBackground != null) typeBadgeColor = typeBadgeBackground.color;
@@ -216,13 +266,11 @@ namespace Switchboard.Game
         }
 
         // Not colour alone (Design 5.4): the badge text and the ring carry the meaning, the accent only adds to it.
-        // The ring keeps its own light colour, so it reads against an accent-tinted halo.
         private void ApplyStyle(CallCardStyle style)
         {
             if (typeBadgeLabel != null) typeBadgeLabel.text = style.HasBadge ? style.badgeText : string.Empty;
             if (typeBadgeBackground != null) typeBadgeBackground.color = style.HasAccent ? Opaque(style.accent, typeBadgeColor.a) : typeBadgeColor;
             if (rateOutline != null) rateOutline.effectColor = style.HasAccent ? Opaque(style.accent, rateOutlineColor.a) : rateOutlineColor;
-            haloColor = style.HasAccent ? Opaque(style.accent, pulseColor.a) : pulseColor;
             if (responseRing == null) return;
             responseRing.color = ringColor;
             responseRing.rectTransform.localScale = Vector3.one;
@@ -235,8 +283,9 @@ namespace Switchboard.Game
             if (Call == null) return;
             if (pressTime >= 0) AnimatePress();
             if (typing.IsTyping) TypeOn();
-            if (Call.State == CallState.Incoming) Pulse();
-            else if (Call.State == CallState.Ended && (stampTimeLeft -= Time.deltaTime) <= 0) Finished?.Invoke(this);
+            if (stampPopTime >= 0) AnimateStamp();
+            if (Call.State == CallState.Ended && !finishedRaised && !endingStampExit && (stampTimeLeft -= Time.deltaTime) <= 0)
+                FinishWithStampExit();
         }
 
         // Earnings and the dev duration change every frame; the text changes only when the shown number does.
@@ -294,11 +343,86 @@ namespace Switchboard.Game
             }
         }
 
-        private void Pulse()
+        private void AnimateStamp()
         {
-            float wave = 0.5f + 0.5f * Mathf.Sin(Time.time * pulsesPerSecond * Mathf.PI * 2f);
-            ringingPulse.color = new Color(haloColor.r, haloColor.g, haloColor.b, haloColor.a * (0.35f + 0.65f * wave));
-            ringingPulse.rectTransform.localScale = Vector3.one * (1f + 0.1f * wave);
+            // Bound loading hitches so the first visible frames still show the pop.
+            stampPopTime += Mathf.Min(Time.unscaledDeltaTime, .05f);
+            float t = Mathf.Clamp01(stampPopTime / Mathf.Max(.05f, stampPopSeconds));
+            float scale = t < .55f
+                ? Mathf.Lerp(.05f, stampOvershoot, 1f - Mathf.Pow(1f - t / .55f, 3))
+                : t < .82f ? Mathf.Lerp(stampOvershoot, .97f, Mathf.SmoothStep(0, 1, (t - .55f) / .27f))
+                : Mathf.Lerp(.97f, 1, Mathf.SmoothStep(0, 1, (t - .82f) / .18f));
+            stamp.transform.localScale = stampScale * scale;
+            if (t >= 1) { stamp.transform.localScale = stampScale; stampPopTime = -1; }
+        }
+
+        // All statuses share the same rectangle and animation. Text/fine refreshes do not replay it.
+        private bool ShowStamp(CallState state)
+        {
+            if (showingStamp && shownStampState == state) return false;
+            if (stamp.activeSelf) LeaveExitingCopy();
+            stampExit.Cancel();
+            endingStampExit = false;
+            StopPress();
+            showingStamp = true;
+            shownStampState = state;
+            stampRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, stampSize.x);
+            stampRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, stampSize.y);
+            stamp.SetActive(true);
+            stampGroup.alpha = 1;
+            stampPopTime = 0;
+            stamp.transform.localScale = stampScale * .05f;
+            return true;
+        }
+
+        private void DismissStamp()
+        {
+            if (initialized && stamp.activeSelf) LeaveExitingCopy();
+            ResetStamp();
+        }
+
+        private void LeaveExitingCopy()
+        {
+            // Keep world geometry, but leave the card's press animation and pool lifecycle behind.
+            var departing = Instantiate(stamp, stamp.transform.parent, false);
+            departing.name = "DepartingStamp";
+            departing.transform.SetParent(transform.parent, true);
+            departing.GetComponent<StampExitAnimation>().Play(stampExitSeconds, () => Destroy(departing));
+        }
+
+        private void FinishWithStampExit()
+        {
+            if (!stamp.activeSelf)
+            {
+                FinishCard();
+                return;
+            }
+            endingStampExit = true;
+            stampPopTime = -1;
+            StopPress();
+            stampExit.Play(stampExitSeconds, () =>
+            {
+                ResetStamp();
+                FinishCard();
+            });
+        }
+
+        private void FinishCard()
+        {
+            if (finishedRaised) return;
+            finishedRaised = true;
+            Finished?.Invoke(this);
+        }
+
+        private void ResetStamp()
+        {
+            showingStamp = false;
+            endingStampExit = false;
+            stampPopTime = -1;
+            if (stampExit != null) stampExit.Cancel();
+            if (stampGroup != null) stampGroup.alpha = 1;
+            if (initialized) stamp.transform.localScale = stampScale;
+            stamp.SetActive(false);
         }
 
         // Restarts only when the words change, so Taken to Connecting keeps typing where it was.
@@ -322,7 +446,7 @@ namespace Switchboard.Game
             speechLabel.maxVisibleCharacters = now;
         }
 
-        // The caller's talking sound will play from here (Step 8).
+        // Reserved for character-specific effects; SceneUiAudio owns the shared task babble.
         private void OnCharacterShown(int index)
         {
         }

@@ -95,7 +95,7 @@ namespace Switchboard.Domain.Tests
 
         [TestCase(CallState.Taken)]
         [TestCase(CallState.Connecting)]
-        public void TakingAnotherCardPutsTheCallInHandBackToRinging(CallState inHandState)
+        public void TakingAnotherCardDoesNotResetAnAcceptedOrder(CallState inHandState)
         {
             var world = new TestWorld();
             var calls = new CallService();
@@ -104,11 +104,11 @@ namespace Switchboard.Domain.Tests
 
             Assert.That(calls.Take(other.Id), Is.True);
 
-            Assert.That(old.State, Is.EqualTo(CallState.Incoming));
+            Assert.That(old.State, Is.EqualTo(inHandState));
             Assert.That(other.State, Is.EqualTo(CallState.Taken));
             Assert.That(calls.InHand, Is.SameAs(other));
-            Assert.That(calls.Take(old.Id), Is.True, "the swapped-out card can be taken again");
-            Assert.That(other.State, Is.EqualTo(CallState.Incoming));
+            Assert.That(calls.Take(old.Id), Is.False, "already accepted; rereading belongs to the view");
+            Assert.That(other.State, Is.EqualTo(CallState.Taken));
         }
 
         [Test]

@@ -55,12 +55,13 @@ namespace Switchboard.Game
             if (callerSlots.Length < config.MaxWaitingCalls)
                 Debug.LogWarning($"The caller panel has {callerSlots.Length} slots but GameConfig allows {config.MaxWaitingCalls} calls.", config);
             callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, Session.Penalties, callerSlots, PortraitOf,
-                cordBridge.ColorOf, CardStyleOf, Session.Notepad);
+                cordBridge.ColorOf, CardStyleOf, Session.Notepad, cordBridge.Synchronize);
             PhoneBookView book = FindSingle<PhoneBookView>(scene);
             if (book != null) bookLink = new NotepadBookLink(book, Session.Stats, Session.Notepad);
             shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene));
             goalPanel.Bind(Session.Goal);
             loopRunner.Bind(Session);
+            if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             // Added at runtime so no scene or prefab references a type that release builds leave out.
             gameObject.AddComponent<DevPanel>().Bind(Session, callQueue);

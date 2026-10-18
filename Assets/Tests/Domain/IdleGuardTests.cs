@@ -116,8 +116,9 @@ namespace Switchboard.Domain.Tests
             session.ClearCalls();
             Call wrong = session.Calls.Add(world.EmergencyRequest(0));
             session.Desk.TryTake(wrong.Id);
-            session.Desk.OnCircuitClosed(new CordId(nextCord++), session.Directory.JackOf(wrong.Request.CallerPerson),
-                session.Directory.JackOf(world.People[5]));
+            var wrongCord = new CordId(nextCord++);
+            session.Desk.OnCircuitClosed(wrongCord, session.Directory.JackOf(wrong.Request.CallerPerson),
+                session.Directory.JackOf(world.People[5]), session.Directory.JackOf(wrong.Request.CallerPerson));
             Assert.That(session.Callbacks.CountPending(world.Emergency), Is.EqualTo(1));
 
             Advance(120, input: false);
