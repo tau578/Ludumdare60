@@ -33,6 +33,7 @@ namespace Switchboard.UI
         public uint InsertionRevision { get; private set; }
         public SocketView LastInsertionAnchor { get; private set; }
         public bool LastInsertionWasManual { get; private set; }
+        public event System.Action<CableController> PickedUp;
 
         public CablePhase Phase => Connection.Phase;
         public SocketView FirstSocket => Connection.FirstSocket;
@@ -86,6 +87,7 @@ namespace Switchboard.UI
         {
             if (!Connection.TryPickUp()) return false;
             RefreshVisuals();
+            PickedUp?.Invoke(this);
             return true;
         }
 

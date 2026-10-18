@@ -20,6 +20,8 @@ namespace Switchboard.UI
         private string configError;
 
         public bool IsOpen { get; private set; }
+        public event System.Action<bool> OpenChanged;
+        public Graphic ClosedBookGraphic => closedBook != null ? closedBook.targetGraphic : null;
         public int CurrentSpreadIndex { get; private set; }
         public int ContactCount => directory.contacts.Length;
         public bool CanGoBack => CurrentSpreadIndex > 0;
@@ -150,9 +152,11 @@ namespace Switchboard.UI
 
         public void SetOpen(bool value)
         {
+            bool changed = IsOpen != value;
             IsOpen = value;
             closedBook.gameObject.SetActive(!value);
             openBook.gameObject.SetActive(value);
+            if (changed) OpenChanged?.Invoke(value);
         }
     }
 }

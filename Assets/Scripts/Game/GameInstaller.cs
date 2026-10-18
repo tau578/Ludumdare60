@@ -54,6 +54,11 @@ namespace Switchboard.Game
             goalPanel.Bind(Session.Goal);
             loopRunner.Bind(Session);
             if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls, Session.Earnings);
+            var guide = GetComponent<FirstOrderGuide>();
+            if (guide == null) guide = gameObject.AddComponent<FirstOrderGuide>();
+            var books = LevelScene.FindAll<PhoneBookView>(scene);
+            guide.Bind(callQueue, Session.Calls, books.Count > 0 ? books[0] : null,
+                LevelScene.FindAll<CableController>(scene).ToArray());
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             // Added at runtime so no scene or prefab references a type that release builds leave out.
             gameObject.AddComponent<DevPanel>().Bind(Session, callQueue);

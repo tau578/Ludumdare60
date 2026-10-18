@@ -39,6 +39,8 @@ namespace Switchboard.Game
         private bool warnedFull;
         private Action synchronizeBoard;
         private MoneyCounterView moneyCounter;
+        public event Action<CallCardView> OrderShown;
+        public event Action<CallCardView> CardOpened;
 
         /// <summary>Dev panel: show each call's hidden duration on its card.</summary>
         public bool HasSpeakingCaller
@@ -143,6 +145,7 @@ namespace Switchboard.Game
             card.Show(e.Call, portraitOf?.Invoke(e.Call.Request.CallerPerson), cordColorOf, style);
             shown.Add(card);
             SnapToSlot(card, shown.Count - 1);
+            OrderShown?.Invoke(card);
         }
 
         private void OnCallStateChanged(CallStateChangedArgs e) => CardOf(e.Call)?.Refresh();
@@ -168,6 +171,7 @@ namespace Switchboard.Game
                 if (!desk.TryTake(clicked.Call.Id)) return;
             }
             foreach (CallCardView card in shown) card.SetDetailsVisible(card == clicked);
+            CardOpened?.Invoke(clicked);
             if (!newOrder) return;
             clicked.PlayPress();
             if (takeSound != null) takeSound.Play();

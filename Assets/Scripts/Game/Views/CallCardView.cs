@@ -103,6 +103,7 @@ namespace Switchboard.Game
         public bool ShowDuration { get; set; }
         public bool IsSpeechBubbleVisible => Call != null && speechBubble != null && speechBubble.activeInHierarchy;
         public bool IsGivingTask => IsSpeechBubbleVisible && (Call.State == CallState.Taken || Call.State == CallState.Connecting);
+        public bool IsTaskTextComplete => IsGivingTask && !typing.IsTyping;
 
         public void Show(Call call, Sprite callerPortrait, Func<CordId, Color> cordColorOf, CallCardStyle style)
         {
