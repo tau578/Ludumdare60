@@ -54,7 +54,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
   m_PlayOnAwake: 0
-  m_Volume: 0.6
+  m_Volume: 1
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -158,9 +158,9 @@ MonoBehaviour:
   trayCableView: {fileID: 0}
   cableColor: {r: 0.69803923, g: 0.3882353, b: 0.2, a: 1}
   audioSource: {fileID: 2646949178535164421}
-  insertSound: {fileID: 8300000, guid: d62cbd4ee2f386042ba40e3cb5be364f, type: 3}
-  removeSound: {fileID: 8300000, guid: 9d6a47065b57f364fa4f6684a682a686, type: 3}
-  blockedSound: {fileID: 8300000, guid: 2d95309e87e6b264b9f25859f5158a74, type: 3}
+  insertSound: {fileID: 8300000, guid: 02c0701636190f74a8994761934dc500, type: 3}
+  removeSound: {fileID: 8300000, guid: 8ae3748b2c6102649b9b7f98238329e7, type: 3}
+  blockedSound: {fileID: 8300000, guid: 265bf43ca32af7f4fb44fcdc4dc892bc, type: 3}
 --- !u!114 &1193999923503207209
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -174,7 +174,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.AudioChannelSource
   channel: 2
-  baseVolume: 0.6
+  baseVolume: 1
 --- !u!1 &311595538540280149
 GameObject:
   m_ObjectHideFlags: 0

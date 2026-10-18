@@ -58,7 +58,10 @@ namespace Switchboard.Game
         private CableController CableAt(CordId cord) =>
             cord.Index >= 0 && cord.Index < cables.Length ? cables[cord.Index] : null;
 
-        private void LateUpdate()
+        private void LateUpdate() => Synchronize();
+
+        // Also called before accepting a card, so plugs placed earlier in the same frame are visible.
+        public void Synchronize()
         {
             if (desk == null) return;
             for (int i = 0; i < cables.Length; i++)
@@ -105,8 +108,12 @@ namespace Switchboard.Game
                 desk.OnPlugInserted(cord, Jack(now.First != null ? now.First : now.Second));
                 if (Moved(index, now)) return;
             }
-            if (now.IsClosed && !before.IsSameCircuit(now))
-                desk.OnCircuitClosed(cord, Jack(now.First), Jack(now.Second));
+            if (now.IsClosed && (!before.IsSameCircuit(now) || !now.SameInsertions(before)))
+            {
+                JackId? manualAnchor = !now.SameInsertions(before) && now.LastInsertionWasManual && now.LastInsertionAnchor != null
+                    ? Jack(now.LastInsertionAnchor) : (JackId?)null;
+                desk.OnCircuitClosed(cord, Jack(now.First), Jack(now.Second), manualAnchor);
+            }
         }
 
         private bool Moved(int index, CordState expected) => !CordState.Of(cables[index]).Same(expected);
@@ -115,25 +122,32 @@ namespace Switchboard.Game
 
         private readonly struct CordState
         {
-            private CordState(CablePhase phase, SocketView first, SocketView second)
+            private CordState(CableController cable)
             {
-                Phase = phase;
-                First = first;
-                Second = second;
+                Phase = cable.Phase;
+                First = cable.FirstSocket;
+                Second = cable.SecondSocket;
+                InsertionRevision = cable.InsertionRevision;
+                LastInsertionAnchor = cable.LastInsertionAnchor;
+                LastInsertionWasManual = cable.LastInsertionWasManual;
             }
 
             public CablePhase Phase { get; }
             public SocketView First { get; }
             public SocketView Second { get; }
+            public uint InsertionRevision { get; }
+            public SocketView LastInsertionAnchor { get; }
+            public bool LastInsertionWasManual { get; }
             public int PlugCount => (First != null ? 1 : 0) + (Second != null ? 1 : 0);
             public bool IsClosed => Phase == CablePhase.Connected && First != null && Second != null;
 
             public static CordState Of(CableController cable) =>
-                new CordState(cable.Phase, cable.FirstSocket, cable.SecondSocket);
+                new CordState(cable);
 
             public bool Holds(SocketView socket) => socket != null && (First == socket || Second == socket);
             public bool IsSameCircuit(CordState other) => IsClosed && other.IsClosed && Holds(other.First) && Holds(other.Second);
-            public bool Same(CordState other) => Phase == other.Phase && First == other.First && Second == other.Second;
+            public bool SameInsertions(CordState other) => InsertionRevision == other.InsertionRevision;
+            public bool Same(CordState other) => Phase == other.Phase && First == other.First && Second == other.Second && SameInsertions(other);
         }
     }
 }

@@ -43,38 +43,38 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void WrongPairEndsTheCallAndReturnsTheCord()
+        public void WrongPairEndsTheCallAndLeavesTheCord()
         {
             Call call = TakeAdaWantsBasil();
-            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3);
+            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3, TestWorld.A1);
 
             Assert.That(call.State, Is.EqualTo(CallState.Ended));
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.WrongConnection));
-            Assert.That(board.Returned, Is.EqualTo(new[] { Cord }));
+            Assert.That(board.Returned, Is.Empty);
             Assert.That(board.Refused, Is.Empty);
             Assert.That(calls.InHand, Is.Null);
         }
 
         [Test]
-        public void CircuitClosedWithNoCallInHandIsRefused()
+        public void CircuitClosedBeforeAcceptanceStaysOnTheBoard()
         {
             Call waiting = calls.Add(world.AdaWantsBasil());
             desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.B2);
 
-            Assert.That(board.Refused, Is.EqualTo(new[] { Cord }));
+            Assert.That(board.Refused, Is.Empty);
             Assert.That(board.Returned, Is.Empty);
             Assert.That(waiting.State, Is.EqualTo(CallState.Incoming));
         }
 
         [Test]
-        public void FinishedCallReturnsItsCord()
+        public void FinishedCallLeavesItsCord()
         {
             Call call = TakeAdaWantsBasil();
             desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.B2);
             calls.Tick(20);
 
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.Finished));
-            Assert.That(board.Returned, Is.EqualTo(new[] { Cord }));
+            Assert.That(board.Returned, Is.Empty);
             Assert.That(desk.CallOn(Cord), Is.Null);
         }
 
@@ -86,7 +86,7 @@ namespace Switchboard.Domain.Tests
             desk.OnCordReturned(Cord);
 
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.DisconnectedEarly));
-            Assert.That(board.Returned, Is.EqualTo(new[] { Cord }));
+            Assert.That(board.Returned, Is.Empty);
         }
 
         [Test]
@@ -124,19 +124,19 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void SwappingWhileConnectingRingsTheOldCallAgainAndTheNewOneConnects()
+        public void AnotherAcceptedOrderDoesNotReactivateTheNewOrderLabel()
         {
             Call first = TakeAdaWantsBasil();
             desk.OnPlugInserted(Cord, TestWorld.A1);
-            Call second = calls.Add(world.AdaWantsBasil());
+            Call second = calls.Add(new CallRequest(world.Callers[2], world.Ada, 5, 20));
 
             Assert.That(desk.TryTake(second.Id), Is.True);
 
-            Assert.That(first.State, Is.EqualTo(CallState.Incoming));
+            Assert.That(first.State, Is.EqualTo(CallState.Connecting));
             Assert.That(second.State, Is.EqualTo(CallState.Connecting));
-            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.B2);
+            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3, TestWorld.A1);
             Assert.That(second.State, Is.EqualTo(CallState.Connected));
-            Assert.That(first.State, Is.EqualTo(CallState.Incoming));
+            Assert.That(first.State, Is.EqualTo(CallState.Taken));
         }
 
         [Test]
@@ -154,9 +154,9 @@ namespace Switchboard.Domain.Tests
         {
             Call call = TakeAdaWantsBasil();
             desk.OnPlugInserted(Cord, TestWorld.A1);
-            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3);
+            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3, TestWorld.A1);
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.WrongConnection));
-            Assert.That(board.Returned, Is.EqualTo(new[] { Cord }));
+            Assert.That(board.Returned, Is.Empty);
         }
 
         [Test]
@@ -170,12 +170,12 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void OpeningACircuitWithNoCallLeavesTheCordHalfPatched()
+        public void OpeningAnUnrelatedCircuitDoesNotChangeAnAcceptedOrder()
         {
             Call call = TakeAdaWantsBasil();
             desk.OnCircuitOpened(OtherCord, TestWorld.C3, TestWorld.A1);
             Assert.That(desk.HalfPatched, Is.EqualTo(new[] { OtherCord }));
-            Assert.That(call.State, Is.EqualTo(CallState.Connecting));
+            Assert.That(call.State, Is.EqualTo(CallState.Taken));
         }
 
         [Test]
@@ -206,7 +206,7 @@ namespace Switchboard.Domain.Tests
             calls.Tick(20);
             Assert.That(first.EndReason, Is.EqualTo(CallEndReason.Finished));
             Assert.That(second.State, Is.EqualTo(CallState.Connected));
-            Assert.That(board.Returned, Is.EqualTo(new[] { Cord }));
+            Assert.That(board.Returned, Is.Empty);
         }
     }
 }

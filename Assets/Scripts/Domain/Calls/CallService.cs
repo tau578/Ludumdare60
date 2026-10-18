@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Switchboard.Domain
 {
-    /// <summary>Owns the live calls, the call in hand and the call timers. It knows nothing about cords, money or UI.</summary>
+    /// <summary>Owns live calls and timers. Accepted calls remain active independently of UI selection.</summary>
     public sealed class CallService
     {
         private readonly List<Call> live = new List<Call>();
@@ -18,7 +18,7 @@ namespace Switchboard.Domain
         /// <summary>Every call that hasn't ended, in arrival order.</summary>
         public IReadOnlyList<Call> Live => live;
 
-        /// <summary>The one Taken or Connecting call, if any (D03).</summary>
+        /// <summary>Most recently accepted waiting call, for compatibility; never used to judge circuits.</summary>
         public Call InHand { get; private set; }
 
         public Call Find(CallId id)
@@ -52,17 +52,13 @@ namespace Switchboard.Domain
             return call;
         }
 
-        // Taking a card while another is in hand swaps them; the old one rings again with its timers running (D03).
+        // Accept once. Opening another card's text does not change either call's lifecycle.
         public bool Take(CallId id)
         {
             Call call = Find(id);
             if (call == null || call.State != CallState.Incoming) return false;
-            Call previous = InHand;
-            CallState previousFrom = previous?.State ?? CallState.Incoming;
-            if (previous != null) previous.State = CallState.Incoming;
             call.State = CallState.Taken;
             InHand = call;
-            if (previous != null) RaiseStateChanged(previous, previousFrom, CallState.Incoming);
             RaiseStateChanged(call, CallState.Incoming, CallState.Taken);
             return true;
         }
@@ -70,7 +66,7 @@ namespace Switchboard.Domain
         public bool BeginConnecting(CallId id)
         {
             Call call = Find(id);
-            if (call == null || call != InHand || call.State != CallState.Taken) return false;
+            if (call == null || call.State != CallState.Taken) return false;
             ChangeState(call, CallState.Connecting);
             return true;
         }
@@ -78,7 +74,7 @@ namespace Switchboard.Domain
         public bool CancelConnecting(CallId id)
         {
             Call call = Find(id);
-            if (call == null || call != InHand || call.State != CallState.Connecting) return false;
+            if (call == null || call.State != CallState.Connecting) return false;
             ChangeState(call, CallState.Taken);
             return true;
         }
@@ -88,7 +84,7 @@ namespace Switchboard.Domain
         {
             Call call = Find(id);
             if (call == null || (call.State != CallState.Taken && call.State != CallState.Connecting)) return false;
-            InHand = null;
+            if (InHand == call) InHand = null;
             ChangeState(call, CallState.Connected);
             return true;
         }

@@ -30,6 +30,9 @@ namespace Switchboard.UI
         private bool pointerInside;
         private Canvas firstPlugCanvas;
         private Canvas secondPlugCanvas;
+        public uint InsertionRevision { get; private set; }
+        public SocketView LastInsertionAnchor { get; private set; }
+        public bool LastInsertionWasManual { get; private set; }
 
         public CablePhase Phase => Connection.Phase;
         public SocketView FirstSocket => Connection.FirstSocket;
@@ -92,7 +95,7 @@ namespace Switchboard.UI
             if (!Connection.TryReturnToTray()) return false;
             if (first != null) first.Release(this);
             if (second != null) second.Release(this);
-            if (first != null || second != null) PlaySound(removeSound, 1f, 0.65f);
+            if (first != null || second != null) PlaySound(removeSound, 1f, 0.9f);
             pointerInside = false;
             RefreshVisuals();
             return true;
@@ -114,13 +117,20 @@ namespace Switchboard.UI
             RefreshVisuals();
         }
 
-        public bool TryInsert(SocketView socket)
+        public bool TryInsert(SocketView socket) => Insert(socket, true);
+
+        private bool Insert(SocketView socket, bool manual)
         {
             if (socket == null || !socket.isActiveAndEnabled || socket.PlugAnchor == null) return false;
             if (!Connection.CanInsert(socket)) return Reject();
             if (!socket.TryOccupy(this)) return Reject();
+            bool firstEnd = FirstSocket == null;
+            SocketView anchor = firstEnd ? SecondSocket : FirstSocket;
             if (!Connection.TryInsert(socket)) { socket.Release(this); return false; }
-            PlaySound(insertSound, Phase == CablePhase.Connected ? 1.07f : 1f, 0.75f);
+            InsertionRevision++;
+            LastInsertionAnchor = anchor;
+            LastInsertionWasManual = manual;
+            PlaySound(insertSound, Phase == CablePhase.Connected ? 1.07f : 1f, 1f);
             RefreshVisuals();
             return true;
         }
@@ -129,7 +139,7 @@ namespace Switchboard.UI
         {
             if (!Connection.TryRemove(socket)) return false;
             if (!Connection.Contains(socket)) socket.Release(this);
-            PlaySound(removeSound, 1f, 0.65f);
+            PlaySound(removeSound, 1f, 0.9f);
             RefreshVisuals();
             return true;
         }
@@ -137,7 +147,7 @@ namespace Switchboard.UI
         public bool TryRestoreConnection()
         {
             return Phase == CablePhase.OneEndConnected && Connection.ReconnectSocket != null &&
-                TryInsert(Connection.ReconnectSocket);
+                Insert(Connection.ReconnectSocket, false);
         }
 
         private bool Reject()
@@ -146,7 +156,7 @@ namespace Switchboard.UI
             return false;
         }
 
-        public void PlayBlockedFeedback() => PlaySound(blockedSound, 1f, 0.3f);
+        public void PlayBlockedFeedback() => PlaySound(blockedSound, 1f, 0.18f);
 
         private void RefreshVisuals()
         {

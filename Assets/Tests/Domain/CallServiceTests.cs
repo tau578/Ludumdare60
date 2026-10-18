@@ -74,7 +74,7 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void TakingAnotherCardSwapsTheCallInHand()
+        public void TakingAnotherCardLeavesBothOrdersAccepted()
         {
             var changes = new List<(Call call, CallState from, CallState to)>();
             Call first = calls.Add(world.AdaWantsBasil());
@@ -84,12 +84,11 @@ namespace Switchboard.Domain.Tests
 
             Assert.That(calls.Take(second.Id), Is.True);
 
-            Assert.That(first.State, Is.EqualTo(CallState.Incoming));
+            Assert.That(first.State, Is.EqualTo(CallState.Taken));
             Assert.That(second.State, Is.EqualTo(CallState.Taken));
             Assert.That(calls.InHand, Is.SameAs(second));
             Assert.That(changes, Is.EqualTo(new[]
             {
-                (first, CallState.Taken, CallState.Incoming),
                 (second, CallState.Incoming, CallState.Taken)
             }));
         }

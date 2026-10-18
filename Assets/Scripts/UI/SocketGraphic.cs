@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Sprites;
 
 namespace Switchboard.UI
 {
@@ -8,6 +9,9 @@ namespace Switchboard.UI
     public sealed class SocketGraphic : MaskableGraphic, ICanvasRaycastFilter
     {
         private const int Segments = 64;
+        [SerializeField] private Sprite faceSprite;
+        public Sprite FaceSprite { get => faceSprite; set { faceSprite = value; SetAllDirty(); } }
+        public override Texture mainTexture => faceSprite != null ? faceSprite.texture : base.mainTexture;
         [SerializeField, Min(1f)] private float hitRadiusScale = 1f;
         public float HitRadiusScale
         {
@@ -39,6 +43,20 @@ namespace Switchboard.UI
             mesh.Clear();
             Rect rect = rectTransform.rect;
             Vector2 center = rect.center;
+            if (faceSprite != null)
+            {
+                Vector2 size = faceSprite.rect.size;
+                size *= Mathf.Min(rect.width, rect.height) * .88f / Mathf.Max(size.x, size.y);
+                Vector2 min = center - size * .5f, max = center + size * .5f;
+                Vector4 uv = DataUtility.GetOuterUV(faceSprite);
+                Color fill = color * (blockedHighlight ? new Color(1f, .38f, .30f) : highlighted ? new Color(1f, .88f, .58f) : Color.white);
+                mesh.AddVert(new Vector3(min.x, min.y), fill, new Vector2(uv.x, uv.y));
+                mesh.AddVert(new Vector3(min.x, max.y), fill, new Vector2(uv.x, uv.w));
+                mesh.AddVert(new Vector3(max.x, max.y), fill, new Vector2(uv.z, uv.w));
+                mesh.AddVert(new Vector3(max.x, min.y), fill, new Vector2(uv.z, uv.y));
+                mesh.AddTriangle(0, 1, 2); mesh.AddTriangle(2, 3, 0);
+                return;
+            }
             float radius = Mathf.Min(rect.width, rect.height) * 0.40f;
 
             AddDisc(mesh, center + Vector2.down * 3f, radius + 3f, new Color32(35, 36, 35, 255));

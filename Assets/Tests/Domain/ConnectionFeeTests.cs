@@ -68,7 +68,7 @@ namespace Switchboard.Domain.Tests
         public void WrongConnectionPaysNoFee()
         {
             Call call = TakeAdaWantsBasil(fee: 10);
-            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3);
+            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3, TestWorld.A1);
             Advance(1);
 
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.WrongConnection));
