@@ -15,7 +15,7 @@ namespace Switchboard.UI
         [SerializeField] private SocketGraphic socketGraphic;
         private CableController occupyingCable;
         private bool pointerHovered;
-        private bool holdingPlug;
+        private CableController pointerCable;
 
         public event Action<SocketView> Clicked;
         public event Action<SocketView, bool> HoverChanged;
@@ -25,6 +25,7 @@ namespace Switchboard.UI
         public string Address => $"{(char)('A' + row)}{column + 1}";
         public RectTransform PlugAnchor => plugAnchor;
         public bool IsOccupied => occupyingCable != null;
+        public bool IsNavigationHighlighted => isActiveAndEnabled && pointerHovered && pointerCable != null;
         public CableController OccupyingCable => occupyingCable;
 
         public bool TryOccupy(CableController cable)
@@ -72,19 +73,20 @@ namespace Switchboard.UI
         private SocketGraphic Graphic => socketGraphic != null
             ? socketGraphic : socketGraphic = GetComponent<SocketGraphic>();
 
-        public void SetPointerState(bool hovered, bool plugOnCursor)
+        public void SetPointerState(bool hovered, CableController heldCable)
         {
             pointerHovered = hovered;
-            holdingPlug = plugOnCursor;
+            pointerCable = heldCable;
             RefreshHighlight();
         }
 
-        private void RefreshHighlight() => Graphic.SetHighlighted(pointerHovered, holdingPlug && IsOccupied);
+        private void RefreshHighlight() => Graphic.SetHighlighted(pointerHovered,
+            pointerCable != null && IsOccupied && occupyingCable != pointerCable);
 
         private void OnDisable()
         {
             pointerHovered = false;
-            holdingPlug = false;
+            pointerCable = null;
             if (socketGraphic != null) socketGraphic.SetHighlighted(false);
         }
     }

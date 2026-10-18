@@ -3,7 +3,7 @@ using UnityEngine.UI;
 
 namespace Switchboard.UI
 {
-    /// <summary>A row or column indicator; sockets remain the source of connection state.</summary>
+    /// <summary>Guides a held plug to the hovered socket's row and column.</summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
     public sealed class SwitchboardLampView : MonoBehaviour
@@ -42,7 +42,7 @@ namespace Switchboard.UI
             bool lit = !Application.isPlaying && previewLit;
             if (sockets != null)
                 foreach (SocketView socket in sockets)
-                    if (socket != null && (socket.IsOccupied || socket.GetComponent<SocketGraphic>().IsHighlighted))
+                    if (socket != null && socket.IsNavigationHighlighted)
                     {
                         lit = true;
                         break;

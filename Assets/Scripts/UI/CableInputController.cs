@@ -118,9 +118,9 @@ namespace Switchboard.UI
         private void UpdatePointers(Vector2 position, SocketView socket, StoredCableView stored)
         {
             var selected = ActiveCable;
-            if (hoveredSocket != socket && hoveredSocket != null) hoveredSocket.SetPointerState(false, selected != null);
+            if (hoveredSocket != socket && hoveredSocket != null) hoveredSocket.SetPointerState(false, selected);
             hoveredSocket = socket;
-            if (hoveredSocket != null) hoveredSocket.SetPointerState(true, selected != null);
+            if (hoveredSocket != null) hoveredSocket.SetPointerState(true, selected);
             CursorMode = selected != null ? CableCursorMode.Plug :
                 stored != null && stored.Available && Owns(stored.Cable) ? CableCursorMode.Grab : CableCursorMode.Pointing;
             var highlightedStock = CursorMode == CableCursorMode.Grab ? stored : null;
@@ -162,7 +162,7 @@ namespace Switchboard.UI
 
         private void HidePointers()
         {
-            if (hoveredSocket != null) hoveredSocket.SetPointerState(false, false);
+            if (hoveredSocket != null) hoveredSocket.SetPointerState(false, null);
             hoveredSocket = null;
             if (hoveredStoredCable != null) hoveredStoredCable.SetHighlighted(false);
             hoveredStoredCable = null;
