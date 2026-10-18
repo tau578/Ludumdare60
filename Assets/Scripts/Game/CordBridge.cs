@@ -17,11 +17,16 @@ namespace Switchboard.Game
         private CableController[] cables = new CableController[0];
         private CordState[] observed = new CordState[0];
         private OperatorDesk desk;
+        private CallService calls;
+        private SocketView[] sockets = new SocketView[0];
+        private readonly HashSet<SocketView> connectedSockets = new HashSet<SocketView>();
 
         public int CordCount => cables.Length;
 
         public void Attach(Scene scene)
         {
+            ClearCallHighlights();
+            sockets = LevelScene.FindAll<SocketView>(scene).ToArray();
             List<CableController> found = LevelScene.FindAll<CableController>(scene);
             found.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
             cables = found.ToArray();
@@ -29,7 +34,61 @@ namespace Switchboard.Game
             for (int i = 0; i < cables.Length; i++) observed[i] = CordState.Of(cables[i]);
         }
 
-        public void Bind(OperatorDesk operatorDesk) => desk = operatorDesk;
+        public void Bind(OperatorDesk operatorDesk, CallService callService = null)
+        {
+            UnsubscribeCalls();
+            desk = operatorDesk;
+            calls = callService;
+            if (isActiveAndEnabled) SubscribeCalls();
+            RefreshCallHighlights();
+        }
+
+        private void OnEnable() => SubscribeCalls();
+        private void OnDisable()
+        {
+            UnsubscribeCalls();
+            ClearCallHighlights();
+        }
+
+        private void SubscribeCalls()
+        {
+            if (calls == null) return;
+            calls.CallStateChanged += OnCallChanged;
+            calls.CallEnded += OnCallEnded;
+        }
+
+        private void UnsubscribeCalls()
+        {
+            if (calls == null) return;
+            calls.CallStateChanged -= OnCallChanged;
+            calls.CallEnded -= OnCallEnded;
+        }
+
+        private void OnCallChanged(CallStateChangedArgs _) => RefreshCallHighlights();
+        private void OnCallEnded(CallEndedArgs _) => RefreshCallHighlights();
+
+        private void RefreshCallHighlights()
+        {
+            connectedSockets.Clear();
+            if (calls != null)
+                foreach (Call call in calls.Live)
+                {
+                    if (call.State != CallState.Connected || !call.Cord.HasValue) continue;
+                    CableController cable = CableAt(call.Cord.Value);
+                    if (cable == null || cable.Phase != CablePhase.Connected) continue;
+                    if (cable.FirstSocket != null) connectedSockets.Add(cable.FirstSocket);
+                    if (cable.SecondSocket != null) connectedSockets.Add(cable.SecondSocket);
+                }
+            foreach (SocketView socket in sockets)
+                if (socket != null) socket.SetCallConnected(connectedSockets.Contains(socket));
+        }
+
+        private void ClearCallHighlights()
+        {
+            connectedSockets.Clear();
+            foreach (SocketView socket in sockets)
+                if (socket != null) socket.SetCallConnected(false);
+        }
 
         public void ReturnToTray(CordId cord)
         {
@@ -73,6 +132,7 @@ namespace Switchboard.Game
                 observed[i] = now;
                 Report(i, before, now);
             }
+            RefreshCallHighlights();
         }
 
         // Reports in a fixed order: opened, returned, first plug, closed. The desk's own commands show up

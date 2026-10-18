@@ -54,8 +54,11 @@ namespace Switchboard.UI
             letter = char.ToUpperInvariant(letter);
             for (int i = 0; i < directory.contacts.Length; i++)
             {
-                string name = directory.contacts[i].name;
-                if (char.ToUpperInvariant(name[name.LastIndexOf(' ') + 1]) == letter) return i;
+                var contact = directory.contacts[i];
+                string name = contact.name;
+                bool service = contact.tags != null && System.Array.IndexOf(contact.tags, "emergency-service") >= 0;
+                int initial = service || name.IndexOf(',') >= 0 ? 0 : name.LastIndexOf(' ') + 1;
+                if (char.ToUpperInvariant(name[initial]) == letter) return i;
             }
             return -1;
         }

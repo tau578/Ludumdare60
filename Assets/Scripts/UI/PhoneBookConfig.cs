@@ -36,5 +36,6 @@ namespace Switchboard.UI
     {
         public string name;
         public string socket;
+        public string[] tags = Array.Empty<string>();
     }
 }

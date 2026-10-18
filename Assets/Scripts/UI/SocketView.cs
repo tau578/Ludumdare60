@@ -28,6 +28,8 @@ namespace Switchboard.UI
         public bool IsNavigationHighlighted => isActiveAndEnabled && pointerHovered && pointerCable != null;
         public CableController OccupyingCable => occupyingCable;
 
+        public void SetCallConnected(bool connected) => Graphic.SetCallConnected(connected && IsOccupied);
+
         public bool TryOccupy(CableController cable)
         {
             if (cable == null || IsOccupied) return false;
@@ -38,7 +40,11 @@ namespace Switchboard.UI
 
         public void Release(CableController cable)
         {
-            if (occupyingCable == cable) occupyingCable = null;
+            if (occupyingCable == cable)
+            {
+                occupyingCable = null;
+                Graphic.SetCallConnected(false);
+            }
             RefreshHighlight();
         }
 
@@ -88,6 +94,7 @@ namespace Switchboard.UI
             pointerHovered = false;
             pointerCable = null;
             if (socketGraphic != null) socketGraphic.SetHighlighted(false);
+            if (socketGraphic != null) socketGraphic.SetCallConnected(false);
         }
     }
 }

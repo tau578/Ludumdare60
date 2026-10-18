@@ -38,6 +38,7 @@ namespace Switchboard.Game
         private bool showDurations;
         private bool warnedFull;
         private Action synchronizeBoard;
+        private MoneyCounterView moneyCounter;
 
         /// <summary>Dev panel: show each call's hidden duration on its card.</summary>
         public bool HasSpeakingCaller
@@ -62,12 +63,14 @@ namespace Switchboard.Game
 
         public void Bind(CallService callService, OperatorDesk operatorDesk, EarningsService earningsService,
             PenaltyService penaltyService, RectTransform[] callerSlots, Func<IPerson, Sprite> portraits,
-            Func<CordId, Color> cordColors, Func<ICallerType, CallCardStyle> cardStyles, Action syncBoard = null)
+            Func<CordId, Color> cordColors, Func<ICallerType, CallCardStyle> cardStyles, Action syncBoard = null,
+            MoneyCounterView counter = null)
         {
             Unsubscribe();
             calls = callService;
             desk = operatorDesk;
             synchronizeBoard = syncBoard;
+            moneyCounter = counter;
             earnings = earningsService;
             penalties = penaltyService;
             portraitOf = portraits;
@@ -144,7 +147,13 @@ namespace Switchboard.Game
 
         private void OnCallStateChanged(CallStateChangedArgs e) => CardOf(e.Call)?.Refresh();
 
-        private void OnConnectionFeePaid(ConnectionFeePaidArgs e) => CardOf(e.Call)?.ShowConnectionFee(e.Cents);
+        private void OnConnectionFeePaid(ConnectionFeePaidArgs e)
+        {
+            CallCardView card = CardOf(e.Call);
+            if (card == null) return;
+            card.ShowConnectionFee(e.Cents);
+            if (moneyCounter != null) moneyCounter.FlyIncomeFrom(card.PortraitRect);
+        }
 
         // "Missed -$2.00" names the amount actually taken, which is known only once the fine lands.
         private void OnFineApplied(FineAppliedArgs e) => CardOf(e.Call)?.RefreshStamp();

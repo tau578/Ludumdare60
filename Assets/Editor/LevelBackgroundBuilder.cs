@@ -73,7 +73,7 @@ namespace Switchboard.Editor
                     var badge = (RectTransform)labels.GetChild(i);
                     DisableGraphics(badge);
                     RectTransform lamp = Rect("Lamp_" + (row ? ((char)('A' + i)).ToString() : (i + 1).ToString()),
-                        badge, Vector2.zero, new Vector2(80, 80));
+                        badge, Vector2.zero, new Vector2(96, 96));
                     Image glass = lamp.gameObject.AddComponent<Image>();
                     glass.sprite = off;
                     glass.raycastTarget = false;
@@ -84,7 +84,7 @@ namespace Switchboard.Editor
                     Image glyph = null;
                     if (textOff != null && textOn != null)
                     {
-                        glyph = Rect("Label", lamp, Vector2.zero, new Vector2(48, 48)).gameObject.AddComponent<Image>();
+                        glyph = Rect("Label", lamp, Vector2.zero, new Vector2(57.6f, 57.6f)).gameObject.AddComponent<Image>();
                         glyph.raycastTarget = false;
                         glyph.preserveAspect = true;
                     }

@@ -91,6 +91,15 @@ namespace Switchboard.Game.Tests
         }
 
         [Test]
+        public void SurnameFirstNamesUseTheSurnameInsteadOfTheGivenName()
+        {
+            var view = Book(Concat(Surnames(12, 'A'), new[] { "Smith, Mary Ann" }));
+            Assert.That(view.HasLetter('M'), Is.False);
+            Assert.That(view.ShowLetter('S'), Is.True);
+            Assert.That(view.CurrentSpreadIndex, Is.EqualTo(1));
+        }
+
+        [Test]
         public void UsesTheLastWordOfTheNameAsTheSurname()
         {
             var view = Book(Concat(Surnames(12, 'A'), new[] { "Mary Ann Smith" }));

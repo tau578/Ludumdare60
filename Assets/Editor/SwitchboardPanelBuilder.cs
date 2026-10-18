@@ -82,7 +82,7 @@ namespace Switchboard.Editor
 
         private static GameObject CreateSocketPrefab()
         {
-            RectTransform root = Rect("Socket", null, Vector2.zero, new Vector2(96, 96));
+            RectTransform root = Rect("Socket", null, Vector2.zero, new Vector2(112, 112));
             root.gameObject.AddComponent<SocketGraphic>();
             RectTransform anchor = Rect("PlugAnchor", root, Vector2.zero, Vector2.zero);
             root.gameObject.AddComponent<SocketView>().Configure(0, 0, anchor);
@@ -111,10 +111,11 @@ namespace Switchboard.Editor
                 Badge(((char)('A' + i)).ToString(), rows, 98, 156 + i * 114);
             }
 
-            RectTransform gridRect = TopLeft("SocketGrid", panel, 214, 140, 756, 666);
+            // Larger faces, with the original row/column centres preserved.
+            RectTransform gridRect = TopLeft("SocketGrid", panel, 206, 132, 772, 682);
             GridLayoutGroup grid = gridRect.gameObject.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(96, 96);
-            grid.spacing = new Vector2(36, 18);
+            grid.cellSize = new Vector2(112, 112);
+            grid.spacing = new Vector2(20, 2);
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = 6;
             grid.startCorner = GridLayoutGroup.Corner.UpperLeft;

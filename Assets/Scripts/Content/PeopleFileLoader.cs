@@ -37,7 +37,11 @@ namespace Switchboard.Content
             return new PeopleCatalog(people, callers, directory, errors);
         }
 
-        public static string PersonId(string name) => "person." + string.Join("-", Words(name)).ToLowerInvariant();
+        public static string PersonId(string name)
+        {
+            SplitName(name, out string first, out string last);
+            return "person." + string.Join("-", Words(first + " " + last)).ToLowerInvariant();
+        }
 
         public static bool IsService(PeopleFileContact contact) => HasTag(contact?.tags, ServiceTag);
 
@@ -116,8 +120,8 @@ namespace Switchboard.Content
             if (errors.Count > errorsBefore) return;
 
             // A service's whole name is its listing, so "Fire Brigade" is not filed under Brigade.
-            string firstName = service ? string.Empty : string.Join(" ", words, 0, words.Length - 1);
-            string lastName = service ? name : words[words.Length - 1];
+            SplitName(name, out string firstName, out string lastName);
+            if (service) { firstName = string.Empty; lastName = name; }
             var person = new PersonRecord(id, firstName, lastName, contact.portrait, Tags(contact.tags));
             people.Add(person);
             if (type != null) callers.Add(new CallerRecord(CallerId(id), person, type, contact.rate, contact.fee));
@@ -174,6 +178,20 @@ namespace Switchboard.Content
                 foreach (ICallerType type in callerTypes)
                     if (type != null && !string.IsNullOrEmpty(type.Id)) ids.Add(type.Id);
             return ids.Count > 0 ? string.Join(", ", ids) : "(no caller types are set up in GameConfig)";
+        }
+
+        private static void SplitName(string name, out string firstName, out string lastName)
+        {
+            int comma = name?.IndexOf(',') ?? -1;
+            if (comma >= 0)
+            {
+                lastName = string.Join(" ", Words(name.Substring(0, comma)));
+                firstName = string.Join(" ", Words(name.Substring(comma + 1)));
+                return;
+            }
+            string[] words = Words(name);
+            firstName = words.Length > 1 ? string.Join(" ", words, 0, words.Length - 1) : string.Empty;
+            lastName = words.Length > 0 ? words[words.Length - 1] : string.Empty;
         }
 
         private static string[] Words(string name) =>

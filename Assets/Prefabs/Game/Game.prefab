@@ -237,10 +237,10 @@ MonoBehaviour:
   feedbackSource: {fileID: 550449638319770665}
   incoming: {fileID: 8300000, guid: 8542f7dbd65816744a14b0c11c3bb0be, type: 3}
   connected: {fileID: 8300000, guid: d040f6a55ee232045ab2dba06c8a5eea, type: 3}
+  cashRegister: {fileID: 8300000, guid: e6f75c2bfd414275b20145c540791ade, type: 3}
   hold: {fileID: 8300000, guid: 563cb2b3b4b5b574abd920bfd9a6aa42, type: 3}
   finished: {fileID: 8300000, guid: bed23119820481943b98493bd08391cd, type: 3}
   wrongConnection: {fileID: 8300000, guid: 265bf43ca32af7f4fb44fcdc4dc892bc, type: 3}
-  ringInterval: 4.5
 --- !u!1 &7743034086733419496
 GameObject:
   m_ObjectHideFlags: 0

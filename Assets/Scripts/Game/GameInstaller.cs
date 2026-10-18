@@ -43,17 +43,17 @@ namespace Switchboard.Game
             cordBridge.Attach(scene);
             int seed = randomSeed != 0 ? randomSeed : Random.Range(1, int.MaxValue);
             Session = new GameSession(new GameContent(config, people, economy), new SeededRandom(seed), cordBridge);
-            cordBridge.Bind(Session.Desk);
+            cordBridge.Bind(Session.Desk, Session.Calls);
             moneyCounter.Bind(Session.Wallet, LevelScene.FindShopHeader(scene), Session.Penalties, Session.Upgrades);
             RectTransform[] callerSlots = LevelScene.FindCallerSlots(scene);
             if (callerSlots.Length < config.MaxWaitingCalls)
                 Debug.LogWarning($"The caller panel has {callerSlots.Length} slots but GameConfig allows {config.MaxWaitingCalls} calls.", config);
             callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, Session.Penalties, callerSlots, PortraitOf,
-                cordBridge.ColorOf, CardStyleOf, cordBridge.Synchronize);
+                cordBridge.ColorOf, CardStyleOf, cordBridge.Synchronize, moneyCounter);
             shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene));
             goalPanel.Bind(Session.Goal);
             loopRunner.Bind(Session);
-            if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls);
+            if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls, Session.Earnings);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             // Added at runtime so no scene or prefab references a type that release builds leave out.
             gameObject.AddComponent<DevPanel>().Bind(Session, callQueue);

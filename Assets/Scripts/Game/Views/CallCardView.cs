@@ -99,6 +99,7 @@ namespace Switchboard.Game
         public event Action<CallCardView> Finished;
 
         public Call Call { get; private set; }
+        public RectTransform PortraitRect => portrait != null ? portrait.rectTransform : (RectTransform)transform;
         public bool ShowDuration { get; set; }
         public bool IsSpeechBubbleVisible => Call != null && speechBubble != null && speechBubble.activeInHierarchy;
         public bool IsGivingTask => IsSpeechBubbleVisible && (Call.State == CallState.Taken || Call.State == CallState.Connecting);
@@ -430,7 +431,7 @@ namespace Switchboard.Game
             speechLabel.maxVisibleCharacters = now;
         }
 
-        // Reserved for character-specific effects; SceneUiAudio owns the shared task babble.
+        // Reserved for character-specific effects; connection babble is independent of typing.
         private void OnCharacterShown(int index)
         {
         }
