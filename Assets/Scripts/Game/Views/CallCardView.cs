@@ -9,7 +9,7 @@ namespace Switchboard.Game
 {
     /// <summary>
     /// A view of one call (Design 5.4): ringing while it waits, a speech bubble while it is in hand or connected,
-    /// the cord's colour and the money earned while connected, then a stamp.
+    /// the cord's colour and the money earned while connected or on hold, then a stamp.
     /// </summary>
     public sealed class CallCardView : MonoBehaviour, IPointerClickHandler
     {
@@ -67,18 +67,20 @@ namespace Switchboard.Game
             if (Call == null) return;
             CallState state = Call.State;
             bool inHand = state == CallState.Taken || state == CallState.Connecting;
-            bool connected = state == CallState.Connected;
+            bool onHold = state == CallState.OnHold;
+            // An on-hold call keeps its cord ring and its earnings, frozen until it resumes (D07).
+            bool onCord = state == CallState.Connected || onHold;
 
             ringingPulse.gameObject.SetActive(state == CallState.Incoming);
             callbackBadge.SetActive(Call.Request.Attempt > 1 && (state == CallState.Incoming || inHand));
-            earningsBadge.SetActive(connected);
-            cordRing.gameObject.SetActive(connected);
-            if (connected && Call.Cord is CordId cord && cordColors != null) cordRing.color = cordColors(cord);
+            earningsBadge.SetActive(onCord);
+            cordRing.gameObject.SetActive(onCord);
+            if (onCord && Call.Cord is CordId cord && cordColors != null) cordRing.color = cordColors(cord);
 
-            speechBubble.SetActive(inHand || connected);
-            if (inHand || connected)
-                speechLabel.text = connected
-                    ? "On the line"
+            speechBubble.SetActive(inHand || onCord);
+            if (inHand || onCord)
+                speechLabel.text = onHold ? "On hold"
+                    : onCord ? "On the line"
                     : $"{Call.Request.CallerPerson.FullName()}\nwants {Call.Request.Recipient.FullName()}";
 
             stamp.SetActive(state == CallState.Ended);
@@ -127,7 +129,7 @@ namespace Switchboard.Game
         private void LateUpdate()
         {
             if (Call == null || Call.State == CallState.Ended) return;
-            if (Call.State == CallState.Connected)
+            if (Call.State == CallState.Connected || Call.State == CallState.OnHold)
             {
                 long cents = (long)Math.Floor(Call.CentsEarned + 1e-9);
                 if (cents != shownCents)

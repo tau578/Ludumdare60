@@ -84,6 +84,23 @@ namespace Switchboard.Domain
             return true;
         }
 
+        // A pulled plug pauses pay and the duration timer (D07); the fee is never paid again on resume.
+        public bool Hold(CallId id)
+        {
+            Call call = Find(id);
+            if (call == null || call.State != CallState.Connected) return false;
+            ChangeState(call, CallState.OnHold);
+            return true;
+        }
+
+        public bool Resume(CallId id)
+        {
+            Call call = Find(id);
+            if (call == null || call.State != CallState.OnHold) return false;
+            ChangeState(call, CallState.Connected);
+            return true;
+        }
+
         public bool End(CallId id, CallEndReason reason)
         {
             Call call = Find(id);

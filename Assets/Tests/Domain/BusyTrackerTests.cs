@@ -22,12 +22,14 @@ namespace Switchboard.Domain.Tests
         [TestCase(CallState.Taken)]
         [TestCase(CallState.Connecting)]
         [TestCase(CallState.Connected)]
+        [TestCase(CallState.OnHold)]
         public void BothPartiesOfALiveCallAreBusy(CallState state)
         {
             Call call = calls.Add(crowd.Request(0, 1));
             if (state != CallState.Incoming) calls.Take(call.Id);
             if (state == CallState.Connecting) calls.BeginConnecting(call.Id);
-            if (state == CallState.Connected) calls.Connect(call.Id);
+            if (state == CallState.Connected || state == CallState.OnHold) calls.Connect(call.Id);
+            if (state == CallState.OnHold) calls.Hold(call.Id);
             Assert.That(call.State, Is.EqualTo(state));
 
             Assert.That(busy.IsBusy(crowd.People[0]), Is.True, "caller");

@@ -11,6 +11,7 @@ namespace Switchboard.Domain
         private readonly ISwitchboard switchboard;
         private readonly List<CordId> halfPatched = new List<CordId>();
         private readonly List<CordId> returning = new List<CordId>();
+        private readonly List<HeldCircuit> held = new List<HeldCircuit>();
 
         public OperatorDesk(CallService calls, ConnectionRule rule, ISwitchboard switchboard)
         {
@@ -45,20 +46,39 @@ namespace Switchboard.Domain
             SyncCallInHand();
         }
 
+        // The same pair closing again is the team's restore and resumes an on-hold call without a second fee.
+        // Any other pair cuts the on-hold call off, and the cord's new circuit is judged as a fresh one (D07).
         public void OnCircuitClosed(CordId cord, JackId a, JackId b)
         {
             SetHalfPatched(cord, false);
+            Call onHold = CallOn(cord);
+            if (onHold != null && onHold.State == CallState.OnHold)
+            {
+                int index = HeldIndex(cord);
+                bool samePair = index >= 0 && held[index].Joins(a, b);
+                if (index >= 0) held.RemoveAt(index);
+                if (samePair)
+                {
+                    calls.Resume(onHold.Id);
+                    SyncCallInHand();
+                    return;
+                }
+                // The cord now carries the new circuit, so ending the old call must not send it back to the tray.
+                onHold.Cord = null;
+                calls.End(onHold.Id, CallEndReason.DisconnectedEarly);
+            }
             Judge(cord, a, b);
             SyncCallInHand();
         }
 
-        // Until hold arrives in Step 2b (D07), a pulled plug cuts the call off and its cord goes back to the tray.
+        // A pulled plug puts the cord's call on hold (D07). The cord still belongs to that call, so its one
+        // remaining plug doesn't count as half-patched for the call in hand.
         public void OnCircuitOpened(CordId cord, JackId stillIn, JackId pulled)
         {
             Call call = CallOn(cord);
             if (call != null)
             {
-                calls.End(call.Id, CallEndReason.DisconnectedEarly);
+                if (calls.Hold(call.Id)) held.Add(new HeldCircuit(cord, stillIn, pulled));
                 return;
             }
             SetHalfPatched(cord, true);
@@ -118,9 +138,35 @@ namespace Switchboard.Domain
             else if (!value && index >= 0) halfPatched.RemoveAt(index);
         }
 
+        private int HeldIndex(CordId cord)
+        {
+            for (int i = 0; i < held.Count; i++)
+                if (held[i].Cord == cord) return i;
+            return -1;
+        }
+
         private void OnCallEnded(CallEndedArgs e)
         {
-            if (e.Call.Cord is CordId cord) switchboard.ReturnToTray(cord);
+            if (!(e.Call.Cord is CordId cord)) return;
+            int index = HeldIndex(cord);
+            if (index >= 0) held.RemoveAt(index);
+            switchboard.ReturnToTray(cord);
+        }
+
+        private readonly struct HeldCircuit
+        {
+            public HeldCircuit(CordId cord, JackId a, JackId b)
+            {
+                Cord = cord;
+                A = a;
+                B = b;
+            }
+
+            public CordId Cord { get; }
+            public JackId A { get; }
+            public JackId B { get; }
+
+            public bool Joins(JackId a, JackId b) => (A == a && B == b) || (A == b && B == a);
         }
     }
 }

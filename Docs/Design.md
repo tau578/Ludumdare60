@@ -2,7 +2,7 @@
 
 This document is the source of truth for how the game works and how the code is organized. Implementing agents follow it. If the code or a step brief disagrees with it, they stop and report instead of improvising. Changes are agreed with the project lead first, then written here.
 
-Last updated 2026-10-17 · Plan: [Plan.md](Plan.md) · Progress: [Progress.md](Progress.md)
+Last updated 2026-10-18 · Plan: [Plan.md](Plan.md) · Progress: [Progress.md](Progress.md)
 
 ## Implementation status
 
@@ -10,10 +10,11 @@ Last updated 2026-10-17 · Plan: [Plan.md](Plan.md) · Progress: [Progress.md](P
 |---|---|---|
 | 1 | Done (`e6f44e5`) | One call at a time, through Incoming → Taken → Connected → Ended. See below. |
 | 1b + 1c | Done (`60c7a88`, `47735c1`) | Connection fee (D32); one people file `PhoneBook.json`, read by Sergei's book and by us (D31); the money counter in the header strip of Sergei's shop panel; a speech bubble left of the caller card; a "+N¢" popup; the temporary Directory list removed. `GameConfig` references the JSON; a plain `GameContent` class implements `IGameContent`. |
-| 2a | Done (2026-10-18) | Up to 6 live calls, one card per caller slot. Taking a card swaps (D03). Connecting while a cord is half-patched. `BusyTracker` (D18), `CallbackScheduler` with "Calling again" cards, and a `PacingProfile`-driven spawner. Connected cards stay in their slot with a cord-colour ring and their own earnings. A dev panel (F1). Pulling a plug still cuts the call off until 2b. |
+| 2a | Done (`2b00ac7`) | Up to 6 live calls, one card per caller slot. Taking a card swaps (D03). Connecting while a cord is half-patched. `BusyTracker` (D18), `CallbackScheduler` with "Calling again" cards, and a `PacingProfile`-driven spawner. Connected cards stay in their slot with a cord-colour ring and their own earnings. A dev panel (F1). |
+| 2b | Done (2026-10-18) | Hold and resume (D07): a pulled plug puts the call OnHold (pay and duration paused, card says "On hold" with frozen earnings); the same pair closing again resumes it with no second fee; the plug in another jack or the cord to the tray cuts it off. Ringing halos draw behind all card content. |
 
 What Step 1 built:
-- **Operator desk.** A right pair connects the call. A wrong pair ends it as "Wrong number!". Patching with no call in hand is refused. Pulling a plug cuts the call off (temporary until D07 in Step 2).
+- **Operator desk.** A right pair connects the call. A wrong pair ends it as "Wrong number!". Patching with no call in hand is refused. Pulling a plug cut the call off (replaced by hold in Step 2b).
 - **`CordBridge`** connects the game to Sergei's cords.
 - **Wallet and earnings.** Money is paid live, with a carried fraction so nothing is lost to rounding.
 - **Content.** 12 people on 12 jacks, two per row.
@@ -254,7 +255,12 @@ In the diagram, HungUp means `Ended` with reason `WrongConnection`, and Finished
 | OnHold | The plug goes into another jack, or the cord goes back to the tray | Ended (DisconnectedEarly) | The early-disconnect fine applies if the type has one [4]. If the plug went into another jack, the new circuit is judged as a fresh circuit. |
 | Incoming, Taken or Connecting | The response timer runs out [4] | Ended (Missed) | The missed fine applies. A callback happens only if the type's flag is set (D10). |
 
-- **Step 1 is temporary on disconnects.** Pulling a plug ends the call as `DisconnectedEarly` straight away, and the cord returns to the tray. Step 2 implements whatever D07 decides.
+- **How hold is implemented (2b).**
+  - `OperatorDesk.OnCircuitOpened` on a bound cord calls `CallService.Hold` and remembers the cord's jack pair in a private `HeldCircuit` list. The cord is **not** marked half-patched, so its remaining plug doesn't put the call in hand into Connecting.
+  - `OnCircuitClosed` on an on-hold cord: the same pair, in either order, resumes the call. This covers both the team's restore (click empty space) and clicking the pulled jack directly. Pay and the duration timer run only for Connected calls, and the `ConnectionFeePaid` flag stops a second fee.
+  - Any other pair: the desk first unbinds the cord from the on-hold call (so ending it doesn't send the cord to the tray), ends it as `DisconnectedEarly`, then judges the new circuit as usual (connect, wrong number, or refuse).
+  - The cord returning to the tray, including by pulling its second plug, ends the call as `DisconnectedEarly`.
+  - Known: a call can earn for at most one frame between the click that pulls a plug and the bridge's report, because `GameLoopRunner.Update` may run before the cord input's `Update`. It is a fraction of a cent; accepted.
 
 ### 5.2 Spawning [1 minimal, 2 full, 7 pacing]
 - **Classes:**
@@ -266,8 +272,8 @@ In the diagram, HungUp means `Ended` with reason `WrongConnection`, and Finished
 - **When** (built in 2a):
   - Each interval is `base × U(1 − jitter, 1 + jitter)`, at least 0.1 s. The first call comes after `firstCallDelaySeconds`.
   - The countdown runs at `dt / load`, where `load = 1 + loadFactor × max(0, waiting − freeCords)`:
-    - waiting = live calls that aren't Connected
-    - freeCords = cord count − connected calls
+    - waiting = live calls that aren't Connected or OnHold
+    - freeCords = cord count − Connected and OnHold calls (an on-hold call keeps its cord in the board, 2b)
     - So the stretch applies live and eases as soon as the player catches up.
   - An attempt with no room, or with no free caller and recipient, is skipped. The next one comes a fresh interval later, and skipped calls are never made up.
   - **Cap (D17):** nothing spawns while `maxWaitingCalls` (6) calls are live. Every live call counts, connected ones included, because each one holds a caller slot.
@@ -298,13 +304,14 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
   - `CallQueueView`: one card per live call (waiting, in hand, connected), in arrival order, laid over the caller panel's 6 slots.
     - When a card leaves after its stamp, the cards below slide up.
     - If a new call needs a slot while a stamp is still showing, the oldest stamp is cut short.
+    - The ringing halo (`RingingPulse`) has a nested canvas with sorting order 9, so every halo draws behind every card's badges (order 10). It stays above Sergei's main canvas (0) and below his book (10, earlier sibling order) and held plugs (20). Fixed in 2b.
   - ~~`LiveCallsView`~~: superseded in 2a. The right-hand column is Sergei's shop, so connected calls keep their card in their slot.
   - `CallCardView`: pooled.
 - **What the card shows in each state:**
   - Waiting: portrait, type badge, rate (e.g. "5¢/s"), and a countdown ring for types with a response time.
   - In hand: also the caller's name and the name of the person they want. From Step 1b they appear in a speech bubble next to the caller's portrait in the left column: "Ada Moss" / "wants Basil Thorne", and "On the line" once connected. This replaces the Step 1 ticket in the right column.
   - Connected: the cord's colour (a ring around the portrait, read through `CordBridge.ColorOf`), the cents earned so far (a top badge), and an "On the line" bubble. Waiting cards show no bubble.
-  - On hold: an "on hold" label.
+  - On hold: the cord ring and the earnings badge stay, the earnings frozen, and the bubble reads "On hold" (2b).
   - Ended: a stamp, such as "Paid $1.20", "Wrong number!", "Cut off" or "Missed −$5".
 
   The duration is never shown.

@@ -63,14 +63,16 @@ namespace Switchboard.Domain
         /// <summary>1 while every waiting call has a free cord; each waiting call beyond that adds the load factor.</summary>
         public double Load()
         {
-            int waiting = 0, connected = 0;
+            int waiting = 0, usingCord = 0;
             IReadOnlyList<Call> live = calls.Live;
             for (int i = 0; i < live.Count; i++)
             {
-                if (live[i].State == CallState.Connected) connected++;
+                CallState state = live[i].State;
+                // An on-hold call still has its cord in the board, so it uses a cord and isn't waiting.
+                if (state == CallState.Connected || state == CallState.OnHold) usingCord++;
                 else waiting++;
             }
-            int freeCords = Math.Max(0, cordCount() - connected);
+            int freeCords = Math.Max(0, cordCount() - usingCord);
             return 1 + Math.Max(0, pacing.LoadFactor) * Math.Max(0, waiting - freeCords);
         }
 

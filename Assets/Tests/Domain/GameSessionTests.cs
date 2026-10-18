@@ -134,5 +134,29 @@ namespace Switchboard.Domain.Tests
             crowded.Tick(0.05);
             Assert.That(crowded.Wallet.Cents, Is.EqualTo(cents), "nothing is paid after clearing");
         }
+
+        [Test]
+        public void ClearCallsAlsoClearsOnHoldCalls()
+        {
+            Advance(2.1);
+            Call call = session.Calls.Live[0];
+            session.Desk.TryTake(call.Id);
+            JackId callerJack = session.Directory.JackOf(call.Request.CallerPerson);
+            JackId recipientJack = session.Directory.JackOf(call.Request.Recipient);
+            session.Desk.OnCircuitClosed(new CordId(0), callerJack, recipientJack);
+            Advance(1);
+            session.Desk.OnCircuitOpened(new CordId(0), callerJack, recipientJack);
+            Assert.That(call.State, Is.EqualTo(CallState.OnHold));
+            long cents = session.Wallet.Cents;
+
+            session.ClearCalls();
+
+            Assert.That(call.EndReason, Is.EqualTo(CallEndReason.Cleared));
+            Assert.That(session.Calls.Live, Is.Empty);
+            Assert.That(session.Callbacks.Pending, Is.Empty);
+            Assert.That(board.Returned, Is.EqualTo(new[] { new CordId(0) }));
+            Assert.That(session.Desk.CallOn(new CordId(0)), Is.Null);
+            Assert.That(session.Wallet.Cents, Is.EqualTo(cents));
+        }
     }
 }

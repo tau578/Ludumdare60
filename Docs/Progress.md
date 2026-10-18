@@ -5,8 +5,8 @@
 | 1. First call | done | ✅ 2026-10-17 (54 min) | ✅ 72/72 tests, scope clean | ✅ all 9 checks | e6f44e5 |
 | 1b. Fee, book, layout | done | ✅ 2026-10-17 (20 min) | ✅ 91/91 tests, scope clean | ✅ | 60c7a88 |
 | 1c. Money slot in shop header | done | ✅ 2026-10-17 (8 min) | ✅ 91/91 tests | ✅ | 47735c1 |
-| 2a. Queue, callbacks, dev panel | done | ✅ 2026-10-17 (24 min) | ✅ 156/156 tests, scope clean | ✅ | |
-| 2b. Hold and resume | not started | | | | |
+| 2a. Queue, callbacks, dev panel | done | ✅ 2026-10-17 (24 min) | ✅ 156/156 tests, scope clean | ✅ | 2b00ac7 |
+| 2b. Hold and resume | done | ✅ 2026-10-18 (12 min) | ✅ 187/187 tests, scope clean | ✅ | |
 | 3. Phone book and cards | not started | | | | |
 | 4. Emergencies and fines | not started | | | | |
 | 5. Upgrades, shop, goal | not started | | | | |
@@ -579,3 +579,112 @@ Follow-ups:
 #### Step 2a playtest (lead, 2026-10-18)
 - Everything works as expected, including the dev panel. The lead asked to commit and push.
 - **Docs:** Design.md (status, 5.1 `Cleared` and `CancelConnecting`, 5.2 pacing and cap, 5.3 callbacks, 5.4 cards, 6.1 `PacingProfile`) and Plan.md (2b notes, §4 lessons) were updated.
+
+### Step 2b prep (orchestrator, 2026-10-18)
+- **Pre-flight:**
+  - `git fetch`: up to date with upstream, no teammate changes.
+  - Editor idle, not in Play Mode, `Game.unity` active. Console cleared.
+  - EditMode tests: 156/156 pass, console clean.
+- **Decisions:** D07 (hold) is decided. For the spawner's load formula, an on-hold call counts as using a cord and not as waiting (the brief's suggestion).
+
+### Step 2b report: 2026-10-18
+Result: done
+
+Playable now: Connect a call, then click one of its plugged jacks. The plug comes out, the card's bubble says "On hold", and its earnings badge and hidden duration freeze. Click empty space (the team's restore) or click the same jack again: the plug goes back in, the bubble says "On the line" again, and pay resumes with no second connection fee. Instead, click the tray, or pull the remaining plug too: the call ends with "Cut off". Or push the pulled plug into a different free jack: the on-hold call ends with "Cut off", and the new pair is judged against the call in hand. With nothing in hand it bounces back (refused); a wrong pair gives "Wrong number!". When the queue is full of ringing cards, every rate badge stays readable, because all the amber halos now draw behind all card content.
+
+How to test: the Plan's Step 2b playtest script. Notes:
+1. Clicking the same jack again also resumes the call. It is the same pair closing, just like the restore.
+2. The plug you pulled follows the pointer, as in the team's sandbox. While you hold it, clicks on other plugged jacks are blocked (the team's rule). A dev-panel click also counts as an "empty space" click, so it restores a held plug (2a deviation 8).
+
+Created:
+- `Assets/Tests/Domain/HoldTests.cs` (+ `.meta`)
+
+Changed:
+- **Domain:**
+  - `CallService`: new `Hold` (Connected → OnHold) and `Resume` (OnHold → Connected). `Tick` and `EarningsService` already act only on Connected calls, so hold pauses both pay and the duration. The fee isn't paid again, because `EarningsService` pays it only while `ConnectionFeePaid` is false.
+  - `OperatorDesk`:
+    - `OnCircuitOpened` on a bound cord now puts its call OnHold and remembers the cord's pair (a private `HeldCircuit` list) instead of ending the call. As in 2a, the cord isn't marked half-patched, so the call in hand doesn't go to Connecting because of it.
+    - `OnCircuitClosed` on a cord bound to an on-hold call:
+      - the same pair, in either order → `Resume`
+      - any other pair → the old call is unbound (`Cord = null`, so ending it doesn't send the cord to the tray) and ended as DisconnectedEarly. The new circuit then goes through the normal `Judge`: it connects the call in hand, gives a wrong number, or is refused when no call is in hand.
+    - `OnCordReturned` was unchanged; it already ends any bound call (OnHold included) as DisconnectedEarly.
+    - `OnCallEnded` also forgets the held pair, so a reused cord starts clean.
+  - `CallSpawner.Load`: an OnHold call counts as **using a cord and not as waiting** (orchestrator decision): `freeCords = cordCount − (Connected + OnHold)`, `waiting = live − (Connected + OnHold)`.
+- **Game:** `CallCardView`. OnHold shows the cord ring, a frozen earnings badge and the bubble text "On hold". The stamps "Paid $X", "Wrong number!" and "Cut off" were already in place and use only atlas glyphs.
+- **Tests:** `CallTransitionTests` (the matrix now has 7 verbs, adding Hold, Resume and End(DisconnectedEarly), and covers the OnHold state), `OperatorDeskTests` (removed the Step 1 "pulled plug cuts the call off" test), `BusyTrackerTests` (OnHold case), `GameSessionTests` (Clear calls with an on-hold call).
+
+Scene and prefab changes:
+- **`GameUI.prefab`:** `Calls/CallCard/RingingPulse` gets a nested `Canvas` with `overrideSorting` on and `sortingOrder` 9.
+  - Every halo now draws below everything at order 10, which includes all cards and badges in our `GameUI` canvas. It still draws above Sergei's main canvas (order 0) and below his book (10) and held plugs (20), the same as before relative to his things.
+  - The copies made at startup inherit it.
+  - `overrideSorting` had to be set through `SerializedObject` (`m_OverrideSorting`). `manage_prefabs` and the `Canvas.overrideSorting` setter both left it off, because in prefab contents the nested canvas counts as a root canvas.
+  - Nothing else in the prefab changed. No raycast targets were added; a Canvas without a GraphicRaycaster takes no clicks.
+- **`Game.unity`:** not changed (not dirty, nothing on disk).
+- **Team files:** not changed and not saved; `Level.unity` and `MainMenu.unity` were not opened. ProjectSettings, Packages and `PhoneBook.json` are untouched. `runInBackground` is still off.
+
+Tests: 187/187 EditMode (156 before; 32 new, 1 removed):
+- CallTransitionTests: 17 more matrix cases (Hold and Resume from every state, plus the OnHold row: only Resume and End are allowed).
+- HoldTests: 13
+  - a pulled plug holds the call and keeps its cord, which isn't half-patched
+  - hold pauses pay and the duration (60 s held: wallet, earnings and seconds left unchanged)
+  - restore in either jack order resumes with one fee only, and pay resumes (2 cases)
+  - a held and resumed call pays exactly fee + rate × duration
+  - hold, resume and hold again
+  - a re-plug elsewhere with nothing in hand: cut off, then refused
+  - a re-plug elsewhere that is the right pair for the call in hand: cut off, then the new call connects on that cord
+  - a re-plug elsewhere on a wrong pair: cut off, then wrong number
+  - cord to the tray: cut off, with no pay afterwards
+  - a cord reused after a cut-off is judged, not mistaken for a restore
+  - several calls with one on hold
+  - spawner load with an on-hold call
+- BusyTrackerTests: 1 (both parties of an on-hold call are busy)
+- GameSessionTests: 1 (`ClearCalls` ends an on-hold call as Cleared, with no pay and no callback, its cord returned and nothing left on the cord)
+
+Console: clean. No errors or warnings from our code while compiling, in two test runs, or in Play Mode. The only lines were the known Metal "memoryless" lines from screenshots. The console was cleared at the end.
+
+Screenshots (`Temp/Captures/`, taken while paused or stepping):
+- `step-02b.png` (main): the top card "On hold" (red ring, $0.19 frozen) next to the card below "On the line" (blue ring, $0.20), the wallet at $0.39, the pulled red plug following the pointer, and four ringing cards below.
+- `step-02b-full-queue.png`: 6 ringing cards. Every rate badge ("7¢ + 5¢/s" … "12¢ + 4¢/s") is fully readable, with the halos behind the badges and portraits.
+
+Checked in Play Mode with `CableInputController.ProcessPointer`, one action per rendered frame inside a one-shot `Canvas.willRenderCanvases` handler, driven by `EditorApplication.Step()`. `Time.timeScale` stayed at 1.
+- **Connect two calls:** A on cord 0 (D5–E4), B on cord 1 (C3–F3). The first paid its 7¢ fee at once.
+- **Pull A's E4 plug:** A went OnHold; cable 0 was OneEndConnected and held by the controller; half-patched 0; nothing in hand. Spawner load was 2.5, which is right for 4 waiting, 3 cords and 2 in use. Over 60 held frames A stayed at 19.50¢ with 19.50 s left, while B kept earning.
+- **Click empty space** (between A1 and B2): the cable went back to D5–E4 Connected, A resumed, and 0 fees were paid since. 60 frames later A had 25.60¢.
+- **Pull again, click the tray:** A ended as DisconnectedEarly, cable 0 was Ready, and the controller held nothing.
+- **Take call C (B4–D2), pull B's F3 plug:** B went OnHold and C stayed Taken (the on-hold cord isn't half-patched).
+- **Click free jack A6:** B ended as DisconnectedEarly, and the new circuit C3–A6 was judged against C, giving WrongConnection. Cable 1 went back to the tray, and one callback is pending for C (none for B).
+- **Hold, then Clear calls (the dev panel's call)** while the controller held the on-hold cord: the call ended as Cleared, cable 0 was Ready, there were 0 live calls and 0 pending callbacks, and the wallet was unchanged. On the next `ProcessPointer` the controller dropped its stale cable, and nothing was left on cord 0.
+
+Deviations from Design/Plan:
+1. **Resuming also works by clicking the pulled jack directly**, not only through the restore click. Design 5.1 already says "the plug goes back into the same jack", and both look the same from outside (the same pair closes).
+2. **The halo fix uses a sorting override** (halos at order 9) rather than shrinking the halo. Halos keep their size and pulse; they just never cover any card's badges, portrait, ring, stamp or bubble.
+3. **Up to one frame of pay after the click.** `GameLoopRunner.Update` can tick before the cord input's `Update`, so a call earns for at most one frame between the click and the bridge's report in `LateUpdate`. In the run this was 0.1¢. Fixing it would mean changing script execution order, so I left it.
+
+Follow-ups:
+- **The stale `heldCable` edge case (Step 1)** now only matters for the dev panel's Clear calls. Pulling a plug no longer makes the desk return a cord the controller holds. Wrong numbers and refusals happen only on a closed circuit, which the controller has already let go of. Clear calls on a held cord was checked: the controller dropped it on its next `ProcessPointer`. A real click in that same frame could still plug the returned cord, but it's dev-only and harmless.
+- **Step 4** will fine DisconnectedEarly through `PenaltyService`. A moved plug ends the old call before judging the new circuit, so a fine and a wrong number can both happen in one move.
+- **Design 5.1** could note that the desk remembers each on-hold call's pair (`HeldCircuit`), and that a moved plug unbinds the old call before it ends.
+- **`Level.unity` sandbox** was not re-run: no file it uses changed (only our prefab, our scripts and our tests).
+
+#### Step 2b verification (orchestrator, 2026-10-18)
+- **Tests:** an independent EditMode run passed 187/187. The console is clean (0 errors, 0 warnings).
+- **Scope:**
+  - Only our files changed: `CallService`, `OperatorDesk`, `CallSpawner`, `CallCardView`, four test files plus the new `HoldTests.cs`, and `GameUI.prefab` (one nested Canvas on `RingingPulse`).
+  - No team file, scene, ProjectSettings, Packages or `PhoneBook.json` changed. `Game.unity` is unchanged on disk.
+- **Code review:**
+  - Hold and Resume are guarded transitions; pay and duration already tick only for Connected calls, and the fee flag prevents a second fee.
+  - The desk remembers the held pair per cord, matches it in either order, and forgets it when the call ends.
+  - On a re-plug elsewhere the cord is unbound before the old call ends, so it isn't sent to the tray while carrying the new circuit; then the new circuit is judged normally.
+  - The on-hold cord's remaining plug isn't counted as half-patched (2a rule kept).
+  - Spawner load counts OnHold as using a cord, not waiting (prep decision).
+- **Screenshots:**
+  - `step-02b.png`: "On hold" card (red ring, $0.19 frozen) above an "On the line" card (blue ring, $0.20); wallet $0.39 = the sum.
+  - `step-02b-full-queue.png`: 6 ringing cards, every rate badge fully readable (compared with `step-02a-full-queue.png`, where halos covered them).
+- **Not done by the orchestrator:** a separate Play Mode run; the agent drove real cord input through `ProcessPointer`. Real mouse play is left to the lead's playtest.
+- **Accepted deviations,** recorded in Design.md:
+  - 1: clicking the pulled jack directly also resumes (same pair closing).
+  - 2: the halo fix uses a nested canvas at sorting order 9 instead of shrinking the halo.
+  - 3: up to one frame of pay after the pulling click (a fraction of a cent).
+
+#### Step 2b playtest (lead, 2026-10-18)
+- Everything looks correct. The lead asked to commit.

@@ -103,6 +103,7 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | `execute_code` quirks (2a) | It compiles with CodeDom (C# 6): no local functions, and `Object` is ambiguous, so write `UnityEngine.Object`. |
 | Keyboard in Play Mode (2a) | The project uses `PointersAndKeyboardsRespectGameViewFocus`, so simulated keys (e.g. F1) don't reach Play Mode unless the Game view has focus. Call the action through the same method the key uses, and leave the real key press to the lead's playtest. |
 | Screenshot names (2a) | `manage_camera screenshot` adds "-1" to the name instead of overwriting an existing file. Delete the old file first if the name matters. |
+| Nested canvas sorting in a prefab (2b) | To give a child its own sorting order inside a prefab (e.g. the halo's order 9), set `m_OverrideSorting` through `SerializedObject`. `manage_prefabs` and the `overrideSorting` setter leave it off, because inside prefab contents the nested canvas counts as a root canvas. |
 | Dev panel (2a) | F1 or the "Dev" button in the top-right corner: + $10, Call now, Speed ×5/×1, Show/Hide times, Clear calls. Editor and development builds only. Its IMGUI clicks also reach the cord input as "empty space" clicks. |
 
 ## 5. Definition of done (every step)
@@ -449,6 +450,9 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
 - **People:** the directory grows to 36 people, one per jack. Portraits are reused, or silhouettes are used. Names follow Design §6.3.
 - **Cards:** every state from Design §5.4, in TextMeshPro, styled to match the caller panel, with a ringing animation.
 - **`ContentValidator`:** an editor menu item plus an EditMode test (Design §6.3).
+- **Notes from 2b:**
+  - Card states now in code: waiting (halo + rate badge), in hand (bubble with names), connected and on hold (cord ring + earnings badge; bubble "On the line" / "On hold"), ended (stamp). Step 3 restyles these; keep the halo's nested canvas (order 9) so badges stay readable.
+  - The dev panel's "Clear calls" can leave the cord input briefly holding a returned cord (stale `heldCable` from Step 1); it lets go on the next update. Dev-only, harmless.
 - **Playtest:**
   - Anyone can be found in under 10 s using the tabs.
   - Cards are readable at 1280×720 and in a phone-sized Game view.

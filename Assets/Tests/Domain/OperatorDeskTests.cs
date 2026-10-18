@@ -79,17 +79,6 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void PulledPlugCutsTheCallOffAndReturnsTheCord()
-        {
-            Call call = TakeAdaWantsBasil();
-            desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.B2);
-            desk.OnCircuitOpened(Cord, TestWorld.B2, TestWorld.A1);
-
-            Assert.That(call.EndReason, Is.EqualTo(CallEndReason.DisconnectedEarly));
-            Assert.That(board.Returned, Is.EqualTo(new[] { Cord }));
-        }
-
-        [Test]
         public void CordBackInTheTrayCutsItsCallOff()
         {
             Call call = TakeAdaWantsBasil();
