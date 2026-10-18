@@ -84,7 +84,7 @@ namespace Switchboard.UI
             }
             if (halo == null) return;
             halo.color = blockedHighlight ? new Color32(241, 87, 70, 255)
-                : ShowsConnected ? new Color32(125, 255, 155, 255) : new Color32(245, 210, 120, 255);
+                : ShowsConnected ? new Color32(125, 255, 155, 255) : SocketHaloGraphic.HoverColor;
             halo.Intensity = ShowsConnected && !blockedHighlight ? 1.4f : 1f;
             halo.gameObject.SetActive(visible);
         }

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using Switchboard.Game;
 
 namespace Switchboard.UI
 {
@@ -33,6 +34,7 @@ namespace Switchboard.UI
         }
         private Image hitArea;
         private Outline[] hoverOutlines;
+        private SlowGuidePulse hoverGlow;
         private bool highlighted;
         public CableController Cable { get; private set; }
         public bool Available => HitArea.enabled && (Cable == null || Cable.IsInTray);
@@ -78,10 +80,22 @@ namespace Switchboard.UI
             value = value && Available && isActiveAndEnabled;
             if (highlighted == value) return;
             highlighted = value;
+            if (artwork != null)
+            {
+                if (value && hoverGlow == null)
+                {
+                    hoverGlow = artwork.GetComponent<SlowGuidePulse>();
+                    if (hoverGlow == null) hoverGlow = artwork.gameObject.AddComponent<SlowGuidePulse>();
+                    hoverGlow.UseSilhouetteHalo();
+                }
+                if (hoverGlow != null) hoverGlow.SetHovered(value);
+                if (hoverOutlines != null)
+                    foreach (var outline in hoverOutlines) if (outline != null) outline.enabled = false;
+                return;
+            }
             if (value && hoverOutlines == null)
             {
-                hoverOutlines = artwork != null ? new[] { CreateOutline(artwork) }
-                    : new[] { CreateOutline(wire), CreateOutline(firstPlug), CreateOutline(secondPlug) };
+                hoverOutlines = new[] { CreateOutline(wire), CreateOutline(firstPlug), CreateOutline(secondPlug) };
             }
             if (hoverOutlines != null)
                 foreach (var outline in hoverOutlines) if (outline != null) outline.enabled = value;
@@ -91,7 +105,7 @@ namespace Switchboard.UI
         {
             if (graphic == null) return null;
             var outline = graphic.gameObject.AddComponent<Outline>();
-            outline.effectColor = new Color(1f, .94f, .72f, .85f);
+            outline.effectColor = SocketHaloGraphic.HoverColor;
             outline.effectDistance = new Vector2(4, -4);
             outline.useGraphicAlpha = true;
             return outline;

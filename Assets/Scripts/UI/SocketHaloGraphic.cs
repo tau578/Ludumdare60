@@ -7,6 +7,7 @@ namespace Switchboard.UI
     [RequireComponent(typeof(CanvasRenderer))]
     public sealed class SocketHaloGraphic : MaskableGraphic
     {
+        public static readonly Color HoverColor = new Color32(245, 210, 120, 255);
         private const int Segments = 64;
         private static readonly float[] Radii = { .435f, .455f, .48f, .535f };
         private static readonly float[] Opacity = { 0f, .8f, .4f, 0f };
