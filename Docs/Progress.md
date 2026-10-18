@@ -9,6 +9,7 @@
 | 2b. Hold and resume | done | ✅ 2026-10-18 (12 min) | ✅ 187/187 tests, scope clean | ✅ | 4c5ac50 |
 | 3. Phone book and cards | done | ✅ 2026-10-18 (16 min + 8 min fix + 3 min fix) | ✅ 211/211 tests, scope clean | ✅ | |
 | 4. Emergencies and fines | done | ✅ 2026-10-18 (26 min) | ✅ 255/255 tests, scope clean | ✅ | |
+| Scene merge: `Final` (D38) | playtesting | ✅ 2026-10-18 (11 min) | ✅ 255/255 tests, scope clean | | |
 | 5. Upgrades, shop, goal | not started | | | | |
 | 6. Saves, Boot, Web build | not started | | | | |
 | 7. Board growth and pacing | not started | | | | |
@@ -1101,4 +1102,114 @@ Follow-ups:
 - "Everything looks good." Accepted as built, including the subtle countdown ring and the fine popup over the shop's top slot.
 - The idle guard stays at 60 s: walking away can cost up to two missed emergencies ($4), then nothing more.
 - The lead asked to commit, and to push if upstream has no new commits.
+
+#### Step 4 commit and the scene merge (orchestrator, 2026-10-18)
+- Step 4 was committed locally as `14fd59c`. It was not pushed, because upstream had moved.
+- **Upstream:**
+  - Mia's `node.png`.
+  - Sergei's "scene merging" (`1c20569`). It pasted prefab-less copies of our `Game` and `GameUI` into `Level.unity`, so the Step 4 visuals were missing there, and it changed `GameInstaller` to a single scene while MainMenu still loaded `Game.unity`. Checked: the commit contained nothing else of his work.
+- **Merged** (`d849187`). Our local `F01/F02.png.meta` files were deleted in favour of the committed ones.
+- **Reverted the scene merge** (`cdc5876`), keeping Mia's `.meta` files. After the revert: `GameInstaller` is identical to Step 4, `Level.unity` is identical to `8ec771f`, and EditMode tests pass 255/255.
+- **Lead's decision (D38):** one `Final.unity` built from prefabs, done by a subagent. The brief is in Plan.md ("Scene merge").
+
+
+## Scene merge report: 2026-10-18
+Result: done
+
+Playable now: `Final.unity` is the one game scene. It holds Sergei's board plus our `Game` and `GameUI` prefab instances. MainMenu → Start lands in it with calls ringing, and playing `Final.unity` directly gives the same game.
+
+How to test: as in the plan's playtest script.
+
+Created:
+- `Assets/Prefabs/Game/Game.prefab`: `GameInstaller` (GameConfig, its own `CordBridge` and `GameLoopRunner`), `GameLoopRunner`, `CordBridge`. The dev panel is still added at runtime, as before.
+- `Assets/Scenes/Final.unity`: `Level.unity` moved inside Unity, so it keeps GUID `4664235fe3d741145ae4fadc5024fbe4`. Git shows it as a delete plus an untracked file until it is staged, and then sees the rename.
+
+Changed:
+- `GameInstaller.cs`:
+  - Removed the additive loading, the `levelScene` field, and the serialized `moneyCounter` and `callQueue` fields.
+  - `Start` is now a plain method. It uses `gameObject.scene`, and finds `MoneyCounterView` and `CallQueueView` by type through `LevelScene.FindAll`.
+  - If either is missing or there is more than one, it logs a clear error ("GameInstaller needs exactly one X in the scene 'Final', but found N.") and stops.
+  - Serialized references stay only inside `Game.prefab`: the `GameConfig` asset, `cordBridge` and `loopRunner`.
+- `LevelScene.cs`: summary comment only. The class name is kept, as the brief names it.
+- `CordBridge.cs`: the parameter of `Attach(Scene)` is renamed from `level` to `scene`.
+- `ContentValidator.cs`, `PeopleFileTests.cs`: the comment "board in Level.unity" now says `Final.unity`.
+- `GameUI.prefab`: the overrides below.
+- `ProjectSettings/EditorBuildSettings.asset`: MainMenu (0), Final (1).
+
+Deleted: `Assets/Scenes/Game.unity` (and its `.meta`).
+
+Scene and prefab changes:
+- **`Final.unity`:**
+  - Only additions: a `Game.prefab` instance and a `GameUI.prefab` instance at the root, plus their two entries in the scene-roots list.
+  - Each instance's only overrides are the name and the root transform values. Those are the defaults Unity always writes for a root instance, and they equal the prefab's.
+  - Nothing of Sergei's was moved, changed or deleted. A text diff against `HEAD:Level.unity` shows only the three added blocks.
+  - There is exactly one camera (the `Main Camera` prefab) and one EventSystem. It is saved and is the active scene.
+- **`GameUI` overrides applied to the prefab:**
+  - `m_AdditionalShaderChannelsFlag` set from 0 to 25 on the `GameUI` and `Hud` canvases. TextMeshPro sets this itself (TexCoord1, Normal, Tangent), so it would otherwise reappear as a scene override.
+  - `Amount` (TextMeshPro, the money counter): `m_fontColor32`, which is the same colour as `m_fontColor` (242,210,122), and `m_TextStyleHashCode`, the "Normal" style. TextMeshPro filled both in when the instance loaded.
+  - No visual change.
+- **`GameUI` overrides dropped as noise:**
+  - The root RectTransform values: they equal the prefab's, and the Canvas drives them.
+  - `Amount` `m_fontSize = 63`: an auto-size result (28–64 pt), which I reverted. It reappears only if the canvas lays out in edit mode at another Game view size. If it shows up as an override, revert it; it's harmless.
+- **The old `Game.unity` instance** had no other overrides: no layout values, no added or removed components or objects.
+
+**Loose (non-prefab) root objects in `Final`** (for Sergei; unchanged):
+- `SwitchboardCanvas`: loose, with the loose children `WorkArea` and `WorkArea/CableInteraction` (and the inactive `HandCursor` under it). It holds the prefab instances BackgroundPanel, CallerQueuePanel, CableTray, UpgradeShopPanel, PhoneBook and Cable_01–03.
+  - Suggestion: make one `Switchboard` prefab (canvas, scaler, `WorkArea`, `CableInteraction` with `CableInputController`, `HandCursor`) nesting those prefabs. Then board edits go to his prefab, not to the shared scene file.
+- `EventSystem`: loose (EventSystem plus InputSystemUIInputModule).
+  - Suggestion: a tiny prefab, or leave it, since it rarely changes.
+- `Main Camera` is already a prefab instance. `Game` and `GameUI` are ours.
+
+**Every place that referenced "Level" or "Game.unity":**
+- Ours, updated: `GameInstaller.cs` (`levelScene = "Level"`, additive `LoadSceneAsync`), `LevelScene.cs` summary, `ContentValidator.cs` comment, `PeopleFileTests.cs` comment, `EditorBuildSettings.asset`. The parameter in `CordBridge.Attach` was renamed.
+- Sergei's, not changed:
+  - `Assets/Editor/LevelBackgroundBuilder.cs` (menu "Tools/Switchboard/Create Level Background And Lamps"): it requires the active scene path to be `Assets/Scenes/Level.unity`, so it now always throws "Open Level in Edit Mode first." It needs `Final.unity`.
+  - `Assets/Editor/GamePresentationBuilder.cs` (menu "Apply English UI And Menu Cursor"): it opens `Assets/Scenes/Level.unity` additively after saving MainMenu, which now fails on the missing path. It needs `Final.unity`.
+  - `Assets/Tools/rodrigo_menu_tools/Runtime/Scripts/Menu.cs` `onPlayButtonClick`: loads build index +1. That works, because `Final` is 1.
+  - `PauseMenu.RestartButton`: reloads the active scene by name. That works.
+  - `MainMenu.unity` itself names no scene.
+- Docs (orchestrator's to update): `CLAUDE.md` lines 64, 77–78 and 123; `Design.md` §3 (lines 97 and 109), §4.1 "Our scenes", §4.2, §4.4 step 3, and D01; `Plan.md` §5 (the smoke test in `Game.unity`, "Level.unity still plays on its own"), §8, and older step scripts that say "Play from `Game.unity`".
+
+Tests: 255/255 EditMode (none new: the change is scene wiring, with no domain rule).
+
+Console: clean. The only lines were the known Metal "memoryless" lines from screenshots and the MCP WebSocket warning after the recompile. I cleared it at the end.
+
+Screenshots (`Temp/Captures/`):
+- `merge-final.png`: `Final` played directly. An emergency rings (EMERGENCY badge and red halo) under a regular call, with the money plaque, board, cords, shop panel and book.
+- `merge-final-fine.png`: the emergency missed. The "Missed -$2.00" stamp and the "-$2.00" popup, with $10.00 going to $8.00.
+- `merge-final-book.png`: the book open on spread 1 (Police, Fire Brigade, Doctor, Abbott…). `LetterTabs` is still inactive.
+- `merge-from-menu.png`: after MainMenu → Start. A fresh session ($0.00) with an emergency ringing.
+
+Checked in Play Mode (stepped frames):
+- **`Final` direct:** one scene loaded, `Session` built, 3 cords attached, both caller types present.
+- **Emergency:** spawned, ticked 12 s, then missed with the fine taken.
+- **A 400-frame natural run at ×5:** no errors or warnings.
+- **From the menu:** `SceneManager.LoadScene(0)` inside Play Mode, then `Menu.onPlayButtonClick()`. `Final` became active at index 1, with one scene, a new session and 3 cords. There is exactly 1 camera, 1 EventSystem, 1 AudioListener and 1 GameInstaller, and no errors. MainMenu was never saved.
+- **Clean-up:** `timeScale` is back to 1, Play Mode is stopped and unpaused, and no callbacks or SessionState keys are left. `Final.unity` is active and not dirty. No format-only re-saves happened (`TimeManager.asset` and `SampleScene.unity` are untouched), so nothing was discarded.
+- **Not checked by simulated clicks:** a full cord patch. The `CordBridge` code path is unchanged, and it found the same 3 cables.
+
+Deviations from Design/Plan:
+1. **The `GameUI` prefab gained data-sync values,** not layout values: none existed. They are listed above.
+2. **`Start` no longer yields.** All objects are in one scene, so the views are bound in the same frame. `GameInstaller` (-100) still runs before Sergei's `Start` methods.
+
+Follow-ups:
+- **Tell Sergei:**
+  - `Level.unity` is now `Final.unity` (same GUID). His two builder menus above still point at the old path.
+  - The scene is shared and the prefabs are owned (D38). Announce root-level additions or removals.
+  - Turn `SwitchboardCanvas` and `EventSystem` into prefabs.
+- **Rename `LevelScene` to something like `BoardLookup`.** That needs only a code edit, but it touches Design §3 and §7 wording, so it's left for the orchestrator.
+- **Old docs** describing Game/Level (listed above).
+
+#### Scene merge verification (orchestrator, 2026-10-18)
+- **Tests:** an independent EditMode run passed 255/255.
+- **Build list:** `MainMenu` (0), `Final` (1).
+- **`Final.unity` against the old `Level.unity`:** 156 lines added and 0 removed. The additions are the two root prefab instances (`Game`, `GameUI`) and their scene-roots entries; nothing of Sergei's changed.
+- **`GameUI.prefab`:** only 4 lines changed (TextMeshPro data-sync values).
+- **`GameInstaller`:** the additive loading is gone. It finds `MoneyCounterView` and `CallQueueView` by type in its own scene, with a clear error if either is missing or appears twice.
+- **Screenshots:** `merge-from-menu.png` shows the full game after Start from the menu, with an emergency ringing at $0.00.
+- **Docs updated:**
+  - Design: §3, §4.1, §4.2, §4.4 and §7; D01, D29 and D33; the status table.
+  - Plan: §5 and §8.
+  - CLAUDE.md: ownership, the scene flow, the git conflict spots, and the next step.
+  - The playtest scripts of older steps still say "Play from `Game.unity`"; read that as `Final.unity`.
 

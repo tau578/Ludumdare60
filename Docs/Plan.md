@@ -112,9 +112,9 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 ## 5. Definition of done (every step)
 - [ ] The project compiles. The console has no errors and no new warnings from our code.
 - [ ] All EditMode tests pass: the team's existing tests plus new tests for every new rule.
-- [ ] A 10-second Play Mode smoke test in `Game.unity` shows no errors or exceptions. The screenshot is saved to `Temp/Captures/step-NN.png`.
+- [ ] A 10-second Play Mode smoke test in `Final.unity` shows no errors or exceptions. The screenshot is saved to `Temp/Captures/step-NN.png`.
 - [ ] Every changed scene and prefab is saved, with no missing references.
-- [ ] `Level.unity` still plays on its own, and the cord sandbox is unchanged.
+- [ ] `Final.unity` plays directly and from `MainMenu` (Start), and nothing of Sergei's in `Final` changed beyond what the brief allows.
 - [ ] No team-owned file was changed, unless the brief lists it as a coordinated change.
 - [ ] The report is in `Docs/Progress.md`, including any deviations from Design.md.
 
@@ -153,7 +153,7 @@ Follow-ups: <ideas, debts, questions>
 | Before Step 5 | Notepad upgrade (D23): Sergei's phone book reports when an entry is tapped (e.g. a public event with the contact's name and socket), so we can note the jack on the call in hand. | Sergei |
 | Feedback (Step 3 playtest) | Holding a cord and clicking a button (the book, a tab, a caller card) drops the cord back in the tray, because any click off a jack counts as "empty space". The lead would find it easier if clicks on buttons kept the cord in hand. His call; we didn't change it. | Sergei |
 | Before Step 6 | Touch input in the cord code: use `Pointer.current` instead of `Mouse.current` in `CableInputController.Update`, and hide the hand cursor on touch. | Sergei |
-| Before Step 6, or earlier if Sergei's cord work settles | Merge into one scene (D29). Agree a time when Sergei isn't editing `Level.unity`; the merge itself takes about 5 minutes. | Sergei |
+| Done (2026-10-18, D38) | One `Final.unity` from prefabs. Tell Sergei: `Level.unity` is now `Final.unity` (same GUID); his `LevelBackgroundBuilder` and `GamePresentationBuilder` menus still name `Assets/Scenes/Level.unity`; the rule is "scene shared, prefabs owned" (announce root-level changes); suggestion: make `SwitchboardCanvas` and `EventSystem` prefabs. | Sergei |
 | Done in Step 1c (lead approved) | The upgrade panel's top header is now a 96 px `HeaderSlot` plaque holding our money counter. Sergei keeps the names `UpgradeShopPanel` and `HeaderSlot`. | Sergei |
 | Before Step 7 | Decide how locked board sections look: cover plates in our overlay, or a change to the board prefab. | Sergei, Mia |
 | Before Step 8 | Sound effects (ring, alarm, coins, paid, fine, hang-up): find them or generate them. | Mia, team |
@@ -640,6 +640,59 @@ Steps 1–4 are fully specified. Steps 5–10 are outlines. The orchestrator tur
 - upgrades (Step 5)
 - re-showing the A–Z tabs
 - the 5-versus-6 caller window layout (Sergei)
+
+---
+
+### Scene merge: one `Final` scene built from prefabs (D29, D38)
+
+**Goal.** One playable scene, `Assets/Scenes/Final.unity`, made of prefab instances, so the team can work in parallel without scene merge conflicts. MainMenu → Start lands in it. **Recommended effort:** high.
+
+**Background.**
+- Sergei's first attempt (`1c20569`) pasted standalone, prefab-less copies of our `Game` and `GameUI` into `Level.unity`. Later `GameUI.prefab` changes (Step 4) therefore never reached the scene, and MainMenu still loaded `Game.unity`. It was reverted in `cdc5876`.
+- The lead decided (2026-10-18) on one scene built from prefabs, named `Final`: "the scene is shared, prefabs are owned".
+
+**Approved changes** (lead, 2026-10-18):
+- Rename `Assets/Scenes/Level.unity` to `Final.unity`, edit it, and save it.
+- Edit `ProjectSettings/EditorBuildSettings.asset`.
+- Delete `Assets/Scenes/Game.unity`.
+- Nothing else of Sergei's: not his prefabs or scripts, and not `MainMenu.unity`. Never save `MainMenu.unity`.
+
+**Build**
+1. **Rename inside Unity** (`AssetDatabase.MoveAsset`, or `manage_asset` move) so the GUID is kept: `Level.unity` → `Final.unity`.
+2. **`Game.prefab`.** Turn the `Game` object in `Game.unity` (`GameInstaller`, `CordBridge`, `GameLoopRunner`, the dev panel if it's there) into `Assets/Prefabs/Game/Game.prefab`, keeping its serialized references (the `GameConfig`, its own components).
+3. **`GameUI` overrides.**
+   - First check the `GameUI` instance in `Game.unity` for overrides that matter, such as layout values that no script sets. Apply those to `GameUI.prefab`, so the prefab alone looks the same as today.
+   - Report what was applied, and drop the noise.
+4. **`GameInstaller` in one scene.**
+   - Drop the additive loading and the `levelScene` field.
+   - Find the views (`MoneyCounterView`, `CallQueueView`, and anything else it needs) and the board objects in its own scene (`gameObject.scene`) by component type, through `LevelScene`. Log a clear error if one is missing or appears twice; Sergei's reverted version shows the idea.
+   - No serialized references between `Game.prefab` and `GameUI.prefab`, or between them and Sergei's prefabs, because scene-level override links are exactly what breaks.
+   - Keep the name lookups `CallerQueuePanel` and `UpgradeShopPanel/HeaderSlot`.
+5. **`Final.unity`:**
+   - Add a `Game.prefab` instance and a `GameUI.prefab` instance at the root, with no overrides beyond the root's position and name. Move nothing of Sergei's and delete nothing of Sergei's.
+   - Exactly one camera and one EventSystem, which `Level` already provides.
+   - Save it.
+6. **Build list:** `MainMenu` (0), `Final` (1). `Game.unity` is removed from the list and deleted; `SampleScene` stays off the list.
+7. **Loose objects report.** List every root object in `Final` that is not a prefab instance, with a one-line suggestion each. These are Sergei's to turn into prefabs; don't change them.
+8. **Stale references.** Search our code, tests and editor tools for "Level" or "Game.unity" scene-name references and update them. Leave Sergei's code alone, and report anything of his that names a scene.
+
+**Checks**
+- EditMode tests all pass.
+- Play `Final.unity` directly: there are no errors; the board, cords, book, shop panel and money counter are there; calls ring; and an emergency shows its ring, badge and fine popup (Step 4 visuals present).
+- Play from `MainMenu.unity`: trigger its Start (the same method the button calls, or `SceneManager.LoadScene(1)` from inside Play Mode) and confirm `Final` loads with no errors. Don't save `MainMenu.unity`.
+- Screenshots in `Temp/Captures/`:
+  - `merge-final.png`: an emergency ringing
+  - `merge-final-book.png`: the book open
+  - `merge-from-menu.png`: after Start from the menu
+- Editor left clean: not in Play Mode, `Final.unity` saved as the active scene, console clean.
+
+**Playtest script (you)**
+1. Open `MainMenu.unity`, press Play, then Start. You land on the board with calls ringing, and there are no errors in the console.
+2. Play through an emergency: the ring, the "EMERGENCY" badge, the fine popup.
+3. Open `Final.unity` directly and press Play: the same game.
+4. In the Hierarchy of `Final`, our objects are two blue prefab entries, `Game` and `GameUI`.
+
+**Out of scope:** turning Sergei's loose objects into prefabs (list them only), Step 5 work, touch input.
 
 ---
 

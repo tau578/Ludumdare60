@@ -15,7 +15,7 @@ namespace Switchboard.Domain.Tests
         private static readonly ICallerType Regular = new FakeCallerType(new FloatRange(3, 8), new FloatRange(15, 30));
         private static readonly ICallerType Emergency = FakeCallerType.Emergency();
 
-        // The team's board in Level.unity: rows A to F, columns 1 to 6.
+        // The team's board in Final.unity: rows A to F, columns 1 to 6.
         private static IEnumerable<string> Board()
         {
             for (char row = 'A'; row <= 'F'; row++)

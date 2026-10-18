@@ -16,6 +16,7 @@ Level art pass (2026-10-18, lead requested): `BackgroundPanel.prefab` groups `ma
 | 2b | Done (`4c5ac50`) | Hold and resume (D07): a pulled plug puts the call OnHold (pay and duration paused, card says "On hold" with frozen earnings); the same pair closing again resumes it with no second fee; the plug in another jack or the cord to the tray cuts it off. Ringing halos draw behind all card content. |
 | 3 | Done (2026-10-18) | A–Z tabs in Sergei's book (D34): `PhoneBookTab` plus `PhoneBookView.ShowLetter`/`HasLetter`, with letters that have no surname greyed out, and arrow keys while the book is open. 36 people on every jack A1–F6 (D35). Restyled cards: bold surnames in the in-hand bubble, on-hold dimming, coloured stamp inks. `ContentValidator` (Content) with `Tools/Switchboard/Validate Content`. Accepted deviations: the tab test lives in `Assets/Tests/Game/Editor/`, the validator menu in `Assets/Scripts/Game/Editor/` (see 4.1), and the validator also checks the surname order and `contactsPerPage`. After the lead's playtest: a press reaction and a placeholder click when a card is taken, typed-out bubble text, and clearer tabs for the spread on show. |
 | 4 | Done (2026-10-18) | Emergencies and fines (D36, D37): `type.emergency` (30 s response ring, $2 miss or wrong-patch fine, $1 cut-off fine, 20–40¢ + 5–10¢/s for 10–20 s, at most one at a time, spawn weight 1 against Regular 5, `everyoneCalls`, `recipientTag` `emergency-service`). Police B6, Fire Brigade C2 and Doctor D4 head `PhoneBook.json`. `PenaltyService` with `FineApplied`, the "Missed -$X" stamp and a red fine popup under the money counter. `IdleGuard` (60 s, `PacingProfile.idleTimeoutSeconds`) blocks fined types and their callbacks. A presentation-only `CallCardStyle` per type (badge, accent). Dev panel "Emergency now". Accepted deviations: the countdown ring is cream on a dark track, turning orange-red in the last 10 s (a red ring was invisible on the red halo); the type badge hides once connected; a `type` given on a service is ignored. |
+| Scene merge | Done (2026-10-18) | One `Final.unity` built from prefabs (D38): our `Game.prefab` and `GameUI.prefab` next to Sergei's board; build list `MainMenu` (0), `Final` (1); `Game.unity` removed; `GameInstaller` finds the views by type in its own scene. |
 
 What Step 1 built:
 - **Operator desk.** A right pair connects the call. A wrong pair ends it as "Wrong number!". Patching with no call in hand is refused. Pulling a plug cut the call off (replaced by hold in Step 2b).
@@ -94,7 +95,7 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 | Area | Owner | Rule for agents |
 |---|---|---|
 | Cord and board code:<br>`Assets/Scripts/UI/`, `Assets/Scripts/Cables/`, `Assets/Editor/`, `Assets/Tests/Editor/` | Sergei | **Read-only.** Use only the public members listed below. Any change is a coordinated change, agreed with the project lead first. |
-| `Assets/Scenes/Level.unity` and the existing prefabs in `Assets/Prefabs/` and `Assets/Prefabs/UI/` | Sergei | **Read-only.** Our systems load `Level.unity` additively (see 4.2). |
+| The existing prefabs in `Assets/Prefabs/` and `Assets/Prefabs/UI/`, and the loose objects in `Final.unity` (`SwitchboardCanvas`, `EventSystem`) | Sergei | **Read-only.** `Final.unity` itself is shared (D38, see 4.2). |
 | `Assets/Sprites/`, `Assets/Audio/` | Mia (art) and Sergei | **Read-only.** Our assets may reference these files. |
 | Sergei's UI components (built after Step 1): phone book (`PhoneBookView`, `Configs/PhoneBook.json`), upgrade shop panel, `MainMenu.unity` and `Assets/Tools/rodrigo_menu_tools`, volume panel | Sergei | **Read-only.** We wire them to our rules (D30). A hook we need in his code is a coordinated change. |
 | Everything listed in section 4 as ours | The project lead, through agents | Agents create and change these files. |
@@ -106,7 +107,7 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 - `CablePhase` values: `Ready` (in the tray), `Held` (picked up, nothing plugged in), `OneEndConnected`, `Connected`.
 - `SocketView`: `Address` (e.g. `"C4"`), `Row`, `Column`, `PlugAnchor`, `IsOccupied`.
 - The cord input model: click a cord in the tray to pick it up, then click a jack to plug in. Clicking a plugged jack pulls that plug out. If the player pulls one plug of a connected cord and then clicks empty space, the plug snaps back to its jack ("restore", `ReconnectSocket`).
-- Objects in `Level.unity` are found **by component type, never by name**: `CableController`, `SocketView` and `CableInputController`.
+- Sergei's objects in `Final.unity` are found **by component type, never by name**: `CableController`, `SocketView` and `CableInputController`.
 - Two exceptions are found by name, because they have no component of their own. Ask Sergei to keep these names:
   - The caller slots: the children of the `VerticalLayoutGroup` under `CallerQueuePanel`.
   - The money slot: `UpgradeShopPanel/HeaderSlot`, a plaque added in Step 1c with Sergei's panel approved as a coordinated change.
@@ -125,7 +126,7 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 | Game tests | `Assets/Tests/Game/Editor/` | **no asmdef** (Assembly-CSharp-Editor) | EditMode tests that need Assembly-CSharp types, such as Sergei's `PhoneBookView` (3). |
 | Content assets | `Assets/Content/` | n/a | `.asset` files, plus our audio in `Assets/Content/Audio/` (3). |
 | Our prefabs | `Assets/Prefabs/Game/` | n/a | `GameUI.prefab` and our other prefabs. |
-| Our scenes | `Assets/Scenes/Game.unity` (later also `Boot.unity`) | n/a | |
+| Scenes | `Assets/Scenes/Final.unity`, shared (D38); `MainMenu.unity` is Sergei's | n/a | Our parts of `Final` are the `Game.prefab` and `GameUI.prefab` instances. |
 | Team code (unchanged) | `Assets/Scripts/UI/`, `Assets/Scripts/Cables/Core/` | Assembly-CSharp, `Switchboard.CableLogic` | Cord interaction and graphics. |
 
 - **Why Game has no asmdef:** an asmdef assembly can't reference Assembly-CSharp, and the team's cord code lives there. Game has to see both our assemblies and the cord code.
@@ -136,16 +137,15 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 - **Namespaces** match the assemblies: `Switchboard.Domain`, `Switchboard.Content`, `Switchboard.Game`, `Switchboard.Domain.Tests`.
 
 ### 4.2 Scenes
-- **`Game.unity` (ours; build index 0 until `Boot` exists).**
-  - Contains a `Game` root object (`GameInstaller`, `GameLoopRunner`, `CordBridge`) and a `GameUI` prefab instance.
-  - No camera and no EventSystem; `Level.unity` provides them.
-  - On start, it loads `Level.unity` additively, unless that scene is already open in the editor.
-- **`Level.unity` (Sergei's; build index 1).**
-  - The physical switchboard: camera, EventSystem, board canvas, sockets, cords, tray and caller panel.
-  - It still plays on its own as the cord sandbox.
+- **`MainMenu.unity` (Sergei's; build index 0).** Start loads the next build index.
+- **`Final.unity` (shared; build index 1; D38, formerly `Level.unity`, same GUID).** The one game scene, made of prefab instances:
+  - Sergei's: `Main Camera` (prefab), `SwitchboardCanvas` (loose; holds the BackgroundPanel, CallerQueuePanel, CableTray, UpgradeShopPanel, PhoneBook and Cable prefabs) and `EventSystem` (loose). He may turn the loose ones into prefabs.
+  - Ours: `Game.prefab` (`GameInstaller`, `GameLoopRunner`, `CordBridge`) and `GameUI.prefab`, at the root, with no overrides.
+  - **Rule: the scene is shared, the prefabs are owned.** Each owner edits only their own prefabs. Adding or removing a root object is announced to the team first. No serialized links between owners' prefabs: `GameInstaller` finds the views and Sergei's objects by type in its own scene at start.
+  - `Game.unity` and the additive loading were removed (D38).
 - **`Boot.unity` (Step 6, then build index 0).** A tap-to-start screen, which unlocks browser audio, then loading.
 - **`SampleScene.unity`** is not in the build list.
-- **The game has one screen.** The two-scene split is a team-workflow measure, not two levels. The scenes get merged later (D29).
+- **The game has one screen,** in one scene (D38).
 
 ### 4.3 UI layering
 - Our UI lives in `Assets/Prefabs/Game/GameUI.prefab`: a Screen Space Overlay canvas with sorting order 10. Its CanvasScaler matches the team's `SwitchboardCanvas` (Scale With Screen Size, 1920×1080, Expand), so positions line up.
@@ -159,7 +159,7 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 - **`GameInstaller`** (Game, `[DefaultExecutionOrder(-100)]`) is the only entry point. It:
   1. loads content
   2. loads the save (from Step 6)
-  3. makes sure `Level.unity` is loaded
+  3. finds the views and the board in its own scene, by type
   4. builds `CordBridge` and `GameSession`
   5. calls `Bind(...)` on the views
 - **`GameLoopRunner`** calls `session.Tick(Time.deltaTime)` from `Update`.
@@ -497,7 +497,7 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
 - **Up: C# events for things that happen.** Payloads are `readonly struct`s. Views subscribe in `Bind` and unsubscribe in `OnDisable`.
 - **Up: polling for values that change every frame** (money, earnings per call, countdowns). Views compare one number in `LateUpdate`.
 - **Between services: the same events.** For example, `PenaltyService` and `CallbackScheduler` both listen for `CallEnded`. `OperatorDesk` is the one deliberate mediator between calls and cords.
-- **Not allowed:** singletons, static mutable state, service locators, `FindObjectOfType` or finding objects by name. The exceptions are the lookups inside the loaded `Level` scene described in section 3: `CordBridge`'s typed lookup and the `CallerQueuePanel` slots.
+- **Not allowed:** singletons, static mutable state, service locators, `FindObjectOfType` or finding objects by name. The exceptions are the lookups of Sergei's objects in `Final` described in section 3: `CordBridge`'s typed lookup and the `CallerQueuePanel` slots.
 - **Not used for core rules:** ScriptableObject event channels.
 - **Event safety.** Raise events only after state is consistent, and don't iterate a list that a handler can change.
 
@@ -536,7 +536,7 @@ Statuses:
 
 | ID | Decision | Status | Needed by |
 |---|---|---|---|
-| D01 | Integrate with the cord code through `CordBridge`, with zero edits to team files. Our systems live in `Game.unity`, which loads `Level.unity` additively. | default | 1 |
+| D01 | Integrate with the cord code through `CordBridge`, with zero edits to team files. Our systems live in `Game.prefab` in the shared `Final.unity` (D38; until then, `Game.unity` loaded `Level.unity` additively). | default | 1 |
 | D02 | Assemblies as in 4.1: Domain and Content are asmdefs; the Game layer is in Assembly-CSharp. | default | 1 |
 | D03 | One call in hand at a time. Taking another card swaps; the old one goes back to the queue with its timers running. | default | 2 |
 | D04 | A circuit closed with no call in hand bounces back with the blocked sound. | default | 1 |
@@ -567,12 +567,13 @@ Statuses:
 | D30 | Division of work: Sergei builds the UI components (phone book, shop panel, main menu, visuals); our agents build the rules and data, and wire his components to them. Steps 3, 5 and 6 become wiring steps. | decided (lead, 2026-10-17) | 1b |
 | D31 | One people file. `Assets/Configs/PhoneBook.json` is the single source of people, jacks and per-caller settings. Each contact has `name`, `socket`, `portrait` (sprite name), `type` (call type id) and optional `rate` / `fee` overrides (0 = use the type). Sergei's book reads only `name` and `socket` from it, unchanged; our game reads every field. The per-person ScriptableObjects from Step 1 are removed. Call types and game settings stay ScriptableObjects. Portraits appear on the call card, not in the book. Names are in English. | decided (lead, 2026-10-17) | 1b |
 | D32 | Connection fee. On a correct connection the caller pays a one-off fee, then the per-second rate. The fee comes from a range on the caller type, with an optional per-caller override (the same simple config as the rate; no tiers). It is paid once per call: not on a wrong connection, not again after hold and resume. The multiplier applies: earnings = (fee + seconds × rate) × multiplier. The card shows both, e.g. "10¢ + 5¢/s". The "Paid" stamp includes the fee, and "+10¢" pops up on connection. | decided (lead, 2026-10-17) | 1b |
-| D33 | Scene flow: `MainMenu` → `Game` → `Level` (build indices 0, 1, 2). Sergei's menu loads the next build index, which is `Game`; `Game` loads `Level` additively. | decided (merge, 2026-10-17) | 1b |
+| D33 | Scene flow: `MainMenu` → `Game` → `Level` (build indices 0, 1, 2). Sergei's menu loads the next build index, which is `Game`; `Game` loads `Level` additively. Superseded by D38: `MainMenu` → `Final`. | superseded | 1b |
 | D34 | Phone book A–Z tabs are added to Sergei's `PhoneBookView` by our Step 3 agent as a coordinated change (approved files are listed in the Step 3 brief). | decided (lead, 2026-10-18) | 3 |
 | D35 | The directory grows to 36 people, one on every jack A1–F6, in Step 3. Portraits are reused until more are drawn. Step 7 may later hide lines behind locked board sections. | decided (lead, 2026-10-18) | 3 |
 | D36 | Emergency services (Police, Fire Brigade, Doctor) replace 3 of the 36 people on their jacks (33 people + 3 services). They are listed **first** in `PhoneBook.json`, so the book shows them at the top of page 1; the people follow, sorted by surname. The validator allows that leading block of `emergency-service` entries. Sergei's book code is unchanged (it shows file order). | decided (lead, 2026-10-18) | 4 |
 | D37 | Step 4 numbers: an emergency must be connected within **30 s**. Fines: **$2** for a miss or a wrong patch, **$1** for cutting a connected emergency off early (not multiplied). Emergency pay: fee 20–40¢, 5–10¢/s, 10–20 s calls. About **1 call in 6** is an emergency (a temporary `spawnWeight` on each caller type: Regular 5, Emergency 1, until Step 7's `weightByProgress`), and at most one at a time. Any person can place an emergency call (`everyoneCalls`); services never call, and regular calls never go to a service (`recipientTag` empty = untagged people only). Services are JSON entries with `"tags": ["emergency-service"]` and no portrait or type. | decided (lead, 2026-10-18) | 4 |
-| D29 | Merge into one scene. The `Game.unity` + `Level.unity` split is temporary; it keeps Sergei's actively edited scene conflict-free. Once his cord work settles, and with his agreement, move the `Game` object and the `GameUI` prefab into one scene, then remove `Game.unity` and the additive loading. Do it at the latest before the first Web build. | decided (lead, 2026-10-17) | 6 |
+| D38 | One final scene, `Final.unity` (formerly `Level.unity`), built from prefab instances: Sergei's prefabs plus our `Game.prefab` and `GameUI.prefab`. Build list: `MainMenu` (0), `Final` (1); `Game.unity` is removed. The scene is shared and the prefabs are owned: each owner edits only their own prefabs, and edits to the scene file itself (adding or removing a root prefab) are announced to the team first. No serialized links between owners' prefabs; our code finds Sergei's objects by type at start. Sergei's first merge (`1c20569`, unpacked copies) was reverted in `cdc5876`. This carries out D29. | decided (lead, 2026-10-18) | before 5 |
+| D29 | Merge into one scene. The `Game.unity` + `Level.unity` split is temporary; it keeps Sergei's actively edited scene conflict-free. Once his cord work settles, and with his agreement, move the `Game` object and the `GameUI` prefab into one scene, then remove `Game.unity` and the additive loading. Do it at the latest before the first Web build. **Done as D38 (2026-10-18).** | done | 6 |
 
 ## 11. Glossary
 - **Jack / socket / line:** a hole in the board, labelled like `C4`. A line is a jack with a subscriber on it.

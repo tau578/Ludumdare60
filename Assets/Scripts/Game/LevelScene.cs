@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 namespace Switchboard.Game
 {
-    /// <summary>The only lookups allowed into the team's Level scene (Design 3 and 7).</summary>
+    /// <summary>The only lookups allowed into the team's board objects in the Final scene (Design 3 and 7).</summary>
     internal static class LevelScene
     {
         // The caller slots have no component of their own, so they are found under this agreed name.

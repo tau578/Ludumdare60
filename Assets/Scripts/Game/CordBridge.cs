@@ -20,9 +20,9 @@ namespace Switchboard.Game
 
         public int CordCount => cables.Length;
 
-        public void Attach(Scene level)
+        public void Attach(Scene scene)
         {
-            List<CableController> found = LevelScene.FindAll<CableController>(level);
+            List<CableController> found = LevelScene.FindAll<CableController>(scene);
             found.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
             cables = found.ToArray();
             observed = new CordState[cables.Length];

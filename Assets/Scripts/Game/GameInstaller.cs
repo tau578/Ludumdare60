@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using Switchboard.Content;
 using Switchboard.Domain;
@@ -13,45 +12,36 @@ namespace Switchboard.Game
     public sealed class GameInstaller : MonoBehaviour
     {
         [SerializeField] private GameConfig config;
-        [SerializeField] private string levelScene = "Level";
         [SerializeField, Tooltip("0 picks a new seed every session.")] private int randomSeed;
         [SerializeField] private CordBridge cordBridge;
         [SerializeField] private GameLoopRunner loopRunner;
-        [SerializeField] private MoneyCounterView moneyCounter;
-        [SerializeField] private CallQueueView callQueue;
 
         public GameSession Session { get; private set; }
 
-        private IEnumerator Start()
+        private void Start()
         {
             if (config == null)
             {
                 Debug.LogError("GameInstaller needs a GameConfig.", this);
-                yield break;
+                return;
             }
 
-            Scene level = SceneManager.GetSceneByName(levelScene);
-            if (!level.isLoaded)
-            {
-                AsyncOperation loading = SceneManager.LoadSceneAsync(levelScene, LoadSceneMode.Additive);
-                if (loading != null) yield return loading;
-                level = SceneManager.GetSceneByName(levelScene);
-            }
-            if (!level.isLoaded)
-            {
-                Debug.LogError($"GameInstaller could not load the scene '{levelScene}'. Is it in the build list?", this);
-                yield break;
-            }
+            // Board, views and this root share one scene (D38). Views live in other prefabs, so they are found
+            // by type at start instead of through serialized links that a scene override could break.
+            Scene scene = gameObject.scene;
+            MoneyCounterView moneyCounter = FindSingle<MoneyCounterView>(scene);
+            CallQueueView callQueue = FindSingle<CallQueueView>(scene);
+            if (moneyCounter == null || callQueue == null) return;
 
-            PeopleCatalog people = config.LoadPeople(BoardJacks(level));
+            PeopleCatalog people = config.LoadPeople(BoardJacks(scene));
             foreach (string error in people.Errors) Debug.LogError($"People file: {error}", config);
 
-            cordBridge.Attach(level);
+            cordBridge.Attach(scene);
             int seed = randomSeed != 0 ? randomSeed : Random.Range(1, int.MaxValue);
             Session = new GameSession(new GameContent(config, people), new SeededRandom(seed), cordBridge);
             cordBridge.Bind(Session.Desk);
-            moneyCounter.Bind(Session.Wallet, LevelScene.FindShopHeader(level), Session.Penalties);
-            RectTransform[] callerSlots = LevelScene.FindCallerSlots(level);
+            moneyCounter.Bind(Session.Wallet, LevelScene.FindShopHeader(scene), Session.Penalties);
+            RectTransform[] callerSlots = LevelScene.FindCallerSlots(scene);
             if (callerSlots.Length < config.MaxWaitingCalls)
                 Debug.LogWarning($"The caller panel has {callerSlots.Length} slots but GameConfig allows {config.MaxWaitingCalls} calls.", config);
             callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, Session.Penalties, callerSlots, PortraitOf,
@@ -67,10 +57,18 @@ namespace Switchboard.Game
 
         private CallCardStyle CardStyleOf(ICallerType type) => type != null ? config.CardStyleOf(type.Id) : default;
 
-        private static List<string> BoardJacks(Scene level)
+        private T FindSingle<T>(Scene scene) where T : Component
+        {
+            List<T> found = LevelScene.FindAll<T>(scene);
+            if (found.Count == 1) return found[0];
+            Debug.LogError($"GameInstaller needs exactly one {typeof(T).Name} in the scene '{scene.name}', but found {found.Count}.", this);
+            return null;
+        }
+
+        private static List<string> BoardJacks(Scene scene)
         {
             var jacks = new List<string>();
-            foreach (SocketView socket in LevelScene.FindAll<SocketView>(level)) jacks.Add(socket.Address);
+            foreach (SocketView socket in LevelScene.FindAll<SocketView>(scene)) jacks.Add(socket.Address);
             return jacks;
         }
     }

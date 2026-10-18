@@ -14,7 +14,7 @@ namespace Switchboard.Content
     {
         public const int MaxContactsPerPage = 12;
 
-        /// <summary>The team's board in Level.unity: rows A to F, columns 1 to 6.</summary>
+        /// <summary>The team's board in Final.unity: rows A to F, columns 1 to 6.</summary>
         public static List<string> BoardJacks()
         {
             var jacks = new List<string>(36);

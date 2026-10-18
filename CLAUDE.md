@@ -13,9 +13,9 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 ## Read first, every session
 1. `Docs/Progress.md`: status table (what's done, what's next), step reports, and verification and playtest notes.
 2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), team coordination (§8) and the step briefs (§9).
-3. `Docs/Design.md`: the source of truth for game rules, architecture, ownership and decisions D01–D37. If the code or a brief disagrees with it, stop and ask; don't improvise.
+3. `Docs/Design.md`: the source of truth for game rules, architecture, ownership and decisions D01–D38. If the code or a brief disagrees with it, stop and ask; don't improvise.
 
-**Next step:** see the first "not started" row in `Docs/Progress.md`. As of 2026-10-18, Step 4 (emergencies and fines, D36/D37) is done, and the next is **Step 5: upgrades, shop and the mystery goal**. It needs the Step 5 coordination items with Sergei first (runtime cords, and the book reporting a tapped entry for the Notepad), and the orchestrator turns its outline in Plan.md into a full brief.
+**Next step:** see the first "not started" row in `Docs/Progress.md`. As of 2026-10-18, Step 4 and the scene merge into `Final.unity` (D38) are done, and the next is **Step 5: upgrades, shop and the mystery goal**. It needs the Step 5 coordination items with Sergei first (runtime cords, and the book reporting a tapped entry for the Notepad), and the orchestrator turns its outline in Plan.md into a full brief.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).
@@ -52,7 +52,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
   3. Merge with `git pull --no-rebase`.
   4. Resolve conflicts carefully, and re-run the tests.
 - **Known conflict spots:**
-  - `ProjectSettings/EditorBuildSettings.asset`: keep the order MainMenu (0), Game (1), Level (2).
+  - `ProjectSettings/EditorBuildSettings.asset`: keep the order MainMenu (0), Final (1).
   - Untracked `.meta` files that Unity generated locally for files a teammate committed without metas. Remove ours and take theirs.
   - Duplicate imports, for example TextMeshPro. Compare GUIDs, then keep theirs.
 - **Unity can re-save scenes:** the test runner can re-save an open scene in a newer format with no real changes, as happened with `SampleScene.unity`. Discard such format-only changes instead of committing them.
@@ -61,10 +61,11 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 | Owner | Area | Rule |
 |---|---|---|
 | Sergei | `Assets/Scripts/UI/`, `Assets/Scripts/Cables/`, `Assets/Editor/`, `Assets/Tests/Editor/` | Read-only unless the lead approves a specific change, which is then a "coordinated change". |
-| Sergei | `Assets/Scenes/Level.unity`, `Assets/Scenes/MainMenu.unity`, the prefabs in `Assets/Prefabs/` and `Assets/Prefabs/UI/` | Same. Never save `Level.unity` or `MainMenu.unity` when opening them to inspect. |
+| Sergei | `Assets/Scenes/MainMenu.unity`, the prefabs in `Assets/Prefabs/` and `Assets/Prefabs/UI/`, the loose `SwitchboardCanvas` and `EventSystem` in `Final.unity` | Same. Never save `MainMenu.unity` when opening it to inspect. |
+| Shared | `Assets/Scenes/Final.unity` (D38) | Scene shared, prefabs owned. Our part is the `Game` and `GameUI` prefab instances; we change our prefabs, not the scene. Adding or removing a root object needs the lead's OK and a heads-up to the team. |
 | Sergei | Phone book (`PhoneBookView`), `UpgradeShopPanel`, main menu, `Assets/Tools/rodrigo_menu_tools`, volume panel | Same. |
 | Mia (art) | `Assets/Sprites/`, `Assets/Fonts/` | Read-only. |
-| Ours | `Assets/Scripts/Domain/`, `Assets/Scripts/Content/`, `Assets/Scripts/Game/`, `Assets/Tests/Domain/`, `Assets/Tests/Game/`, `Assets/Content/`, `Assets/Prefabs/Game/`, `Assets/Scenes/Game.unity`, `Docs/`, `CLAUDE.md` | Agents change these. |
+| Ours | `Assets/Scripts/Domain/`, `Assets/Scripts/Content/`, `Assets/Scripts/Game/`, `Assets/Tests/Domain/`, `Assets/Tests/Game/`, `Assets/Content/`, `Assets/Prefabs/Game/`, `Docs/`, `CLAUDE.md` | Agents change these. |
 | Shared | `Assets/Configs/PhoneBook.json` | The single people file (D31). Sergei's book reads `name` and `socket`; our game reads every field. Keep his format, `contactsPerPage`, and the surname sort order. |
 
 **Division of work (D30):** Sergei builds the UI components; we build the rules and data and wire his components to them. Before building any UI, check whether Sergei already has one.
@@ -74,9 +75,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 - Step 3 (D34, A–Z tabs in the phone book): `PhoneBookView.cs`, `PhoneBookPageView.cs`, `PhoneBookContactRow.cs`, a new tab component in `Assets/Scripts/UI/`, `PhoneBookBuilder.cs`, `PhoneBook.prefab`, and a test in `Assets/Tests/Editor/` for the tab jump. Used: `PhoneBookView.cs`, the new `PhoneBookTab.cs`, `PhoneBookBuilder.cs` (new menu `Tools/Switchboard/Update Phone Book Tabs`) and `PhoneBook.prefab`. The test went to our `Assets/Tests/Game/Editor/` instead.
 
 ## Architecture in brief (details in Design.md §4–§7)
-- **Scene flow (D33).** `MainMenu` → `Game` → `Level`. Sergei's menu loads the next build index. Our `Game.unity` loads his `Level.unity` additively.
-  - `Game.unity` has no camera or EventSystem; `Level` provides them. "No cameras rendering" in edit mode is expected.
-  - The two-scene split is temporary and gets merged before the first Web build (D29), when Sergei agrees.
+- **Scene flow (D38).** `MainMenu` → `Final`. Sergei's menu loads the next build index. `Final.unity` (formerly `Level.unity`, same GUID) is the one game scene: Sergei's board plus our `Game.prefab` and `GameUI.prefab` instances. Sergei's first merge attempt (`1c20569`, prefab-less copies) was reverted in `cdc5876`.
 - **Assemblies:**
   - `Switchboard.Domain` (`noEngineReferences`): all rules, plain C#, ticked by `GameSession.Tick(dt)` in a fixed order. Time only comes from ticks, randomness only from a seeded `IRandom`, and money is a `long` of cents plus a carried fraction.
   - `Switchboard.Content`: ScriptableObjects (`GameConfig`, `CallerTypeDefinition`) plus the `PhoneBook.json` loader and validator.
@@ -84,7 +83,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
   - Tests: `Switchboard.Domain.Tests` (EditMode).
 - **Integration with Sergei's code:**
   - **`CordBridge`** observes his `CableController`s every `LateUpdate`, reading only public members (Design §3). It reports plugs and circuits to `OperatorDesk`, and returns cords to the tray with his `TryRemove`.
-  - Objects in `Level` are found **by component type**. The only name lookups are `CallerQueuePanel` (the caller slots) and `UpgradeShopPanel/HeaderSlot` (the money plaque).
+  - `GameInstaller` finds the views and Sergei's objects in its own scene **by component type**. The only name lookups are `CallerQueuePanel` (the caller slots) and `UpgradeShopPanel/HeaderSlot` (the money plaque).
 - **Composition root:** `GameInstaller`. No singletons, statics with state, service locators, or `FindObjectOfType`.
 - **Communication:** views call verbs (`OperatorDesk.TryTake`), services raise C# events, and values that change every frame are polled in `LateUpdate`.
 - **UI:**
@@ -120,12 +119,12 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
   - To speed things up, set `Time.timeScale` temporarily and reset it afterwards.
   - Simulate clicks inside a one-shot `Canvas.willRenderCanvases` handler.
 - **Screenshots:** `manage_camera screenshot` with `output_folder: "Temp/Captures"` (git-ignored). Never save under `Assets/`. Take them while Play Mode is paused or being stepped.
-- **Leave the editor clean:** idle, not in Play Mode, compiled, `Game.unity` saved as the active scene, console clean, and no temporary callbacks or editor state left behind.
+- **Leave the editor clean:** idle, not in Play Mode, compiled, `Final.unity` saved as the active scene, console clean, and no temporary callbacks or editor state left behind.
 
 ## Pending coordination with Sergei (Plan §8)
 - **Step 5:** a way to add cords at runtime, and the phone book reporting a tapped entry (Notepad upgrade, D23).
 - **Step 6:** touch input in `CableInputController` (`Pointer.current`).
-- **Before Step 6:** merge the two scenes into one (D29).
+- **Tell Sergei (scene merge):** `Level.unity` is now `Final.unity`; his `LevelBackgroundBuilder` and `GamePresentationBuilder` menus still name the old path; "scene shared, prefabs owned"; suggest making `SwitchboardCanvas` and `EventSystem` prefabs.
 - **Ongoing:** keep the names `CallerQueuePanel`, `UpgradeShopPanel` and `HeaderSlot`, and keep the extra fields in `PhoneBook.json`.
 - **His `PhoneBookBuilder`** points at a missing `Assets/Settings/PhoneBook.json`.
 - **A–Z tabs are hidden** (lead, 2026-10-18): `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab`; the code, objects and tests stay. His `Update Phone Book Tabs` menu rebuilds them active, so untick them again afterwards.
