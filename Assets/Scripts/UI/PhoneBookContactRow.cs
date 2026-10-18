@@ -33,7 +33,7 @@ namespace Switchboard.UI
             contactName.fontSize = socketAddress.fontSize = fontSize;
         }
 
-        // Off, the row lets clicks fall through to the open book, which closes it.
+        // Off, the row lets clicks fall through to page turning.
         public void SetTappable(bool value)
         {
             if (tapArea != null) tapArea.raycastTarget = value;

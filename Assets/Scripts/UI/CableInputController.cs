@@ -7,7 +7,7 @@ using UnityEngine.UI;
 
 namespace Switchboard.UI
 {
-    public enum CableCursorMode { Pointing, Grab, Plug }
+    public enum CableCursorMode { Pointing, Grab, Plug, PageTurn }
 
     /// <summary>One held cable, explicit pickup from the tray, and one LMB input path.</summary>
     [DisallowMultipleComponent]
@@ -137,10 +137,12 @@ namespace Switchboard.UI
             StoredCableView stored = target != null ? target.GetComponentInParent<StoredCableView>() : null;
             bool overTray = target != null && tray != null && target.transform.IsChildOf(tray);
             bool overCall = target != null && target.GetComponentInParent<Switchboard.Game.CallCardView>() != null;
+            var hoveredBook = target != null ? target.GetComponentInParent<PhoneBookView>() : null;
+            bool overOpenBook = hoveredBook != null && hoveredBook.IsOpen;
             if (leftPressed)
             {
                 if (socket != null) HandleSocketClick(socket);
-                else if (ActiveCable != null && !overCall)
+                else if (ActiveCable != null && !overCall && hoveredBook == null)
                 {
                     if (heldCable.Phase == CablePhase.Held || overTray)
                     {
@@ -152,7 +154,10 @@ namespace Switchboard.UI
                     heldCable = stored.Cable;
             }
             if (ActiveCable != null && (heldCable.Phase == CablePhase.Ready || heldCable.Phase == CablePhase.Connected)) heldCable = null;
-            UpdatePointers(position, socket, stored);
+            var clickHandler = target != null ? ExecuteEvents.GetEventHandler<IPointerClickHandler>(target) : null;
+            var book = clickHandler != null ? clickHandler.GetComponent<PhoneBookView>() : null;
+            int pageTurn = book != null ? book.PageTurnDirectionAt(position, hits[0].module.eventCamera) : 0;
+            UpdatePointers(position, socket, stored, pageTurn, overOpenBook);
         }
 
         private GameObject Raycast(Vector2 position)
@@ -187,13 +192,15 @@ namespace Switchboard.UI
                 heldCable = null;
         }
 
-        private void UpdatePointers(Vector2 position, SocketView socket, StoredCableView stored)
+        private void UpdatePointers(Vector2 position, SocketView socket, StoredCableView stored, int pageTurn, bool overOpenBook)
         {
             var selected = ActiveCable;
             if (hoveredSocket != socket && hoveredSocket != null) hoveredSocket.SetPointerState(false, selected);
             hoveredSocket = socket;
             if (hoveredSocket != null) hoveredSocket.SetPointerState(true, selected);
-            CursorMode = selected != null ? CableCursorMode.Plug :
+            CursorMode = overOpenBook ? (pageTurn != 0 ? CableCursorMode.PageTurn : CableCursorMode.Pointing) :
+                selected != null ? CableCursorMode.Plug :
+                pageTurn != 0 ? CableCursorMode.PageTurn :
                 stored != null && stored.Available && Owns(stored.Cable) ? CableCursorMode.Grab : CableCursorMode.Pointing;
             var highlightedStock = CursorMode == CableCursorMode.Grab ? stored : null;
             if (hoveredStoredCable != highlightedStock && hoveredStoredCable != null) hoveredStoredCable.SetHighlighted(false);
@@ -203,7 +210,7 @@ namespace Switchboard.UI
             foreach (var cable in cables)
             {
                 if (!Usable(cable)) continue;
-                cable.UpdatePointer(position, cable == selected);
+                cable.UpdatePointer(position, cable == selected && !overOpenBook);
             }
             bool handVisible = false;
             if (handCursor != null)
@@ -211,7 +218,7 @@ namespace Switchboard.UI
                 var area = (RectTransform)handCursor.transform.parent;
                 var canvas = area.GetComponentInParent<Canvas>();
                 var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-                handVisible = selected == null && RectTransformUtility.RectangleContainsScreenPoint(area, position, camera);
+                handVisible = (selected == null || overOpenBook) && RectTransformUtility.RectangleContainsScreenPoint(area, position, camera);
                 handCursor.gameObject.SetActive(handVisible);
                 if (handVisible)
                 {
@@ -219,6 +226,7 @@ namespace Switchboard.UI
                     RectTransformUtility.ScreenPointToLocalPointInRectangle(area, position, camera, out var local);
                     handCursor.rectTransform.anchoredPosition = local;
                     handCursor.Grabbing = CursorMode == CableCursorMode.Grab;
+                    handCursor.PageTurnDirection = CursorMode == CableCursorMode.PageTurn ? pageTurn : 0;
                     handCursor.transform.SetAsLastSibling();
                 }
             }

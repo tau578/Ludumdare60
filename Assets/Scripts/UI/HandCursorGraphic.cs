@@ -9,7 +9,24 @@ namespace Switchboard.UI
     public sealed class HandCursorGraphic : MaskableGraphic
     {
         private bool grabbing;
+        private int pageTurnDirection;
         public bool Grabbing { get => grabbing; set { if (grabbing == value) return; grabbing = value; SetVerticesDirty(); } }
+        public int PageTurnDirection { get => pageTurnDirection; set { if (pageTurnDirection == value) return; pageTurnDirection = value; SetVerticesDirty(); } }
+        private static readonly Vector2[] Page = {
+            new Vector2(10,3), new Vector2(36,3), new Vector2(45,12), new Vector2(45,34),
+            new Vector2(10,34)
+        };
+        private static readonly Vector2[] Pinch = {
+            new Vector2(18,23), new Vector2(18,15), new Vector2(20,12), new Vector2(24,12),
+            new Vector2(27,15), new Vector2(27,26), new Vector2(31,23), new Vector2(35,24),
+            new Vector2(38,27), new Vector2(41,27), new Vector2(45,30), new Vector2(47,35),
+            new Vector2(47,44), new Vector2(44,50), new Vector2(40,54), new Vector2(40,59),
+            new Vector2(22,59), new Vector2(22,54), new Vector2(17,50), new Vector2(12,43),
+            new Vector2(8,35), new Vector2(8,30), new Vector2(11,27), new Vector2(15,27),
+            new Vector2(22,33), new Vector2(22,27)
+        };
+        private static readonly int[] PageTriangles = Triangulate(Page);
+        private static readonly int[] PinchTriangles = Triangulate(Pinch);
         private static readonly Vector2[] Pointing = {
             new Vector2(20,2), new Vector2(23,3), new Vector2(25,6), new Vector2(25,25),
             new Vector2(28,22), new Vector2(32,22), new Vector2(35,25), new Vector2(38,24),
@@ -35,14 +52,31 @@ namespace Switchboard.UI
         protected override void OnPopulateMesh(VertexHelper mesh)
         {
             mesh.Clear();
-            var shape = grabbing ? Grab : Pointing;
-            var triangles = grabbing ? GrabTriangles : PointingTriangles;
+            bool turning = pageTurnDirection != 0;
+            var shape = turning ? Pinch : grabbing ? Grab : Pointing;
+            var triangles = turning ? PinchTriangles : grabbing ? GrabTriangles : PointingTriangles;
             var shadow = new Color32(10, 15, 12, 110);
             var outline = new Color32(30, 35, 29, 255);
+            if (turning)
+            {
+                Fill(mesh, Page, PageTriangles, new Vector2(2, 3), shadow);
+                Fill(mesh, Page, PageTriangles, Vector2.zero, new Color32(211, 199, 165, 255));
+                for (int i = 0; i < Page.Length; i++) Line(mesh, Page[i], Page[(i + 1) % Page.Length], 2.3f, outline);
+                Line(mesh, new Vector2(36,3), new Vector2(36,12), 1.6f, outline);
+                Line(mesh, new Vector2(36,12), new Vector2(45,12), 1.6f, outline);
+                Line(mesh, new Vector2(31,18), new Vector2(39,18), 1.2f, outline);
+            }
             Fill(mesh, shape, triangles, new Vector2(2, 3), shadow);
             Fill(mesh, shape, triangles, Vector2.zero, new Color32(238, 235, 214, 255));
             for (int i = 0; i < shape.Length; i++) Line(mesh, shape[i], shape[(i + 1) % shape.Length], 2.3f, outline);
-            if (grabbing)
+            if (turning)
+            {
+                Line(mesh, new Vector2(27,26), new Vector2(27,35), 1.6f, outline);
+                Line(mesh, new Vector2(38,27), new Vector2(37,37), 1.6f, outline);
+                Line(mesh, new Vector2(15,32), new Vector2(24,39), 1.6f, outline);
+                Line(mesh, new Vector2(22,54), new Vector2(40,54), 1.6f, outline);
+            }
+            else if (grabbing)
             {
                 Line(mesh, new Vector2(27,20), new Vector2(27,32), 1.6f, outline);
                 Line(mesh, new Vector2(37,22), new Vector2(36,33), 1.6f, outline);
@@ -61,8 +95,8 @@ namespace Switchboard.UI
 
         private Vector2 Local(Vector2 p)
         {
-            var hotspot = grabbing ? new Vector2(29,28) : new Vector2(20,2);
-            return new Vector2(p.x - hotspot.x, hotspot.y - p.y);
+            var hotspot = pageTurnDirection != 0 ? new Vector2(22,23) : grabbing ? new Vector2(29,28) : new Vector2(20,2);
+            return new Vector2((p.x - hotspot.x) * (pageTurnDirection < 0 ? -1 : 1), hotspot.y - p.y);
         }
         private void Fill(VertexHelper mesh, Vector2[] shape, int[] triangles, Vector2 offset, Color tint)
         {

@@ -64,7 +64,7 @@ namespace Switchboard.Game
             shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene));
             goalPanel.Bind(Session.Goal);
             loopRunner.Bind(Session);
-            if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls, Session.Earnings);
+            if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls);
             var guide = GetComponent<FirstOrderGuide>();
             if (guide == null) guide = gameObject.AddComponent<FirstOrderGuide>();
             guide.Bind(callQueue, Session.Calls, book,
