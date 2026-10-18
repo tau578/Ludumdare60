@@ -8,8 +8,8 @@
 | 2a. Queue, callbacks, dev panel | done | ✅ 2026-10-17 (24 min) | ✅ 156/156 tests, scope clean | ✅ | 2b00ac7 |
 | 2b. Hold and resume | done | ✅ 2026-10-18 (12 min) | ✅ 187/187 tests, scope clean | ✅ | 4c5ac50 |
 | 3. Phone book and cards | done | ✅ 2026-10-18 (16 min + 8 min fix + 3 min fix) | ✅ 211/211 tests, scope clean | ✅ | |
-| 4. Emergencies and fines | done | ✅ 2026-10-18 (26 min) | ✅ 255/255 tests, scope clean | ✅ | |
-| Scene merge: `Final` (D38) | playtesting | ✅ 2026-10-18 (11 min) | ✅ 255/255 tests, scope clean | | |
+| 4. Emergencies and fines | done | ✅ 2026-10-18 (26 min) | ✅ 255/255 tests, scope clean | ✅ | 14fd59c |
+| Scene merge: `Final` (D38) | done | ✅ 2026-10-18 (11 min) | ✅ 255/255 tests, scope clean | ✅ | 3002ea8 |
 | 5. Upgrades, shop, goal | not started | | | | |
 | 6. Saves, Boot, Web build | not started | | | | |
 | 7. Board growth and pacing | not started | | | | |
@@ -1226,3 +1226,9 @@ Follow-ups:
   - The 3 people who use it fail validation and are left out.
   - EditMode: 252/255. Failing: `ContentValidatorTests.RealContentHasNoProblems`, `PeopleFileTests.RealFileHasThirtyThreePeopleAndThreeServicesOnEveryJack`, and `FullBoardTests` (33 of 36 jacks used).
   - This is already on GitHub `main`. Not pushed; waiting for the lead.
+
+#### caller-02 slice fix (2026-10-18)
+- **Change (lead approved, Mia's file):** `Assets/Sprites/callers/caller-02.png.meta`, the `caller-02_0` sprite rect height 191 → 190, to fit her new 190×190 image. Same sprite name and internalID (`7311596053533559507`); every other import setting unchanged.
+- **Check:** after the re-import, `caller-02_0` loads as 190×190 with the fileID and GUID that `GameConfig.asset` references, so the `caller-02` portrait is back.
+- **EditMode:** 255/255 pass (the 3 failures are fixed). Console clean. No format-only re-saves to discard.
+- Orchestrator check: an independent EditMode run passed 255/255. Lead playtest of `Final` from MainMenu: all good. The lead asked to push.
