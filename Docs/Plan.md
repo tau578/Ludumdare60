@@ -1051,6 +1051,13 @@ Steps 1–5b are fully specified. Steps 5c–10 are outlines. The orchestrator t
 - Domain is unchanged; it already reads through `ICallerType`, `IPacingProfile` and `IGameContent`. The Content loaders, the validator and the tests change.
 - Keep the current values exactly (D37 and the `Default.asset` pacing), so the game plays the same.
 - Update `Docs/EconomyFile.md`.
+- **Notes for the brief** (orchestrator, 2026-10-18):
+  - Before removing the asset fields, record the current values (or add a test that compares the file with them), so the game provably plays the same.
+  - Check that Sergei's persistent wiring (D45, `OperatorDesk` and `CallService`) reads none of the moving values.
+  - Questions for the lead, if the code doesn't settle them:
+    - Does `startingCords` (5b, `GameConfig`) move into the file too?
+    - Are the ScriptableObject fields deleted, or kept as a fallback?
+    - How are ranges written: min/max pairs, or objects?
 
 ### Step 6: Saves and first Web build (outline). Sergei's `MainMenu` is the start screen: it replaces our planned `Boot.unity` and doubles as the tap-to-start audio unlock (D30, D33).
 - **Saving:**
