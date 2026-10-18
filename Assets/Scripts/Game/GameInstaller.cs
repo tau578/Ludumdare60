@@ -31,21 +31,27 @@ namespace Switchboard.Game
             Scene scene = gameObject.scene;
             MoneyCounterView moneyCounter = FindSingle<MoneyCounterView>(scene);
             CallQueueView callQueue = FindSingle<CallQueueView>(scene);
-            if (moneyCounter == null || callQueue == null) return;
+            ShopView shop = FindSingle<ShopView>(scene);
+            GoalPanelView goalPanel = FindSingle<GoalPanelView>(scene);
+            if (moneyCounter == null || callQueue == null || shop == null || goalPanel == null) return;
 
             PeopleCatalog people = config.LoadPeople(BoardJacks(scene));
             foreach (string error in people.Errors) Debug.LogError($"People file: {error}", config);
+            EconomyCatalog economy = config.LoadEconomy();
+            foreach (string error in economy.Errors) Debug.LogError($"Economy file: {error}", config);
 
             cordBridge.Attach(scene);
             int seed = randomSeed != 0 ? randomSeed : Random.Range(1, int.MaxValue);
-            Session = new GameSession(new GameContent(config, people), new SeededRandom(seed), cordBridge);
+            Session = new GameSession(new GameContent(config, people, economy), new SeededRandom(seed), cordBridge);
             cordBridge.Bind(Session.Desk);
-            moneyCounter.Bind(Session.Wallet, LevelScene.FindShopHeader(scene), Session.Penalties);
+            moneyCounter.Bind(Session.Wallet, LevelScene.FindShopHeader(scene), Session.Penalties, Session.Upgrades);
             RectTransform[] callerSlots = LevelScene.FindCallerSlots(scene);
             if (callerSlots.Length < config.MaxWaitingCalls)
                 Debug.LogWarning($"The caller panel has {callerSlots.Length} slots but GameConfig allows {config.MaxWaitingCalls} calls.", config);
             callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, Session.Penalties, callerSlots, PortraitOf,
                 cordBridge.ColorOf, CardStyleOf);
+            shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene));
+            goalPanel.Bind(Session.Goal);
             loopRunner.Bind(Session);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             // Added at runtime so no scene or prefab references a type that release builds leave out.
