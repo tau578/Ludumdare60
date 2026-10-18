@@ -17,7 +17,9 @@ namespace Switchboard.UI
         [SerializeField] private Button previousSpread;
         [SerializeField] private Button nextSpread;
         [SerializeField] private PhoneBookTab[] tabs = new PhoneBookTab[0];
+        private PhoneBookConfig allContacts = new PhoneBookConfig();
         private PhoneBookConfig directory = new PhoneBookConfig();
+        private Predicate<string> isVisibleSocket;
         private string configError;
         private bool contactTapsEnabled;
 
@@ -38,7 +40,10 @@ namespace Switchboard.UI
 
         public bool IsOpen { get; private set; }
         public int CurrentSpreadIndex { get; private set; }
+        /// <summary>The contacts the book shows, after the socket filter.</summary>
         public int ContactCount => directory.contacts.Length;
+        public int PageCount => Mathf.Max(1, Mathf.CeilToInt(ContactCount / (float)directory.contactsPerPage));
+        public PhoneBookContact ContactAt(int index) => directory.contacts[index];
         public bool CanGoBack => CurrentSpreadIndex > 0;
         public bool CanGoForward => (CurrentSpreadIndex + 1) * 2 * directory.contactsPerPage < ContactCount;
         private int ContactsPerSpread => 2 * directory.contactsPerPage;
@@ -68,6 +73,32 @@ namespace Switchboard.UI
 
         public void ConfigureTabs(PhoneBookTab[] letterTabs) => tabs = letterTabs;
 
+        /// <summary>
+        /// Shows only the contacts whose socket passes the filter (D42: the open board), in file order, so the
+        /// services stay first and the surname order holds. Null shows everyone. Pages and tabs follow the filter.
+        /// </summary>
+        public void SetVisibleSockets(Predicate<string> isVisible)
+        {
+            isVisibleSocket = isVisible;
+            ApplyFilter();
+            int lastSpread = Mathf.Max(0, (ContactCount - 1) / ContactsPerSpread);
+            if (CurrentSpreadIndex > lastSpread) CurrentSpreadIndex = lastSpread;
+            RefreshPages();
+        }
+
+        private void ApplyFilter()
+        {
+            if (isVisibleSocket == null)
+            {
+                directory = allContacts;
+                return;
+            }
+            var visible = new System.Collections.Generic.List<PhoneBookContact>(allContacts.contacts.Length);
+            foreach (PhoneBookContact contact in allContacts.contacts)
+                if (isVisibleSocket(contact.socket)) visible.Add(contact);
+            directory = new PhoneBookConfig { contactsPerPage = allContacts.contactsPerPage, contacts = visible.ToArray() };
+        }
+
         public bool HasLetter(char letter) => FirstContactWithSurname(letter) >= 0;
 
         /// <summary>Opens the spread with the first surname starting with the letter; the contacts are sorted by surname.</summary>
@@ -94,18 +125,19 @@ namespace Switchboard.UI
         [ContextMenu("Reload Contacts")]
         public void ReloadContacts()
         {
-            directory = new PhoneBookConfig();
+            allContacts = new PhoneBookConfig();
             configError = null;
             try
             {
                 if (contactsConfig == null) throw new System.ArgumentException("Phone book config is not assigned.");
-                directory = PhoneBookConfig.Parse(contactsConfig.text);
+                allContacts = PhoneBookConfig.Parse(contactsConfig.text);
             }
             catch (System.ArgumentException ex)
             {
                 configError = "Configuration error";
                 Debug.LogWarning($"Phone book: {ex.Message}", this);
             }
+            ApplyFilter();
             CurrentSpreadIndex = 0;
             RefreshPages();
         }

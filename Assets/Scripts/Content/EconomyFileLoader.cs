@@ -7,8 +7,8 @@ using UnityEngine;
 namespace Switchboard.Content
 {
     /// <summary>
-    /// Parses and checks the designer's economy file (D39, D40, D47; Design 6.4): starting money and cords, pacing,
-    /// call types and upgrades. An entry with a problem is left out, and a bad starting or pacing value falls back to
+    /// Parses and checks the designer's economy file (D39, D40, D47, D49; Design 6.4): starting money, cords, board
+    /// and caller slots, pacing, call types and upgrades. An entry with a problem is left out, and a bad starting or pacing value falls back to
     /// its default; each is reported in plain words naming the entry and the fix, and the game still starts.
     /// </summary>
     public static class EconomyFileLoader
@@ -17,11 +17,11 @@ namespace Switchboard.Content
 
         private static readonly TypeInfo[] Types =
         {
-            new TypeInfo("extra_income", UpgradeKind.ExtraIncome, null),
-            new TypeInfo("extra_wires", UpgradeKind.ExtraWires, null),
-            new TypeInfo("notepad", UpgradeKind.Notepad, null),
-            new TypeInfo("extra_clients", UpgradeKind.ExtraClients, "Step 7"),
-            new TypeInfo("secret", UpgradeKind.Secret, null)
+            new TypeInfo("extra_income", UpgradeKind.ExtraIncome),
+            new TypeInfo("extra_wires", UpgradeKind.ExtraWires),
+            new TypeInfo("notepad", UpgradeKind.Notepad),
+            new TypeInfo("extra_clients", UpgradeKind.ExtraClients),
+            new TypeInfo("secret", UpgradeKind.Secret)
         };
 
         private static readonly FloatRange DefaultCallbackDelay = new FloatRange(20, 40);
@@ -33,18 +33,22 @@ namespace Switchboard.Content
             var callTypes = new List<ICallerType>();
             long startingCents = 0;
             int startingCords = StatSheet.DefaultStartingCords;
+            BoardSize startingBoard = BoardSize.Full;
+            int startingClientSlots = StatSheet.MaxClientSlots;
             IPacingProfile pacing = PacingSettings.Default;
             EconomyFileData data = Parse(json, errors);
             if (data != null)
             {
                 startingCents = CheckStartingCents(data.startingCents, errors);
                 startingCords = CheckStartingCords(data.startingCords, errors);
+                startingBoard = CheckStartingBoard(data.startingBoard, errors);
+                startingClientSlots = CheckStartingClientSlots(data.startingClientSlots, errors);
                 pacing = CheckPacing(data.pacing, errors);
                 CheckCalls(data.calls, callTypes, errors);
 
                 var ids = new Dictionary<string, int>(StringComparer.Ordinal);
                 var lastInChain = new Dictionary<UpgradeKind, UpgradeRecord>();
-                var rules = new ChainRules(startingCords);
+                var rules = new ChainRules(startingCords, startingBoard, startingClientSlots);
                 for (int i = 0; i < data.upgrades.Length; i++)
                 {
                     UpgradeRecord record = Check(i, data.upgrades[i], ids, lastInChain, rules, errors);
@@ -56,7 +60,8 @@ namespace Switchboard.Content
                     errors.Add("There is no secret upgrade. Add exactly one entry with \"type\": \"secret\": " +
                         "the most expensive one, which the player saves for.");
             }
-            return new EconomyCatalog(startingCents, startingCords, pacing, callTypes, upgrades, errors);
+            return new EconomyCatalog(startingCents, startingCords, startingBoard, startingClientSlots, pacing, callTypes,
+                upgrades, errors);
         }
 
         public static string KnownTypes()
@@ -113,6 +118,37 @@ namespace Switchboard.Content
                     $"Use {fallback} to {StatSheet.MaxCords}. The game starts with {fallback} for now.");
             else return cords;
             return fallback;
+        }
+
+        // Without a valid start the game still plays, on the whole board with every caller slot open.
+        private static BoardSize CheckStartingBoard(BoardSizeEntry entry, List<string> errors)
+        {
+            BoardSize full = BoardSize.Full;
+            string instead = $"The game starts on the full {full} board for now.";
+            if (entry == null || entry.IsMissing)
+                errors.Add($"startingBoard is missing. Add the part of the board a new game opens, such as " +
+                    $"\"startingBoard\": {{ \"cols\": 3, \"rows\": 3 }}. {instead}");
+            else if (entry.IsPartial)
+                errors.Add($"startingBoard needs both cols and rows, such as {{ \"cols\": 3, \"rows\": 3 }}. {instead}");
+            else
+            {
+                var size = new BoardSize(entry.cols, entry.rows);
+                if (size.IsValid) return size;
+                errors.Add($"startingBoard {size} is outside the board. cols and rows must each be 1 to {BoardSize.MaxSide}. {instead}");
+            }
+            return full;
+        }
+
+        private static int CheckStartingClientSlots(int slots, List<string> errors)
+        {
+            const int all = StatSheet.MaxClientSlots;
+            if (slots == EconomyFileData.Unset)
+                errors.Add($"startingClientSlots is missing. Add how many caller slots a new game opens, such as " +
+                    $"\"startingClientSlots\": 3. The game opens all {all} for now.");
+            else if (slots < 1 || slots > all)
+                errors.Add($"startingClientSlots {slots} is outside 1 to {all}, the caller panel's slots. The game opens all {all} for now.");
+            else return slots;
+            return all;
         }
 
         private static IPacingProfile CheckPacing(PacingEntry entry, List<string> errors)
@@ -281,11 +317,6 @@ namespace Switchboard.Content
                     : $"{where}: type \"{entry.type.Trim()}\" is unknown. Use one of: {KnownTypes()}.");
                 return null;
             }
-            if (type.ArrivesIn != null)
-            {
-                errors.Add($"{where}: type \"{type.Name}\" arrives in {type.ArrivesIn} and can't be used yet. Remove the entry for now.");
-                return null;
-            }
 
             double multiplier = 0;
             if (type.Kind == UpgradeKind.ExtraIncome)
@@ -311,6 +342,14 @@ namespace Switchboard.Content
                 else if (previous != null && wires <= previous.Wires)
                     errors.Add($"{where}: wires {wires} is not higher than {previous.Id}'s {previous.Wires}. Values in a chain must grow.");
             }
+            BoardSize boardSize = default;
+            int clientSlots = 0;
+            if (type.Kind == UpgradeKind.ExtraClients)
+            {
+                lastInChain.TryGetValue(type.Kind, out UpgradeRecord previous);
+                boardSize = CheckBoardSize(where, entry.boardSize, previous, rules, errors);
+                clientSlots = CheckClientSlots(where, entry.clientSlots, previous, rules, errors);
+            }
             if (type.Kind == UpgradeKind.Secret && errors.Count == errorsBefore)
             {
                 if (rules.SecretAt >= 0)
@@ -325,7 +364,57 @@ namespace Switchboard.Content
             }
             if (errors.Count > errorsBefore) return null;
             return new UpgradeRecord(id, type.Kind, entry.name.Trim(), entry.description?.Trim() ?? string.Empty,
-                entry.costCents, multiplier, wires);
+                entry.costCents, multiplier, wires, boardSize, clientSlots);
+        }
+
+        // Each entry sets the open board; along the chain, starting from startingBoard, it only grows.
+        private static BoardSize CheckBoardSize(string where, BoardSizeEntry entry, UpgradeRecord previous, ChainRules rules,
+            List<string> errors)
+        {
+            const string example = "{ \"cols\": 4, \"rows\": 4 }";
+            if (entry == null || entry.IsMissing)
+            {
+                errors.Add($"{where}: boardSize is missing. Add the part of the board this upgrade opens, such as \"boardSize\": {example}.");
+                return default;
+            }
+            if (entry.IsPartial)
+            {
+                errors.Add($"{where}: boardSize needs both cols and rows, such as {example}.");
+                return default;
+            }
+            var size = new BoardSize(entry.cols, entry.rows);
+            if (!size.IsValid)
+            {
+                errors.Add($"{where}: boardSize {size} is outside the board. cols and rows must each be 1 to {BoardSize.MaxSide}.");
+                return size;
+            }
+            BoardSize before = previous != null ? previous.BoardSize : rules.StartingBoard;
+            string beforeName = previous != null ? $"{previous.Id}'s" : "the startingBoard";
+            if (size.Cols < before.Cols || size.Rows < before.Rows)
+                errors.Add($"{where}: boardSize {size} is smaller than {beforeName} {before}. The board can only grow along the chain, " +
+                    "so neither cols nor rows may go down.");
+            else if (size.Equals(before))
+                errors.Add($"{where}: boardSize {size} is the same as {beforeName} {before}. The board must grow: raise cols, rows or both.");
+            return size;
+        }
+
+        private static int CheckClientSlots(string where, int slots, UpgradeRecord previous, ChainRules rules, List<string> errors)
+        {
+            if (slots == EconomyFileData.Unset)
+            {
+                errors.Add($"{where}: clientSlots is missing. Add how many caller slots are open after this upgrade, such as \"clientSlots\": 4.");
+                return 0;
+            }
+            if (slots < 1 || slots > StatSheet.MaxClientSlots)
+            {
+                errors.Add($"{where}: clientSlots {slots} is outside 1 to {StatSheet.MaxClientSlots}, the caller panel's slots.");
+                return slots;
+            }
+            int before = previous != null ? previous.ClientSlots : rules.StartingClientSlots;
+            string beforeName = previous != null ? $"{previous.Id}'s" : "startingClientSlots";
+            if (slots < before)
+                errors.Add($"{where}: clientSlots {slots} is fewer than {beforeName} {before}. Caller slots can only grow along the chain.");
+            return slots;
         }
 
         private static TypeInfo FindType(string name)
@@ -356,28 +445,30 @@ namespace Switchboard.Content
         // What the checks remember from one entry to the next.
         private sealed class ChainRules
         {
-            public ChainRules(int startingCords) =>
+            public ChainRules(int startingCords, BoardSize startingBoard, int startingClientSlots)
+            {
                 StartingCords = startingCords > 0 ? startingCords : StatSheet.DefaultStartingCords;
+                StartingBoard = startingBoard;
+                StartingClientSlots = startingClientSlots;
+            }
 
             public int StartingCords { get; }
+            public BoardSize StartingBoard { get; }
+            public int StartingClientSlots { get; }
             public int SecretAt { get; set; } = -1;
             public int NotepadAt { get; set; } = -1;
         }
 
         private sealed class TypeInfo
         {
-            public TypeInfo(string name, UpgradeKind kind, string arrivesIn)
+            public TypeInfo(string name, UpgradeKind kind)
             {
                 Name = name;
                 Kind = kind;
-                ArrivesIn = arrivesIn;
             }
 
             public string Name { get; }
             public UpgradeKind Kind { get; }
-
-            /// <summary>The step that builds the type; null once it is built.</summary>
-            public string ArrivesIn { get; }
         }
     }
 }

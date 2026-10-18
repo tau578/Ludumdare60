@@ -142,6 +142,31 @@ namespace Switchboard.Domain
             SyncWaitingCalls();
         }
 
+        /// <summary>Developer reset only: sends back every cord with a plug in a jack the predicate picks.</summary>
+        public void ReturnCordsWhere(Func<JackId, bool> picks)
+        {
+            if (picks == null) return;
+            returning.Clear();
+            for (int i = closed.Count - 1; i >= 0; i--)
+            {
+                if (!picks(closed[i].A) && !picks(closed[i].B)) continue;
+                returning.Add(closed[i].Cord);
+                closed.RemoveAt(i);
+            }
+            foreach (KeyValuePair<CordId, JackId> plug in remainingJacks)
+                if (picks(plug.Value) && !returning.Contains(plug.Key)) returning.Add(plug.Key);
+            foreach (CordId cord in returning)
+            {
+                remainingJacks.Remove(cord);
+                SetHalfPatched(cord, false);
+                int index = HeldIndex(cord);
+                if (index >= 0) held.RemoveAt(index);
+            }
+            foreach (CordId cord in returning) switchboard.ReturnToTray(cord);
+            returning.Clear();
+            SyncWaitingCalls();
+        }
+
         private static bool Waiting(Call call) => call.State == CallState.Taken || call.State == CallState.Connecting;
 
         private void Judge(CordId cord, JackId a, JackId b, JackId? manualAnchor)

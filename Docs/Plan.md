@@ -111,6 +111,7 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Disabled buttons (5a) | Setting `Button.interactable = false` applies the button's grey, half-transparent disabled tint and changes the shop's look. To make a button inert, ignore the click in our view and dim it ourselves. |
 | Book row clicks (5b) | Row taps only reach `PhoneBookContactRow` while `ContactTapsEnabled` is on (Notepad owned); otherwise the open book's button gets the click and closes. Simulate them with EventSystem raycasts inside a `Canvas.willRenderCanvases` handler. |
 | Buying in Play Mode (5a) | Connect a call through `OperatorDesk.OnCircuitClosed` to check fees and pay without plugging cords; the dev panel's "+ $100" and "Reset upgrades" call `GameSession` methods directly. |
+| Art merges (7a) | Re-exported images can keep a slice bigger than the new texture, and Unity then drops the sprite with no console message. Compare PNG sizes (`sips -g pixelWidth -g pixelHeight`) with the `.meta` rects, or load the path with `AssetDatabase.LoadAssetAtPath<Sprite>` and check it isn't null. |
 | Missing JSON fields (5c) | `JsonUtility.FromJson` keeps field initializers for fields the file leaves out, also inside nested objects in arrays. Use a marker initializer (NaN, or a named `Unset` constant) to tell "missing" from 0. |
 
 ## 5. Definition of done (every step)
@@ -159,9 +160,10 @@ Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs 
 | Stale paths in editor menus | `LevelBackgroundBuilder` and `GamePresentationBuilder` still name `Assets/Scenes/Level.unity` (now `Final.unity`, same GUID). `PhoneBookBuilder` points at a missing `Assets/Settings/PhoneBook.json` (the file is `Assets/Configs/PhoneBook.json`). | cleanup, any step |
 | A–Z tabs are hidden | `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab` (lead, 2026-10-18); the code, objects and tests stay. `Tools/Switchboard/Update Phone Book Tabs` rebuilds them active, so untick them again after running it. | |
 | Loose scene objects | `SwitchboardCanvas` and `EventSystem` are loose in `Final.unity`; making them prefabs would keep scene merges small. | optional |
-| Missing `.meta` files for Mia's shop images | `61dae7a` added `buy_btn.png`, `powerup-backdrop.png`, `powerup01.png` and `powerup01-hover.png` in `Assets/Sprites/store/` without their `.meta` files; the lead asked Mia to push them. Until she does: never commit the `.meta` files our Unity generates for these 4 images (stage files by name, not `git add -A`), and don't reference the images in any prefab or scene. When hers arrive, delete our untracked copies and pull. Remove this row then. | waiting on Mia |
 | Sound effects | Ring, alarm, coins, paid, fine, hang-up: find them or generate them. | before Step 8 |
-| Art imports | `caller-04` and `caller-05` were re-exported at 190×190 while their slices stayed 191 tall, so Unity dropped them (fixed). After resizing a sprite sheet, re-slice it in the Sprite Editor. | tip |
+| Art imports | Mia has no Unity, so her re-exports keep the old slices: `caller-04`/`05` (5b) and `caller-06`/`07`/`08` (7a) came back at 190×190 with 191×191 slices, and Unity dropped them silently (all fixed to 190×190 in the `.meta`). After every art merge, compare each changed PNG's size with its `.meta` sprite rect. `Assets/Sprites/board/caller.png` (229×190, slice 190×191) has no sprite for the same reason; nothing uses it yet. | check after art merges |
+| Closed caller-slot covers (7a) | Closed slots get plain dark discs made at runtime; the 6th slot sits over the printer art, so its disc overlaps it. A cover-plate drawing from Mia would replace them. | when art exists |
+| `EconomyFile.md` Notepad wording | The Notepad row still says "the call in hand" (pre-D46). | cleanup, any step |
 
 Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `UpgradeShopPanel/HeaderSlot`, or update `GameInstaller` with the rename. `PhoneBook.json` keeps the book's format, `contactsPerPage` and the surname order.
 
@@ -185,7 +187,7 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 9 | Mobile and Web polish | Good on phones and desktop browsers |
 | 10 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–5c and 7a are fully specified (7a is built before 6). Steps 6, 7b and 8–10 are outlines. The orchestrator turns each one into a full brief before launching it.
+Steps 1–5c and 7a are built (7a before 6). Steps 6, 7b and 8–10 are outlines. The orchestrator turns each one into a full brief before launching it.
 
 ---
 
@@ -1146,6 +1148,7 @@ No team-owned file changes. `Final.unity` and the prefabs shouldn't need to chan
 - **`Boot.unity`:** tap to start, then load `Game`.
 - **Web build** through `manage_build`, to `Builds/Web/` (git-ignored).
 - **Depends on** D26 (hosting). Includes the touch-input open item (§8).
+- **From 7a:** the board size and caller slots are ordinary upgrade ids (`board_1`…), so a save restores them through `StatSheet` with no extra data; `OpenBoardLink` then reopens the jacks. Test that a loaded `board_2` opens 5×5 before the first call rings. `GameSession.ResetUpgrades` (clears calls, returns cords from closing jacks) is dev-only; a "new game" button would need the same care.
 - **Tests:**
   - Saving and loading gives back the same data.
   - Migration from a v1 test file.

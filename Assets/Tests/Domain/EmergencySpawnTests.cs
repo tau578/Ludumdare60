@@ -86,7 +86,7 @@ namespace Switchboard.Domain.Tests
             var world = new EmergencyWorld();
             var clock = new GameClock();
             var calls = new CallService();
-            var callbacks = new CallbackScheduler(calls, clock, new SeededRandom(2), 6);
+            var callbacks = new CallbackScheduler(calls, clock, new SeededRandom(2), () => 6);
             calls.End(calls.Add(world.EmergencyRequest(0)).Id, CallEndReason.WrongConnection);
             Call other = calls.Add(world.EmergencyRequest(1, service: 1));
 

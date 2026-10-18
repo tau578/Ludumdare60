@@ -17,6 +17,7 @@ namespace Switchboard.Game
         [SerializeField] private GameLoopRunner loopRunner;
 
         private NotepadBookLink bookLink;
+        private OpenBoardLink boardLink;
 
         public GameSession Session { get; private set; }
 
@@ -40,26 +41,31 @@ namespace Switchboard.Game
             // People reference the economy file's call types by id, so the economy file loads first.
             EconomyCatalog economy = config.LoadEconomy();
             foreach (string error in economy.Errors) Debug.LogError($"Economy file: {error}", config);
-            PeopleCatalog people = config.LoadPeople(economy, BoardJacks(scene));
+            List<SocketView> sockets = LevelScene.FindAll<SocketView>(scene);
+            PeopleCatalog people = config.LoadPeople(economy, BoardJacks(sockets));
             foreach (string error in people.Errors) Debug.LogError($"People file: {error}", config);
+            foreach (string error in ContentValidator.ValidateStartingBoard(people.Directory, economy.StartingBoard))
+                Debug.LogError($"People file: {error}", config);
 
             // Fewer cords than startingCords are added below like bought ones; more can't be taken away.
             cordBridge.Attach(scene, config.ExtraCordColors);
             if (cordBridge.CordCount > economy.StartingCords)
                 Debug.LogWarning($"The scene has {cordBridge.CordCount} cords but Economy.json starts with {economy.StartingCords}.", config);
             int seed = randomSeed != 0 ? randomSeed : Random.Range(1, int.MaxValue);
-            Session = new GameSession(new GameContent(config, people, economy), new SeededRandom(seed), cordBridge);
+            Session = new GameSession(new GameContent(people, economy), new SeededRandom(seed), cordBridge);
             cordBridge.Bind(Session.Desk);
             cordBridge.EnsureCords(Session.Stats.Cords);
             Session.Stats.Changed += OnStatsChanged;
             moneyCounter.Bind(Session.Wallet, LevelScene.FindShopHeader(scene), Session.Penalties, Session.Upgrades);
             RectTransform[] callerSlots = LevelScene.FindCallerSlots(scene);
-            if (callerSlots.Length < config.MaxWaitingCalls)
-                Debug.LogWarning($"The caller panel has {callerSlots.Length} slots but GameConfig allows {config.MaxWaitingCalls} calls.", config);
+            if (callerSlots.Length < economy.MostClientSlots)
+                Debug.LogWarning($"The caller panel has {callerSlots.Length} slots, but Economy.json can open {economy.MostClientSlots} " +
+                    "(startingClientSlots or an extra_clients clientSlots). Lower the file's values or add slots to the panel.", config);
             callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, Session.Penalties, callerSlots, PortraitOf,
                 cordBridge.ColorOf, CardStyleOf, Session.Notepad, cordBridge.Synchronize);
             PhoneBookView book = FindSingle<PhoneBookView>(scene);
             if (book != null) bookLink = new NotepadBookLink(book, Session.Stats, Session.Notepad);
+            boardLink = new OpenBoardLink(sockets, book, callQueue, Session.Stats, Session.Board);
             shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene));
             goalPanel.Bind(Session.Goal);
             loopRunner.Bind(Session);
@@ -75,6 +81,8 @@ namespace Switchboard.Game
             if (Session != null) Session.Stats.Changed -= OnStatsChanged;
             bookLink?.Dispose();
             bookLink = null;
+            boardLink?.Dispose();
+            boardLink = null;
         }
 
         // Cords are only ever added: one can't be taken away safely mid-call.
@@ -92,10 +100,10 @@ namespace Switchboard.Game
             return null;
         }
 
-        private static List<string> BoardJacks(Scene scene)
+        private static List<string> BoardJacks(List<SocketView> sockets)
         {
-            var jacks = new List<string>();
-            foreach (SocketView socket in LevelScene.FindAll<SocketView>(scene)) jacks.Add(socket.Address);
+            var jacks = new List<string>(sockets.Count);
+            foreach (SocketView socket in sockets) jacks.Add(socket.Address);
             return jacks;
         }
     }

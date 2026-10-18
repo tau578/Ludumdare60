@@ -26,6 +26,7 @@ namespace Switchboard.Game
         private GUIStyle style;
         private readonly List<ICallerType> timedTypes = new List<ICallerType>();
         private readonly List<string> timedLabels = new List<string>();
+        private readonly List<string> unreachableLabels = new List<string>();
 
         public void Bind(GameSession gameSession, CallQueueView queue)
         {
@@ -34,11 +35,13 @@ namespace Switchboard.Game
             // One "ring now" button per type that must be answered in time, such as "Emergency now".
             timedTypes.Clear();
             timedLabels.Clear();
+            unreachableLabels.Clear();
             foreach (ICallerType type in session.Spawner.Types)
             {
                 if (type.ResponseTimeSeconds <= 0) continue;
                 timedTypes.Add(type);
                 timedLabels.Add(type.DisplayName + " now");
+                unreachableLabels.Add(type.DisplayName + ": none open");
             }
         }
 
@@ -66,14 +69,22 @@ namespace Switchboard.Game
             if (Button(x, ref y, "+ $10")) session.Wallet.Earn(1000);
             if (Button(x, ref y, "+ $100")) session.Wallet.Earn(10000);
             if (Button(x, ref y, "Call now")) session.Spawner.TrySpawn();
+            // Before the board opens over a service, nobody could take an emergency, so the button says so.
             for (int i = 0; i < timedTypes.Count; i++)
-                if (Button(x, ref y, timedLabels[i])) session.Spawner.TrySpawn(timedTypes[i]);
+            {
+                bool reachable = session.Spawner.HasOpenRecipient(timedTypes[i]);
+                if (Button(x, ref y, reachable ? timedLabels[i] : unreachableLabels[i]) && reachable)
+                    session.Spawner.TrySpawn(timedTypes[i]);
+            }
             if (Button(x, ref y, fast ? "Speed ×1" : "Speed ×5")) Time.timeScale = fast ? 1f : FastTimeScale;
             if (Button(x, ref y, callQueue.ShowDurations ? "Hide times" : "Show times"))
                 callQueue.ShowDurations = !callQueue.ShowDurations;
             // Clearing ends calls as Cleared, which never fines or calls back.
             if (Button(x, ref y, "Clear calls")) session.ClearCalls();
-            // Forgets purchases without a refund, so the shop is back to its start.
+            // Opens the next board size for free, as if bought (D49).
+            if (Button(x, ref y, "Open board")) session.Upgrades.TryGrantNext(UpgradeKind.ExtraClients);
+            // Forgets purchases without a refund, so the shop is back to its start. The board closes again, which
+            // also clears live calls and sends back cords plugged into closing jacks.
             if (Button(x, ref y, "Reset upgrades")) session.ResetUpgrades();
         }
 

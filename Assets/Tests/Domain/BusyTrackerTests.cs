@@ -14,7 +14,7 @@ namespace Switchboard.Domain.Tests
         {
             crowd = new Crowd(4);
             calls = new CallService();
-            callbacks = new CallbackScheduler(calls, new GameClock(), new SeededRandom(3), 6);
+            callbacks = new CallbackScheduler(calls, new GameClock(), new SeededRandom(3), () => 6);
             busy = new BusyTracker(calls, callbacks);
         }
 

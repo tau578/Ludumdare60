@@ -23,7 +23,7 @@ namespace Switchboard.Domain.Tests
 
         // A valid start, pacing and calls section, so each test sees only its upgrades' messages.
         private const string Head =
-            "'startingCords': {0}, " +
+            "'startingCords': {0}, 'startingBoard': { 'cols': 3, 'rows': 3 }, 'startingClientSlots': 3, " +
             "'pacing': { 'firstCallDelaySeconds': 2, 'baseIntervalSeconds': 8, 'intervalJitter': 0.3, 'loadFactor': 0.5, 'idleTimeoutSeconds': 60 }, " +
             "'calls': [ { 'id': 'type.regular', 'name': 'Regular', 'spawnWeight': 1, 'rateCentsPerSecond': { 'min': 3, 'max': 8 }, " +
             "'feeCents': { 'min': 5, 'max': 15 }, 'durationSeconds': { 'min': 15, 'max': 30 } } ], ";
@@ -42,13 +42,13 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void TheRealFileLoadsEightEntriesWithNoProblems()
+        public void TheRealFileLoadsElevenEntriesWithNoProblems()
         {
             var file = AssetDatabase.LoadAssetAtPath<TextAsset>(EconomyFilePath);
             Assert.That(file, Is.Not.Null, EconomyFilePath);
             EconomyCatalog catalog = EconomyFileLoader.Load(file.text);
             Assert.That(catalog.Errors, Is.Empty);
-            Assert.That(catalog.Upgrades.Count, Is.EqualTo(8));
+            Assert.That(catalog.Upgrades.Count, Is.EqualTo(11));
             Assert.That(catalog.Upgrades[0].Id, Is.EqualTo("income_1"));
             Assert.That(catalog.Upgrades[0].Kind, Is.EqualTo(UpgradeKind.ExtraIncome));
             Assert.That(catalog.Upgrades[0].CostCents, Is.EqualTo(800));
@@ -65,22 +65,24 @@ namespace Switchboard.Domain.Tests
             Assert.That(catalog.Upgrades[6].Id, Is.EqualTo("notepad"));
             Assert.That(catalog.Upgrades[6].Kind, Is.EqualTo(UpgradeKind.Notepad));
             Assert.That(catalog.Upgrades[6].CostCents, Is.EqualTo(300));
-            Assert.That(catalog.Upgrades[7].Kind, Is.EqualTo(UpgradeKind.Secret));
-            Assert.That(catalog.Upgrades[7].CostCents, Is.EqualTo(25000));
+            for (int i = 0; i < 3; i++)
+                Assert.That(catalog.Upgrades[7 + i].Kind, Is.EqualTo(UpgradeKind.ExtraClients), "the board entries follow the Notepad");
+            Assert.That(catalog.Upgrades[10].Kind, Is.EqualTo(UpgradeKind.Secret));
+            Assert.That(catalog.Upgrades[10].CostCents, Is.EqualTo(25000));
         }
 
         [Test]
         public void GameConfigReferencesTheRealFile()
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
-            Assert.That(config.LoadEconomy().Upgrades.Count, Is.EqualTo(8));
+            Assert.That(config.LoadEconomy().Upgrades.Count, Is.EqualTo(11));
             Assert.That(config.LoadEconomy().StartingCords, Is.EqualTo(3));
             Assert.That(config.ExtraCordColors.Count, Is.EqualTo(3));
             Assert.That(config.Validate(), Is.Empty);
         }
 
         [Test]
-        public void TheRealShelfOffersIncomeWiresAndTheNotepad()
+        public void TheRealShelfOffersIncomeWiresAndTheNotepadThenTheBiggerBoard()
         {
             var file = AssetDatabase.LoadAssetAtPath<TextAsset>(EconomyFilePath);
             var upgrades = new UpgradeService(EconomyFileLoader.Load(file.text).Upgrades, new Wallet(100000));
@@ -89,9 +91,15 @@ namespace Switchboard.Domain.Tests
                 Is.EqualTo(new[] { "income_1", "wires_1", "notepad" }));
 
             Assert.That(upgrades.TryBuy("notepad"), Is.True);
-            Assert.That(shelf.OfferAt(2), Is.Null, "nothing is left for slot 3");
+            Assert.That(shelf.OfferAt(2).Id, Is.EqualTo("board_1"), "the board chain takes the sold-out slot");
             Assert.That(shelf.OfferAt(0).Id, Is.EqualTo("income_1"));
             Assert.That(shelf.OfferAt(1).Id, Is.EqualTo("wires_1"));
+
+            Assert.That(upgrades.TryBuy("board_1"), Is.True);
+            Assert.That(upgrades.TryBuy("board_2"), Is.True);
+            Assert.That(shelf.OfferAt(2).Id, Is.EqualTo("board_3"));
+            Assert.That(upgrades.TryBuy("board_3"), Is.True);
+            Assert.That(shelf.OfferAt(2), Is.Null, "nothing is left for slot 3 after 6x6");
         }
 
         [Test]
@@ -123,11 +131,6 @@ namespace Switchboard.Domain.Tests
             EconomyCatalog catalog = Load("{ 'id': 'vip_1', 'type': 'vip', 'name': 'VIP', 'costCents': 100 }", Secret);
             AssertSingleError(catalog, "\"vip\"", "extra_income, extra_wires, notepad, extra_clients, secret");
         }
-
-        [Test]
-        public void ReportsATypeNotBuiltYet() =>
-            AssertSingleError(Load("{ 'id': 'clients_1', 'type': 'extra_clients', 'name': 'More lines', 'costCents': 1500 }", Secret),
-                "\"clients_1\"", "extra_clients", "Step 7", "Remove the entry");
 
         [Test]
         public void LoadsWiresAndTheNotepad()

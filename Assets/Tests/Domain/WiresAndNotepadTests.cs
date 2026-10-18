@@ -285,10 +285,10 @@ namespace Switchboard.Domain.Tests
             Call call = emergencySession.Calls.Add(emergency.EmergencyRequest(0, 1));
             emergencySession.Desk.TryTake(call.Id);
 
-            Assert.That(emergencySession.Notepad.Note(new JackId("S2")), Is.True);
-            Assert.That(call.RecipientNote, Is.EqualTo(new JackId("S2")));
-            Assert.That(emergencySession.Notepad.Note(new JackId("J1")), Is.True);
-            Assert.That(call.CallerNote, Is.EqualTo(new JackId("J1")));
+            Assert.That(emergencySession.Notepad.Note(new JackId("F5")), Is.True);
+            Assert.That(call.RecipientNote, Is.EqualTo(new JackId("F5")));
+            Assert.That(emergencySession.Notepad.Note(new JackId("A1")), Is.True);
+            Assert.That(call.CallerNote, Is.EqualTo(new JackId("A1")));
         }
 
         [Test]

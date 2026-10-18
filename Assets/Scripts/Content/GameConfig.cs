@@ -7,13 +7,11 @@ namespace Switchboard.Content
 {
     /// <summary>
     /// The one asset GameInstaller references: the people and economy files, plus what stays in Unity because it is
-    /// presentation or scene layout (card styles, portraits, cord colours, the caller panel's slot count).
+    /// presentation (card styles, portraits, cord colours).
     /// </summary>
     [CreateAssetMenu(menuName = "Switchboard/GameConfig")]
     public sealed class GameConfig : ScriptableObject
     {
-        [SerializeField, Min(1), Tooltip("Live calls never outnumber the caller panel's slots (D17).")]
-        private int maxWaitingCalls = 6;
         [SerializeField, Tooltip("Colours for the cords that extra_wires upgrades add, in order (5b).")]
         private Color[] extraCordColors =
         {
@@ -29,7 +27,6 @@ namespace Switchboard.Content
         private TextAsset economyFile;
         [SerializeField] private PortraitEntry[] portraits = new PortraitEntry[0];
 
-        public int MaxWaitingCalls => maxWaitingCalls;
         public IReadOnlyList<Color> ExtraCordColors => extraCordColors ?? new Color[0];
 
         public string PeopleFileText => peopleFile != null ? peopleFile.text : null;
@@ -47,7 +44,10 @@ namespace Switchboard.Content
             EconomyCatalog economy = LoadEconomy();
             var errors = new List<string>();
             foreach (string error in economy.Errors) errors.Add("Economy file: " + error);
-            foreach (string error in ContentValidator.Validate(PeopleFileText, economy.CallTypes, HasPortrait, ContentValidator.BoardJacks()))
+            List<string> board = ContentValidator.BoardJacks();
+            foreach (string error in ContentValidator.Validate(PeopleFileText, economy.CallTypes, HasPortrait, board))
+                errors.Add("People file: " + error);
+            foreach (string error in ContentValidator.ValidateStartingBoard(LoadPeople(economy, board).Directory, economy.StartingBoard))
                 errors.Add("People file: " + error);
             errors.AddRange(ContentValidator.ValidateCardStyles(CardStyleIds(), economy.CallTypes));
             return errors;

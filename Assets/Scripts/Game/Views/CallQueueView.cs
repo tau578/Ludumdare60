@@ -2,14 +2,17 @@ using System;
 using System.Collections.Generic;
 using Switchboard.Content;
 using Switchboard.Domain;
+using Switchboard.UI;
 using UnityEngine;
 using UnityEngine.Serialization;
+using UnityEngine.UI;
 
 namespace Switchboard.Game
 {
     /// <summary>
     /// Every live call has a card over one of the team's caller slots, in arrival order (Design 4.3, 5.4).
     /// When a card leaves, the cards below it slide up. Ended cards keep their slot while the stamp shows.
+    /// Only the open slots take cards (D49); closed ones get a dark cover that lets clicks through.
     /// </summary>
     public sealed class CallQueueView : MonoBehaviour
     {
@@ -19,6 +22,8 @@ namespace Switchboard.Game
         [SerializeField, Min(0), Tooltip("How fast cards slide to a new slot; 0 snaps.")]
         private float slideSpeed = 14f;
         [SerializeField] private UiClickSound takeSound;
+        [SerializeField, Tooltip("The cover over a closed caller slot (D49).")]
+        private Color closedSlotCover = new Color(.06f, .05f, .04f, .72f);
 
         private readonly List<CallCardView> pool = new List<CallCardView>();
         private readonly List<CallCardView> shown = new List<CallCardView>();
@@ -33,6 +38,9 @@ namespace Switchboard.Game
         private Func<CordId, Color> cordColorOf;
         private RectTransform[] slots = new RectTransform[0];
         private Vector2[] slotCentres = new Vector2[0];
+        private Vector2[] slotSizes = new Vector2[0];
+        private Graphic[] covers = new Graphic[0];
+        private int openSlots = -1;
         private Vector3[] slotMin = new Vector3[0];
         private Vector3[] slotMax = new Vector3[0];
         private Vector2 slotSize;
@@ -78,6 +86,8 @@ namespace Switchboard.Game
             cordColorOf = cordColors;
             slots = callerSlots ?? new RectTransform[0];
             slotCentres = new Vector2[slots.Length];
+            slotSizes = new Vector2[slots.Length];
+            BuildCovers();
             slotMin = new Vector3[slots.Length];
             slotMax = new Vector3[slots.Length];
             BuildPool(Mathf.Max(1, slots.Length));
@@ -93,6 +103,36 @@ namespace Switchboard.Game
                 card.Hide();
             }
             shown.Clear();
+        }
+
+        /// <summary>How many slots, from the top, take calls; the rest are covered (D49).</summary>
+        public void SetOpenSlots(int count)
+        {
+            openSlots = Mathf.Clamp(count, 0, slots.Length);
+            for (int i = 0; i < covers.Length; i++)
+                if (covers[i] != null) covers[i].gameObject.SetActive(i >= openSlots);
+        }
+
+        private int OpenSlotCount => openSlots >= 0 ? openSlots : slots.Length;
+
+        // Behind the cards, over the team's slot art; never a raycast target, so cords and cards still get clicks.
+        private void BuildCovers()
+        {
+            foreach (Graphic cover in covers)
+                if (cover != null) Destroy(cover.gameObject);
+            covers = new Graphic[slots.Length];
+            for (int i = 0; i < covers.Length; i++)
+            {
+                // A disc, like the slot's round portrait window.
+                var cover = new GameObject($"ClosedSlotCover {i + 1}", typeof(RectTransform)).AddComponent<CircleGraphic>();
+                cover.transform.SetParent(cardArea, false);
+                cover.transform.SetSiblingIndex(0);
+                cover.color = closedSlotCover;
+                cover.raycastTarget = false;
+                cover.gameObject.SetActive(false);
+                covers[i] = cover;
+            }
+            openSlots = -1;
         }
 
         private void OnDisable() => Unsubscribe();
@@ -133,11 +173,11 @@ namespace Switchboard.Game
         private void OnCallAdded(CallAddedArgs e)
         {
             // A stamp still showing gives up its slot to a new call.
-            if (shown.Count >= slots.Length) RemoveOldestEnded();
+            if (shown.Count >= OpenSlotCount) RemoveOldestEnded();
             CallCardView card = FreeCard();
             if (card == null)
             {
-                if (!warnedFull) Debug.LogWarning("CallQueueView: more live calls than caller slots; check maxWaitingCalls.", this);
+                if (!warnedFull) Debug.LogWarning("CallQueueView: more live calls than open caller slots; check the slot values in Economy.json.", this);
                 warnedFull = true;
                 return;
             }
@@ -193,7 +233,7 @@ namespace Switchboard.Game
 
         private CallCardView FreeCard()
         {
-            if (shown.Count >= slots.Length && slots.Length > 0) return null;
+            if (shown.Count >= OpenSlotCount && slots.Length > 0) return null;
             foreach (CallCardView card in pool)
                 if (card.Call == null) return card;
             return null;
@@ -246,7 +286,14 @@ namespace Switchboard.Game
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(cardArea, slotMin[i], null, out Vector2 min);
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(cardArea, slotMax[i], null, out Vector2 max);
                 slotCentres[i] = (min + max) * 0.5f;
-                if (i == 0) slotSize = max - min;
+                slotSizes[i] = max - min;
+                if (i == 0) slotSize = slotSizes[i];
+                if (i < covers.Length && covers[i] != null)
+                {
+                    var cover = (RectTransform)covers[i].transform;
+                    cover.sizeDelta = slotSizes[i];
+                    cover.localPosition = slotCentres[i];
+                }
             }
             return moved;
         }

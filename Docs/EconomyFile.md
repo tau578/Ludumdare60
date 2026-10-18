@@ -9,6 +9,7 @@ Keep it readable: one entry per line, in the order you want the player to meet t
 | Section | What it holds | Ready? |
 |---|---|---|
 | `startingCents`, `startingCords` | The money and the cords a new game starts with. | Yes (5c) |
+| `startingBoard`, `startingClientSlots` | How much of the board, and how many caller slots, a new game opens. | Yes (7a) |
 | `pacing` | How fast calls arrive, and the idle timeout. | Yes (5c) |
 | `calls` | Each call type's money and timing: fee, rate and duration ranges, fines, response time, how often it rings. | Yes (5c) |
 | `upgrades` | Everything the shop sells. | Yes (Steps 5a and 5b) |
@@ -19,6 +20,8 @@ The whole file looks like this (the calls and upgrades are shortened here):
 {
   "startingCents": 0,
   "startingCords": 3,
+  "startingBoard": { "cols": 3, "rows": 3 },
+  "startingClientSlots": 3,
   "pacing": { "firstCallDelaySeconds": 2, "baseIntervalSeconds": 8, "intervalJitter": 0.3, "loadFactor": 0.5, "idleTimeoutSeconds": 60 },
   "calls": [
     { "id": "type.regular", "name": "Regular", ... },
@@ -32,7 +35,7 @@ The whole file looks like this (the calls and upgrades are shortened here):
 
 **Cents and seconds.** Every money value is in **cents**: 500 is $5.00, 25 is 25¢. Every time value is in **seconds**. The field names say which: `...Cents`, `...Seconds`, `...CentsPerSecond`.
 
-What stays in Unity: how cards look (the EMERGENCY badge and its red), the portraits, the cord colours and the number of caller slots. You never need to touch those to tune the economy.
+What stays in Unity: how cards look (the EMERGENCY badge and its red), the portraits and the cord colours. You never need to touch those to tune the economy.
 
 ## Starting money and cords
 
@@ -49,6 +52,23 @@ What stays in Unity: how cards look (the EMERGENCY badge and its red), the portr
 - The tray is built with 3 cords, and cords can't be taken away, so `startingCords` can't go below 3. The tray holds at most 6.
 - Above 3, the extra cords are in the tray from the start, in the same colours as bought cords.
 - The `extra_wires` upgrades must start above `startingCords`. With `"startingCords": 4`, a `wires` of 4 is reported, and the first cord the shop offers is the one with `"wires": 5`.
+
+## Starting board and caller slots
+
+```json
+"startingBoard": { "cols": 3, "rows": 3 },
+"startingClientSlots": 3,
+```
+
+| Field | Meaning | If left out or wrong |
+|---|---|---|
+| `startingBoard` | The part of the board a new game opens. `cols` are the columns 1 to 6, `rows` the rows A to F; each is **1 to 6**. The open part is always the top-left corner: `{ "cols": 3, "rows": 3 }` opens rows A to C and columns 1 to 3 (9 jacks). | The full 6x6 board, with a message |
+| `startingClientSlots` | How many caller slots, from the top, take calls in a new game: **1 to 6**. The others look closed. Live calls never outnumber the open slots. | All 6, with a message |
+
+- **Who is in the game** follows from `PhoneBook.json`: exactly the people whose jack is on the open part call, are called, and are listed in the book. To change the starting group, move people onto or off those jacks.
+- The starting board needs **at least two people without tags**, or no call could ever ring; the validator says so.
+- An emergency service (Police, Fire Brigade, Doctor) only takes calls once the board opens over its jack. With the shipped files, the Doctor (D4) joins at 4x4, the Fire Brigade (E5) at 5x5 and the Police (B6) at 6x6, so emergencies start once the board is 4x4.
+- The board in Unity has 6 by 6 jacks and 6 caller slots; those are the only fixed limits.
 
 ## Pacing
 
@@ -144,9 +164,7 @@ Every upgrade is bought **once**. An entry looks like this:
 | `secret` | none | The mystery upgrade, the goal the player saves for. Its shop button fills up as money is saved. There must be **exactly one**. For now, buying it shows "To be continued...". | Yes (5a) |
 | `extra_wires` | `wires` | **Sets** the total number of cords. The new cord appears in the tray at once, in a new colour. | Yes (5b) |
 | `notepad` | none | While owned, tapping a name in the open phone book notes that person's jack on the call in hand, if they are the caller or the person wanted: "Ada Moss (C3)". There is **at most one**. Delete the entry to drop the feature. | Yes (5b) |
-| `extra_clients` | `boardSize`, `clientSlots` | **Sets** how much of the board is open, and the caller slots. | Coming in Step 7 |
-
-A type that isn't ready yet is reported by the validator and left out of the game, so add those entries when their step arrives.
+| `extra_clients` | `boardSize`, `clientSlots` | **Sets** how much of the board is open, and the caller slots. The new jacks, their people and the slots open at once. | Yes (7a) |
 
 ### Extra cords: `wires`
 
@@ -162,7 +180,21 @@ A type that isn't ready yet is reported by the validator and left out of the gam
 - It can be **at most 6**: that's all the tray holds.
 - Along the chain it must **grow**: 4, then 5, then 6.
 
-### The Notepad
+### Bigger board: `boardSize` and `clientSlots`
+
+```json
+{ "id": "board_1", "type": "extra_clients", "name": "Bigger board", "description": "4x4, 4 callers", "costCents": 1000, "boardSize": { "cols": 4, "rows": 4 }, "clientSlots": 4 },
+{ "id": "board_2", "type": "extra_clients", "name": "Bigger board", "description": "5x5, 5 callers", "costCents": 2500, "boardSize": { "cols": 5, "rows": 5 }, "clientSlots": 5 },
+{ "id": "board_3", "type": "extra_clients", "name": "Bigger board", "description": "6x6, 6 callers", "costCents": 6000, "boardSize": { "cols": 6, "rows": 6 }, "clientSlots": 6 },
+```
+
+- `boardSize` is the **whole** open part after buying, written like `startingBoard` (`cols` and `rows`, each 1 to 6), not the jacks added.
+- `clientSlots` is the **total** number of open caller slots after buying, 1 to 6.
+- Along the chain, starting from `startingBoard`, the board must **grow**: neither `cols` nor `rows` may go down, and at least one must go up. So the first entry must be bigger than `startingBoard`.
+- `clientSlots` may stay the same but never goes down, starting from `startingClientSlots`.
+- Add or remove lines to have more or fewer board steps; a non-square step such as `{ "cols": 4, "rows": 3 }` is fine.
+- Write "x", not "×", in the description: the game's font has no "×".
+
 
 ```json
 { "id": "notepad", "type": "notepad", "name": "Notepad", "description": "Tap a name: note its jack", "costCents": 300 },
@@ -200,6 +232,8 @@ Economy file: Upgrade 2 "income_2": incomeMultiplier 1.2 is not higher than inco
 The validator reports:
 - a missing file, or one that isn't valid JSON (usually a missing comma, quote or bracket)
 - a negative `startingCents`, or a `startingCords` outside 3 to 6 (the game then starts with 3)
+- a missing `startingBoard` or `startingClientSlots`, a `startingBoard` without both `cols` and `rows` or outside 1 to 6, or a `startingClientSlots` outside 1 to 6 (the game then opens the full board and all 6 slots)
+- fewer than two people without tags on the starting board
 - a missing `pacing` section or value, or one out of its range (the game then uses the default for it)
 - a missing or empty `calls` section (then no calls ring)
 - a call type with an empty or duplicate id, an empty name, or a missing `spawnWeight`, `rateCentsPerSecond`, `feeCents` or `durationSeconds`
@@ -209,12 +243,13 @@ The validator reports:
 - a person in `PhoneBook.json` whose `type` isn't a call type in this file
 - a card style asset in Unity whose id isn't a call type in this file
 - an empty id, an id with other characters than `a-z`, `0-9` and `_`, or an id used twice
-- an unknown type (the message lists the known ones), or a type that isn't ready yet
+- an unknown type (the message lists the known ones)
 - an empty name
 - a `costCents` of 0 or less
 - an `incomeMultiplier` of 1 or less, or one that doesn't grow along its chain
 - a `wires` that isn't above `startingCords`, is more than 6, or doesn't grow along its chain
 - more than one `notepad`
+- an `extra_clients` entry with a missing `boardSize` or `clientSlots`, a size outside 1 to 6, a board that doesn't grow (or shrinks on one side) along its chain, or `clientSlots` that go down
 - no `secret`, or more than one
 
 More example messages:
@@ -232,6 +267,10 @@ Economy file: Upgrade 5 "wires_2": wires 4 is not higher than wires_1's 4. Value
 Economy file: Upgrade 4 "wires_1": wires 3 is not above the 3 cords the game starts with. wires is the total number of cords, so use 4 or more.
 Economy file: Upgrade 6 "wires_3": wires 7 is more than the tray holds. Use 6 or less.
 Economy file: Upgrade 8 "notepad_2": there is already a notepad (upgrade 7). Keep at most one notepad entry.
+Economy file: Upgrade 9 "board_2": boardSize 4x4 is the same as board_1's 4x4. The board must grow: raise cols, rows or both.
+Economy file: Upgrade 10 "board_3": clientSlots 4 is fewer than board_2's 5. Caller slots can only grow along the chain.
+Economy file: startingBoard is missing. Add the part of the board a new game opens, such as "startingBoard": { "cols": 3, "rows": 3 }. The game starts on the full 6x6 board for now.
+People file: Only 1 person without tags sits on the starting board (3x3: rows A to C, columns 1 to 3), so no call could ever ring. Put at least two people on those jacks, or make startingBoard in Economy.json bigger.
 ```
 
 An upgrade or call type with a problem is left out, and the game still starts with the others. A wrong starting or pacing value falls back to its default. The same check runs in the automated tests, so a broken file is noticed before a build.

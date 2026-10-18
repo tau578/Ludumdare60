@@ -101,7 +101,8 @@ namespace Switchboard.Domain.Tests
     internal sealed class FakeContent : IGameContent
     {
         public long StartingCents { get; set; }
-        public int MaxWaitingCalls { get; set; } = 6;
+        public BoardSize StartingBoard { get; set; } = BoardSize.Full;
+        public int StartingClientSlots { get; set; } = 6;
         public int StartingCords { get; set; } = 3;
         public IPacingProfile Pacing { get; set; } = PacingSettings.Default;
         public IReadOnlyList<ICallerType> CallerTypes { get; set; } = Array.Empty<ICallerType>();
@@ -113,13 +114,16 @@ namespace Switchboard.Domain.Tests
 
     internal sealed class FakeUpgrade : IUpgrade
     {
-        public FakeUpgrade(string id, UpgradeKind kind, long costCents, double incomeMultiplier = 0, int wires = 0)
+        public FakeUpgrade(string id, UpgradeKind kind, long costCents, double incomeMultiplier = 0, int wires = 0,
+            BoardSize boardSize = default, int clientSlots = 0)
         {
             Id = id;
             Kind = kind;
             CostCents = costCents;
             IncomeMultiplier = incomeMultiplier;
             Wires = wires;
+            BoardSize = boardSize;
+            ClientSlots = clientSlots;
         }
 
         public string Id { get; }
@@ -129,6 +133,12 @@ namespace Switchboard.Domain.Tests
         public long CostCents { get; }
         public double IncomeMultiplier { get; }
         public int Wires { get; }
+        public BoardSize BoardSize { get; }
+        public int ClientSlots { get; }
+
+        /// <summary>An extra_clients entry: a square board of the given side and as many caller slots (D49).</summary>
+        public static FakeUpgrade BoardUpgrade(string id, long costCents, int side) =>
+            new FakeUpgrade(id, UpgradeKind.ExtraClients, costCents, boardSize: new BoardSize(side, side), clientSlots: side);
 
         public static FakeUpgrade WireUpgrade(string id, long costCents, int wires) =>
             new FakeUpgrade(id, UpgradeKind.ExtraWires, costCents, wires: wires);
@@ -213,7 +223,13 @@ namespace Switchboard.Domain.Tests
             new CallRequest(AdaCaller, Basil, centsPerSecond, durationSeconds, connectionFeeCents);
     }
 
-    /// <summary>Any number of regular callers: Person N1 on jack J1, Person N2 on J2, and so on.</summary>
+    internal static class Grid
+    {
+        /// <summary>The board's jacks row by row: 0 is A1, 5 is A6, 6 is B1, up to 35 for F6.</summary>
+        public static string Jack(int index) => $"{(char)('A' + index / 6)}{index % 6 + 1}";
+    }
+
+    /// <summary>Any number of regular callers, up to 36: Person N1 on jack A1, Person N2 on A2, and so on (Grid.Jack).</summary>
     internal sealed class Crowd
     {
         public Crowd(int count, FloatRange? callbackDelaySeconds = null)
@@ -226,7 +242,7 @@ namespace Switchboard.Domain.Tests
             {
                 people[i] = new FakePerson("Person", "N" + (i + 1));
                 callers[i] = new FakeCaller(people[i], Regular);
-                entries[i] = new FakeDirectoryEntry(people[i], "J" + (i + 1));
+                entries[i] = new FakeDirectoryEntry(people[i], Grid.Jack(i));
             }
             People = people;
             Callers = callers;
@@ -245,8 +261,8 @@ namespace Switchboard.Domain.Tests
     }
 
     /// <summary>
-    /// People N1..Nn on jacks J1..Jn, each with a regular and an emergency caller (as Content builds them for
-    /// everyoneCalls), plus Police on S1, Fire Brigade on S2 and Doctor on S3, who never call (D36, D37).
+    /// People N1..Nn on jacks A1 onwards (Grid.Jack), each with a regular and an emergency caller (as Content builds
+    /// them for everyoneCalls), plus Police on F6, Fire Brigade on F5 and Doctor on F4, who never call (D36, D37).
     /// </summary>
     internal sealed class EmergencyWorld
     {
@@ -266,14 +282,14 @@ namespace Switchboard.Domain.Tests
             for (int i = 0; i < Services.Count; i++)
             {
                 people.Add(Services[i]);
-                entries.Add(new FakeDirectoryEntry(Services[i], "S" + (i + 1)));
+                entries.Add(new FakeDirectoryEntry(Services[i], Grid.Jack(35 - i)));
             }
             var subscribers = new IPerson[count];
             for (int i = 0; i < count; i++)
             {
                 subscribers[i] = new FakePerson("Person", "N" + (i + 1));
                 people.Add(subscribers[i]);
-                entries.Add(new FakeDirectoryEntry(subscribers[i], "J" + (i + 1)));
+                entries.Add(new FakeDirectoryEntry(subscribers[i], Grid.Jack(i)));
                 callers.Add(new FakeCaller(subscribers[i], Regular));
             }
             foreach (IPerson person in subscribers) callers.Add(new FakeCaller(person, Emergency));

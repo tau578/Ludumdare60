@@ -13,7 +13,7 @@
 | 5a. Economy file, shop, income, secret | done | ✅ 2026-10-18 (23 min) | ✅ 304/304 tests, scope clean | ✅ | e115c59 |
 | 5b. Extra wires and Notepad | done | ✅ 2026-10-18 (22 min) | ✅ 333/333 tests, scope clean | ✅ | 667adda |
 | 5c. Calls and pacing into Economy.json | done | ✅ 2026-10-18 (17 min) | ✅ 388/388 tests, scope clean | ✅ | f70b7df |
-| 7a. Board growth | not started | | | | |
+| 7a. Board growth | done | ✅ 2026-10-18 (25 min) | ✅ 439/439 tests, scope clean | ✅ | |
 | 6. Saves, Boot, Web build | not started | | | | |
 | 7b. Pacing and tutorial | not started | | | | |
 | 8. Sound and feel | not started | | | | |
@@ -1776,3 +1776,113 @@ Follow-ups:
 - Screenshots: `step-05c.png` (calls ringing, emergency badge, 3 cords) and `step-05c-four-cords.png` (`startingCords` 4: four cords, shop offers "5 cords").
 - Design.md updated: implementation row, §6.1 (`GameConfig`, `CallerTypeDefinition`, `PacingProfile`), §6.4 sections, §9 "New caller type", and the pacing mentions in §5.
 - **Playtest (lead, 2026-10-18):** all looks good.
+
+### Step 7a prep (orchestrator, 2026-10-18)
+- **Pre-flight:** `git fetch`: up to date with upstream. Editor idle on `Final.unity`, console cleared, 388/388 EditMode tests pass, no format-only re-saves.
+- **Brief check against the code:** the brief matches. Extra notes passed to the agent: `GameSession.DefaultMaxWaitingCalls`, `IGameContent.MaxWaitingCalls` and `CallQueueView`'s "check maxWaitingCalls" warning go with `GameConfig.maxWaitingCalls`; lamps light only through `SocketView.IsNavigationHighlighted`; the 4 untracked store-image `.meta` files stay untouched (Plan §8).
+
+## Step 7a report: 2026-10-18
+Result: done
+
+Playable now: a new game starts on a small board. Only the top-left 3×3 jacks (rows A–C, columns 1–3) are bright and usable; the rest of the board, and the row and column lamps D–F and 4–6, are dimmed and ignore the mouse. Only 3 caller slots take calls (the other 3 have a dark disc over them), and the phone book lists only the 9 people on the open jacks. Buying "Bigger board" in the shop opens 4×4, then 5×5, then 6×6: the new jacks, their people and one more caller slot appear at once, and emergencies start once the Doctor (D4) is on the board. All of it, sizes and prices included, comes from `Economy.json`.
+
+How to test: the Plan's 7a playtest script works as written. Notes:
+1. The dev panel (F1) has a new **"Open board"** button: it opens the next board size for free.
+2. Before 4×4 the emergency button reads **"Emergency: none open"** and does nothing; from 4×4 it is "Emergency now" again.
+3. "Bigger board" shows in the shop once a chain is bought out (usually after the $3 Notepad).
+4. **"Reset upgrades"** now closes the board again. It also clears every live call and pending callback, and sends back to the tray any cord that has a plug in a jack that closes (cords on the open 3×3 stay where they are). Added cords still stay (as in 5b).
+5. A held cord clicked on a dimmed jack plays the "blocked" sound and stays in your hand.
+
+Created:
+- `Assets/Scripts/Domain/Board/BoardSize.cs`: the open rectangle (`Cols`, `Rows`, `Contains(jack)`), plus the one physical limit `BoardSize.MaxSide` = 6 and `BoardSize.Full`.
+- `Assets/Scripts/Domain/Board/OpenBoard.cs`: `IsOpen(JackId)`, `IsInGame(IPerson)`, read live from `StatSheet.Board`.
+- `Assets/Scripts/Game/OpenBoardLink.cs`: on every `StatSheet.Changed`, opens/closes the sockets, filters the book and sets the open caller slots.
+- Tests: `Assets/Tests/Domain/BoardGrowthTests.cs`, `Assets/Tests/Domain/EconomyBoardTests.cs`, `Assets/Tests/Game/Editor/PhoneBookFilterTests.cs`, `Assets/Tests/Game/Editor/ClosedSocketTests.cs` (and their `.meta` files, plus `Assets/Scripts/Domain/Board.meta`).
+
+Changed:
+- **Domain:**
+  - `IGameContent`: `MaxWaitingCalls` is gone; `StartingBoard` and `StartingClientSlots` replace it.
+  - `IUpgrade`: new `BoardSize` and `ClientSlots`.
+  - `StatSheet`: `Board`, `BoardCols`, `BoardRows`, `ClientSlots` (start values, then the last bought `extra_clients`), and `MaxClientSlots` = 6 (the caller panel). An invalid start falls back to the full board and 6 slots.
+  - `CallSpawner`: takes `Func<int> openSlots` instead of `int maxLiveCalls`, and an optional `OpenBoard`; callers and recipients must be on open jacks, so a type with no open caller or recipient doesn't ring and the weights are shared among the types that can. New `HasOpenRecipient(type)` (used by the dev panel).
+  - `CallbackScheduler`: `Func<int> openSlots` instead of the fixed cap.
+  - `GameSession`: `DefaultMaxWaitingCalls` removed; new `Board` (`OpenBoard`); slots come live from `Stats.ClientSlots`. `ResetUpgrades` now clears callbacks and live calls (as `Cleared`), recomputes, then returns cords plugged into closed jacks.
+  - `OperatorDesk`: new `ReturnCordsWhere(jack predicate)` (dev reset only).
+  - `UpgradeService`: new dev-only `TryGrantNext(kind)` (bought for 0, no spend popup).
+- **Content:**
+  - `EconomyFileData`: `startingBoard`, `startingClientSlots`, and `boardSize`/`clientSlots` on upgrades, with "missing" markers (`BoardSizeEntry`).
+  - `EconomyFileLoader`: the "arrives in Step 7" gate is gone (the `ArrivesIn` mechanism with it); new checks for the start and the `extra_clients` chain, in plain words.
+  - `EconomyCatalog`: `StartingBoard`, `StartingClientSlots`, `MostClientSlots`.
+  - `UpgradeRecord`: board size and slots.
+  - `GameContent`: no longer takes `GameConfig` (it only needed the slot count).
+  - `GameConfig`: `maxWaitingCalls` removed; `Validate()` adds the starting-board people check.
+  - `ContentValidator`: `BoardJacks()` built from `BoardSize.Full`; new `ValidateStartingBoard(directory, board)`.
+- **Board, cords and book (team code, D48):**
+  - `SocketView`: `IsOpen`, `SetOpen(bool)`. A closed socket refuses `TryOccupy` (so no plug goes in), ignores hover and clicks, and never counts as navigation-highlighted. Sockets are never deactivated, so `BoardJacks(scene)` and `OnDisable` are unaffected.
+  - `SocketGraphic`: `SetDimmed`/`IsDimmed`, a serialized `dimmedTint` (grey, 75 % alpha).
+  - `SwitchboardLampView`: dims its own graphics (bulb, glyph image, or the plain-text F label) when none of its sockets is open, and keeps their original colours to restore. It finds this by itself from its sockets, so no wiring was needed.
+  - `CableInputController`: a closed socket is not a hit target. Clicking it with a cord in hand plays the blocked sound and keeps the cord (instead of counting as "empty space"); `HandleSocketClick` also refuses it.
+  - `PhoneBookView`: `SetVisibleSockets(Predicate<string>)` filters the parsed file in file order (services first, surname order kept), re-paginates, keeps the spread in range, and `HasLetter`/tabs follow it. New `PageCount` and `ContactAt(i)`.
+- **Game layer:**
+  - `GameInstaller`: builds `OpenBoardLink`; logs the starting-board check; the slot warning now reads "The caller panel has N slots, but Economy.json can open M (startingClientSlots or an extra_clients clientSlots)…".
+  - `CallQueueView`: `SetOpenSlots(count)`; cards only use the open slots; closed slots get a dark translucent disc (`CircleGraphic`, raycast off, behind the cards) that follows the slot like the cards do; the "check maxWaitingCalls" warning now points at Economy.json.
+  - `DevPanel`: "Open board"; the emergency button says "Emergency: none open" while no service is open.
+- **Data:**
+  - `Assets/Configs/Economy.json`: `startingBoard` 3×3, `startingClientSlots` 3, and `board_1`–`board_3` (4×4/4 for $10, 5×5/5 for $25, 6×6/6 for $60) after `notepad`.
+  - `Assets/Configs/PhoneBook.json`: Fire Brigade C2 → E5, Reginald Underhill E5 → C2.
+  - `Assets/Content/GameConfig.asset`: re-serialized; only the `maxWaitingCalls: 6` line went.
+- **Docs:** `Docs/EconomyFile.md` (sections table, full-file outline, new "Starting board and caller slots" and "Bigger board" sections, types table, validator list and example messages).
+- **Existing tests:** `Fakes.cs` (`FakeContent` board fields, `FakeUpgrade.BoardUpgrade`, a `Grid.Jack` helper: `Crowd` and `EmergencyWorld` now sit on real board jacks A1…, with the services on F6/F5/F4 instead of the off-board labels J1…/S1…); the scheduler/spawner constructor calls in `BusyTrackerTests`, `CallSpawnerTests`, `CallbackSchedulerTests`, `EmergencySpawnTests`, `HoldTests`, `PenaltyServiceTests`, `ResponseTimerTests` (fixture values kept); `GameSessionTests` and `WiresAndNotepadTests` (jack labels); `EconomyFileTests` (valid board start in the helper, 11 real entries, the gate test removed, the real shelf now offers `board_1` after the Notepad and nothing after 6×6); `EconomyCallsTests` (board start in the helper, new `GameContent`); `FullBoardTests` (opens 6×6 first, then plays exactly as before: same seed, same assertions, all pass).
+
+Scene and prefab changes: none. `Final.unity`, `MainMenu.unity` and every prefab are untouched; the closed-slot covers are made at runtime by `CallQueueView`.
+
+Tests: 439/439 EditMode (388 before; 1 removed, 52 new):
+- `BoardGrowthTests` (26): `BoardSize.Contains` cases ×15, validity and names; `StatSheet` defaults, purchases 3→4→5→6 and the reset; `OpenBoard`; a 3×3 crowd only ever rings open people and never exceeds 3 live calls; a purchase opens the 4th slot at once; emergencies don't ring (and can't be forced) until the board covers a service, then do; callbacks wait for an open slot; the reset clears calls and callbacks and returns only cords in closing jacks; the real files in a seeded 10-minute 3×3 session involve only the starting nine; one service per new ring and the Fire Brigade/Underhill swap.
+- `EconomyBoardTests` (21): the real file; JSON markers; a valid chain (one side growing alone, slots staying level); missing start (full board, 6 slots); bad start ×3; bad start slots ×2; missing, half-written and out-of-range `boardSize`; missing and too-many `clientSlots`; the first entry not bigger than the start; a chain that doesn't grow; a side that shrinks; slots that go down; broken entries left out; the starting-board people check; recipients judged on the full board.
+- `PhoneBookFilterTests` (3, real `PhoneBook.json`): 3×3 shows the nine in surname order on 2 pages (6 + 3 rows), no services, `HasLetter('V')` false; 4×4/5×5/6×6 add people with the services first; shrinking brings the book back to spread 1.
+- `ClosedSocketTests` (2): a closed `SocketView` refuses a real `CableController` plug while an open one takes it (and reopening works); a closed socket ignores hover, its lamp stays dark and is dimmed, including a plain-text label, and the colours come back on reopening.
+
+Console: clean. Only the engine's two "Ignoring depth surface … memoryless" lines around screenshots, and the known MCP WebSocket line after recompiles.
+
+Screenshots (`Temp/Captures/`):
+- `step-7a.png`: start of a game, 3 calls ringing in the 3 open slots, the 3×3 board bright, everything else and lamps D–F/4–6 dimmed, three discs over the closed slots.
+- `step-7a-caller-panel.png`: a crop of the caller column from the same frame.
+- `step-7a-4x4-book.png`: after "Open board": row D and column 4 open, a 4th slot with an EMERGENCY card for the Doctor, and the book (16 entries) with the Doctor first.
+- `step-7a-book-3x3.png`: after "Reset upgrades": back to 3×3, the book shows exactly the nine starting people on two pages.
+
+Checked in Play Mode (stepped frames; clicks through `CableInputController.ProcessPointer` inside a `Canvas.willRenderCanvases` handler):
+- **Start:** board 3×3, 3 slots, 9 sockets open and 27 closed; lamps A–C and 1–3 normal, the others dimmed; book 9 contacts on 2 pages. The spawner capped at 3 live calls (extra "Call now" attempts refused).
+- **Cords:** picked up a cord from the tray; hovering the closed D4 did not highlight it; clicking D4 left it empty and the cord still in hand; hovering A1 highlighted it and clicking plugged it in.
+- **4×4** (dev grant): 16 sockets open, 4 slots, book 16 with the Doctor first; the emergency button was usable and an emergency rang for the Doctor.
+- **Reset:** with that cord moved to A1–D4 and 4 live calls, "Reset upgrades" gave 3×3, 3 slots, no live calls, book 9, and the A1–D4 cord back in the tray; new calls then rang on the 3×3 only.
+- **MainMenu path:** loading build index 0, then 1, gave a working 3×3 session in `Final` with no errors.
+- **Editor left clean:** not in Play Mode, `Final.unity` active and not dirty, `timeScale` 1, Game view not changed, the SessionState key erased, no callbacks left, console cleared.
+
+Format-only re-saves: none (`TimeManager.asset` and `SampleScene.unity` untouched). Note: the 4 store-image `.meta` files were committed upstream (`8311221`) while I worked; I didn't touch them or reference the images. `Docs/Plan.md` shows a one-line change that isn't mine (it was already modified when I started).
+
+Deviations from Design/Plan:
+- **Field names** as proposed in the brief (`startingBoard {cols, rows}`, `startingClientSlots`, `boardSize`, `clientSlots`).
+- **A bad (not only missing) `startingBoard` or `startingClientSlots`** also falls back to the full board / 6 slots, with a message.
+- **Board chain rule for equal slots:** `clientSlots` may stay level along the chain ("never shrink"); the board itself must grow.
+- **`GameContent(people, economy)`** no longer takes `GameConfig`, since its only use (the slot count) moved to the file.
+- **Test fixtures** (`Crowd`, `EmergencyWorld`) moved from off-board labels (J1…, S1…) to real jacks, because the open board now decides who is in the game. Their behaviour is otherwise unchanged and all old tests pass.
+- **The emergency dev button** shows "Emergency: none open" instead of doing nothing silently.
+- **`ContentValidator.ValidateStartingBoard`** messages are prefixed "People file: " (it is about who sits where).
+
+Follow-ups:
+- **Covers:** the closed-slot discs are plain dark circles. The 6th slot sits over the printer art at the bottom of the column (a layout issue from before this step, see the Level artwork note), so its disc overlaps the printer. A cover-plate drawing from Mia would look better.
+- **Design.md (orchestrator):** 5.2 (cap and spawner: open slots, open jacks), 5.7 (book filter), 5.9 (`extra_clients` built, `TryGrantNext`, reset behaviour), 6.1 (`GameConfig` without `maxWaitingCalls`; `BoardLayoutDefinition` is not needed), 6.4 (new fields), 9 "Bigger board" (now a line in `Economy.json` plus people on the jacks), D17 wording, and §3 (new public members `SocketView.IsOpen/SetOpen`, `PhoneBookView.SetVisibleSockets`).
+- **`EconomyFile.md`:** the Notepad row still says "the call in hand" (pre-D46 wording); left as is.
+- **Saves (Step 6):** bought `board_*` ids restore the board through `StatSheet` like the other upgrades; the reset path in `GameSession` is dev-only.
+
+### Step 7a verification (orchestrator, 2026-10-18)
+- EditMode tests re-run: 439/439 green (388 before; 52 new, 1 removed with the Step 7 gate). Console: no errors or warnings.
+- `git status`: every changed file is in the report (Domain, Content, Game, the team's UI scripts, tests, `Economy.json`, `PhoneBook.json`, `GameConfig.asset`, `EconomyFile.md`). No scene or prefab changed; no format-only re-saves.
+- Data diffs: `Economy.json` adds only `startingBoard`, `startingClientSlots` and `board_1`–`board_3` (after `notepad`); `PhoneBook.json` only swaps Fire Brigade and Reginald Underhill; `GameConfig.asset` only loses `maxWaitingCalls`.
+- Code skim: closed sockets refuse plugs in `SocketView.TryOccupy` itself, so no path can plug one; the spawner checks open jacks for callers and recipients; reset clears calls and callbacks before the board closes. Lamp dimming caches colours once, with no per-frame allocation.
+- Screenshots: `step-7a.png` (3×3 bright, D–F and 4–6 dimmed, discs over 3 slots), `step-7a-4x4-book.png` (Doctor first in a 16-person book, emergency in slot 4), `step-7a-book-3x3.png` (the starting nine on 2 pages, surname order).
+- **Upstream merge** (`1d51f6f`, merge of Mia's `b376834`, `ade205a`, `8a2b839`): new `store.png` and re-exported `caller-06`/`07`/`08`. These three came back at 190×190 with 191×191 slices, so Unity would have dropped them (Mabel Dunmore and Arthur Hollis are in the starting nine). A small fix agent set the three slices to 190×190 (6 lines in the `.meta` files, nothing else) and confirmed each loads a 190×190 sprite. It also found `Assets/Sprites/board/caller.png` with the same problem, unused, and left it (Plan §8).
+- The four store-image `.meta` files were committed locally (`8311221`, lead's request); not pushed yet.
+- Design.md updated: implementation row, §1 rules, §3 members, 5.2 (cap and who), 5.7 (filter), 5.9 (7a deviations), 6.1, 6.4, §9 "Bigger board", D17. Plan.md: §8 (art imports, slot covers, EconomyFile wording), a cheat-sheet row for art merges, and 7a notes in the Step 6 outline.
+- **Playtest (lead, 2026-10-18):** OK. Committed and pushed with the store-image `.meta` files and the portrait slice fix.
+

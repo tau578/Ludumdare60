@@ -24,10 +24,23 @@ namespace Switchboard.UI
                 raycastPadding = new Vector4(padding.x, padding.y, padding.x, padding.y);
             }
         }
+        [SerializeField, Tooltip("How a closed socket is tinted (D42).")]
+        private Color dimmedTint = new Color(.38f, .38f, .38f, .75f);
         private bool highlighted;
         private bool blockedHighlight;
+        private bool dimmed;
         public bool IsHighlighted => highlighted;
         public bool IsBlockedHighlight => blockedHighlight;
+        public bool IsDimmed => dimmed;
+
+        public void SetDimmed(bool value)
+        {
+            if (dimmed == value) return;
+            dimmed = value;
+            SetVerticesDirty();
+        }
+
+        private Color Tint => dimmed ? color * dimmedTint : color;
 
         public void SetHighlighted(bool value, bool blocked = false)
         {
@@ -49,7 +62,7 @@ namespace Switchboard.UI
                 size *= Mathf.Min(rect.width, rect.height) * .88f / Mathf.Max(size.x, size.y);
                 Vector2 min = center - size * .5f, max = center + size * .5f;
                 Vector4 uv = DataUtility.GetOuterUV(faceSprite);
-                Color fill = color * (blockedHighlight ? new Color(1f, .38f, .30f) : highlighted ? new Color(1f, .88f, .58f) : Color.white);
+                Color fill = Tint * (blockedHighlight ? new Color(1f, .38f, .30f) : highlighted ? new Color(1f, .88f, .58f) : Color.white);
                 mesh.AddVert(new Vector3(min.x, min.y), fill, new Vector2(uv.x, uv.y));
                 mesh.AddVert(new Vector3(min.x, max.y), fill, new Vector2(uv.x, uv.w));
                 mesh.AddVert(new Vector3(max.x, max.y), fill, new Vector2(uv.z, uv.w));
@@ -71,7 +84,7 @@ namespace Switchboard.UI
         private void AddDisc(VertexHelper mesh, Vector2 center, float radius, Color tint)
         {
             int start = mesh.currentVertCount;
-            Color fill = tint * color;
+            Color fill = tint * Tint;
             mesh.AddVert(center, fill, Vector2.zero);
             for (int i = 0; i <= Segments; i++)
             {

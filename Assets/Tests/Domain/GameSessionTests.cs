@@ -71,7 +71,7 @@ namespace Switchboard.Domain.Tests
                 crowded.Tick(0.05);
                 most = System.Math.Max(most, crowded.Calls.Live.Count);
             }
-            Assert.That(most, Is.EqualTo(GameSession.DefaultMaxWaitingCalls));
+            Assert.That(most, Is.EqualTo(crowd.Content.StartingClientSlots));
             Assert.That(crowded.Calls.Live.Count, Is.EqualTo(6));
         }
 
@@ -114,7 +114,7 @@ namespace Switchboard.Domain.Tests
             crowded.Desk.OnCircuitClosed(new CordId(1), crowded.Directory.JackOf(wrong.Request.CallerPerson), new JackId("J99"), crowded.Directory.JackOf(wrong.Request.CallerPerson));
             Assert.That(crowded.Callbacks.Pending.Count, Is.EqualTo(1));
             crowded.Desk.TryTake(crowded.Calls.Live[1].Id);
-            crowded.Desk.OnPlugInserted(new CordId(2), new JackId("J5"));
+            crowded.Desk.OnPlugInserted(new CordId(2), new JackId("A5"));
             for (int frame = 0; frame < 20; frame++) crowded.Tick(0.05);
             board.Returned.Clear();
 

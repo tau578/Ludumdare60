@@ -127,13 +127,16 @@ namespace Switchboard.UI
         public void ProcessPointer(Vector2 position, bool leftPressed)
         {
             GameObject target = Raycast(position);
-            SocketView socket = target != null ? target.GetComponentInParent<SocketView>() : null;
+            SocketView hit = target != null ? target.GetComponentInParent<SocketView>() : null;
+            // A closed socket (D42) is no target: it doesn't highlight, and a click there only bounces the held cord.
+            SocketView socket = hit != null && hit.IsOpen ? hit : null;
             StoredCableView stored = target != null ? target.GetComponentInParent<StoredCableView>() : null;
             bool overTray = target != null && tray != null && target.transform.IsChildOf(tray);
             bool overCall = target != null && target.GetComponentInParent<Switchboard.Game.CallCardView>() != null;
             if (leftPressed)
             {
                 if (socket != null) HandleSocketClick(socket);
+                else if (hit != null) ActiveCable?.PlayBlockedFeedback();
                 else if (ActiveCable != null && !overCall)
                 {
                     if (heldCable.Phase == CablePhase.Held || overTray)
@@ -167,6 +170,11 @@ namespace Switchboard.UI
         public void HandleSocketClick(SocketView socket)
         {
             if (socket == null || !socket.isActiveAndEnabled) return;
+            if (!socket.IsOpen)
+            {
+                ActiveCable?.PlayBlockedFeedback();
+                return;
+            }
             var owner = socket.OccupyingCable;
             if (owner != null)
             {

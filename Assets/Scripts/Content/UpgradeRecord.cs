@@ -4,7 +4,8 @@ namespace Switchboard.Content
 {
     public sealed class UpgradeRecord : IUpgrade
     {
-        public UpgradeRecord(string id, UpgradeKind kind, string name, string description, long costCents, double incomeMultiplier, int wires = 0)
+        public UpgradeRecord(string id, UpgradeKind kind, string name, string description, long costCents, double incomeMultiplier, int wires = 0,
+            BoardSize boardSize = default, int clientSlots = 0)
         {
             Id = id;
             Kind = kind;
@@ -13,6 +14,8 @@ namespace Switchboard.Content
             CostCents = costCents;
             IncomeMultiplier = incomeMultiplier;
             Wires = wires;
+            BoardSize = boardSize;
+            ClientSlots = clientSlots;
         }
 
         public string Id { get; }
@@ -22,5 +25,7 @@ namespace Switchboard.Content
         public long CostCents { get; }
         public double IncomeMultiplier { get; }
         public int Wires { get; }
+        public BoardSize BoardSize { get; }
+        public int ClientSlots { get; }
     }
 }

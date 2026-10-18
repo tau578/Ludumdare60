@@ -16,9 +16,9 @@ namespace Switchboard.Domain.Tests
             clock = new GameClock();
             calls = new CallService();
             var random = new SeededRandom(seed);
-            callbacks = new CallbackScheduler(calls, clock, random, maxLiveCalls);
+            callbacks = new CallbackScheduler(calls, clock, random, () => maxLiveCalls);
             spawner = new CallSpawner(calls, new CallFactory(random), crowd.Directory, crowd.Callers, random,
-                new BusyTracker(calls, callbacks), pacing, maxLiveCalls, () => cords);
+                new BusyTracker(calls, callbacks), pacing, () => maxLiveCalls, () => cords);
             return spawner;
         }
 
@@ -225,9 +225,9 @@ namespace Switchboard.Domain.Tests
             clock = new GameClock();
             calls = new CallService();
             var random = new SeededRandom(5);
-            callbacks = new CallbackScheduler(calls, clock, random, 6);
+            callbacks = new CallbackScheduler(calls, clock, random, () => 6);
             spawner = new CallSpawner(calls, new CallFactory(random), world.Directory, new ICaller[] { stranger, world.AdaCaller },
-                random, new BusyTracker(calls, callbacks), new PacingSettings(0, 1, 0, 0), 6, () => 3);
+                random, new BusyTracker(calls, callbacks), new PacingSettings(0, 1, 0, 0), () => 6, () => 3);
             for (int i = 0; i < 50; i++)
             {
                 Assert.That(spawner.TrySpawn(), Is.True);

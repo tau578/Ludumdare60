@@ -18,11 +18,31 @@ namespace Switchboard.Content
         /// <summary>The team's board in Final.unity: rows A to F, columns 1 to 6.</summary>
         public static List<string> BoardJacks()
         {
-            var jacks = new List<string>(36);
-            for (char row = 'A'; row <= 'F'; row++)
-                for (int column = 1; column <= 6; column++)
+            BoardSize board = BoardSize.Full;
+            var jacks = new List<string>(board.Cols * board.Rows);
+            for (char row = 'A'; row <= board.LastRow; row++)
+                for (int column = 1; column <= board.Cols; column++)
                     jacks.Add($"{row}{column}");
             return jacks;
+        }
+
+        /// <summary>
+        /// A new game only has the people on the starting board (D42). A caller can't call themselves, so fewer
+        /// than two people without tags there means no call could ever ring.
+        /// </summary>
+        public static List<string> ValidateStartingBoard(IReadOnlyList<IDirectoryEntry> directory, BoardSize startingBoard)
+        {
+            var errors = new List<string>();
+            if (directory == null || !startingBoard.IsValid) return errors;
+            int people = 0;
+            foreach (IDirectoryEntry entry in directory)
+                if (entry?.Person != null && entry.Person.Tags.Count == 0 && startingBoard.Contains(entry.JackLabel)) people++;
+            if (people >= 2) return errors;
+            string who = people == 0 ? "Nobody without tags sits" : "Only 1 person without tags sits";
+            errors.Add($"{who} on the starting board ({startingBoard}: rows A to {startingBoard.LastRow}, columns 1 to " +
+                $"{startingBoard.Cols}), so no call could ever ring. Put at least two people on those jacks, or make " +
+                "startingBoard in Economy.json bigger.");
+            return errors;
         }
 
         public static List<string> Validate(string peopleJson, IReadOnlyList<ICallerType> callerTypes,

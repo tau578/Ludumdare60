@@ -16,7 +16,7 @@ namespace Switchboard.Domain.Tests
             clock = new GameClock();
             calls = new CallService();
             random = new SeededRandom(17);
-            callbacks = new CallbackScheduler(calls, clock, random, maxLiveCalls);
+            callbacks = new CallbackScheduler(calls, clock, random, () => maxLiveCalls);
         }
 
         private void Advance(double seconds)
@@ -155,7 +155,7 @@ namespace Switchboard.Domain.Tests
         {
             Build(maxLiveCalls: 2, delay: new FloatRange(20, 20));
             var spawner = new CallSpawner(calls, new CallFactory(random), crowd.Directory, crowd.Callers, random,
-                new BusyTracker(calls, callbacks), new PacingSettings(0, 1, 0, 0), 2, () => 10);
+                new BusyTracker(calls, callbacks), new PacingSettings(0, 1, 0, 0), () => 2, () => 10);
             WrongConnection(0, 1);
             Call a = calls.Add(crowd.Request(2, 3));
             calls.Add(crowd.Request(4, 5));

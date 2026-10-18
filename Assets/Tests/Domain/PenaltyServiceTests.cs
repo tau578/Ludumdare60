@@ -22,7 +22,7 @@ namespace Switchboard.Domain.Tests
             wallet = new Wallet(cents);
             penalties = new PenaltyService(calls, wallet);
             clock = new GameClock();
-            callbacks = new CallbackScheduler(calls, clock, new SeededRandom(9), 6);
+            callbacks = new CallbackScheduler(calls, clock, new SeededRandom(9), () => 6);
             desk = new OperatorDesk(calls, new ConnectionRule(world.Directory), new FakeSwitchboard());
             fines = new List<FineAppliedArgs>();
             penalties.FineApplied += fines.Add;

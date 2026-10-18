@@ -13,6 +13,8 @@ namespace Switchboard.Content
 
         public long startingCents;
         public int startingCords = Unset;
+        public BoardSizeEntry startingBoard = new BoardSizeEntry();
+        public int startingClientSlots = Unset;
         public PacingEntry pacing = new PacingEntry();
         public CallEntry[] calls;
         public UpgradeEntry[] upgrades = Array.Empty<UpgradeEntry>();
@@ -72,5 +74,18 @@ namespace Switchboard.Content
         public long costCents;
         public float incomeMultiplier;
         public int wires;
+        public BoardSizeEntry boardSize = new BoardSizeEntry();
+        public int clientSlots = EconomyFileData.Unset;
+    }
+
+    /// <summary>The open part of the board, written as { "cols": 4, "rows": 4 } (D49).</summary>
+    [Serializable]
+    public sealed class BoardSizeEntry
+    {
+        public int cols = EconomyFileData.Unset;
+        public int rows = EconomyFileData.Unset;
+
+        public bool IsMissing => cols == EconomyFileData.Unset && rows == EconomyFileData.Unset;
+        public bool IsPartial => (cols == EconomyFileData.Unset) != (rows == EconomyFileData.Unset);
     }
 }

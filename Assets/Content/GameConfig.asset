@@ -12,7 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77ad71c65e2284d9fba0784eb7f5f12e, type: 3}
   m_Name: GameConfig
   m_EditorClassIdentifier: Switchboard.Content::Switchboard.Content.GameConfig
-  maxWaitingCalls: 6
   extraCordColors:
   - {r: 0.36078432, g: 0.72156864, b: 0.36078432, a: 1}
   - {r: 0.6117647, g: 0.40784314, b: 0.8392157, a: 1}

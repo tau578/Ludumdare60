@@ -13,16 +13,17 @@ namespace Switchboard.Domain
         private readonly CallService calls;
         private readonly IGameClock clock;
         private readonly IRandom random;
-        private readonly int maxLiveCalls;
+        private readonly Func<int> openSlots;
         private readonly IdleGuard idle;
         private readonly List<PendingCallback> pending = new List<PendingCallback>();
 
-        public CallbackScheduler(CallService calls, IGameClock clock, IRandom random, int maxLiveCalls, IdleGuard idle = null)
+        /// <param name="openSlots">The open caller slots, read live: live calls never outnumber them (D17, D49).</param>
+        public CallbackScheduler(CallService calls, IGameClock clock, IRandom random, Func<int> openSlots, IdleGuard idle = null)
         {
             this.calls = calls ?? throw new ArgumentNullException(nameof(calls));
             this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
             this.random = random ?? throw new ArgumentNullException(nameof(random));
-            this.maxLiveCalls = maxLiveCalls;
+            this.openSlots = openSlots ?? (() => 0);
             this.idle = idle;
             calls.CallEnded += OnCallEnded;
         }
@@ -45,13 +46,15 @@ namespace Switchboard.Domain
             return count;
         }
 
-        // Due callbacks ring in due order when there's room and neither party is on another call.
+        // Due callbacks ring in due order when there's room and neither party is on another call. They are always
+        // for people already in the game, and the board never shrinks in play, so they stay on open jacks.
         // A callback also waits while its type is at its limit of live calls or held back by the idle guard.
         // They tick before the spawner, so they go ahead of new calls.
         public void Tick()
         {
             int i = 0;
-            while (i < pending.Count && calls.Live.Count < maxLiveCalls)
+            int slots = openSlots();
+            while (i < pending.Count && calls.Live.Count < slots)
             {
                 PendingCallback callback = pending[i];
                 if (callback.DueAt > clock.Now) break;

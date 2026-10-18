@@ -150,7 +150,7 @@ namespace Switchboard.Domain.Tests
         {
             world.Emergency.CallbackAfterMiss = true;
             var clock = new GameClock();
-            var callbacks = new CallbackScheduler(calls, clock, new SeededRandom(5), 6);
+            var callbacks = new CallbackScheduler(calls, clock, new SeededRandom(5), () => 6);
             calls.Add(world.EmergencyRequest(0));
             calls.Tick(31);
             Assert.That(callbacks.Pending.Count, Is.EqualTo(1));

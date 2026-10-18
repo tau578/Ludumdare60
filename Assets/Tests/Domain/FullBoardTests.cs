@@ -5,7 +5,10 @@ using UnityEditor;
 
 namespace Switchboard.Domain.Tests
 {
-    /// <summary>The real file, 33 people and 3 services on all 36 jacks (D35, D36), with a player who connects every call at once.</summary>
+    /// <summary>
+    /// The real file, 33 people and 3 services on all 36 jacks (D35, D36), with a player who connects every call at once.
+    /// The board is opened to 6x6 first, which plays as the full board did before Step 7a (D49).
+    /// </summary>
     public sealed class FullBoardTests
     {
         private const string GameConfigPath = "Assets/Content/GameConfig.asset";
@@ -18,7 +21,10 @@ namespace Switchboard.Domain.Tests
             EconomyCatalog economy = config.LoadEconomy();
             PeopleCatalog people = config.LoadPeople(economy, ContentValidator.BoardJacks());
             var board = new FakeSwitchboard { CordCount = 6 };
-            var session = new GameSession(new GameContent(config, people, economy), new SeededRandom(36), board);
+            var session = new GameSession(new GameContent(people, economy), new SeededRandom(36), board);
+            while (session.Upgrades.TryGrantNext(UpgradeKind.ExtraClients)) { }
+            Assert.That(session.Stats.Board, Is.EqualTo(BoardSize.Full));
+            Assert.That(session.Stats.ClientSlots, Is.EqualTo(6));
             var callers = new HashSet<string>();
             var inCalls = new HashSet<string>();
             int emergencies = 0;

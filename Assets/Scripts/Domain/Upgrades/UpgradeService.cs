@@ -85,6 +85,16 @@ namespace Switchboard.Domain
             return true;
         }
 
+        /// <summary>A dev tool: gives the next entry of the kind's chain for free, as if bought for 0.</summary>
+        public bool TryGrantNext(UpgradeKind kind)
+        {
+            IUpgrade next = NextInChain(kind);
+            if (next == null) return false;
+            owned.Add(next.Id);
+            UpgradeBought?.Invoke(new UpgradeBought(next, 0));
+            return true;
+        }
+
         /// <summary>A dev tool: forgets every purchase without refunding it.</summary>
         public void ClearOwned() => owned.Clear();
 

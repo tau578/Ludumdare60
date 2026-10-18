@@ -16,6 +16,7 @@ namespace Switchboard.UI
         private CableController occupyingCable;
         private bool pointerHovered;
         private CableController pointerCable;
+        private bool open = true;
 
         public event Action<SocketView> Clicked;
         public event Action<SocketView, bool> HoverChanged;
@@ -25,12 +26,15 @@ namespace Switchboard.UI
         public string Address => $"{(char)('A' + row)}{column + 1}";
         public RectTransform PlugAnchor => plugAnchor;
         public bool IsOccupied => occupyingCable != null;
-        public bool IsNavigationHighlighted => isActiveAndEnabled && pointerHovered && pointerCable != null;
+
+        /// <summary>A closed socket (D42) is dimmed, ignores hover and clicks, and takes no plug.</summary>
+        public bool IsOpen => open;
+        public bool IsNavigationHighlighted => isActiveAndEnabled && open && pointerHovered && pointerCable != null;
         public CableController OccupyingCable => occupyingCable;
 
         public bool TryOccupy(CableController cable)
         {
-            if (cable == null || IsOccupied) return false;
+            if (cable == null || IsOccupied || !open) return false;
             occupyingCable = cable;
             RefreshHighlight();
             return true;
@@ -39,6 +43,20 @@ namespace Switchboard.UI
         public void Release(CableController cable)
         {
             if (occupyingCable == cable) occupyingCable = null;
+            RefreshHighlight();
+        }
+
+        /// <summary>Opens or closes the socket; a plug already in it stays until it is pulled.</summary>
+        public void SetOpen(bool value)
+        {
+            if (open == value) return;
+            open = value;
+            if (!open)
+            {
+                pointerHovered = false;
+                pointerCable = null;
+            }
+            Graphic.SetDimmed(!open);
             RefreshHighlight();
         }
 
@@ -53,11 +71,12 @@ namespace Switchboard.UI
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (eventData.button == PointerEventData.InputButton.Left) Clicked?.Invoke(this);
+            if (open && eventData.button == PointerEventData.InputButton.Left) Clicked?.Invoke(this);
         }
 
         public void OnPointerEnter(PointerEventData eventData)
         {
+            if (!open) return;
             pointerHovered = true;
             RefreshHighlight();
             HoverChanged?.Invoke(this, true);
@@ -75,8 +94,8 @@ namespace Switchboard.UI
 
         public void SetPointerState(bool hovered, CableController heldCable)
         {
-            pointerHovered = hovered;
-            pointerCable = heldCable;
+            pointerHovered = open && hovered;
+            pointerCable = open ? heldCable : null;
             RefreshHighlight();
         }
 

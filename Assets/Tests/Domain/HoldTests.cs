@@ -252,9 +252,9 @@ namespace Switchboard.Domain.Tests
             var clock = new GameClock();
             var random = new SeededRandom(5);
             var crowdCalls = new CallService();
-            var callbacks = new CallbackScheduler(crowdCalls, clock, random, 6);
+            var callbacks = new CallbackScheduler(crowdCalls, clock, random, () => 6);
             var spawner = new CallSpawner(crowdCalls, new CallFactory(random), crowd.Directory, crowd.Callers, random,
-                new BusyTracker(crowdCalls, callbacks), new PacingSettings(2, 8, 0, 0.5), 6, () => 1);
+                new BusyTracker(crowdCalls, callbacks), new PacingSettings(2, 8, 0, 0.5), () => 6, () => 1);
             Call onHold = crowdCalls.Add(crowd.Request(0, 1));
             crowdCalls.Take(onHold.Id);
             crowdCalls.Connect(onHold.Id);

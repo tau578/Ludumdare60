@@ -38,7 +38,11 @@ namespace Switchboard.Domain.Tests
 
         private static string Calls(params string[] entries) => "'calls': [ " + string.Join(", ", entries) + " ]";
 
-        private static string File(params string[] sections) => ("{ " + string.Join(", ", sections) + " }").Replace('\'', '"');
+        // A valid board start, so each test sees only its own section's messages (the board has its own tests).
+        private const string Board = "'startingBoard': { 'cols': 3, 'rows': 3 }, 'startingClientSlots': 3";
+
+        private static string File(params string[] sections) =>
+            ("{ " + Board + ", " + string.Join(", ", sections) + " }").Replace('\'', '"');
 
         private static string Sample(string start = "'startingCents': 0, 'startingCords': 3", string pacing = Pacing, string calls = null) =>
             File(start, pacing, calls ?? Calls(Regular, Emergency()), Upgrades);
@@ -338,7 +342,7 @@ namespace Switchboard.Domain.Tests
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
             PeopleCatalog people = config.LoadPeople(catalog, ContentValidator.BoardJacks());
             Assert.That(people.Callers, Is.Empty);
-            var session = new GameSession(new GameContent(config, people, catalog), new SeededRandom(5), new FakeSwitchboard());
+            var session = new GameSession(new GameContent(people, catalog), new SeededRandom(5), new FakeSwitchboard());
             int rung = 0;
             session.Calls.CallAdded += _ => rung++;
             for (int tick = 0; tick < 1200; tick++) session.Tick(0.1);
