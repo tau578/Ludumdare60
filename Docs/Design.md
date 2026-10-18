@@ -17,6 +17,7 @@ Level art pass (2026-10-18, lead requested): `BackgroundPanel.prefab` groups `ma
 | 3 | Done (2026-10-18) | A–Z tabs in Sergei's book (D34): `PhoneBookTab` plus `PhoneBookView.ShowLetter`/`HasLetter`, with letters that have no surname greyed out, and arrow keys while the book is open. 36 people on every jack A1–F6 (D35). Restyled cards: bold surnames in the in-hand bubble, on-hold dimming, coloured stamp inks. `ContentValidator` (Content) with `Tools/Switchboard/Validate Content`. Accepted deviations: the tab test lives in `Assets/Tests/Game/Editor/`, the validator menu in `Assets/Scripts/Game/Editor/` (see 4.1), and the validator also checks the surname order and `contactsPerPage`. After the lead's playtest: a press reaction and a placeholder click when a card is taken, typed-out bubble text, and clearer tabs for the spread on show. |
 | 4 | Done (2026-10-18) | Emergencies and fines (D36, D37): `type.emergency` (30 s response ring, $2 miss or wrong-patch fine, $1 cut-off fine, 20–40¢ + 5–10¢/s for 10–20 s, at most one at a time, spawn weight 1 against Regular 5, `everyoneCalls`, `recipientTag` `emergency-service`). Police B6, Fire Brigade C2 and Doctor D4 head `PhoneBook.json`. `PenaltyService` with `FineApplied`, the "Missed -$X" stamp and a red fine popup under the money counter. `IdleGuard` (60 s, `PacingProfile.idleTimeoutSeconds`) blocks fined types and their callbacks. A presentation-only `CallCardStyle` per type (badge, accent). Dev panel "Emergency now". Accepted deviations: the countdown ring is cream on a dark track, turning orange-red in the last 10 s (a red ring was invisible on the red halo); the type badge hides once connected; a `type` given on a service is ignored. |
 | Scene merge | Done (2026-10-18) | One `Final.unity` built from prefabs (D38): our `Game.prefab` and `GameUI.prefab` next to Sergei's board; build list `MainMenu` (0), `Final` (1); `Game.unity` removed; `GameInstaller` finds the views by type in its own scene. |
+| 5a | Done (2026-10-18) | The designer's `Assets/Configs/Economy.json` (`upgrades` only) and `Docs/EconomyFile.md`. Domain `UpgradeService` (with `PurchaseCheck`), `StatSheet`, `ShopShelf`, `GoalProgress`, `Wallet.TrySpend`; the live income multiplier on fee and pay. `EconomyFileLoader` with plain-English checks, shown by `Validate Content`. Sergei's 4 shop buttons (coordinated, D44) carry `UpgradeSlotView` (title, description, price, savings fill, gold frame) and are 204 px wide; menu `Tools/Switchboard/Update Upgrade Shop Buttons`. Our `ShopView`, a neutral "-$X" spend popup and the "To be continued..." dialog (`GoalPanelView`). Dev panel "+ $100" and "Reset upgrades" (no refund). Accepted deviations: see 5.9 and 4.3. |
 
 What Step 1 built:
 - **Operator desk.** A right pair connects the call. A wrong pair ends it as "Wrong number!". Patching with no call in hand is refused. Pulling a plug cut the call off (replaced by hold in Step 2b).
@@ -154,6 +155,8 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 - **Text glyphs.** Use only characters that exist in the static LiberationSans SDF atlas. "¢" and "—" are there; "→" is not. A missing glyph makes TextMeshPro write it into the fallback font asset at runtime, which dirties a file under `Assets/TextMesh Pro/`.
 - **Turn off `raycastTarget` on anything that isn't meant to be clicked.** The cord input takes the topmost raycast hit across all canvases, so a stray raycast target over the board or tray blocks cords. Modal overlays (the open book, the shop) block clicks on purpose.
 - Call cards line up with the caller panel's slots by reading the slots' positions at runtime. We never edit the panel prefab.
+- **Popups by the money counter** (5a): the fine popup sits under the counter; the neutral "-$X" spend popup sits to its left, over the board's frame (briefly covering the "6" column label, never a jack), so the two never collide.
+- **The "To be continued..." dialog** (5a) is the `Goal` object in `GameUI.prefab` with its own canvas at sorting order 15: above the open book (10), below the hand cursor and held plugs (20), so the pointer stays visible. Its backdrop blocks clicks while it is open (a deliberate modal); it is inactive otherwise.
 
 ### 4.4 Composition root and tick order
 - **`GameSession`** (Domain, plain C#) creates every domain service in dependency order and owns the tick order. Tests and the balance simulator build it without Unity.
@@ -174,6 +177,7 @@ public void Tick(double dt)
     calls.Tick(dt);      // finish calls whose duration ran out; miss expired emergencies (Step 4)
     callbacks.Tick();    // re-queue due callbacks if there's room (Step 2)
     spawner.Tick(dt);    // new calls if there's room
+    goal.Tick();         // raise GoalAffordable once, after this tick's money has moved (Step 5a)
 }
 ```
 
@@ -361,7 +365,7 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
   - The fraction is carried forward, and saved [6], so nothing is lost to rounding.
   - Never use `float` for money: at $100,000, a float can't register the fraction of a cent a call earns each frame.
   - Floating-point noise: when the remainder is within 1e-9 ¢ of a whole cent, that cent is credited.
-- **`EarningsService`** pays each connected call `min(dt, secondsLeft) × centsPerSecond × multiplier` every tick, so a finished call earns exactly duration × rate × multiplier. The multiplier is read live, so an upgrade bought mid-call applies at once (D12). It is a constant 1 until `StatSheet` exists [5].
+- **`EarningsService`** pays each connected call `min(dt, secondsLeft) × centsPerSecond × multiplier` every tick, so a finished call earns exactly duration × rate × multiplier. The multiplier is read live from `StatSheet.IncomeMultiplier`, so an upgrade bought mid-call applies at once (D12) [5a].
 - **Display:** dollars and cents, e.g. `$12.34`, formatted with the invariant culture. `MoneyFormat` lives in Domain so it can be unit-tested. It formats `$1,234.56` and rates such as `5¢/s`.
 - **Cheap UI updates:**
   - Views poll the wallet in `LateUpdate`.
@@ -388,11 +392,16 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
 
 - **Chains.** Entries of the same type form a chain in file order. Only the next unbought entry of a chain can be bought; there's no skipping. Values in a chain must grow.
 - **`UpgradeService`** (Domain) owns the set of bought ids.
+  - `CanBuy(id)` returns a `PurchaseCheck` (`Ok`, `Unknown`, `Owned`, `NotNext`, `TooExpensive`).
   - `TryBuy(id)` checks that the entry exists, isn't owned, is next in its chain and is affordable, then spends through `Wallet.TrySpend` and raises `UpgradeBought`. Otherwise it changes nothing and returns false.
   - A save restores the bought ids without spending [6].
 - **`StatSheet`** recomputes every stat from the bought ids whenever they change. A stat is the value of the last bought entry in its chain, or the base value from `GameConfig` if none is bought (multiplier 1). Recomputing from scratch means nothing can be applied twice.
 - **`ShopShelf`** (Domain) decides what the shop's buttons show (D41). It has 3 rotating slots, each holding one chain. A slot keeps its chain until the chain is bought out, then takes the next chain (in order of first appearance in the file) that isn't shown yet. The secret is never on the shelf; it has its own pinned button.
 - **Multiplier.** It applies to the fee and the per-second pay, live, including calls already connected (D12, D32). Fines are never multiplied (D37).
+- **Shop buttons as built (5a, accepted deviations from D41):**
+  - Empty and too-expensive buttons stay clickable but do nothing; disabling Unity's `Button` would tint Sergei's "+" look. Too-expensive offers are dimmed instead (grey button image, faded text).
+  - The owned secret shows its name and "Owned", with a full fill, no price, no frame, and does nothing on click.
+- **Checks.** The economy file's checks live in `EconomyFileLoader` (as the people-file checks live in `PeopleFileLoader`); `ContentValidator.ValidateEconomy` passes them on with the prefix "Economy file: ". There is no separate `EconomyValidator`.
 
 ### 5.10 Progression and the goal [5a]
 - **`GoalProgress`** (Domain):

@@ -10,7 +10,7 @@
 | 3. Phone book and cards | done | ✅ 2026-10-18 (16 min + 8 min fix + 3 min fix) | ✅ 211/211 tests, scope clean | ✅ | |
 | 4. Emergencies and fines | done | ✅ 2026-10-18 (26 min) | ✅ 255/255 tests, scope clean | ✅ | 14fd59c |
 | Scene merge: `Final` (D38) | done | ✅ 2026-10-18 (11 min) | ✅ 255/255 tests, scope clean | ✅ | 3002ea8 |
-| 5a. Economy file, shop, income, secret | not started | | | | |
+| 5a. Economy file, shop, income, secret | done | ✅ 2026-10-18 (23 min) | ✅ 304/304 tests, scope clean | ✅ | |
 | 5b. Extra wires and Notepad | not started | | | | |
 | 5c. Calls and pacing into Economy.json | not started | | | | |
 | 6. Saves, Boot, Web build | not started | | | | |
@@ -1263,3 +1263,135 @@ Follow-ups:
 - **Split:** 5a (file, shop, income, secret), 5b (wires and Notepad), 5c (calls, pacing and starting money into the file). Plan §9 has the full 5a brief.
 - **Docs updated:** Design 1, 3, 5.9, 5.10, 5.11, 5.12, 6.1–6.4, 9 and 10 (D14, D21, D23, D27, D35; new D39–D44). Plan §8, §9, Steps 5a/5b/5c/6/7/10. CLAUDE.md.
 
+### Step 5a report: 2026-10-18
+Result: done
+
+Playable now: the right-hand shop panel sells real offers from the designer's `Assets/Configs/Economy.json`. The top button sells "Better rates / Earn x1.5 / $8.00", then ×2 ($20) and ×3 ($50), and goes back to "+" once the chain is bought out. The two middle buttons keep the "+" look. The bottom button is the secret ("??? / Something big / $250.00"): it fills from the bottom as money is saved and gets a gold frame when affordable. Buying it shows "To be continued..." with a "Keep playing" button, and the button then reads "Owned". A purchase pops "-$8.00" left of the money plaque in a neutral ink. Income upgrades multiply the fee and the per-second pay, including calls already connected; fines are not multiplied.
+
+How to test: as in the plan's playtest script. Two details:
+- "+$100" and "Reset upgrades" are in the dev panel (F1) under "+ $10" and "Clear calls". Reset forgets purchases without refunding them.
+- The "-$8.00" popup appears to the left of the money plaque, not under it (see deviation 2).
+
+Created:
+- `Assets/Configs/Economy.json`: the 4 entries of the brief, one per line, in the brief's order. The names fit the buttons as they are, so nothing was shortened.
+- `Docs/EconomyFile.md`: the designer's guide (sections, fields, types and which step builds them, chains, "values set", cents, never renaming ids, Validate Content with an example message).
+- Domain, in `Assets/Scripts/Domain/Upgrades/`:
+  - `UpgradeKind` (`ExtraIncome = 1` … `Secret = 5`), `IUpgrade`, `PurchaseCheck` (`Ok`, `Unknown`, `Owned`, `NotNext`, `TooExpensive`)
+  - `UpgradeService`, with `UpgradeBought` (readonly struct)
+  - `StatSheet`, `ShopShelf`, `GoalProgress`
+- Content: `EconomyFileData`/`UpgradeEntry` (JsonUtility), `UpgradeRecord`, `EconomyCatalog`, `EconomyFileLoader`.
+- Game: `Views/ShopView.cs`, `Views/GoalPanelView.cs`.
+- Sergei's folder (approved coordinated change): `Assets/Scripts/UI/UpgradeSlotView.cs`.
+- Tests: `Assets/Tests/Domain/UpgradeTests.cs`, `Assets/Tests/Domain/EconomyFileTests.cs`.
+
+Changed:
+- `Wallet.TrySpend(long)`.
+- `IGameContent.Upgrades`; `GameContent` takes an `EconomyCatalog`.
+- `GameSession`:
+  - builds `Upgrades`, `Stats`, `Shelf` and `Goal` before `Earnings`, which now reads `() => Stats.IncomeMultiplier`
+  - `Tick` ends with `Goal.Tick()` (goal check last, Design 4.4)
+  - new dev method `ResetUpgrades()`: clears the bought ids, recomputes the stats, resets the goal's affordable flag and rebuilds the shelf
+- `EarningsService`: comment only.
+- `GameConfig`: new `economyFile` `TextAsset`, `LoadEconomy()`; `Validate()` adds the economy problems, each prefixed "Economy file: ".
+- `ContentValidator.ValidateEconomy(json)`: the economy rules live in `EconomyFileLoader`, which the game uses too, so the menu, the test and the game report the same messages.
+- `GameInstaller`:
+  - finds `ShopView` and `GoalPanelView` with `FindSingle`
+  - finds the `UpgradeSlotView`s by type in the scene
+  - loads the economy file and logs each problem as "Economy file: ..."
+- `MoneyCounterView`: a `spendPopup`, shown on `UpgradeBought`.
+- `DevPanel`: "+ $100" and "Reset upgrades".
+- `Assets/Content/GameConfig.asset`: `economyFile` set to `Economy.json`.
+- `Fakes.cs`: `FakeContent.Upgrades`, plus a new `FakeUpgrade` with the D43 placeholder shop.
+- `FullBoardTests.cs`: passes the real economy to `GameContent`.
+- Sergei's `Assets/Editor/UpgradeShopPanelBuilder.cs` (approved):
+  - `CreateButtonPrefab` now builds the new parts too, through a shared `BuildSlotParts`.
+  - New menu `Tools/Switchboard/Update Upgrade Shop Buttons`. It rebuilds the parts in `UpgradePlaceholderButton.prefab` in place (it is safe to run again), and sets the 4 nested buttons in `UpgradeShopPanel.prefab` to the new size. It touches nothing else: no scene, and no other prefab.
+
+Scene and prefab changes:
+- **`UpgradePlaceholderButton.prefab`** (Sergei's, approved; built by the new menu):
+  - The button is now 204×144 (was 144×144), with `LayoutElement` 204×144.
+  - The root gets `UpgradeSlotView`.
+  - New children:
+    - `FillArea/Fill`: green, inset 6 px, starts inactive. It is sized by its anchors (`anchorMax.y` = progress), so it needs no sprite.
+    - `Details` (CanvasGroup, `blocksRaycasts` off): `Title` 26 bold cream, `Description` 21 light grey-green with wrapping, `Price` 26 bold gold. All TextMeshPro with LiberationSans SDF, auto-size down to 14–16, `raycastTarget` off. Starts inactive.
+    - `Highlight`: 4 gold 4 px bars. Starts inactive.
+  - The "+" `PlaceholderIcon`, the `Button`, its colours and the `Shadow` are unchanged.
+  - The only raycast target is still the button's own image.
+- **`UpgradeShopPanel.prefab`** (Sergei's, approved): only the 4 nested buttons' `m_SizeDelta.x` overrides, 144 → 204. `HeaderSlot`, the spacing, the padding and the names are untouched. The 4 buttons still fit inside the 236×860 panel below the plaque (the same vertical layout, with heights unchanged).
+- **`GameUI.prefab`** (ours):
+  - `Hud/MoneyPlate/SpendPopup`: a copy of `FinePopup`, 190×48, ink (236,230,210), anchored to the plaque's left edge, falling 24 px. Wired to `MoneyCounterView.spendPopup`.
+  - `Shop`: a plain `RectTransform` with `ShopView`, and no graphics.
+  - `Goal`: a stretched nested Canvas (override sorting, order 15, set through `SerializedObject`) with a `GraphicRaycaster` and `GoalPanelView`. Its child `Dialog` starts inactive and holds:
+    - `Blocker`: full screen, dark at 60 %, a raycast target
+    - `Panel`: 640×320, dark with a gold outline, holding "To be continued...", the secret's name in gold, and a green "Keep playing" button
+- **`Final.unity`:** not changed (git shows no diff). Its existing layout-driven overrides on the shop buttons are untouched, and the runtime layout sizes the buttons from the new `LayoutElement`. MainMenu was never saved. No phone book menu was run, so `LetterTabs` stays hidden.
+
+Tests: 304/304 EditMode (255 before; 49 new):
+- `WalletSpendTests` (5): spends when covered; refuses when short, 0 or negative with nothing changed; keeps the fraction.
+- `UpgradeServiceTests` (8): buys the next entry; refuses out of order, owned, unknown and too expensive, each with nothing changed; `UpgradeBought` once per purchase; the secret is buyable regardless of the chains; file order and kinds.
+- `StatSheetTests` (4): 1 with nothing bought; set, not stacked (1.5 then 2.0 gives 2.0); recompute is stable; the secret leaves it alone.
+- `UpgradeEarningsTests` (3): bought mid-call applies to the rest of that call (exactly 50 + 75); the fee after a purchase is ×1.5; a missed emergency is still fined 200 at ×3.
+- `ShopShelfTests` (6): file order and the secret never shelved; a bought-out slot takes the next chain while the others stay; empty when nothing is left; buying the secret moves nothing; rebuild after clearing; a secret-only shop has an empty shelf.
+- `GoalProgressTests` (4): the clamped ratio; `GoalAffordable` fires once (even after dipping below and recovering); `GoalPurchased` on buying the secret, with progress staying 1; no secret means no goal and no event.
+- `UpgradeSessionTests` (2): a session with no upgrades ticks with multiplier 1, an empty shelf and no goal; a session with the shop pays ×2 after two buys, and `ResetUpgrades` resets ids, stats, shelf and affordable flag without a refund.
+- `EconomyFileTests` (17): the real file loads 4 entries with no problems; `GameConfig` references it; a valid file passes; one test for each problem in Build 9 (missing file, invalid JSON, empty id, badly formed id with a suggestion, duplicate id, unknown type listing the known ones, `extra_wires` "arrives in Step 5b", empty name, cost 0 and -5, multiplier 1, the exact brief message for 1.2 after 1.5, no secret, a second secret); a broken entry is left out while the others load.
+
+Console: clean. Only the known MCP WebSocket line appeared after recompiles. No `CallerPortraitSliceCheck` warning appeared. No format-only re-saves happened (`TimeManager.asset` and `SampleScene.unity` are untouched), so nothing was discarded.
+
+Screenshots (`Temp/Captures/`):
+- `step-05a.png`: the start state at $60. Better rates in slot 1, two "+" placeholders, the secret about 24 % filled and dimmed.
+- `step-05a-bought.png`: after a real raycast click on slot 1. Slot 1 shows "Good rates / Earn x2 / $20.00", "-$8.00" sits left of the plaque, and a "-$2.00" fine popup was forced at the same moment to show that the two don't overlap.
+- `step-05a-goal.png`: at $252. The secret full and framed in gold.
+- `step-05a-continued.png`: the "To be continued..." dialog after a raycast click on the secret. The bottom button reads "??? / Owned". This shot predates the popup widening, so "-$250.00" is clipped in it.
+- `step-05a-continued-book.png`: the same dialog with the book open. The book's pages are dimmed under the backdrop, and the dialog is on top.
+- `step-05a-720.png`: 1280×720 after "Reset upgrades": the shop back at its start, readable.
+- `step-05a-spend-wide.png`: "-$250.00" fitting the widened 190 px popup.
+
+Checked in Play Mode (stepped frames):
+- Shop binding: exactly 4 `UpgradeSlotView`s, ordered top to bottom, each 204×144.
+- Raycast clicks:
+  - The top button's top hit is `UpgradeButton_01`, and clicking it buys ×1.5 ($60 → $52).
+  - The secret's click buys it.
+  - With the dialog open, the top hit over jack F1 is `Blocker`, so cords can't be used behind it.
+  - "Keep playing" is hit and closes the dialog.
+- `GoalAffordable` fired exactly once.
+- A real call connected after buying ×1.5 paid a 22.5¢ fee (15¢ base) and finished at exactly 180¢ = (15 + 5 × 21) × 1.5.
+- About 30 s of game time at ×5 with no errors or warnings.
+- MainMenu → `Menu.onPlayButtonClick()` lands in `Final` (index 1) with a session, 4 slots, the shelf on `income_1` and the goal `secret`. No errors.
+- Validator: with `income_2` set to 1.2, `Tools/Switchboard/Validate Content` logged "Economy file: Upgrade 2 "income_2": incomeMultiplier 1.2 is not higher than income_1's 1.5. Values in a chain must grow." The file was restored afterwards, and the menu then reports no problems.
+- Editor left clean: not in Play Mode, `Final.unity` active and not dirty, `timeScale` 1, Game view 1920×1080, no SessionState keys or callbacks left, console cleared.
+
+Deviations from Design/Plan:
+1. **Empty and too-expensive buttons stay interactable.** A click gives Sergei's press tint and nothing else: `ShopView` buys only when `CanBuy` is `Ok`. Setting `interactable` off would switch to Unity's disabled tint (grey at 50 % alpha), and disabling the `Button` resets it to a white tint. Either would change his placeholder look. Too-expensive offers are dimmed instead: the button image at 150 grey, and the texts at 45 % alpha.
+2. **The spend popup sits left of the money plaque, not under it.** Under the plaque, it covered the next offer's title right after a purchase, and it would collide with a fine popup landing at the same time. Now it floats over the board's top-right frame margin, briefly covering the "6" column label. It is never over a jack, and it is not a raycast target.
+3. **The goal dialog uses sorting order 15:** above the open book (10), below the hand cursor and held plugs (20), so the pointer stays visible while the dialog is open.
+4. **The owned secret** shows its name and "Owned", with no price, a full fill and no frame. Clicking it does nothing.
+5. **The economy validation rules live in `EconomyFileLoader`**, like the people file's per-entry rules in `PeopleFileLoader`. `ContentValidator.ValidateEconomy` forwards to it. There is no separate `EconomyValidator` class.
+6. **The update menu sets the nested buttons' size directly.** `LayoutRebuilder` does nothing inside `LoadPrefabContents`, so the menu writes the size itself. Positions are left to the runtime layout, as before.
+
+Follow-ups:
+- **Tell Sergei (D44, after):**
+  - his shop button prefab now has `UpgradeSlotView`, `FillArea`, `Details` and `Highlight`
+  - the buttons are 204 wide
+  - the new menu `Tools/Switchboard/Update Upgrade Shop Buttons` exists, and `CreateButtonPrefab` builds the same parts
+  - keep the names `UpgradeShopPanel`, `HeaderSlot` and the 4 buttons
+- **Design 4.4:** the tick snippet should end with `goal.Tick(); // goal check last (5a)`. Add `PurchaseCheck` to 5.9 and the dialog's order 15 to 4.3 (orchestrator's docs).
+- **"-$250.00" at 34 pt** fills about 160 of the popup's 190 px. Bigger prices from the designer, such as "-$2,500.00", would need a wider popup or auto-sizing.
+- **Old screenshots:** `step-05a-continued.png` still shows the old 150 px popup. Retake it in a later pass if needed.
+- **Not checked by a real cord patch:** the in-play fee and earnings check connected the call through `OperatorDesk.OnCircuitClosed` with cord 2, not by plugging Sergei's cords. The multiplier path is the same code that the unit tests cover.
+
+#### Step 5a verification (orchestrator, 2026-10-18)
+- **Tests:** an independent EditMode run passed 304/304 (255 before, 49 new). Console clean, with no `CallerPortraitSliceCheck` warning.
+- **Scope (`git status`):**
+  - Sergei's files: only the four approved ones (`UpgradeSlotView.cs` new, `UpgradeShopPanelBuilder.cs`, `UpgradePlaceholderButton.prefab`, `UpgradeShopPanel.prefab`).
+  - `UpgradeShopPanel.prefab`'s diff is just the 4 buttons' width, 144 → 204, so `HeaderSlot` is untouched.
+  - `Final.unity`, `MainMenu.unity`, `PhoneBook.prefab` (tabs still hidden) and `PhoneBook.json` are unchanged. No format-only re-saves.
+- **`Economy.json`:** the brief's 4 entries, one per line, in order. `GameConfig.asset` gained only the `economyFile` reference.
+- **Code skim:** stats are recomputed from the bought ids (values set, never stacked); `ShopShelf` refills only the bought-out slot; `GoalProgress.Tick` is last in `GameSession.Tick`; `ShopView` polls with change checks and allocates nothing per frame.
+- **Screenshots checked:** `step-05a.png`, `-bought`, `-continued-book` and `-720` look right. Two small visual points for the playtest:
+  - The fine popup ("-$2.00", from Step 4, under the counter) now lands on the top offer's title.
+  - "-$250.00" sits tight against the left edge of its dark box.
+- **Docs updated:** Design status table, 4.3 (popups, dialog order 15), 4.4 (goal tick), 5.8, 5.9 (`PurchaseCheck`, accepted button deviations, where the checks live). Plan §4 lessons, §8. CLAUDE.md.
+
+#### Step 5a playtest (lead, 2026-10-18)
+- All checks passed ("all works well"). The lead asked to commit and push.

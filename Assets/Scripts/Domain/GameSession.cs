@@ -20,7 +20,11 @@ namespace Switchboard.Domain
             Wallet = new Wallet(content.StartingCents);
             Idle = new IdleGuard(pacing.IdleTimeoutSeconds);
             Calls = new CallService();
-            Earnings = new EarningsService(Calls, Wallet);
+            Upgrades = new UpgradeService(content.Upgrades, Wallet);
+            Stats = new StatSheet(Upgrades);
+            Shelf = new ShopShelf(Upgrades);
+            Goal = new GoalProgress(Upgrades, Wallet);
+            Earnings = new EarningsService(Calls, Wallet, () => Stats.IncomeMultiplier);
             Penalties = new PenaltyService(Calls, Wallet);
             Callbacks = new CallbackScheduler(Calls, clock, random, maxLiveCalls, Idle);
             Busy = new BusyTracker(Calls, Callbacks);
@@ -33,6 +37,10 @@ namespace Switchboard.Domain
         public PhoneDirectory Directory { get; }
         public Wallet Wallet { get; }
         public CallService Calls { get; }
+        public UpgradeService Upgrades { get; }
+        public StatSheet Stats { get; }
+        public ShopShelf Shelf { get; }
+        public GoalProgress Goal { get; }
         public EarningsService Earnings { get; }
         public PenaltyService Penalties { get; }
         public IdleGuard Idle { get; }
@@ -50,6 +58,16 @@ namespace Switchboard.Domain
             Calls.Tick(dt);
             Callbacks.Tick();
             Spawner.Tick(dt);
+            Goal.Tick();
+        }
+
+        /// <summary>A dev tool: forgets every purchase (no refund) and puts the shop back to its start.</summary>
+        public void ResetUpgrades()
+        {
+            Upgrades.ClearOwned();
+            Stats.Recompute();
+            Goal.ResetAffordable();
+            Shelf.Rebuild();
         }
 
         /// <summary>A dev tool: ends every live call without pay, fines or callbacks, and empties the board.</summary>

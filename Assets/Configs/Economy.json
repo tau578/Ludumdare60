@@ -1,0 +1,8 @@
+{
+  "upgrades": [
+    { "id": "income_1", "type": "extra_income", "name": "Better rates", "description": "Earn x1.5", "costCents": 800, "incomeMultiplier": 1.5 },
+    { "id": "income_2", "type": "extra_income", "name": "Good rates", "description": "Earn x2", "costCents": 2000, "incomeMultiplier": 2.0 },
+    { "id": "income_3", "type": "extra_income", "name": "Top rates", "description": "Earn x3", "costCents": 5000, "incomeMultiplier": 3.0 },
+    { "id": "secret", "type": "secret", "name": "???", "description": "Something big", "costCents": 25000 }
+  ]
+}

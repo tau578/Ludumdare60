@@ -19,6 +19,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 4bef3ba27d35f481cb8d2a5c7c95dc32, type: 2}
   - {fileID: 11400000, guid: 923fd2044d1114dcbbf4ed520081707d, type: 2}
   peopleFile: {fileID: 4900000, guid: 2b056d57ca6ba034fba544a4e3f87de2, type: 3}
+  economyFile: {fileID: 4900000, guid: 40ca8933a2957462dbd79017f4f12b46, type: 3}
   portraits:
   - name: caller-01
     sprite: {fileID: -3528310941345610784, guid: f1165ce58b3149e488092261ba6f7544, type: 3}

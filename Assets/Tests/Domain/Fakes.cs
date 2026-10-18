@@ -107,6 +107,37 @@ namespace Switchboard.Domain.Tests
         public IReadOnlyList<IPerson> People { get; set; } = Array.Empty<IPerson>();
         public IReadOnlyList<ICaller> Callers { get; set; } = Array.Empty<ICaller>();
         public IReadOnlyList<IDirectoryEntry> Directory { get; set; } = Array.Empty<IDirectoryEntry>();
+        public IReadOnlyList<IUpgrade> Upgrades { get; set; } = Array.Empty<IUpgrade>();
+    }
+
+    internal sealed class FakeUpgrade : IUpgrade
+    {
+        public FakeUpgrade(string id, UpgradeKind kind, long costCents, double incomeMultiplier = 0)
+        {
+            Id = id;
+            Kind = kind;
+            CostCents = costCents;
+            IncomeMultiplier = incomeMultiplier;
+        }
+
+        public string Id { get; }
+        public UpgradeKind Kind { get; }
+        public string Name => Id;
+        public string Description => string.Empty;
+        public long CostCents { get; }
+        public double IncomeMultiplier { get; }
+
+        public static FakeUpgrade Income(string id, long costCents, double multiplier) =>
+            new FakeUpgrade(id, UpgradeKind.ExtraIncome, costCents, multiplier);
+
+        /// <summary>The placeholder shop of D43: income x1.5, x2 and x3 for $8, $20 and $50, and the $250 secret.</summary>
+        public static IUpgrade[] PlaceholderShop() => new IUpgrade[]
+        {
+            Income("income_1", 800, 1.5),
+            Income("income_2", 2000, 2.0),
+            Income("income_3", 5000, 3.0),
+            new FakeUpgrade("secret", UpgradeKind.Secret, 25000)
+        };
     }
 
     internal sealed class FakeSwitchboard : ISwitchboard

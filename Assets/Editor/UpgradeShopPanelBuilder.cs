@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using Switchboard.UI;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -19,6 +21,18 @@ namespace Switchboard.Editor
         private const float HeaderY = 366;
         private const int SlotsTopPadding = 144;
         private const float SlotSpacing = 32;
+        // The buttons may be as wide as the header plaque, so their texts fit (Step 5a).
+        private static readonly Vector2 ButtonSize = new Vector2(204, 144);
+        private const string FontPath = "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset";
+        private const float TextInset = 10;
+        private const float FillInset = 6;
+        private const float HighlightThickness = 4;
+        private static readonly Color TitleColor = new Color32(238, 236, 222, 255);
+        private static readonly Color DescriptionColor = new Color32(214, 218, 200, 255);
+        // The money counter's gold.
+        private static readonly Color PriceColor = new Color32(242, 210, 122, 255);
+        private static readonly Color FillColor = new Color32(92, 134, 78, 255);
+        private static readonly Color HighlightColor = new Color32(242, 210, 122, 255);
 
         [MenuItem("Tools/Switchboard/Create Upgrade Shop Panel")]
         public static void CreateUpgradeShopPanel()
@@ -59,7 +73,7 @@ namespace Switchboard.Editor
 
         private static GameObject CreateButtonPrefab()
         {
-            var root = Rect("UpgradePlaceholderButton", null, new Vector2(144, 144));
+            var root = Rect("UpgradePlaceholderButton", null, ButtonSize);
             try
             {
                 var image = root.gameObject.AddComponent<Image>();
@@ -82,16 +96,128 @@ namespace Switchboard.Editor
                 colors.fadeDuration = .08f;
                 button.colors = colors;
                 var layout = root.gameObject.AddComponent<LayoutElement>();
-                layout.minWidth = layout.preferredWidth = 144;
-                layout.minHeight = layout.preferredHeight = 144;
                 layout.flexibleWidth = layout.flexibleHeight = 0;
 
                 var icon = Box("PlaceholderIcon", root, new Vector2(100, 100), Vector2.zero, new Color32(65, 73, 62, 255));
                 Box("PlusHorizontal", icon, new Vector2(40, 8), Vector2.zero, new Color32(186, 192, 172, 255));
                 Box("PlusVertical", icon, new Vector2(8, 40), Vector2.zero, new Color32(186, 192, 172, 255));
+                BuildSlotParts(root);
                 return PrefabUtility.SaveAsPrefabAsset(root.gameObject, ButtonPath);
             }
             finally { Object.DestroyImmediate(root.gameObject); }
+        }
+
+        [MenuItem("Tools/Switchboard/Update Upgrade Shop Buttons")]
+        public static void UpdateShopButtons()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Exit Play Mode first.");
+            var button = PrefabUtility.LoadPrefabContents(ButtonPath);
+            try
+            {
+                BuildSlotParts((RectTransform)button.transform);
+                PrefabUtility.SaveAsPrefabAsset(button, ButtonPath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(button); }
+            // The panel's copies keep the size its layout last gave them; the layout itself only runs in a scene.
+            var panel = PrefabUtility.LoadPrefabContents(PanelPath);
+            try
+            {
+                foreach (var slot in panel.GetComponentsInChildren<UpgradeSlotView>(true))
+                    ((RectTransform)slot.transform).sizeDelta = ButtonSize;
+                PrefabUtility.SaveAsPrefabAsset(panel, PanelPath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(panel); }
+        }
+
+        // The offer texts, the savings fill and the highlight frame that UpgradeSlotView drives.
+        private static void BuildSlotParts(RectTransform root)
+        {
+            foreach (var part in new[] { "FillArea", "Details", "Highlight" })
+            {
+                var old = root.Find(part);
+                if (old != null) Object.DestroyImmediate(old.gameObject);
+            }
+            root.sizeDelta = ButtonSize;
+            var layout = root.GetComponent<LayoutElement>();
+            layout.minWidth = layout.preferredWidth = ButtonSize.x;
+            layout.minHeight = layout.preferredHeight = ButtonSize.y;
+            var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
+            if (font == null) throw new InvalidOperationException("LiberationSans SDF was not found at " + FontPath);
+
+            var fillArea = Stretch("FillArea", root, FillInset);
+            fillArea.SetAsFirstSibling();
+            var fill = Stretch("Fill", fillArea, 0);
+            var fillImage = fill.gameObject.AddComponent<Image>();
+            fillImage.color = FillColor;
+            fillImage.raycastTarget = false;
+            fill.anchorMax = new Vector2(1, 0);
+            fill.gameObject.SetActive(false);
+
+            var details = Stretch("Details", root, 0);
+            var group = details.gameObject.AddComponent<CanvasGroup>();
+            group.blocksRaycasts = false;
+            group.interactable = false;
+            var title = Label("Title", details, 1, -10, 36, 26, 16, FontStyles.Bold, TitleColor, font);
+            var description = Label("Description", details, .5f, 2, 48, 21, 14, FontStyles.Normal, DescriptionColor, font);
+            description.textWrappingMode = TextWrappingModes.Normal;
+            var price = Label("Price", details, 0, 10, 34, 26, 16, FontStyles.Bold, PriceColor, font);
+            details.gameObject.SetActive(false);
+
+            var highlight = Stretch("Highlight", root, 0);
+            Bar("Top", highlight, new Vector2(0, 1), new Vector2(1, 1));
+            Bar("Bottom", highlight, new Vector2(0, 0), new Vector2(1, 0));
+            Bar("Left", highlight, new Vector2(0, 0), new Vector2(0, 1));
+            Bar("Right", highlight, new Vector2(1, 0), new Vector2(1, 1));
+            highlight.gameObject.SetActive(false);
+
+            var view = root.GetComponent<UpgradeSlotView>();
+            if (view == null) view = root.gameObject.AddComponent<UpgradeSlotView>();
+            view.Configure(root.GetComponent<Button>(), root.GetComponent<Image>(), root.Find("PlaceholderIcon").gameObject,
+                group, title, description, price, fill, highlight.gameObject);
+        }
+
+        private static RectTransform Stretch(string name, Transform parent, float inset)
+        {
+            var rect = Rect(name, parent, Vector2.zero);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(inset, inset);
+            rect.offsetMax = new Vector2(-inset, -inset);
+            return rect;
+        }
+
+        private static TextMeshProUGUI Label(string name, Transform parent, float anchorY, float y, float height, float size,
+            float minSize, FontStyles style, Color color, TMP_FontAsset font)
+        {
+            var rect = Rect(name, parent, new Vector2(-2 * TextInset, height));
+            rect.anchorMin = new Vector2(0, anchorY);
+            rect.anchorMax = new Vector2(1, anchorY);
+            rect.pivot = new Vector2(.5f, anchorY);
+            rect.anchoredPosition = new Vector2(0, y);
+            var text = rect.gameObject.AddComponent<TextMeshProUGUI>();
+            text.font = font;
+            text.fontSize = text.fontSizeMax = size;
+            text.fontSizeMin = minSize;
+            text.enableAutoSizing = true;
+            text.fontStyle = style;
+            text.color = color;
+            text.alignment = TextAlignmentOptions.Center;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.raycastTarget = false;
+            return text;
+        }
+
+        private static void Bar(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax)
+        {
+            var rect = Rect(name, parent, Vector2.zero);
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.pivot = new Vector2(anchorMin.x == anchorMax.x ? anchorMin.x : .5f, anchorMin.y == anchorMax.y ? anchorMin.y : .5f);
+            rect.sizeDelta = anchorMin.x == anchorMax.x ? new Vector2(HighlightThickness, 0) : new Vector2(0, HighlightThickness);
+            var image = rect.gameObject.AddComponent<Image>();
+            image.color = HighlightColor;
+            image.raycastTarget = false;
         }
 
         private static GameObject CreatePanelPrefab(GameObject buttonPrefab)

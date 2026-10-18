@@ -16,6 +16,8 @@ namespace Switchboard.Content
         [SerializeField] private CallerTypeDefinition[] callerTypes = new CallerTypeDefinition[0];
         [SerializeField, Tooltip("Assets/Configs/PhoneBook.json, shared with the team's phone book (D31).")]
         private TextAsset peopleFile;
+        [SerializeField, Tooltip("Assets/Configs/Economy.json, the designer's economy file (D39).")]
+        private TextAsset economyFile;
         [SerializeField] private PortraitEntry[] portraits = new PortraitEntry[0];
 
         public long StartingCents => startingCents;
@@ -25,11 +27,19 @@ namespace Switchboard.Content
 
         public string PeopleFileText => peopleFile != null ? peopleFile.text : null;
 
+        public string EconomyFileText => economyFile != null ? economyFile.text : null;
+
         public PeopleCatalog LoadPeople(IEnumerable<string> boardJacks) =>
             PeopleFileLoader.Load(PeopleFileText, CallerTypes, HasPortrait, boardJacks);
 
-        public List<string> Validate() =>
-            ContentValidator.Validate(PeopleFileText, CallerTypes, HasPortrait, ContentValidator.BoardJacks());
+        public EconomyCatalog LoadEconomy() => EconomyFileLoader.Load(EconomyFileText);
+
+        public List<string> Validate()
+        {
+            List<string> errors = ContentValidator.Validate(PeopleFileText, CallerTypes, HasPortrait, ContentValidator.BoardJacks());
+            foreach (string error in ContentValidator.ValidateEconomy(EconomyFileText)) errors.Add("Economy file: " + error);
+            return errors;
+        }
 
         /// <summary>How cards of a caller type look; a type with no style gets plain cards.</summary>
         public CallCardStyle CardStyleOf(string typeId)

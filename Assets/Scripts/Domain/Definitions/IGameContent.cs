@@ -11,5 +11,8 @@ namespace Switchboard.Domain
         IReadOnlyList<IPerson> People { get; }
         IReadOnlyList<ICaller> Callers { get; }
         IReadOnlyList<IDirectoryEntry> Directory { get; }
+
+        /// <summary>Economy.json's upgrades in file order (D39, D40).</summary>
+        IReadOnlyList<IUpgrade> Upgrades { get; }
     }
 }
