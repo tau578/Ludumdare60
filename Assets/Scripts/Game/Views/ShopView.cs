@@ -26,13 +26,14 @@ namespace Switchboard.Game
         private ShopShelf shelf;
         private GoalProgress goal;
         private Wallet wallet;
+        private MoneyCounterView moneyCounter;
         private long shownCents = -1;
         private float shownFill = -1;
         private bool shownHighlight;
         private bool stale;
 
         /// <param name="found">The team's shop buttons in the scene; exactly 4 are expected.</param>
-        public bool Bind(UpgradeService service, ShopShelf offers, GoalProgress savings, Wallet money, List<UpgradeSlotView> found)
+        public bool Bind(UpgradeService service, ShopShelf offers, GoalProgress savings, Wallet money, List<UpgradeSlotView> found, MoneyCounterView counter = null)
         {
             Unbind();
             if (found == null || found.Count != SlotCount)
@@ -48,6 +49,7 @@ namespace Switchboard.Game
             shelf = offers;
             goal = savings;
             wallet = money;
+            moneyCounter = counter;
             for (int i = 0; i < SlotCount; i++)
             {
                 int slot = i;
@@ -72,6 +74,7 @@ namespace Switchboard.Game
                 clickHandlers[i] = null;
             }
             shelf = null;
+            moneyCounter = null;
         }
 
         private void OnShelfChanged() => stale = true;
@@ -79,8 +82,10 @@ namespace Switchboard.Game
         private void OnSlotClicked(int slot)
         {
             IUpgrade offer = OfferAt(slot);
-            // Too expensive or empty: the button's own press feel only.
-            if (offer == null || upgrades.CanBuy(offer.Id) != PurchaseCheck.Ok) return;
+            if (offer == null) return;
+            PurchaseCheck check = upgrades.CanBuy(offer.Id);
+            if (check == PurchaseCheck.TooExpensive && moneyCounter != null) moneyCounter.ShowInsufficientFunds();
+            if (check != PurchaseCheck.Ok) return;
             upgrades.TryBuy(offer.Id);
         }
 

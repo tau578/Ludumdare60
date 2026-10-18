@@ -65,7 +65,7 @@ namespace Switchboard.Game
                 cordBridge.ColorOf, config.CardStyleFor, syncBoard: cordBridge.Synchronize, counter: moneyCounter);
             PhoneBookView book = FindSingle<PhoneBookView>(scene);
             boardLink = new OpenBoardLink(sockets, book, callQueue, Session.Stats, Session.Board);
-            shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene));
+            shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene), moneyCounter);
             goalPanel.Bind(Session.Goal);
             loopRunner.Bind(Session);
             if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls);
