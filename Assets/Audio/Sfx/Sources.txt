@@ -1,0 +1,49 @@
+COZY SWITCHBOARD SFX - source and processing notes (2026-10-18)
+
+All third-party sounds in this folder are CC0 1.0:
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Kenney - Interface Sounds
+https://kenney.nl/assets/interface-sounds
+Original package: kenney_interface-sounds.zip
+Files: click_003.ogg, switch_001.ogg, switch_002.ogg, toggle_001.ogg,
+close_001.ogg, error_004.ogg. Original license included separately.
+
+Kenney - RPG Audio
+https://kenney.nl/assets/rpg-audio
+Original package: kenney_rpg-audio.zip
+Files: bookOpen.ogg, bookClose.ogg, bookFlip1.ogg, bookFlip2.ogg,
+metalClick.ogg, metalLatch.ogg. Original license included separately.
+
+cookies+policy - Rotary Phone Ring loopable
+https://freesound.org/people/cookies%2Bpolicy/sounds/556499/
+RotaryRingSource.mp3 is the publicly offered HQ MP3 preview:
+https://cdn.freesound.org/previews/556/556499_10713160-hq.mp3
+IncomingRing.wav: first audible 1.1 seconds, mono, low-pass 2600 Hz,
+short attack / 40 ms release, peak normalized to 0.48.
+
+Joao_Janz - Power Cord Plug 1_2
+https://freesound.org/people/Joao_Janz/sounds/477621/
+PlugSource.mp3 is the publicly offered HQ MP3 preview:
+https://cdn.freesound.org/previews/477/477621_9961300-hq.mp3
+PlugInsertWarm.wav: first audible 0.55 seconds, mono, low-pass 4800 Hz,
+short fades, peak 0.60. Acoustic plug/socket recording, not electrical buzz.
+
+Maajora - Unplug
+https://freesound.org/people/Maajora/sounds/432906/
+UnplugSource.mp3 is the publicly offered HQ MP3 preview:
+https://cdn.freesound.org/previews/432/432906_2731617-hq.mp3
+PlugRemoveWarm.wav: first audible 0.42 seconds, mono, low-pass 3800 Hz,
+short fades, peak 0.58. Phone-charger unplugging recording.
+
+Other processed WAVs (mono, silence trimmed, low-pass, short fades, normalized):
+ConnectedRelay.wav <- metalClick.ogg (0.35s, 3000 Hz, peak .44)
+HoldLatch.wav <- metalLatch.ogg (0.32s, 2700 Hz, peak .40)
+ReceiverDown.wav <- close_001.ogg (0.35s, 2400 Hz, peak .46)
+WrongConnection.wav <- switch_002.ogg (0.40s, 3000 Hz, peak .48)
+MenuClick.wav <- click_003.ogg (0.25s, 3000 Hz, peak .44)
+CardTake.wav <- bookFlip2.ogg (0.28s, 3500 Hz, peak .42)
+
+Durations are maxima, limited by the source duration after silence trimming.
+The original imported clips remain here for comparison and future revisions.
+No sound represents implemented emergency-call behavior; that system is pending.

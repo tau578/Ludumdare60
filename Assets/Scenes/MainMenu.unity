@@ -127,6 +127,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7057213394505302225}
     m_Modifications:
+    - target: {fileID: 3209488147982701469, guid: 3a4942889f8570e4cb5a99cc35ed2bdb, type: 3}
+      propertyPath: insertSound
+      value: 
+      objectReference: {fileID: 8300000, guid: 02c0701636190f74a8994761934dc500, type: 3}
+    - target: {fileID: 3209488147982701469, guid: 3a4942889f8570e4cb5a99cc35ed2bdb, type: 3}
+      propertyPath: removeSound
+      value: 
+      objectReference: {fileID: 8300000, guid: 8ae3748b2c6102649b9b7f98238329e7, type: 3}
     - target: {fileID: 4637692620129581332, guid: 3a4942889f8570e4cb5a99cc35ed2bdb, type: 3}
       propertyPath: m_Name
       value: MasterVolumeCableSlider
@@ -988,6 +996,63 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1535270627}
   m_CullTransparentMesh: 1
+--- !u!1001 &1927630340
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 3841172136654036501, guid: db29ef2fe06c30c4d81d839f66ce06e8, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3841172136654036501, guid: db29ef2fe06c30c4d81d839f66ce06e8, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3841172136654036501, guid: db29ef2fe06c30c4d81d839f66ce06e8, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3841172136654036501, guid: db29ef2fe06c30c4d81d839f66ce06e8, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3841172136654036501, guid: db29ef2fe06c30c4d81d839f66ce06e8, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3841172136654036501, guid: db29ef2fe06c30c4d81d839f66ce06e8, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3841172136654036501, guid: db29ef2fe06c30c4d81d839f66ce06e8, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3841172136654036501, guid: db29ef2fe06c30c4d81d839f66ce06e8, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3841172136654036501, guid: db29ef2fe06c30c4d81d839f66ce06e8, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3841172136654036501, guid: db29ef2fe06c30c4d81d839f66ce06e8, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 9002390375668951645, guid: db29ef2fe06c30c4d81d839f66ce06e8, type: 3}
+      propertyPath: m_Name
+      value: BackgroundMusic
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: db29ef2fe06c30c4d81d839f66ce06e8, type: 3}
 --- !u!1001 &2006130689
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1076,10 +1141,34 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3511907543363916341, guid: 3ba5de93c38c6ae4a81195c2ed7e75e0, type: 3}
+      propertyPath: insertSound
+      value: 
+      objectReference: {fileID: 8300000, guid: 02c0701636190f74a8994761934dc500, type: 3}
+    - target: {fileID: 3511907543363916341, guid: 3ba5de93c38c6ae4a81195c2ed7e75e0, type: 3}
+      propertyPath: removeSound
+      value: 
+      objectReference: {fileID: 8300000, guid: 8ae3748b2c6102649b9b7f98238329e7, type: 3}
     - target: {fileID: 3570794494232896124, guid: 3ba5de93c38c6ae4a81195c2ed7e75e0, type: 3}
       propertyPath: m_Name
       value: VolumeCablePanel
       objectReference: {fileID: 0}
+    - target: {fileID: 5673862944624372578, guid: 3ba5de93c38c6ae4a81195c2ed7e75e0, type: 3}
+      propertyPath: insertSound
+      value: 
+      objectReference: {fileID: 8300000, guid: 02c0701636190f74a8994761934dc500, type: 3}
+    - target: {fileID: 5673862944624372578, guid: 3ba5de93c38c6ae4a81195c2ed7e75e0, type: 3}
+      propertyPath: removeSound
+      value: 
+      objectReference: {fileID: 8300000, guid: 8ae3748b2c6102649b9b7f98238329e7, type: 3}
+    - target: {fileID: 7045032297936140971, guid: 3ba5de93c38c6ae4a81195c2ed7e75e0, type: 3}
+      propertyPath: insertSound
+      value: 
+      objectReference: {fileID: 8300000, guid: 02c0701636190f74a8994761934dc500, type: 3}
+    - target: {fileID: 7045032297936140971, guid: 3ba5de93c38c6ae4a81195c2ed7e75e0, type: 3}
+      propertyPath: removeSound
+      value: 
+      objectReference: {fileID: 8300000, guid: 8ae3748b2c6102649b9b7f98238329e7, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1227,6 +1316,10 @@ PrefabInstance:
     - target: {fileID: 2055613923473963024, guid: bdd41d3123a68ee4c8a5c483091673c1, type: 3}
       propertyPath: m_Name
       value: Music_randomizer
+      objectReference: {fileID: 0}
+    - target: {fileID: 2055613923473963024, guid: bdd41d3123a68ee4c8a5c483091673c1, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7197860790244933171, guid: bdd41d3123a68ee4c8a5c483091673c1, type: 3}
       propertyPath: m_Volume
@@ -1427,6 +1520,10 @@ PrefabInstance:
     - target: {fileID: 3621927195907593463, guid: 10d01240acfa80a43a4156c2c78c1063, type: 3}
       propertyPath: m_enableAutoSizing
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4124116371163597375, guid: 10d01240acfa80a43a4156c2c78c1063, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4152928353645378031, guid: 10d01240acfa80a43a4156c2c78c1063, type: 3}
       propertyPath: m_IsActive
@@ -1792,3 +1889,4 @@ SceneRoots:
   - {fileID: 832575519}
   - {fileID: 7057213394505302221}
   - {fileID: 3115015291327057013}
+  - {fileID: 1927630340}
