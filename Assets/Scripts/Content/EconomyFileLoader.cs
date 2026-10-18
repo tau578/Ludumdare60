@@ -105,7 +105,7 @@ namespace Switchboard.Content
             return 0;
         }
 
-        // The team's tray is built with 3 cords, and cords can't be taken away, so a game starts with 3 to 6.
+        // A session starts with 2 to 6 cords; the input inventory is trimmed before binding.
         private static int CheckStartingCords(int cords, List<string> errors)
         {
             const int fallback = StatSheet.DefaultStartingCords;

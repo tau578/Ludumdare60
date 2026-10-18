@@ -487,9 +487,9 @@ namespace Switchboard.Game
 
         private string Noted(JackId? jack) => jack.HasValue ? $" <size={jackTextSize}%>({jack.Value.Label})</size>" : string.Empty;
 
-        // The book is sorted by surname, so the surname stands out.
+        // The book is sorted by given name, so the given name stands out.
         private static string Listed(IPerson person) =>
-            string.IsNullOrEmpty(person.FirstName) ? $"<b>{person.LastName}</b>" : $"{person.FirstName} <b>{person.LastName}</b>";
+            string.IsNullOrEmpty(person.FirstName) ? $"<b>{person.LastName}</b>" : $"<b>{person.FirstName}</b> {person.LastName}";
 
         private Color Ink(CallEndReason reason)
         {

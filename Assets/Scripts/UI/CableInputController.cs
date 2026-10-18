@@ -50,6 +50,30 @@ namespace Switchboard.UI
             handCursor = cursor;
         }
 
+        /// <summary>Called before session binding; only unused tray cords may be removed.</summary>
+        public void LimitStartingCables(int count)
+        {
+            count = Mathf.Clamp(count, 1, MaxCables);
+            if (count >= cables.Length) return;
+            foreach (var cable in cables)
+                if (cable != null && !cable.IsInTray)
+                    throw new System.InvalidOperationException("Starting inventory must be configured before using cords.");
+            for (int i = count; i < cables.Length; i++)
+            {
+                var cable = cables[i];
+                if (cable == null) continue;
+                if (cable.TrayView != null)
+                {
+                    cable.TrayView.gameObject.SetActive(false);
+                    DestroyCopyPart(cable.TrayView.gameObject);
+                }
+                cable.gameObject.SetActive(false);
+                DestroyCopyPart(cable.gameObject);
+            }
+            System.Array.Resize(ref cables, count);
+            LayoutTray();
+        }
+
         /// <summary>Adds a cable at runtime by copying the last one and its tray slot; null when the tray is full.</summary>
         public CableController AddCable(Color color)
         {

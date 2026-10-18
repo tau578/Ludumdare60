@@ -126,9 +126,14 @@ namespace Switchboard.Game
             shownStates[slot] = state;
 
             UpgradeSlotView view = slots[slot];
+            view.SetArtwork(offer?.Kind == UpgradeKind.ExtraWires, offer?.Kind == UpgradeKind.ExtraIncome, offer?.Kind == UpgradeKind.Secret);
+            string title = offer == null ? string.Empty : offer.Kind == UpgradeKind.ExtraWires ? "More Cables"
+                : offer.Kind == UpgradeKind.ExtraClients ? "More Clients"
+                : offer.Kind == UpgradeKind.ExtraIncome ? "More Profit"
+                : offer.Kind == UpgradeKind.Secret ? "??????????" : offer.Name;
             if (state == SlotState.Empty) view.ShowEmpty();
-            else if (state == SlotState.Owned) view.Show(offer.Name, OwnedText, string.Empty, true);
-            else view.Show(offer.Name, offer.Description, MoneyFormat.Dollars(offer.CostCents), state == SlotState.Affordable);
+            else if (state == SlotState.Owned) view.Show(title, OwnedText, string.Empty, true);
+            else view.Show(title, offer.Description, MoneyFormat.Dollars(offer.CostCents), state == SlotState.Affordable);
         }
     }
 }

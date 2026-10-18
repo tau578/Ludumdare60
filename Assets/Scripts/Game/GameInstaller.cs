@@ -32,6 +32,7 @@ namespace Switchboard.Game
             // Board, views and this root share one scene (D38). Views live in other prefabs, so they are found
             // by type at start instead of through serialized links that a scene override could break.
             Scene scene = gameObject.scene;
+            foreach (var skin in LevelScene.FindAll<UpgradeShopSkin>(scene)) skin.Apply();
             MoneyCounterView moneyCounter = FindSingle<MoneyCounterView>(scene);
             CallQueueView callQueue = FindSingle<CallQueueView>(scene);
             ShopView shop = FindSingle<ShopView>(scene);
@@ -47,8 +48,8 @@ namespace Switchboard.Game
             foreach (string error in ContentValidator.ValidateStartingBoard(people.Directory, economy.StartingBoard))
                 Debug.LogError($"People file: {error}", config);
 
-            // Fewer cords than startingCords are added below like bought ones; more can't be taken away.
-            cordBridge.Attach(scene, config.ExtraCordColors);
+            // Trim unused prefab cords before binding; missing starting cords are added below.
+            cordBridge.Attach(scene, config.ExtraCordColors, economy.StartingCords);
             if (cordBridge.CordCount > economy.StartingCords)
                 Debug.LogWarning($"The scene has {cordBridge.CordCount} cords but Economy.json starts with {economy.StartingCords}.", config);
             int seed = randomSeed != 0 ? randomSeed : Random.Range(1, int.MaxValue);

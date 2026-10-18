@@ -12,7 +12,7 @@ namespace Switchboard.Game
     /// <summary>
     /// Every live call has a card over one of the team's caller slots, in arrival order (Design 4.3, 5.4).
     /// When a card leaves, the cards below it slide up. Ended cards keep their slot while the stamp shows.
-    /// Only the open slots take cards (D49); closed ones get a dark cover that lets clicks through.
+    /// Only the open slots take cards (D49); closed slot artwork is hidden without changing the layout.
     /// </summary>
     public sealed class CallQueueView : MonoBehaviour
     {
@@ -21,9 +21,8 @@ namespace Switchboard.Game
         [SerializeField] private RectTransform cardArea;
         [SerializeField, Min(0), Tooltip("How fast cards slide to a new slot; 0 snaps.")]
         private float slideSpeed = 14f;
+        [SerializeField] private Sprite callerFrame;
         [SerializeField] private UiClickSound takeSound;
-        [SerializeField, Tooltip("The cover over a closed caller slot (D49).")]
-        private Color closedSlotCover = new Color(.06f, .05f, .04f, .72f);
 
         private readonly List<CallCardView> pool = new List<CallCardView>();
         private readonly List<CallCardView> shown = new List<CallCardView>();
@@ -39,7 +38,8 @@ namespace Switchboard.Game
         private RectTransform[] slots = new RectTransform[0];
         private Vector2[] slotCentres = new Vector2[0];
         private Vector2[] slotSizes = new Vector2[0];
-        private Graphic[] covers = new Graphic[0];
+        private CanvasGroup[] slotVisibility = new CanvasGroup[0];
+        private Vector2[] preferredSlotSizes = new Vector2[0];
         private int openSlots = -1;
         private Vector3[] slotMin = new Vector3[0];
         private Vector3[] slotMax = new Vector3[0];
@@ -91,7 +91,7 @@ namespace Switchboard.Game
             slots = callerSlots ?? new RectTransform[0];
             slotCentres = new Vector2[slots.Length];
             slotSizes = new Vector2[slots.Length];
-            BuildCovers();
+            BuildSlotVisibility();
             slotMin = new Vector3[slots.Length];
             slotMax = new Vector3[slots.Length];
             BuildPool(Mathf.Max(1, slots.Length));
@@ -109,36 +109,56 @@ namespace Switchboard.Game
             shown.Clear();
         }
 
-        /// <summary>How many slots, from the top, take calls; the rest are covered (D49).</summary>
+        /// <summary>How many slots, from the top, take calls; the rest are hidden (D49).</summary>
         public void SetOpenSlots(int count)
         {
             openSlots = Mathf.Clamp(count, 0, slots.Length);
-            for (int i = 0; i < covers.Length; i++)
-                if (covers[i] != null) covers[i].gameObject.SetActive(i >= openSlots);
+            float scale = openSlots == 6 ? .84f : 1f;
+            for (int i = 0; i < slotVisibility.Length; i++)
+            {
+                if (slotVisibility[i] == null) continue;
+                var layout = slots[i].GetComponent<LayoutElement>();
+                if (layout != null)
+                {
+                    layout.minWidth = layout.preferredWidth = preferredSlotSizes[i].x * scale;
+                    layout.minHeight = layout.preferredHeight = preferredSlotSizes[i].y * scale;
+                }
+                slotVisibility[i].alpha = i < openSlots ? 1 : 0;
+                slotVisibility[i].blocksRaycasts = i < openSlots;
+                slotVisibility[i].interactable = i < openSlots;
+            }
         }
 
         private int OpenSlotCount => openSlots >= 0 ? openSlots : slots.Length;
 
-        // Behind the cards, over the team's slot art; never a raycast target, so cords and cards still get clicks.
-        private void BuildCovers()
+        // Keep each layout cell in place while hiding all artwork of locked slots.
+        private void BuildSlotVisibility()
         {
-            foreach (Graphic cover in covers)
-                if (cover != null) Destroy(cover.gameObject);
-            covers = new Graphic[slots.Length];
-            for (int i = 0; i < covers.Length; i++)
+            slotVisibility = new CanvasGroup[slots.Length];
+            preferredSlotSizes = new Vector2[slots.Length];
+            for (int i = 0; i < slots.Length; i++)
             {
-                // A disc, like the slot's round portrait window.
-                var cover = new GameObject($"ClosedSlotCover {i + 1}", typeof(RectTransform)).AddComponent<CircleGraphic>();
-                cover.transform.SetParent(cardArea, false);
-                cover.transform.SetSiblingIndex(0);
-                cover.color = closedSlotCover;
-                cover.raycastTarget = false;
-                cover.gameObject.SetActive(false);
-                covers[i] = cover;
+                if (slots[i] == null) continue;
+                var layout = slots[i].GetComponent<LayoutElement>();
+                if (layout != null) preferredSlotSizes[i] = new Vector2(layout.preferredWidth, layout.preferredHeight);
+                var group = slots[i].GetComponent<CanvasGroup>();
+                if (group == null) group = slots[i].gameObject.AddComponent<CanvasGroup>();
+                slotVisibility[i] = group;
+                if (callerFrame != null && slots[i].Find("Portrait frame") == null)
+                {
+                    foreach (var old in slots[i].GetComponentsInChildren<Graphic>(true)) old.enabled = false;
+                    var frame = new GameObject("Portrait frame", typeof(RectTransform)).AddComponent<Image>();
+                    frame.transform.SetParent(slots[i], false);
+                    frame.sprite = callerFrame;
+                    frame.raycastTarget = false;
+                    var rect = frame.rectTransform;
+                    rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
+                    rect.offsetMin = new Vector2(-45, -8); rect.offsetMax = new Vector2(10, 8);
+                    frame.preserveAspect = true;
+                }
             }
             openSlots = -1;
         }
-
         private void OnDisable() => Unsubscribe();
 
         private void Unsubscribe()
@@ -300,12 +320,7 @@ namespace Switchboard.Game
                 slotCentres[i] = (min + max) * 0.5f;
                 slotSizes[i] = max - min;
                 if (i == 0) slotSize = slotSizes[i];
-                if (i < covers.Length && covers[i] != null)
-                {
-                    var cover = (RectTransform)covers[i].transform;
-                    cover.sizeDelta = slotSizes[i];
-                    cover.localPosition = slotCentres[i];
-                }
+
             }
             return moved;
         }

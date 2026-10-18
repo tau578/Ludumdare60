@@ -68,15 +68,15 @@ namespace Switchboard.Game.Tests
             Assert.That(book.PageCount, Is.EqualTo(2));
             string[] names =
             {
-                "Dunmore, Mabel", "Godfrey, Irene", "Hollis, Arthur", "Moss, Ada", "Quigley, Bernard", "Rook, Gertrude",
-                "Stanhope, Mildred", "Underhill, Reginald", "Yardley, Lillian"
+                "Ada Moss", "Arthur Hollis", "Bernard Quigley", "Gertrude Rook", "Irene Godfrey", "Lillian Yardley",
+                "Mabel Dunmore", "Mildred Stanhope", "Reginald Underhill"
             };
-            for (int i = 0; i < names.Length; i++) Assert.That(book.ContactAt(i).name, Is.EqualTo(names[i]), "surname order, no services");
+            for (int i = 0; i < names.Length; i++) Assert.That(book.ContactAt(i).name, Is.EqualTo(names[i]), "given-name order, no services");
             Assert.That(book.CanGoForward, Is.False, "two pages make one spread");
             Assert.That(root.transform.Find("Right/Entries/Contact_03").gameObject.activeSelf, Is.True);
             Assert.That(root.transform.Find("Right/Entries/Contact_04").gameObject.activeSelf, Is.False, "the second page has 3 rows");
             Assert.That(book.HasLetter('M'), Is.True);
-            Assert.That(book.HasLetter('V'), Is.False, "Vickery is on C4, still closed");
+            Assert.That(book.HasLetter('E'), Is.False, "Vickery is on C4, still closed");
         }
 
         [Test]
@@ -86,7 +86,7 @@ namespace Switchboard.Game.Tests
             book.SetVisibleSockets(Open(4));
             Assert.That(book.ContactCount, Is.EqualTo(16));
             Assert.That(book.ContactAt(0).name, Is.EqualTo("Doctor"));
-            Assert.That(book.HasLetter('V'), Is.True);
+            Assert.That(book.HasLetter('E'), Is.True);
 
             book.SetVisibleSockets(Open(5));
             Assert.That(book.ContactCount, Is.EqualTo(25));

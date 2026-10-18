@@ -18,6 +18,9 @@ namespace Switchboard.UI
         [SerializeField] private PlugGraphic secondPlug;
         [SerializeField] private StoredCableView trayCableView;
         [SerializeField] private Color cableColor = new Color32(178, 99, 51, 255);
+        [SerializeField] private CableArtwork artwork;
+
+        public void SetArtwork(CableArtwork value) { artwork = value; ApplyColor(); }
 
         [Header("Sound")]
         [SerializeField] private AudioSource audioSource;
@@ -81,6 +84,18 @@ namespace Switchboard.UI
             if (firstPlug != null) firstPlug.SleeveColor = cableColor;
             if (secondPlug != null) secondPlug.SleeveColor = cableColor;
             if (trayCableView != null) trayCableView.SetCableColor(cableColor);
+            if (artwork != null)
+            {
+                var art = artwork.ForColor(cableColor);
+                if (wire != null) wire.ThicknessScale = 1.5f;
+                // Tint only additional colours which have no matching painted variant.
+                Color.RGBToHSV(cableColor, out float hue, out _, out _);
+                Color.RGBToHSV(art.color, out float artHue, out _, out _);
+                Color tint = Mathf.Abs(Mathf.DeltaAngle(hue * 360, artHue * 360)) > 45 ? cableColor : Color.white;
+                if (firstPlug != null) firstPlug.SetArtwork(art.held, art.inserted, tint);
+                if (secondPlug != null) secondPlug.SetArtwork(art.held, art.inserted, tint);
+                if (trayCableView != null) trayCableView.SetArtwork(art.stored, tint);
+            }
         }
 
         public bool TryPickUp()
@@ -166,6 +181,8 @@ namespace Switchboard.UI
             if (wire == null || firstPlug == null || secondPlug == null) return;
             bool firstAttached = FirstSocket != null;
             bool secondAttached = SecondSocket != null;
+            firstPlug.SetInserted(firstAttached);
+            secondPlug.SetInserted(secondAttached);
             bool showFirst = firstAttached || (pointerInside && (Phase == CablePhase.Held || secondAttached));
             bool showSecond = secondAttached || (firstAttached && !secondAttached && pointerInside);
             firstPlug.gameObject.SetActive(showFirst);

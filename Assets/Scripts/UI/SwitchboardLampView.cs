@@ -5,7 +5,7 @@ namespace Switchboard.UI
 {
     /// <summary>
     /// Guides a held plug to the hovered socket's row and column. A lamp whose sockets are all closed (D42) is
-    /// dimmed, bulb and label alike (including a plain-text label), and never lights.
+    /// hidden, bulb and label alike (including a plain-text label), and never lights.
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
@@ -20,8 +20,6 @@ namespace Switchboard.UI
         [SerializeField] private SocketView[] sockets;
         [SerializeField, Tooltip("Show the lit state in Edit Mode to preview the artwork.")]
         private bool previewLit;
-        [SerializeField, Tooltip("How the bulb and label of a closed row or column are tinted (D42).")]
-        private Color dimmedTint = new Color(.35f, .35f, .35f, .7f);
         private Graphic[] graphics;
         private Color[] baseColors;
         private bool dimmed;
@@ -79,7 +77,7 @@ namespace Switchboard.UI
             }
             dimmed = value;
             for (int i = 0; i < graphics.Length; i++)
-                if (graphics[i] != null) graphics[i].color = dimmed ? baseColors[i] * dimmedTint : baseColors[i];
+                if (graphics[i] != null) graphics[i].color = dimmed ? Color.clear : baseColors[i];
         }
 
         private void SetLit(bool lit)

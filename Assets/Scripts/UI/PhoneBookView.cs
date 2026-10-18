@@ -76,8 +76,8 @@ namespace Switchboard.UI
         public void ConfigureTabs(PhoneBookTab[] letterTabs) => tabs = letterTabs;
 
         /// <summary>
-        /// Shows only the contacts whose socket passes the filter (D42: the open board), in file order, so the
-        /// services stay first and the surname order holds. Null shows everyone. Pages and tabs follow the filter.
+        /// Shows only the contacts whose socket passes the filter (D42: the open board), in display order, so the
+        /// services stay first and the given-name order holds. Null shows everyone. Pages and tabs follow the filter.
         /// </summary>
         public void SetVisibleSockets(Predicate<string> isVisible)
         {
@@ -101,19 +101,19 @@ namespace Switchboard.UI
             directory = new PhoneBookConfig { contactsPerPage = allContacts.contactsPerPage, contacts = visible.ToArray() };
         }
 
-        public bool HasLetter(char letter) => FirstContactWithSurname(letter) >= 0;
+        public bool HasLetter(char letter) => FirstContactWithName(letter) >= 0;
 
-        /// <summary>Opens the spread with the first surname starting with the letter; the contacts are sorted by surname.</summary>
+        /// <summary>Opens the spread with the first given name starting with the letter; people are sorted by given name.</summary>
         public bool ShowLetter(char letter)
         {
-            int index = FirstContactWithSurname(letter);
+            int index = FirstContactWithName(letter);
             if (index < 0) return false;
             CurrentSpreadIndex = index / ContactsPerSpread;
             RefreshPages();
             return true;
         }
 
-        private int FirstContactWithSurname(char letter)
+        private int FirstContactWithName(char letter)
         {
             letter = char.ToUpperInvariant(letter);
             for (int i = 0; i < directory.contacts.Length; i++)
@@ -121,8 +121,7 @@ namespace Switchboard.UI
                 var contact = directory.contacts[i];
                 string name = contact.name;
                 bool service = contact.tags != null && System.Array.IndexOf(contact.tags, "emergency-service") >= 0;
-                int initial = service || name.IndexOf(',') >= 0 ? 0 : name.LastIndexOf(' ') + 1;
-                if (char.ToUpperInvariant(name[initial]) == letter) return i;
+                if (!service && char.ToUpperInvariant(name[0]) == letter) return i;
             }
             return -1;
         }
@@ -170,7 +169,7 @@ namespace Switchboard.UI
             foreach (var tab in tabs)
             {
                 if (tab == null) continue;
-                int index = FirstContactWithSurname(tab.Letter);
+                int index = FirstContactWithName(tab.Letter);
                 tab.Show(index >= 0, index >= 0 && index / ContactsPerSpread == CurrentSpreadIndex);
             }
         }

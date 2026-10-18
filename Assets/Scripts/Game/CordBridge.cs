@@ -22,16 +22,27 @@ namespace Switchboard.Game
         private readonly HashSet<SocketView> connectedSockets = new HashSet<SocketView>();
         private CableInputController input;
         private IReadOnlyList<Color> extraColors = new Color[0];
+        private readonly List<Color> deferredColors = new List<Color>();
         private int added;
 
         public int CordCount => cables.Length;
         public event System.Action<CableController> CableAdded;
 
-        public void Attach(Scene scene, IReadOnlyList<Color> extraCordColors)
+        public void Attach(Scene scene, IReadOnlyList<Color> extraCordColors, int startingCords = -1)
         {
             ClearCallHighlights();
+            deferredColors.Clear();
+            added = 0;
+            var originalCables = LevelScene.FindAll<CableController>(scene);
+            originalCables.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+            if (startingCords > 0)
+                for (int i = startingCords; i < originalCables.Count; i++) deferredColors.Add(originalCables[i].CableColor);
+            var initialInputs = LevelScene.FindAll<CableInputController>(scene);
+            if (startingCords > 0 && initialInputs.Count == 1) initialInputs[0].LimitStartingCables(startingCords);
             sockets = LevelScene.FindAll<SocketView>(scene).ToArray();
             List<CableController> found = LevelScene.FindAll<CableController>(scene);
+            found.RemoveAll(cable => !cable.gameObject.activeInHierarchy);
+            foreach (var cable in found) cable.SetCableColor(cable.CableColor);
             found.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
             cables = found.ToArray();
             observed = new CordState[cables.Length];
@@ -49,7 +60,8 @@ namespace Switchboard.Game
             if (input == null) return;
             while (cables.Length < total)
             {
-                Color color = extraColors.Count > 0 ? extraColors[added % extraColors.Count] : Color.white;
+                Color color = added < deferredColors.Count ? deferredColors[added]
+                    : extraColors.Count > 0 ? extraColors[(added - deferredColors.Count) % extraColors.Count] : Color.white;
                 CableController cable = input.AddCable(color);
                 if (cable == null) return;
                 added++;

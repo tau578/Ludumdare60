@@ -10,7 +10,7 @@ namespace Switchboard.Domain
     public sealed class StatSheet
     {
         public const double BaseIncomeMultiplier = 1;
-        public const int DefaultStartingCords = 3;
+        public const int DefaultStartingCords = 2;
 
         // All the team's cord tray holds (5b).
         public const int MaxCords = 6;
