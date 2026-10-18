@@ -4,8 +4,8 @@ A casual telephone switchboard-operator game:
 - The player takes call cards and looks callers up in a phone book.
 - They patch jacks with a limited number of cords.
 - Connected calls pay a one-off connection fee plus a per-second rate.
-- Wrong connections make the caller hang up and call back later.
-- Emergency calls bring fines (later step), but money never drops below 0 and there is no lose condition.
+- Wrong connections make the caller hang up; the same call returns only when the queue comes round to it (D52).
+- A missed emergency brings a fine, but money never drops below 0 and there is no lose condition.
 - The player buys upgrades and saves for a final "mystery upgrade" (the `secret` entry) whose effect is still undecided.
 - The economy is driven by the designer's hand-edited `Assets/Configs/Economy.json` (D39, D40): one-time upgrade entries in chains, values that set the result, costs in cents.
 
@@ -16,7 +16,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), open items (§8) and the step briefs (§9).
 3. `Docs/Design.md`: the source of truth for game rules, architecture and decisions D01–D54. If the code or a brief disagrees with it, stop and ask; don't improvise.
 
-**Next step:** see the first row in `Docs/Progress.md` that isn't "done". As of 2026-10-18, Step 5 is split (D39–D44): **5a** (the designer's `Economy.json`, the shop panel, income upgrades, the secret goal), **5b** (extra wires up to 6 cords, the Notepad) and **5c** (calls, pacing, starting money and cords in `Economy.json`, D47) are done, and so is **7a** (board growth from a 3×3 start, D49). Step 6 (board growth, built as "7a") is done too. **Step 7 (hand-written calls and call queues, D51, D52, D54) and Step 8 (the lookup-only phone book, D53) come next**, then Step 9 (saves, Web build; still an outline, needs D26, hosting), 10 (tutorial), 11 (sound), 12 (mobile and Web polish), 13 (balance). Steps were renumbered on 2026-10-18 to follow the build order; older reports and commits use the old numbers.
+**Next step:** see the first row in `Docs/Progress.md` that isn't "done". As of 2026-10-18, Step 5 is split (D39–D44): **5a** (the designer's `Economy.json`, the shop panel, income upgrades, the secret goal), **5b** (extra wires up to 6 cords, the Notepad) and **5c** (calls, pacing, starting money and cords in `Economy.json`, D47) are done, and so is **7a** (board growth from a 3×3 start, D49). Step 6 (board growth, built as "7a") is done too. Step 7 (hand-written calls and call queues, D51, D52, D54) is done too. **Step 8 (the lookup-only phone book, D53) comes next**, then Step 9 (saves, Web build; still an outline, needs D26, hosting), 10 (tutorial), 11 (sound), 12 (mobile and Web polish), 13 (balance). Steps were renumbered on 2026-10-18 to follow the build order; older reports and commits use the old numbers.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).
@@ -82,7 +82,7 @@ Teammates still push to `main`, so pre-flight always merges first (see the git r
   - Our `GameUI.prefab` is a Screen Space Overlay canvas (sorting order 10, 1920×1080 Expand), laid over the board's `SwitchboardCanvas`.
   - Anything not meant to be clicked has `raycastTarget` off, because his cord input takes the topmost hit. His book is also at sorting order 10, so nothing of ours may overlap it.
   - The money counter fills `HeaderSlot`. The call in hand shows as a speech bubble left of the caller column. Cards sit over the caller slots.
-- **Data:** people, jacks and per-caller overrides live in `PhoneBook.json`; call types (rate, fee and duration ranges) live in ScriptableObjects. Rates and fees are rolled as whole cents when the range allows. Names are English.
+- **Data:** every call (caller name, portrait, message, jacks, pay) is hand-written in the designer's `Assets/Configs/Calls.json` (D51) and played from the queues in `Economy.json` (D52). The book reads `PhoneBook.json` until Step 8 replaces it with `Book.json` (D53). Names are English.
 
 ## Code conventions
 - Match the existing style:

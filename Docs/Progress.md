@@ -14,7 +14,7 @@
 | 5b. Extra wires and Notepad | done | ✅ 2026-10-18 (22 min) | ✅ 333/333 tests, scope clean | ✅ | 667adda |
 | 5c. Calls and pacing into Economy.json | done | ✅ 2026-10-18 (17 min) | ✅ 388/388 tests, scope clean | ✅ | f70b7df |
 | 6. Board growth (built as 7a) | done | ✅ 2026-10-18 (25 min) | ✅ 439/439 tests, scope clean | ✅ | d166ffa |
-| 7. Hand-written calls and queues | playtesting | ✅ 2026-10-18 (36 min) | ✅ 431/431 tests, scope clean | | |
+| 7. Hand-written calls and queues | done | ✅ 2026-10-18 (36 min) | ✅ 431/431 tests, scope clean | ✅ | 8e48320 |
 | 8. The new phone book | not started | | | | |
 | 9. Saves, Boot, Web build | not started | | | | |
 | 10. Tutorial | not started | | | | |
@@ -2294,3 +2294,4 @@ Follow-ups:
   - card styles as two `GameConfig` fields
   - whole-cent fees and fines, and a required `penaltyCents`
 - Committed and pushed on the lead's request (2026-10-18), before the playtest, merged with `f4bdae2` (red bounce on the money counter when an upgrade is too expensive).
+- **Playtest (lead, 2026-10-18):** all good. The deviations listed above are accepted.

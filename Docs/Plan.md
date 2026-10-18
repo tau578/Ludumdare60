@@ -11,7 +11,7 @@ Design: [Design.md](Design.md) · Progress: [Progress.md](Progress.md)
    - Check that Unity is connected, idle, and has a clean console.
    - Make sure the step's decisions (Design §10) are settled, and check the open items (§8) the step could pick up.
    - Refine the step's brief with anything learned so far.
-2. **Build (one implementer agent).** The agent gets the brief, works only through Unity MCP, and returns a report (§7).
+2. **Build (one implementer agent, run at high effort).** The agent gets the brief, works only through Unity MCP, and returns a report (§7).
 3. **Verify (orchestrator).**
    - Re-run all EditMode tests and read the console.
    - Run a Play Mode smoke test and take a screenshot.
@@ -127,6 +127,7 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 - [ ] The report is in `Docs/Progress.md`, including any deviations from Design.md.
 
 ## 6. Launch prompt (orchestrator → agent)
+Launch the agent with the Agent tool (`subagent_type: general-purpose`) at **`effort: "high"`**, unless the lead asks otherwise.
 ```
 You are implementing Step N of the Switchboard Operator game in this Unity project, using the Unity MCP server.
 Read Docs/Design.md, Docs/Plan.md (sections 3–7 and "Step N") and Docs/Progress.md before changing anything.
@@ -194,7 +195,7 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 12 | Mobile and Web polish | Good on phones and desktop browsers |
 | 13 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–7 are built (Step 7 awaits the playtest). Step 8 is fully specified and comes next. Steps 9–13 are outlines; the orchestrator turns each one into a full brief before launching it.
+Steps 1–7 are built. Step 8 is fully specified and comes next. Steps 9–13 are outlines; the orchestrator turns each one into a full brief before launching it.
 
 > **Renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7, 7d → 8, 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11, 9 → 12, 10 → 13. The briefs of done steps, commit messages and older reports keep the numbers they were written with.
 
