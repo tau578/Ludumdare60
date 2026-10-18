@@ -11,7 +11,8 @@ namespace Switchboard.Game
 {
     /// <summary>
     /// Every live call has a card over one of the team's caller slots, in arrival order (Design 4.3, 5.4).
-    /// When a card leaves, the cards below it slide up. Ended cards keep their slot while the stamp shows.
+    /// When a card leaves, the cards below it slide up. Ended cards keep their slot while the stamp shows, so a call
+    /// the queue fills in at once (D52) waits for that stamp before its card appears.
     /// Only the open slots take cards (D49); closed slot artwork is hidden without changing the layout.
     /// </summary>
     public sealed class CallQueueView : MonoBehaviour
@@ -26,14 +27,14 @@ namespace Switchboard.Game
 
         private readonly List<CallCardView> pool = new List<CallCardView>();
         private readonly List<CallCardView> shown = new List<CallCardView>();
+        private readonly List<Call> waitingForSlot = new List<Call>();
         private readonly Vector3[] slotCorners = new Vector3[4];
         private CallService calls;
         private OperatorDesk desk;
         private EarningsService earnings;
         private PenaltyService penalties;
-        private Notepad notepad;
-        private Func<IPerson, Sprite> portraitOf;
-        private Func<ICallerType, CallCardStyle> styleOf;
+        private Func<CallScript, Sprite> portraitOf;
+        private Func<bool, CallCardStyle> styleOf;
         private Func<CordId, Color> cordColorOf;
         private RectTransform[] slots = new RectTransform[0];
         private Vector2[] slotCentres = new Vector2[0];
@@ -73,9 +74,9 @@ namespace Switchboard.Game
         }
 
         public void Bind(CallService callService, OperatorDesk operatorDesk, EarningsService earningsService,
-            PenaltyService penaltyService, RectTransform[] callerSlots, Func<IPerson, Sprite> portraits,
-            Func<CordId, Color> cordColors, Func<ICallerType, CallCardStyle> cardStyles, Notepad notes = null,
-            Action syncBoard = null, MoneyCounterView counter = null)
+            PenaltyService penaltyService, RectTransform[] callerSlots, Func<CallScript, Sprite> portraits,
+            Func<CordId, Color> cordColors, Func<bool, CallCardStyle> cardStyles, Action syncBoard = null,
+            MoneyCounterView counter = null)
         {
             Unsubscribe();
             calls = callService;
@@ -84,7 +85,6 @@ namespace Switchboard.Game
             moneyCounter = counter;
             earnings = earningsService;
             penalties = penaltyService;
-            notepad = notes;
             portraitOf = portraits;
             styleOf = cardStyles;
             cordColorOf = cordColors;
@@ -99,7 +99,6 @@ namespace Switchboard.Game
             calls.CallStateChanged += OnCallStateChanged;
             earnings.ConnectionFeePaid += OnConnectionFeePaid;
             if (penalties != null) penalties.FineApplied += OnFineApplied;
-            if (notepad != null) notepad.Noted += OnNoted;
             foreach (CallCardView card in pool)
             {
                 card.Clicked += OnCardClicked;
@@ -107,6 +106,7 @@ namespace Switchboard.Game
                 card.Hide();
             }
             shown.Clear();
+            waitingForSlot.Clear();
         }
 
         /// <summary>How many slots, from the top, take calls; the rest are hidden (D49).</summary>
@@ -127,6 +127,7 @@ namespace Switchboard.Game
                 slotVisibility[i].blocksRaycasts = i < openSlots;
                 slotVisibility[i].interactable = i < openSlots;
             }
+            ShowWaitingCalls();
         }
 
         private int OpenSlotCount => openSlots >= 0 ? openSlots : slots.Length;
@@ -170,7 +171,6 @@ namespace Switchboard.Game
             }
             if (earnings != null) earnings.ConnectionFeePaid -= OnConnectionFeePaid;
             if (penalties != null) penalties.FineApplied -= OnFineApplied;
-            if (notepad != null) notepad.Noted -= OnNoted;
             foreach (CallCardView card in pool)
             {
                 if (card == null) continue;
@@ -180,7 +180,6 @@ namespace Switchboard.Game
             calls = null;
             earnings = null;
             penalties = null;
-            notepad = null;
         }
 
         private void BuildPool(int size)
@@ -196,24 +195,61 @@ namespace Switchboard.Game
 
         private void OnCallAdded(CallAddedArgs e)
         {
-            // A stamp still showing gives up its slot to a new call.
-            if (shown.Count >= OpenSlotCount) RemoveOldestEnded();
-            CallCardView card = FreeCard();
-            if (card == null)
+            // A stamp still showing keeps its slot; the new call's card appears when the stamp leaves.
+            if (waitingForSlot.Count > 0 || FreeCard() == null)
             {
-                if (!warnedFull) Debug.LogWarning("CallQueueView: more live calls than open caller slots; check the slot values in Economy.json.", this);
-                warnedFull = true;
+                if (!warnedFull && !AnyEnded())
+                {
+                    Debug.LogWarning("CallQueueView: more live calls than open caller slots; check the slot values in Economy.json.", this);
+                    warnedFull = true;
+                }
+                waitingForSlot.Add(e.Call);
                 return;
             }
+            ShowCard(e.Call);
+        }
+
+        private void ShowCard(Call call)
+        {
+            CallCardView card = FreeCard();
             card.ShowDuration = showDurations;
-            CallCardStyle style = styleOf != null ? styleOf(e.Call.Request.Type) : default;
-            card.Show(e.Call, portraitOf?.Invoke(e.Call.Request.CallerPerson), cordColorOf, style);
+            CallCardStyle style = styleOf != null ? styleOf(call.Request.Script.IsEmergency) : default;
+            card.Show(call, portraitOf?.Invoke(call.Request.Script), cordColorOf, style);
             shown.Add(card);
             SnapToSlot(card, shown.Count - 1);
+            DrawUpperCardsOnTop();
             OrderShown?.Invoke(card);
         }
 
-        private void OnCallStateChanged(CallStateChangedArgs e) => CardOf(e.Call)?.Refresh();
+        // Each card's name plate hangs below it into the gap between slots, so a card draws over the one below it.
+        private void DrawUpperCardsOnTop()
+        {
+            for (int i = 0; i < shown.Count; i++) shown[i].transform.SetAsFirstSibling();
+        }
+
+        private void ShowWaitingCalls()
+        {
+            while (waitingForSlot.Count > 0 && FreeCard() != null)
+            {
+                Call call = waitingForSlot[0];
+                waitingForSlot.RemoveAt(0);
+                if (call.State != CallState.Ended) ShowCard(call);
+            }
+        }
+
+        private bool AnyEnded()
+        {
+            foreach (CallCardView card in shown)
+                if (card.Call != null && card.Call.State == CallState.Ended) return true;
+            return false;
+        }
+
+        private void OnCallStateChanged(CallStateChangedArgs e)
+        {
+            // A call that ends before its card could show (the dev panel's clear) never shows.
+            if (e.To == CallState.Ended) waitingForSlot.Remove(e.Call);
+            CardOf(e.Call)?.Refresh();
+        }
 
         private void OnConnectionFeePaid(ConnectionFeePaidArgs e)
         {
@@ -225,11 +261,6 @@ namespace Switchboard.Game
 
         // "Missed -$2.00" names the amount actually taken, which is known only once the fine lands.
         private void OnFineApplied(FineAppliedArgs e) => CardOf(e.Call)?.RefreshStamp();
-
-        private void OnNoted(CallId id)
-        {
-            if (calls != null) CardOf(calls.Find(id))?.ShowNotes();
-        }
 
         private void OnCardClicked(CallCardView clicked)
         {
@@ -251,16 +282,8 @@ namespace Switchboard.Game
         {
             shown.Remove(card);
             card.Hide();
-        }
-
-        private void RemoveOldestEnded()
-        {
-            for (int i = 0; i < shown.Count; i++)
-            {
-                if (shown[i].Call == null || shown[i].Call.State != CallState.Ended) continue;
-                OnCardFinished(shown[i]);
-                return;
-            }
+            DrawUpperCardsOnTop();
+            ShowWaitingCalls();
         }
 
         private CallCardView FreeCard()

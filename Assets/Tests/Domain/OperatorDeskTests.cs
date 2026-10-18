@@ -18,7 +18,7 @@ namespace Switchboard.Domain.Tests
             world = new TestWorld();
             calls = new CallService();
             board = new FakeSwitchboard();
-            desk = new OperatorDesk(calls, new ConnectionRule(world.Directory), board);
+            desk = new OperatorDesk(calls, new ConnectionRule(), board);
         }
 
         private Call TakeAdaWantsBasil()
@@ -128,7 +128,7 @@ namespace Switchboard.Domain.Tests
         {
             Call first = TakeAdaWantsBasil();
             desk.OnPlugInserted(Cord, TestWorld.A1);
-            Call second = calls.Add(new CallRequest(world.Callers[2], world.Ada, 5, 20));
+            Call second = calls.Add(TestWorld.Request(TestWorld.C3, TestWorld.A1, 5, 20));
 
             Assert.That(desk.TryTake(second.Id), Is.True);
 
@@ -197,7 +197,7 @@ namespace Switchboard.Domain.Tests
         {
             Call first = TakeAdaWantsBasil();
             desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.B2);
-            Call second = calls.Add(new CallRequest(world.AdaCaller, world.Clara, 5, 40));
+            Call second = calls.Add(TestWorld.Request(TestWorld.A1, TestWorld.C3, 5, 40));
             desk.TryTake(second.Id);
             desk.OnCircuitClosed(OtherCord, TestWorld.C3, TestWorld.A1);
 

@@ -23,23 +23,7 @@ namespace Switchboard.UI
         private PhoneBookConfig directory = new PhoneBookConfig();
         private Predicate<string> isVisibleSocket;
         private string configError;
-        private bool contactTapsEnabled;
         private readonly List<RaycastResult> pointerHits = new List<RaycastResult>();
-
-        /// <summary>A tapped entry's name and socket, raised only while taps are on.</summary>
-        public event Action<string, string> ContactTapped;
-
-        /// <summary>Off by default: entry taps fall through to page turning.</summary>
-        public bool ContactTapsEnabled
-        {
-            get => contactTapsEnabled;
-            set
-            {
-                contactTapsEnabled = value;
-                if (leftPage != null) leftPage.SetTappable(value);
-                if (rightPage != null) rightPage.SetTappable(value);
-            }
-        }
 
         public bool IsOpen { get; private set; }
         public event System.Action<bool> OpenChanged;
@@ -61,21 +45,7 @@ namespace Switchboard.UI
             previousSpread = previous;
             nextSpread = next;
             ConfigurePageInput();
-            ListenToPages();
         }
-
-        private void ListenToPages()
-        {
-            foreach (var page in new[] { leftPage, rightPage })
-            {
-                if (page == null) continue;
-                page.ContactTapped -= OnContactTapped;
-                page.ContactTapped += OnContactTapped;
-                page.SetTappable(contactTapsEnabled);
-            }
-        }
-
-        private void OnContactTapped(PhoneBookContact contact) => ContactTapped?.Invoke(contact.name, contact.socket);
 
         public void ConfigureTabs(PhoneBookTab[] letterTabs) => tabs = letterTabs;
 
@@ -233,7 +203,6 @@ namespace Switchboard.UI
             closedBook.onClick.AddListener(Toggle);
             ConfigurePageInput();
             foreach (var tab in tabs) if (tab != null) tab.Bind(this);
-            ListenToPages();
             ReloadContacts();
             SetOpen(false);
         }
@@ -242,8 +211,6 @@ namespace Switchboard.UI
         {
             if (closedBook != null) closedBook.onClick.RemoveListener(Toggle);
             foreach (var tab in tabs) if (tab != null) tab.Unbind();
-            if (leftPage != null) leftPage.ContactTapped -= OnContactTapped;
-            if (rightPage != null) rightPage.ContactTapped -= OnContactTapped;
         }
 
         private void Update()

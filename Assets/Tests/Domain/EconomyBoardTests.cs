@@ -6,16 +6,12 @@ using UnityEngine;
 
 namespace Switchboard.Domain.Tests
 {
-    /// <summary>Economy.json's startingBoard, startingClientSlots and extra_clients entries (D49), and the starting-board people check.</summary>
+    /// <summary>Economy.json's startingBoard, startingClientSlots and extra_clients entries (D49, D52).</summary>
     public sealed class EconomyBoardTests
     {
         private const string EconomyFilePath = "Assets/Configs/Economy.json";
 
-        private const string Rest =
-            "'startingCords': 3, " +
-            "'pacing': { 'firstCallDelaySeconds': 2, 'baseIntervalSeconds': 8, 'intervalJitter': 0.3, 'loadFactor': 0.5, 'idleTimeoutSeconds': 60 }, " +
-            "'calls': [ { 'id': 'type.regular', 'name': 'Regular', 'spawnWeight': 1, 'rateCentsPerSecond': { 'min': 3, 'max': 8 }, " +
-            "'feeCents': { 'min': 5, 'max': 15 }, 'durationSeconds': { 'min': 15, 'max': 30 } } ]";
+        private const string Rest = "'startingCords': 3";
 
         private const string Start = "'startingBoard': { 'cols': 3, 'rows': 3 }, 'startingClientSlots': 3";
 
@@ -43,7 +39,7 @@ namespace Switchboard.Domain.Tests
             EconomyCatalog catalog = EconomyFileLoader.Load(AssetDatabase.LoadAssetAtPath<TextAsset>(EconomyFilePath).text);
             Assert.That(catalog.Errors, Is.Empty);
             Assert.That(catalog.StartingBoard, Is.EqualTo(new BoardSize(3, 3)));
-            Assert.That(catalog.StartingClientSlots, Is.EqualTo(3));
+            Assert.That(catalog.StartingClientSlots, Is.EqualTo(2), "D52: two caller slots at the start");
             var boards = new List<IUpgrade>();
             foreach (IUpgrade upgrade in catalog.Upgrades)
                 if (upgrade.Kind == UpgradeKind.ExtraClients) boards.Add(upgrade);
@@ -54,10 +50,11 @@ namespace Switchboard.Domain.Tests
                 Assert.That(boards[i].Id, Is.EqualTo("board_" + (i + 1)));
                 Assert.That(boards[i].Name, Is.EqualTo("Bigger board"));
                 Assert.That(boards[i].BoardSize, Is.EqualTo(new BoardSize(4 + i, 4 + i)));
-                Assert.That(boards[i].ClientSlots, Is.EqualTo(4 + i));
+                Assert.That(boards[i].ClientSlots, Is.EqualTo(3 + i));
+                Assert.That(boards[i].Description, Is.EqualTo($"{4 + i}x{4 + i}, {3 + i} callers"));
                 Assert.That(boards[i].CostCents, Is.EqualTo(costs[i]));
             }
-            Assert.That(catalog.MostClientSlots, Is.EqualTo(6));
+            Assert.That(catalog.MostClientSlots, Is.EqualTo(5));
         }
 
         [Test]
@@ -164,39 +161,6 @@ namespace Switchboard.Domain.Tests
             EconomyCatalog catalog = Load(Board("board_1", 4, 4, 4), Board("board_2", 4, 4, 4));
             Assert.That(catalog.Upgrades.Count, Is.EqualTo(2), "board_1 and the secret");
             Assert.That(catalog.Upgrades[0].Id, Is.EqualTo("board_1"));
-        }
-
-        private static IDirectoryEntry Entry(string first, string last, string jack, params string[] tags) =>
-            new FakeDirectoryEntry(new FakePerson(first, last, tags), jack);
-
-        [Test]
-        public void TheStartingBoardNeedsTwoPeopleWithoutTags()
-        {
-            var small = new BoardSize(3, 3);
-            IDirectoryEntry ada = Entry("Ada", "Moss", "A1"), basil = Entry("Basil", "Thorne", "C3");
-            IDirectoryEntry outside = Entry("Clara", "Whitlock", "D4"), police = Entry("", "Police", "B2", FakeCallerType.ServiceTag);
-
-            Assert.That(ContentValidator.ValidateStartingBoard(new[] { ada, basil, outside }, small), Is.Empty);
-
-            List<string> one = ContentValidator.ValidateStartingBoard(new[] { ada, outside, police }, small);
-            Assert.That(one.Count, Is.EqualTo(1));
-            Assert.That(one[0], Does.Contain("Only 1 person without tags").And.Contain("3x3: rows A to C, columns 1 to 3")
-                .And.Contain("no call could ever ring").And.Contain("startingBoard in Economy.json"));
-
-            List<string> none = ContentValidator.ValidateStartingBoard(new[] { outside, police }, small);
-            Assert.That(none[0], Does.Contain("Nobody without tags"));
-        }
-
-        [Test]
-        public void RecipientsAreJudgedOnTheFullBoard()
-        {
-            // The only service sits outside a 3x3 start; that is fine, because it joins when the board grows.
-            EconomyCatalog catalog = EconomyFileLoader.Load(AssetDatabase.LoadAssetAtPath<TextAsset>(EconomyFilePath).text);
-            string people = ("{ 'contactsPerPage': 6, 'contacts': [ " +
-                "{ 'name': 'Police', 'socket': 'F6', 'tags': ['emergency-service'] }, " +
-                "{ 'name': 'Ada Moss', 'socket': 'A1', 'portrait': 'caller-01', 'type': 'type.regular' }, " +
-                "{ 'name': 'Basil Thorne', 'socket': 'B2', 'portrait': 'caller-01', 'type': 'type.regular' } ] }").Replace('\'', '"');
-            Assert.That(ContentValidator.Validate(people, catalog.CallTypes, null, ContentValidator.BoardJacks()), Is.Empty);
         }
     }
 }

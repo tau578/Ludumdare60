@@ -139,7 +139,7 @@ namespace Switchboard.Domain.Tests
             Assert.That(service.Kinds, Is.EqualTo(new[] { UpgradeKind.ExtraWires, UpgradeKind.ExtraIncome, UpgradeKind.Secret }));
             Assert.That(service.ChainOf(UpgradeKind.ExtraWires).Count, Is.EqualTo(2));
             Assert.That(service.ChainOf(UpgradeKind.ExtraWires)[1].Id, Is.EqualTo("wires_2"));
-            Assert.That(service.ChainOf(UpgradeKind.Notepad), Is.Empty);
+            Assert.That(service.ChainOf(UpgradeKind.ExtraClients), Is.Empty);
         }
     }
 
@@ -268,12 +268,15 @@ namespace Switchboard.Domain.Tests
 
     public sealed class ShopShelfTests
     {
+        // Since the Notepad went (D54) the file has three chains; a fourth, later type keeps the rotation covered.
+        private const UpgradeKind LaterKind = (UpgradeKind)99;
+
         private static readonly IUpgrade[] FourChains =
         {
             FakeUpgrade.Income("income_1", 800, 1.5),
             new FakeUpgrade("wires_1", UpgradeKind.ExtraWires, 500),
             FakeUpgrade.Income("income_2", 2000, 2),
-            new FakeUpgrade("notepad", UpgradeKind.Notepad, 300),
+            new FakeUpgrade("later_1", LaterKind, 300),
             new FakeUpgrade("secret", UpgradeKind.Secret, 25000),
             new FakeUpgrade("clients_1", UpgradeKind.ExtraClients, 1000),
             new FakeUpgrade("wires_2", UpgradeKind.ExtraWires, 800)
@@ -300,14 +303,14 @@ namespace Switchboard.Domain.Tests
 
         [Test]
         public void ChainsArePlacedInFileOrderAndTheSecretIsNeverShelved() =>
-            Assert.That(Offers(), Is.EqualTo(new[] { "income_1", "wires_1", "notepad" }));
+            Assert.That(Offers(), Is.EqualTo(new[] { "income_1", "wires_1", "later_1" }));
 
         [Test]
         public void ABoughtOutSlotTakesTheNextChainWhileTheOthersStay()
         {
             upgrades.TryBuy("wires_1");
-            Assert.That(Offers(), Is.EqualTo(new[] { "income_1", "wires_2", "notepad" }));
-            upgrades.TryBuy("notepad");
+            Assert.That(Offers(), Is.EqualTo(new[] { "income_1", "wires_2", "later_1" }));
+            upgrades.TryBuy("later_1");
             Assert.That(Offers(), Is.EqualTo(new[] { "income_1", "wires_2", "clients_1" }));
             Assert.That(changes, Is.EqualTo(2));
         }
@@ -315,7 +318,7 @@ namespace Switchboard.Domain.Tests
         [Test]
         public void SlotsGoEmptyWhenNothingIsLeft()
         {
-            foreach (string id in new[] { "income_1", "income_2", "wires_1", "wires_2", "notepad", "clients_1", "secret" })
+            foreach (string id in new[] { "income_1", "income_2", "wires_1", "wires_2", "later_1", "clients_1", "secret" })
                 Assert.That(upgrades.TryBuy(id), Is.True, id);
             Assert.That(Offers(), Is.EqualTo(new string[] { null, null, null }));
             Assert.That(shelf.TryGetKind(0, out _), Is.False);
@@ -325,16 +328,16 @@ namespace Switchboard.Domain.Tests
         public void BuyingTheSecretMovesNoSlot()
         {
             upgrades.TryBuy("secret");
-            Assert.That(Offers(), Is.EqualTo(new[] { "income_1", "wires_1", "notepad" }));
+            Assert.That(Offers(), Is.EqualTo(new[] { "income_1", "wires_1", "later_1" }));
         }
 
         [Test]
         public void RebuildPutsTheShelfBackAfterTheBoughtIdsAreCleared()
         {
-            upgrades.TryBuy("notepad");
+            upgrades.TryBuy("later_1");
             upgrades.ClearOwned();
             shelf.Rebuild();
-            Assert.That(Offers(), Is.EqualTo(new[] { "income_1", "wires_1", "notepad" }));
+            Assert.That(Offers(), Is.EqualTo(new[] { "income_1", "wires_1", "later_1" }));
         }
 
         [Test]
@@ -423,7 +426,7 @@ namespace Switchboard.Domain.Tests
         public void ASessionWithNoUpgradesStillTicks()
         {
             var world = new TestWorld();
-            var session = new GameSession(world.Content, new SeededRandom(3), new FakeSwitchboard());
+            var session = new GameSession(world.Content, new FakeSwitchboard());
             for (int frame = 0; frame < 200; frame++) session.Tick(0.05);
             Assert.That(session.Calls.Live.Count, Is.GreaterThan(0));
             Assert.That(session.Stats.IncomeMultiplier, Is.EqualTo(1));
@@ -438,7 +441,7 @@ namespace Switchboard.Domain.Tests
             var world = new TestWorld();
             world.Content.StartingCents = 30000;
             world.Content.Upgrades = FakeUpgrade.PlaceholderShop();
-            var session = new GameSession(world.Content, new SeededRandom(21), new FakeSwitchboard());
+            var session = new GameSession(world.Content, new FakeSwitchboard());
             int affordable = 0;
             session.Goal.GoalAffordable += () => affordable++;
             session.Tick(0.05);

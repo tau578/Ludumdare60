@@ -6,7 +6,8 @@ using UnityEngine;
 namespace Switchboard.Content
 {
     /// <summary>
-    /// Parses and validates the people file (D31). Invalid entries are left out and reported in plain words,
+    /// Parses and validates the people file (D31). Since Step 7 only the book's fields matter (name, socket, tags);
+    /// calls carry their own portrait, jacks and pay (D51). Invalid entries are left out and reported in plain words,
     /// because the designer edits the file by hand.
     /// </summary>
     public static class PeopleFileLoader
@@ -14,14 +15,11 @@ namespace Switchboard.Content
         /// <summary>Entries with this tag are emergency services (D36): listed and reachable, but they never call.</summary>
         public const string ServiceTag = "emergency-service";
 
-        /// <param name="hasPortrait">Null skips the portrait check.</param>
         /// <param name="boardJacks">The jack labels on the board; null skips the on-board check.</param>
-        public static PeopleCatalog Load(string json, IReadOnlyList<ICallerType> callerTypes,
-            Func<string, bool> hasPortrait, IEnumerable<string> boardJacks)
+        public static PeopleCatalog Load(string json, IEnumerable<string> boardJacks)
         {
             var errors = new List<string>();
             var people = new List<IPerson>();
-            var callers = new List<ICaller>();
             var directory = new List<IDirectoryEntry>();
 
             PeopleFileData data = Parse(json, errors);
@@ -31,10 +29,9 @@ namespace Switchboard.Content
                 var jackOwners = new Dictionary<string, string>(StringComparer.Ordinal);
                 var ids = new HashSet<string>(StringComparer.Ordinal);
                 for (int i = 0; i < data.contacts.Length; i++)
-                    Add(i, data.contacts[i], callerTypes, hasPortrait, board, jackOwners, ids, errors, people, callers, directory);
-                AddEveryoneCallers(callerTypes, people, callers);
+                    Add(i, data.contacts[i], board, jackOwners, ids, errors, people, directory);
             }
-            return new PeopleCatalog(people, callers, directory, errors);
+            return new PeopleCatalog(people, directory, errors);
         }
 
         public static string PersonId(string name)
@@ -78,9 +75,8 @@ namespace Switchboard.Content
             return data;
         }
 
-        private static void Add(int index, PeopleFileContact contact, IReadOnlyList<ICallerType> callerTypes,
-            Func<string, bool> hasPortrait, HashSet<string> board, Dictionary<string, string> jackOwners,
-            HashSet<string> ids, List<string> errors, List<IPerson> people, List<ICaller> callers, List<IDirectoryEntry> directory)
+        private static void Add(int index, PeopleFileContact contact, HashSet<string> board, Dictionary<string, string> jackOwners,
+            HashSet<string> ids, List<string> errors, List<IPerson> people, List<IDirectoryEntry> directory)
         {
             string[] words = Words(contact?.name);
             if (words.Length == 0)
@@ -104,47 +100,15 @@ namespace Switchboard.Content
             string id = PersonId(name);
             if (!ids.Add(id)) errors.Add($"{where}: this name is listed twice. Every name must be different.");
 
-            // Services need no portrait or type: they only receive calls.
-            ICallerType type = null;
-            if (!service)
-            {
-                if (hasPortrait != null && !hasPortrait(contact.portrait))
-                    errors.Add($"{where}: portrait '{contact.portrait}' is not in GameConfig's portrait list. " +
-                        "Use a portrait name from that list, such as caller-01.");
-                type = FindType(callerTypes, contact.type);
-                if (type == null)
-                    errors.Add($"{where}: call type '{contact.type}' is unknown. Use one of: {TypeIds(callerTypes)}.");
-            }
-            if (contact.rate < 0 || contact.fee < 0)
-                errors.Add($"{where}: rate and fee must not be negative. Use 0 to take the call type's own values.");
             if (errors.Count > errorsBefore) return;
 
             // A service's whole name is its listing, so "Fire Brigade" is not filed under Brigade.
             SplitName(name, out string firstName, out string lastName);
             if (service) { firstName = string.Empty; lastName = name; }
-            var person = new PersonRecord(id, firstName, lastName, contact.portrait, Tags(contact.tags));
+            var person = new PersonRecord(id, firstName, lastName, Tags(contact.tags));
             people.Add(person);
-            if (type != null) callers.Add(new CallerRecord(CallerId(id), person, type, contact.rate, contact.fee));
             directory.Add(new DirectoryRecord(person, jack));
         }
-
-        // For a type every person can place, such as an emergency, each untagged person also gets a caller of it.
-        private static void AddEveryoneCallers(IReadOnlyList<ICallerType> callerTypes, List<IPerson> people, List<ICaller> callers)
-        {
-            if (callerTypes == null) return;
-            foreach (ICallerType type in callerTypes)
-            {
-                if (type == null || !type.EveryoneCalls) continue;
-                foreach (IPerson person in people)
-                    if (person.Tags.Count == 0)
-                        callers.Add(new CallerRecord(CallerId(person.Id) + "." + TypeSlug(type.Id), person, type, 0, 0));
-            }
-        }
-
-        private static string CallerId(string personId) => "caller." + personId.Substring("person.".Length);
-
-        private static string TypeSlug(string typeId) =>
-            typeId != null && typeId.StartsWith("type.", StringComparison.Ordinal) ? typeId.Substring("type.".Length) : typeId;
 
         private static IReadOnlyList<string> Tags(string[] tags)
         {
@@ -161,23 +125,6 @@ namespace Switchboard.Content
             foreach (string each in tags)
                 if (each != null && string.Equals(each.Trim(), tag, StringComparison.Ordinal)) return true;
             return false;
-        }
-
-        private static ICallerType FindType(IReadOnlyList<ICallerType> callerTypes, string id)
-        {
-            if (callerTypes == null || string.IsNullOrEmpty(id)) return null;
-            for (int i = 0; i < callerTypes.Count; i++)
-                if (callerTypes[i] != null && string.Equals(callerTypes[i].Id, id, StringComparison.Ordinal)) return callerTypes[i];
-            return null;
-        }
-
-        private static string TypeIds(IReadOnlyList<ICallerType> callerTypes)
-        {
-            var ids = new List<string>();
-            if (callerTypes != null)
-                foreach (ICallerType type in callerTypes)
-                    if (type != null && !string.IsNullOrEmpty(type.Id)) ids.Add(type.Id);
-            return ids.Count > 0 ? string.Join(", ", ids) : "(Economy.json has no usable call types)";
         }
 
         private static void SplitName(string name, out string firstName, out string lastName)

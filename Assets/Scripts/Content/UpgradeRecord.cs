@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Switchboard.Domain;
 
 namespace Switchboard.Content
@@ -27,5 +29,8 @@ namespace Switchboard.Content
         public int Wires { get; }
         public BoardSize BoardSize { get; }
         public int ClientSlots { get; }
+
+        // Resolved after the whole file is read, because the pools refer to Calls.json.
+        public IReadOnlyList<CallScript> StagePool { get; internal set; } = Array.Empty<CallScript>();
     }
 }

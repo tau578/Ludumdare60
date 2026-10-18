@@ -7,9 +7,10 @@ using UnityEngine;
 namespace Switchboard.Content
 {
     /// <summary>
-    /// Parses and checks the designer's economy file (D39, D40, D47, D49; Design 6.4): starting money, cords, board
-    /// and caller slots, pacing, call types and upgrades. An entry with a problem is left out, and a bad starting or pacing value falls back to
-    /// its default; each is reported in plain words naming the entry and the fix, and the game still starts.
+    /// Parses and checks the designer's economy file (D39, D40, D47, D49, D52; Design 6.4): starting money, cords,
+    /// board and caller slots, the call queues and upgrades. An entry with a problem is left out, and a bad starting
+    /// value falls back to its default; each is reported in plain words naming the entry and the fix, and the game
+    /// still starts.
     /// </summary>
     public static class EconomyFileLoader
     {
@@ -19,23 +20,20 @@ namespace Switchboard.Content
         {
             new TypeInfo("extra_income", UpgradeKind.ExtraIncome),
             new TypeInfo("extra_wires", UpgradeKind.ExtraWires),
-            new TypeInfo("notepad", UpgradeKind.Notepad),
             new TypeInfo("extra_clients", UpgradeKind.ExtraClients),
             new TypeInfo("secret", UpgradeKind.Secret)
         };
 
-        private static readonly FloatRange DefaultCallbackDelay = new FloatRange(20, 40);
-
-        public static EconomyCatalog Load(string json)
+        /// <param name="calls">Calls.json, which the pools refer to; null skips the pools and their checks.</param>
+        public static EconomyCatalog Load(string json, CallsCatalog calls = null)
         {
             var errors = new List<string>();
             var upgrades = new List<IUpgrade>();
-            var callTypes = new List<ICallerType>();
+            IReadOnlyList<CallScript> startPool = Array.Empty<CallScript>();
             long startingCents = 0;
             int startingCords = StatSheet.DefaultStartingCords;
             BoardSize startingBoard = BoardSize.Full;
             int startingClientSlots = StatSheet.MaxClientSlots;
-            IPacingProfile pacing = PacingSettings.Default;
             EconomyFileData data = Parse(json, errors);
             if (data != null)
             {
@@ -43,25 +41,101 @@ namespace Switchboard.Content
                 startingCords = CheckStartingCords(data.startingCords, errors);
                 startingBoard = CheckStartingBoard(data.startingBoard, errors);
                 startingClientSlots = CheckStartingClientSlots(data.startingClientSlots, errors);
-                pacing = CheckPacing(data.pacing, errors);
-                CheckCalls(data.calls, callTypes, errors);
+                CheckRemovedSections(data, errors);
 
                 var ids = new Dictionary<string, int>(StringComparer.Ordinal);
                 var lastInChain = new Dictionary<UpgradeKind, UpgradeRecord>();
                 var rules = new ChainRules(startingCords, startingBoard, startingClientSlots);
+                var stageEntries = new List<KeyValuePair<UpgradeRecord, UpgradeEntry>>();
                 for (int i = 0; i < data.upgrades.Length; i++)
                 {
                     UpgradeRecord record = Check(i, data.upgrades[i], ids, lastInChain, rules, errors);
                     if (record == null) continue;
                     upgrades.Add(record);
                     lastInChain[record.Kind] = record;
+                    if (record.Kind == UpgradeKind.ExtraClients)
+                        stageEntries.Add(new KeyValuePair<UpgradeRecord, UpgradeEntry>(record, data.upgrades[i]));
                 }
                 if (rules.SecretAt < 0)
                     errors.Add("There is no secret upgrade. Add exactly one entry with \"type\": \"secret\": " +
                         "the most expensive one, which the player saves for.");
+                if (calls != null)
+                {
+                    startPool = CheckPool("startPool", "startPool", data.startPool, startingBoard, "the startingBoard",
+                        startingClientSlots, "startingClientSlots", calls, errors);
+                    foreach (KeyValuePair<UpgradeRecord, UpgradeEntry> stage in stageEntries)
+                    {
+                        UpgradeRecord record = stage.Key;
+                        string where = $"Upgrade \"{record.Id}\"";
+                        record.StagePool = CheckPool(where + ": stagePool", "stagePool", stage.Value.stagePool, record.BoardSize,
+                            record.Id, record.ClientSlots, record.Id + "'s clientSlots", calls, errors);
+                    }
+                }
             }
-            return new EconomyCatalog(startingCents, startingCords, startingBoard, startingClientSlots, pacing, callTypes,
-                upgrades, errors);
+            return new EconomyCatalog(startingCents, startingCords, startingBoard, startingClientSlots, startPool, upgrades, errors);
+        }
+
+        /// <summary>
+        /// Resolves a pool's call ids. Unknown calls and calls with a jack outside the stage's board are left out, because
+        /// the player could never connect them; the queue plays the rest in order.
+        /// </summary>
+        private static IReadOnlyList<CallScript> CheckPool(string where, string field, string[] ids, BoardSize board,
+            string boardName, int slots, string slotsName, CallsCatalog calls, List<string> errors)
+        {
+            const string example = "[ \"call_001\", \"call_002\" ]";
+            if (ids == null)
+            {
+                errors.Add($"{where} is missing. Add the call ids from Calls.json this stage plays in order, such as \"{field}\": {example}.");
+                return Array.Empty<CallScript>();
+            }
+            if (ids.Length == 0)
+            {
+                errors.Add($"{where} is empty, so no calls would ring. Add call ids from Calls.json, such as {example}.");
+                return Array.Empty<CallScript>();
+            }
+            var pool = new List<CallScript>(ids.Length);
+            var distinct = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string raw in ids)
+            {
+                string id = raw?.Trim() ?? string.Empty;
+                CallScript call = calls.Find(id);
+                if (id.Length == 0)
+                    errors.Add($"{where} has an empty call id. Remove it or type the id of a call in Calls.json.");
+                else if (call == null && calls.IsLeftOut(id))
+                    errors.Add($"{where}: {id} has a problem in Calls.json (see the Calls file messages), so it is left out of the queue.");
+                else if (call == null)
+                    errors.Add($"{where}: {id} is not in Calls.json. Check the spelling, or add the call to Calls.json.");
+                else if (!board.Contains(call.From) || !board.Contains(call.To))
+                {
+                    JackId outside = board.Contains(call.From) ? call.To : call.From;
+                    errors.Add($"{where}: {id} uses {outside}, but {boardName} opens only {board}. The player could never connect it, " +
+                        "so it is left out. Move it to the pool of a bigger board, or give it jacks on this one.");
+                }
+                else
+                {
+                    pool.Add(call);
+                    distinct.Add(id);
+                }
+            }
+            if (pool.Count > 0 && distinct.Count < slots)
+            {
+                int empty = slots - distinct.Count;
+                errors.Add($"{where} has {distinct.Count} different call{(distinct.Count == 1 ? "" : "s")} for {slots} caller slots " +
+                    $"({slotsName}), so {empty} slot{(empty == 1 ? "" : "s")} would stay empty. A note only: add more calls if you want every slot busy.");
+            }
+            else if (pool.Count == 0)
+                errors.Add($"{where} has no usable calls, so no calls would ring at this stage. Fix the calls named above.");
+            return pool;
+        }
+
+        private static void CheckRemovedSections(EconomyFileData data, List<string> errors)
+        {
+            if (data.pacing != null && data.pacing.IsPresent)
+                errors.Add("The pacing section is no longer used: calls now come from the queues (startPool and each " +
+                    "extra_clients's stagePool). Remove the section.");
+            if (data.calls != null)
+                errors.Add("The calls section (call types) is no longer used: every call is written in Calls.json. " +
+                    "Remove the section.");
         }
 
         public static string KnownTypes()
@@ -151,139 +225,6 @@ namespace Switchboard.Content
             return all;
         }
 
-        private static IPacingProfile CheckPacing(PacingEntry entry, List<string> errors)
-        {
-            PacingSettings fallback = PacingSettings.Default;
-            if (entry == null || float.IsNaN(entry.firstCallDelaySeconds) && float.IsNaN(entry.baseIntervalSeconds) &&
-                float.IsNaN(entry.intervalJitter) && float.IsNaN(entry.loadFactor) && float.IsNaN(entry.idleTimeoutSeconds))
-            {
-                errors.Add("There is no pacing section, so the game uses the default pacing: " +
-                    $"firstCallDelaySeconds {Number(fallback.FirstCallDelaySeconds)}, baseIntervalSeconds {Number(fallback.BaseIntervalSeconds)}, " +
-                    $"intervalJitter {Number(fallback.IntervalJitter)}, loadFactor {Number(fallback.LoadFactor)}, " +
-                    $"idleTimeoutSeconds {Number(fallback.IdleTimeoutSeconds)}. Add the section; see Docs/EconomyFile.md.");
-                return fallback;
-            }
-            return new PacingSettings(
-                PacingValue(entry.firstCallDelaySeconds, "firstCallDelaySeconds", fallback.FirstCallDelaySeconds, 0, null, errors),
-                PacingValue(entry.baseIntervalSeconds, "baseIntervalSeconds", fallback.BaseIntervalSeconds, 0.1, null, errors),
-                PacingValue(entry.intervalJitter, "intervalJitter", fallback.IntervalJitter, 0, 0.95, errors),
-                PacingValue(entry.loadFactor, "loadFactor", fallback.LoadFactor, 0, null, errors),
-                PacingValue(entry.idleTimeoutSeconds, "idleTimeoutSeconds", fallback.IdleTimeoutSeconds, 0, null, errors));
-        }
-
-        // A float widens to double exactly as the old asset did, so the same file plays the same.
-        private static double PacingValue(float value, string field, double fallback, double lowest, double? highest, List<string> errors)
-        {
-            string instead = $"The game uses {Number(fallback)} for now.";
-            if (float.IsNaN(value))
-                errors.Add($"pacing: {field} is missing. Add \"{field}\": {Number(fallback)}. {instead}");
-            else if (highest.HasValue && (value < lowest || value > highest.Value))
-                errors.Add($"pacing: {field} {Number(value)} is outside {Number(lowest)} to {Number(highest.Value)}. " +
-                    $"Use a value such as {Number(fallback)}. {instead}");
-            else if (value < lowest)
-                errors.Add(lowest == 0
-                    ? $"pacing: {field} {Number(value)} is negative. Use 0 or more. {instead}"
-                    : $"pacing: {field} {Number(value)} is below {Number(lowest)}. Use {Number(lowest)} or more. {instead}");
-            else return value;
-            return fallback;
-        }
-
-        private static void CheckCalls(CallEntry[] entries, List<ICallerType> callTypes, List<string> errors)
-        {
-            if (entries == null || entries.Length == 0)
-            {
-                errors.Add("The calls section is missing or empty, so no calls would ring. Add \"calls\": [ ... ] with at least " +
-                    "one call type, such as type.regular; see Docs/EconomyFile.md.");
-                return;
-            }
-            var ids = new Dictionary<string, int>(StringComparer.Ordinal);
-            bool anySpawns = false;
-            for (int i = 0; i < entries.Length; i++)
-            {
-                CallTypeRecord record = CheckCall(i, entries[i], ids, errors);
-                if (record == null) continue;
-                callTypes.Add(record);
-                if (record.SpawnWeight > 0) anySpawns = true;
-            }
-            if (!anySpawns)
-                errors.Add("No call type has a spawnWeight above 0, so no calls would ever ring. Give one a weight, such as 1.");
-        }
-
-        private static CallTypeRecord CheckCall(int index, CallEntry entry, Dictionary<string, int> ids, List<string> errors)
-        {
-            string id = entry?.id?.Trim() ?? string.Empty;
-            string where = id.Length == 0 ? $"Call type {index + 1}" : $"Call type {index + 1} \"{id}\"";
-            if (entry == null)
-            {
-                errors.Add($"{where} is empty. Fill it in or remove it.");
-                return null;
-            }
-            int errorsBefore = errors.Count;
-
-            if (id.Length == 0)
-                errors.Add($"{where}: the id is empty. Give it an id such as type.vip; the people file's \"type\" uses it.");
-            else if (ids.TryGetValue(id, out int first))
-                errors.Add($"{where}: this id is already used by call type {first + 1}. Every id must be different.");
-            else ids.Add(id, index);
-
-            if (string.IsNullOrWhiteSpace(entry.name))
-                errors.Add($"{where}: the name is empty. Type a short name, such as \"Regular\".");
-            if (float.IsNaN(entry.spawnWeight))
-                errors.Add($"{where}: spawnWeight is missing. Add how often this type rings compared with the others, " +
-                    "such as \"spawnWeight\": 1.");
-            else if (entry.spawnWeight < 0)
-                errors.Add($"{where}: spawnWeight {Number(entry.spawnWeight)} is negative. Use 0 or more; 0 means it never rings.");
-
-            FloatRange rate = Range(where, "rateCentsPerSecond", entry.rateCentsPerSecond, null, false, "{ \"min\": 3, \"max\": 8 }", errors);
-            FloatRange fee = Range(where, "feeCents", entry.feeCents, null, false, "{ \"min\": 5, \"max\": 15 }", errors);
-            FloatRange duration = Range(where, "durationSeconds", entry.durationSeconds, null, true, "{ \"min\": 15, \"max\": 30 }", errors);
-            FloatRange callback = Range(where, "callbackDelaySeconds", entry.callbackDelaySeconds, DefaultCallbackDelay, false,
-                "{ \"min\": 20, \"max\": 40 }", errors);
-            NotNegative(where, "responseTimeSeconds", entry.responseTimeSeconds, errors);
-            NotNegative(where, "fineMissedCents", entry.fineMissedCents, errors);
-            NotNegative(where, "fineEarlyDisconnectCents", entry.fineEarlyDisconnectCents, errors);
-            NotNegative(where, "maxSimultaneous", entry.maxSimultaneous, errors);
-            if (errors.Count > errorsBefore) return null;
-
-            return new CallTypeRecord(id, entry.name.Trim(), entry.spawnWeight, rate, fee, duration, callback)
-            {
-                ResponseTimeSeconds = entry.responseTimeSeconds,
-                FineMissedCents = entry.fineMissedCents,
-                FineEarlyDisconnectCents = entry.fineEarlyDisconnectCents,
-                CallbackAfterMiss = entry.callbackAfterMiss,
-                CallbackAfterDisconnect = entry.callbackAfterDisconnect,
-                MaxSimultaneous = entry.maxSimultaneous,
-                EveryoneCalls = entry.everyoneCalls,
-                RecipientTag = entry.recipientTag?.Trim() ?? string.Empty
-            };
-        }
-
-        /// <param name="fallback">Used when the file leaves the range out; null makes the range required.</param>
-        private static FloatRange Range(string where, string field, RangeEntry range, FloatRange? fallback, bool aboveZero,
-            string example, List<string> errors)
-        {
-            if (range == null || range.IsMissing)
-            {
-                if (fallback.HasValue) return fallback.Value;
-                errors.Add($"{where}: {field} is missing. Add it as \"{field}\": {example}.");
-                return default;
-            }
-            if (range.IsPartial)
-                errors.Add($"{where}: {field} needs both a min and a max, such as {example}.");
-            else if (range.min > range.max)
-                errors.Add($"{where}: {field} min {Number(range.min)} is above its max {Number(range.max)}. Swap them.");
-            else if (aboveZero && range.min <= 0)
-                errors.Add($"{where}: {field} min {Number(range.min)} must be above 0. Raise it.");
-            else if (range.min < 0)
-                errors.Add($"{where}: {field} min {Number(range.min)} is negative. Use 0 or more.");
-            return new FloatRange(range.min, range.max);
-        }
-
-        private static void NotNegative(string where, string field, double value, List<string> errors)
-        {
-            if (value < 0) errors.Add($"{where}: {field} {Number(value)} is negative. Use 0 or more; 0 means off.");
-        }
-
         private static UpgradeRecord Check(int index, UpgradeEntry entry, Dictionary<string, int> ids,
             Dictionary<UpgradeKind, UpgradeRecord> lastInChain, ChainRules rules, List<string> errors)
         {
@@ -309,6 +250,11 @@ namespace Switchboard.Content
             if (entry.costCents <= 0)
                 errors.Add($"{where}: costCents is {entry.costCents}. Give a price in cents above 0, such as 800 for $8.00.");
 
+            if (string.Equals(entry.type?.Trim(), "notepad", StringComparison.Ordinal))
+            {
+                errors.Add($"{where}: the notepad upgrade is no longer used, so this entry is left out. Remove it from the file.");
+                return null;
+            }
             TypeInfo type = FindType(entry.type);
             if (type == null)
             {
@@ -355,12 +301,6 @@ namespace Switchboard.Content
                 if (rules.SecretAt >= 0)
                     errors.Add($"{where}: there is already a secret upgrade (upgrade {rules.SecretAt + 1}). Keep exactly one secret entry.");
                 else rules.SecretAt = index;
-            }
-            if (type.Kind == UpgradeKind.Notepad && errors.Count == errorsBefore)
-            {
-                if (rules.NotepadAt >= 0)
-                    errors.Add($"{where}: there is already a notepad (upgrade {rules.NotepadAt + 1}). Keep at most one notepad entry.");
-                else rules.NotepadAt = index;
             }
             if (errors.Count > errorsBefore) return null;
             return new UpgradeRecord(id, type.Kind, entry.name.Trim(), entry.description?.Trim() ?? string.Empty,
@@ -456,7 +396,6 @@ namespace Switchboard.Content
             public BoardSize StartingBoard { get; }
             public int StartingClientSlots { get; }
             public int SecretAt { get; set; } = -1;
-            public int NotepadAt { get; set; } = -1;
         }
 
         private sealed class TypeInfo

@@ -3,15 +3,13 @@ using NUnit.Framework;
 
 namespace Switchboard.Domain.Tests
 {
-    /// <summary>Fines by end reason, the zero floor and the callback flags (Design 5.3, 5.5; D10, D37).</summary>
+    /// <summary>Only a missed emergency is fined, its own penaltyCents, never below zero (Design 5.5; D37, D51).</summary>
     public sealed class PenaltyServiceTests
     {
         private EmergencyWorld world;
         private CallService calls;
         private Wallet wallet;
         private PenaltyService penalties;
-        private GameClock clock;
-        private CallbackScheduler callbacks;
         private OperatorDesk desk;
         private List<FineAppliedArgs> fines;
 
@@ -21,9 +19,7 @@ namespace Switchboard.Domain.Tests
             calls = new CallService();
             wallet = new Wallet(cents);
             penalties = new PenaltyService(calls, wallet);
-            clock = new GameClock();
-            callbacks = new CallbackScheduler(calls, clock, new SeededRandom(9), () => 6);
-            desk = new OperatorDesk(calls, new ConnectionRule(world.Directory), new FakeSwitchboard());
+            desk = new OperatorDesk(calls, new ConnectionRule(), new FakeSwitchboard());
             fines = new List<FineAppliedArgs>();
             penalties.FineApplied += fines.Add;
         }
@@ -32,11 +28,11 @@ namespace Switchboard.Domain.Tests
         public void SetUp() => Build();
 
         [TestCase(CallEndReason.Missed, 200)]
-        [TestCase(CallEndReason.WrongConnection, 200)]
-        [TestCase(CallEndReason.DisconnectedEarly, 100)]
+        [TestCase(CallEndReason.WrongConnection, 0)]
+        [TestCase(CallEndReason.DisconnectedEarly, 0)]
         [TestCase(CallEndReason.Finished, 0)]
         [TestCase(CallEndReason.Cleared, 0)]
-        public void EmergencyFinesDependOnHowTheCallEnded(CallEndReason reason, long fine)
+        public void OnlyAMissedEmergencyIsFined(CallEndReason reason, long fine)
         {
             Call call = calls.Add(world.EmergencyRequest(0));
 
@@ -52,13 +48,32 @@ namespace Switchboard.Domain.Tests
             Assert.That(fines[0].TakenCents, Is.EqualTo(fine));
         }
 
+        [Test]
+        public void EachEmergencyFinesItsOwnPenalty()
+        {
+            Call call = calls.Add(new CallRequest(Scripts.Emergency("fire", "A1", "F5", penaltyCents: 350)));
+            calls.Tick(31);
+            Assert.That(call.EndReason, Is.EqualTo(CallEndReason.Missed));
+            Assert.That(wallet.Cents, Is.EqualTo(650));
+            Assert.That(fines[0].RequestedCents, Is.EqualTo(350));
+        }
+
+        [Test]
+        public void AnEmergencyWithNoPenaltyIsNotFined()
+        {
+            Call call = calls.Add(new CallRequest(Scripts.Emergency("free", "A1", "F4", penaltyCents: 0)));
+            calls.End(call.Id, CallEndReason.Missed);
+            Assert.That(wallet.Cents, Is.EqualTo(1000));
+            Assert.That(fines, Is.Empty);
+        }
+
         [TestCase(CallEndReason.Missed)]
         [TestCase(CallEndReason.WrongConnection)]
         [TestCase(CallEndReason.DisconnectedEarly)]
         [TestCase(CallEndReason.Finished)]
         public void RegularCallsNeverFine(CallEndReason reason)
         {
-            Call call = calls.Add(new CallRequest(world.Callers[0], world.People[1], 5, 20));
+            Call call = calls.Add(world.RegularRequest(0, 1));
 
             calls.End(call.Id, reason);
 
@@ -95,58 +110,31 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void AWrongPatchOnAnEmergencyFinesAndTheCallerRingsAgain()
+        public void AWrongPatchOnAnEmergencyEndsItWithNoFine()
         {
             Call call = calls.Add(world.EmergencyRequest(0, service: 0));
             desk.TryTake(call.Id);
 
-            desk.OnCircuitClosed(new CordId(0), world.Directory.JackOf(call.Request.CallerPerson),
-                world.Directory.JackOf(world.Services[1]), world.Directory.JackOf(call.Request.CallerPerson));
+            desk.OnCircuitClosed(new CordId(0), call.Request.From, EmergencyWorld.ServiceJack(1), call.Request.From);
 
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.WrongConnection));
-            Assert.That(wallet.Cents, Is.EqualTo(800));
-            Assert.That(callbacks.Pending.Count, Is.EqualTo(1));
-            Assert.That(callbacks.Pending[0].Request.Recipient, Is.SameAs(world.Services[0]));
+            Assert.That(wallet.Cents, Is.EqualTo(1000));
+            Assert.That(fines, Is.Empty);
         }
 
         [Test]
-        public void AMissCallsBackOnlyWhenTheTypeSaysSo()
-        {
-            calls.End(calls.Add(world.EmergencyRequest(0)).Id, CallEndReason.Missed);
-            Assert.That(callbacks.Pending, Is.Empty);
-
-            world.Emergency.CallbackAfterMiss = true;
-            calls.End(calls.Add(world.EmergencyRequest(1)).Id, CallEndReason.Missed);
-            Assert.That(callbacks.Pending.Count, Is.EqualTo(1));
-        }
-
-        [Test]
-        public void AnEarlyDisconnectCallsBackOnlyWhenTheTypeSaysSo()
-        {
-            calls.End(calls.Add(world.EmergencyRequest(0)).Id, CallEndReason.DisconnectedEarly);
-            Assert.That(callbacks.Pending, Is.Empty);
-            Assert.That(wallet.Cents, Is.EqualTo(900));
-
-            world.Emergency.CallbackAfterDisconnect = true;
-            calls.End(calls.Add(world.EmergencyRequest(1)).Id, CallEndReason.DisconnectedEarly);
-            Assert.That(callbacks.Pending.Count, Is.EqualTo(1));
-        }
-
-        [Test]
-        public void CuttingOffAConnectedEmergencyFinesTheEarlyDisconnectFine()
+        public void CuttingOffAConnectedEmergencyIsNotFined()
         {
             Call call = calls.Add(world.EmergencyRequest(0));
             desk.TryTake(call.Id);
-            JackId caller = world.Directory.JackOf(call.Request.CallerPerson);
-            JackId service = world.Directory.JackOf(call.Request.Recipient);
-            desk.OnCircuitClosed(new CordId(0), caller, service);
-            desk.OnCircuitOpened(new CordId(0), caller, service);
+            desk.OnCircuitClosed(new CordId(0), call.Request.From, call.Request.To);
+            desk.OnCircuitOpened(new CordId(0), call.Request.From, call.Request.To);
 
             desk.OnCordReturned(new CordId(0));
 
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.DisconnectedEarly));
-            Assert.That(wallet.Cents, Is.EqualTo(900));
-            Assert.That(fines[0].Reason, Is.EqualTo(CallEndReason.DisconnectedEarly));
+            Assert.That(wallet.Cents, Is.EqualTo(1000));
+            Assert.That(fines, Is.Empty);
         }
     }
 }

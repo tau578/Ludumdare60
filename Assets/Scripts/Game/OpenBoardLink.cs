@@ -7,7 +7,7 @@ namespace Switchboard.Game
 {
     /// <summary>
     /// Pushes the open part of the board (D42, D49) to the team's sockets, the phone book and the caller panel
-    /// whenever the stats change. The lamps follow their sockets by themselves.
+    /// whenever the stats change. The lamps follow their sockets by themselves. The book filter goes in Step 8 (D53).
     /// </summary>
     internal sealed class OpenBoardLink : IDisposable
     {

@@ -23,7 +23,7 @@ namespace Switchboard.Domain.Tests
             wallet = new Wallet();
             multiplier = 1;
             earnings = new EarningsService(calls, wallet, () => multiplier);
-            desk = new OperatorDesk(calls, new ConnectionRule(world.Directory), new FakeSwitchboard());
+            desk = new OperatorDesk(calls, new ConnectionRule(), new FakeSwitchboard());
             feesPaid = new List<ConnectionFeePaidArgs>();
             earnings.ConnectionFeePaid += e => feesPaid.Add(e);
         }

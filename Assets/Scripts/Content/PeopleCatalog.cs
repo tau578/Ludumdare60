@@ -6,17 +6,14 @@ namespace Switchboard.Content
     /// <summary>The valid people from the people file, plus a message for every entry that was left out.</summary>
     public sealed class PeopleCatalog
     {
-        public PeopleCatalog(IReadOnlyList<IPerson> people, IReadOnlyList<ICaller> callers,
-            IReadOnlyList<IDirectoryEntry> directory, IReadOnlyList<string> errors)
+        public PeopleCatalog(IReadOnlyList<IPerson> people, IReadOnlyList<IDirectoryEntry> directory, IReadOnlyList<string> errors)
         {
             People = people;
-            Callers = callers;
             Directory = directory;
             Errors = errors;
         }
 
         public IReadOnlyList<IPerson> People { get; }
-        public IReadOnlyList<ICaller> Callers { get; }
         public IReadOnlyList<IDirectoryEntry> Directory { get; }
         public IReadOnlyList<string> Errors { get; }
     }

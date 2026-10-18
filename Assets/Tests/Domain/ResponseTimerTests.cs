@@ -16,10 +16,8 @@ namespace Switchboard.Domain.Tests
             world = new EmergencyWorld();
             calls = new CallService();
             board = new FakeSwitchboard();
-            desk = new OperatorDesk(calls, new ConnectionRule(world.Directory), board);
+            desk = new OperatorDesk(calls, new ConnectionRule(), board);
         }
-
-        private JackId Jack(IPerson person) => world.Directory.JackOf(person);
 
         [Test]
         public void CountsDownWhileRingingInHandAndConnecting()
@@ -34,7 +32,7 @@ namespace Switchboard.Domain.Tests
             calls.Tick(5);
             Assert.That(call.State, Is.EqualTo(CallState.Taken));
             Assert.That(call.ResponseSecondsLeft, Is.EqualTo(20).Within(1e-9));
-            desk.OnPlugInserted(new CordId(0), Jack(call.Request.CallerPerson));
+            desk.OnPlugInserted(new CordId(0), call.Request.From);
             calls.Tick(5);
             Assert.That(call.State, Is.EqualTo(CallState.Connecting));
             Assert.That(call.ResponseSecondsLeft, Is.EqualTo(15).Within(1e-9));
@@ -44,7 +42,7 @@ namespace Switchboard.Domain.Tests
         public void KeepsCountingAfterAnotherOrderIsAccepted()
         {
             Call emergency = calls.Add(world.EmergencyRequest(0));
-            Call regular = calls.Add(new CallRequest(world.Callers[1], world.People[2], 5, 20));
+            Call regular = calls.Add(world.RegularRequest(1, 2));
             desk.TryTake(emergency.Id);
             desk.TryTake(regular.Id);
 
@@ -61,7 +59,7 @@ namespace Switchboard.Domain.Tests
             Call call = calls.Add(world.EmergencyRequest(0));
             desk.TryTake(call.Id);
             calls.Tick(10);
-            JackId caller = Jack(call.Request.CallerPerson), service = Jack(call.Request.Recipient);
+            JackId caller = call.Request.From, service = call.Request.To;
             desk.OnCircuitClosed(new CordId(0), caller, service);
             Assert.That(call.State, Is.EqualTo(CallState.Connected));
 
@@ -99,7 +97,7 @@ namespace Switchboard.Domain.Tests
         [Test]
         public void RegularCallsWaitAsLongAsItTakes()
         {
-            Call call = calls.Add(new CallRequest(world.Callers[0], world.People[1], 5, 20));
+            Call call = calls.Add(world.RegularRequest(0, 1));
 
             calls.Tick(10000);
 
@@ -112,7 +110,7 @@ namespace Switchboard.Domain.Tests
         {
             Call call = calls.Add(world.EmergencyRequest(0));
             desk.TryTake(call.Id);
-            JackId caller = Jack(call.Request.CallerPerson);
+            JackId caller = call.Request.From;
             desk.OnPlugInserted(new CordId(0), caller);
             Assert.That(call.State, Is.EqualTo(CallState.Connecting));
 
@@ -124,7 +122,7 @@ namespace Switchboard.Domain.Tests
             Assert.That(desk.HalfPatched, Is.EqualTo(new[] { new CordId(0) }));
             Assert.That(board.Returned, Is.Empty);
 
-            desk.OnCircuitClosed(new CordId(0), caller, Jack(call.Request.Recipient));
+            desk.OnCircuitClosed(new CordId(0), caller, call.Request.To);
 
             Assert.That(board.Refused, Is.Empty);
             Assert.That(desk.HalfPatched, Is.Empty);
@@ -136,9 +134,9 @@ namespace Switchboard.Domain.Tests
         {
             Call missed = calls.Add(world.EmergencyRequest(0));
             desk.TryTake(missed.Id);
-            desk.OnPlugInserted(new CordId(0), Jack(missed.Request.CallerPerson));
+            desk.OnPlugInserted(new CordId(0), missed.Request.From);
             calls.Tick(31);
-            Call next = calls.Add(new CallRequest(world.Callers[1], world.People[2], 5, 20));
+            Call next = calls.Add(world.RegularRequest(1, 2));
 
             desk.TryTake(next.Id);
 
@@ -146,21 +144,26 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void ACallbackAfterAMissStartsWithTheFullTime()
+        public void AGivenResponseTimeOnARegularCallIsIgnored()
         {
-            world.Emergency.CallbackAfterMiss = true;
-            var clock = new GameClock();
-            var callbacks = new CallbackScheduler(calls, clock, new SeededRandom(5), () => 6);
-            calls.Add(world.EmergencyRequest(0));
-            calls.Tick(31);
-            Assert.That(callbacks.Pending.Count, Is.EqualTo(1));
+            var script = new CallScript("regular", "Ada Moss", "caller-01", "Hello", new JackId("A1"), new JackId("B2"), 20, 10, 5,
+                emergency: false, responseTimeSeconds: 30, penaltyCents: 200);
+            Call call = calls.Add(new CallRequest(script));
+            Assert.That(call.HasResponseTime, Is.False);
+            Assert.That(script.PenaltyCents, Is.Zero);
+            calls.Tick(60);
+            Assert.That(call.State, Is.EqualTo(CallState.Incoming));
+        }
 
-            clock.Advance(41);
-            callbacks.Tick();
-
-            Assert.That(calls.Live.Count, Is.EqualTo(1));
-            Assert.That(calls.Live[0].Request.Attempt, Is.EqualTo(2));
-            Assert.That(calls.Live[0].ResponseSecondsLeft, Is.EqualTo(30));
+        [Test]
+        public void EachEmergencyUsesItsOwnResponseTime()
+        {
+            Call quick = calls.Add(new CallRequest(Scripts.Emergency("quick", "A1", "F4", responseTimeSeconds: 10)));
+            Call slow = calls.Add(new CallRequest(Scripts.Emergency("slow", "A2", "F4", responseTimeSeconds: 45)));
+            calls.Tick(11);
+            Assert.That(quick.EndReason, Is.EqualTo(CallEndReason.Missed));
+            Assert.That(slow.State, Is.EqualTo(CallState.Incoming));
+            Assert.That(slow.ResponseSecondsLeft, Is.EqualTo(34).Within(1e-9));
         }
     }
 }

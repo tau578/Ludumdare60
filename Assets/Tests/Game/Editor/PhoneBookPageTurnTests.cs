@@ -80,22 +80,20 @@ namespace Switchboard.Game.Tests
         }
 
         [Test]
-        public void ContactAndTabHandlersKeepPriorityOverPageTurning()
+        public void TabsKeepPriorityAndRowsLetClicksThroughToPageTurning()
         {
-            book.ContactTapsEnabled = true;
             var row = opened.GetComponentInChildren<PhoneBookContactRow>();
-            int taps = 0;
-            book.ContactTapped += (name, socket) => taps++;
+            Assert.That(row.GetComponent<Image>().raycastTarget, Is.False, "rows never take clicks since the Notepad went (D54)");
+            Assert.That(ExecuteEvents.GetEventHandler<IPointerClickHandler>(row.gameObject), Is.EqualTo(root),
+                "a click on a row reaches the book");
             ExecuteEvents.ExecuteHierarchy(row.gameObject, new PointerEventData(null)
                 { position = Position(200), button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
-            Assert.That(taps, Is.EqualTo(1));
-            Assert.That(book.CurrentSpreadIndex, Is.Zero);
+            Assert.That(book.CurrentSpreadIndex, Is.EqualTo(1), "a row click on the right half turns the page");
+            book.PreviousSpread();
             var tab = opened.GetComponentInChildren<PhoneBookTab>(true);
             for (Transform parent = tab.transform; parent != opened; parent = parent.parent) parent.gameObject.SetActive(true);
             Assert.That(ExecuteEvents.GetEventHandler<IPointerClickHandler>(tab.gameObject), Is.EqualTo(tab.gameObject));
             Assert.That(ExecuteEvents.GetEventHandler<IPointerClickHandler>(opened.gameObject), Is.EqualTo(root));
-            book.ContactTapsEnabled = false;
-            Assert.That(row.GetComponent<Image>().raycastTarget, Is.False);
             Click(200);
             Assert.That(book.CurrentSpreadIndex, Is.EqualTo(1));
         }
@@ -222,15 +220,14 @@ namespace Switchboard.Game.Tests
                 book.NextSpread();
                 input.ProcessPointer(Position(-200), false);
                 Assert.That(cursor.PageTurnDirection, Is.EqualTo(-1));
-                book.ContactTapsEnabled = true;
                 Canvas.ForceUpdateCanvases();
                 var row = opened.GetComponentInChildren<PhoneBookContactRow>();
+                // Rows no longer take clicks (D54), so over a row the hand shows its half's page turn.
                 input.ProcessPointer(row.transform.position, false);
-                Assert.That(input.CursorMode, Is.EqualTo(CableCursorMode.Pointing));
-                Assert.That(cursor.PageTurnDirection, Is.Zero);
+                Assert.That(input.CursorMode, Is.EqualTo(CableCursorMode.PageTurn));
+                Assert.That(cursor.PageTurnDirection, Is.EqualTo(-1));
                 if (holding)
                 {
-                    input.ProcessPointer(row.transform.position, true);
                     Assert.That(input.ActiveCable, Is.SameAs(cable));
                     Assert.That(cable.IsPointerVisible, Is.False);
                     input.ProcessPointer(new Vector2(100, 800), false);

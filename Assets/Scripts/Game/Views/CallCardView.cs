@@ -10,13 +10,14 @@ using UnityEngine.UI;
 namespace Switchboard.Game
 {
     /// <summary>
-    /// A view of one call (Design 5.4): ringing while it waits, a speech bubble while it is in hand or connected,
-    /// the cord's colour and the money earned while connected or on hold, then a stamp. Types with a response time
-    /// (emergencies) also get their badge, their accent and a countdown ring around the portrait.
+    /// A view of one hand-written call (Design 5.4, D51): the portrait with the caller's name under it, ringing while
+    /// it waits, its own message in a speech bubble while it is in hand, the cord's colour and the money earned while
+    /// connected or on hold, then a stamp. Emergencies also get their badge, their accent and a countdown ring.
     /// </summary>
     public sealed class CallCardView : MonoBehaviour, IPointerClickHandler
     {
         [SerializeField] private Image portrait;
+        [SerializeField, Tooltip("The caller's name under the portrait.")] private TMP_Text nameLabel;
         [SerializeField] private TMP_Text rateLabel;
         [SerializeField] private GameObject stamp;
         [SerializeField] private TMP_Text stampLabel;
@@ -29,14 +30,9 @@ namespace Switchboard.Game
         [SerializeField] private TMP_Text speechLabel;
         [SerializeField, Min(1), Tooltip("How fast the bubble's text types out.")]
         private float charactersPerSecond = 40f;
-        [SerializeField, Range(50, 100), Tooltip("Size of a jack the Notepad noted, in percent of the name's size.")]
-        private int jackTextSize = 85;
         [SerializeField] private FloatingTextView feePopup;
         [SerializeField, Tooltip("A ring around the portrait in the colour of the call's cord.")]
         private Graphic cordRing;
-        [SerializeField] private GameObject callbackBadge;
-        [SerializeField, Tooltip("How far the callback badge moves down when the type badge takes the top.")]
-        private float stackedBadgeOffset = -34f;
         [SerializeField, Tooltip("The caller type's badge, e.g. EMERGENCY.")] private GameObject typeBadge;
         [SerializeField] private TMP_Text typeBadgeLabel;
         [SerializeField] private Graphic typeBadgeBackground;
@@ -82,7 +78,6 @@ namespace Switchboard.Game
         private Color rateOutlineColor;
         private Color typeBadgeColor;
         private Color ringColor;
-        private Vector2 callbackBadgePosition;
         private float shownRingFill = -1;
         private bool ringWasUrgent;
         private bool initialized;
@@ -114,6 +109,7 @@ namespace Switchboard.Game
             Call = call;
             cordColors = cordColorOf;
             portrait.sprite = callerPortrait != null ? callerPortrait : defaultPortrait;
+            if (nameLabel != null) nameLabel.text = call.Request.Script.Name;
             rateLabel.text = MoneyFormat.CardRate(call.Request.ConnectionFeeCents, call.Request.CentsPerSecond);
             ApplyStyle(style);
             shownRingFill = -1;
@@ -142,9 +138,6 @@ namespace Switchboard.Game
             // The type badge sits on top while the call waits; once connected the earnings take that place.
             bool showTypeBadge = waiting && typeBadge != null && !string.IsNullOrEmpty(typeBadgeLabel.text);
             if (typeBadge != null) typeBadge.SetActive(showTypeBadge);
-            callbackBadge.SetActive(Call.Request.Attempt > 1 && waiting);
-            ((RectTransform)callbackBadge.transform).anchoredPosition =
-                callbackBadgePosition + (showTypeBadge ? new Vector2(0, stackedBadgeOffset) : Vector2.zero);
             // The response timer stops for good on a correct connection (D09), so the ring goes with it.
             if (responseRingRoot != null) responseRingRoot.SetActive(Call.HasResponseTime && waiting);
             earningsBadge.SetActive(onCord);
@@ -157,7 +150,7 @@ namespace Switchboard.Game
             if (showSpeech)
                 Say(onHold ? "On hold"
                     : onCord ? "On the line"
-                    : InHandText());
+                    : Call.Request.Script.Message);
             else typedText = null;
 
             if (state == CallState.Incoming)
@@ -191,20 +184,6 @@ namespace Switchboard.Game
             if (Call == null || Call.State != CallState.Ended) return;
             stampLabel.text = StampText(Call);
             stampLabel.color = stampOutline.effectColor = Ink(Call.EndReason);
-        }
-
-        /// <summary>A new Notepad note: the jack joins the bubble at once, without typing the bubble again.</summary>
-        public void ShowNotes()
-        {
-            if (Call == null || !speechBubble.activeSelf) return;
-            if (Call.State != CallState.Taken && Call.State != CallState.Connecting) return;
-            string text = InHandText();
-            if (text == typedText) return;
-            typedText = text;
-            speechLabel.text = text;
-            speechLabel.ForceMeshUpdate();
-            typing.Resize(speechLabel.textInfo.characterCount);
-            speechLabel.maxVisibleCharacters = typing.Visible;
         }
 
         public void ShowConnectionFee(double cents) => feePopup.Show("+" + MoneyFormat.Cents(cents));
@@ -264,7 +243,6 @@ namespace Switchboard.Game
             if (rateOutline != null) rateOutlineColor = rateOutline.effectColor;
             if (typeBadgeBackground != null) typeBadgeColor = typeBadgeBackground.color;
             if (responseRing != null) ringColor = responseRing.color;
-            callbackBadgePosition = ((RectTransform)callbackBadge.transform).anchoredPosition;
         }
 
         // Not colour alone (Design 5.4): the badge text and the ring carry the meaning, the accent only adds to it.
@@ -320,7 +298,7 @@ namespace Switchboard.Game
         // The fill changes every frame, so it is only written when it moves by a visible step.
         private void UpdateResponseRing()
         {
-            double total = Call.Request.Type.ResponseTimeSeconds;
+            double total = Call.Request.Script.ResponseTimeSeconds;
             float fill = total > 0 ? Mathf.Clamp01((float)(Call.ResponseSecondsLeft / total)) : 0f;
             fill = Mathf.Ceil(fill * 360f) / 360f;
             bool urgent = Call.ResponseSecondsLeft <= urgentSeconds;
@@ -480,16 +458,6 @@ namespace Switchboard.Game
         }
 
         private Color Faded(Color color, bool onHold) => onHold ? new Color(color.r, color.g, color.b, color.a * onHoldAlpha) : color;
-
-        private string InHandText() =>
-            $"{Listed(Call.Request.CallerPerson)}{Noted(Call.CallerNote)}\n<size=80%>wants</size>\n" +
-            $"{Listed(Call.Request.Recipient)}{Noted(Call.RecipientNote)}";
-
-        private string Noted(JackId? jack) => jack.HasValue ? $" <size={jackTextSize}%>({jack.Value.Label})</size>" : string.Empty;
-
-        // The book is sorted by surname, so the surname stands out.
-        private static string Listed(IPerson person) =>
-            string.IsNullOrEmpty(person.FirstName) ? $"<b>{person.LastName}</b>" : $"{person.FirstName} <b>{person.LastName}</b>";
 
         private Color Ink(CallEndReason reason)
         {

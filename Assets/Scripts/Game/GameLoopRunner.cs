@@ -1,6 +1,5 @@
 using Switchboard.Domain;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace Switchboard.Game
 {
@@ -14,17 +13,8 @@ namespace Switchboard.Game
         private void Update()
         {
             if (session == null) return;
-            if (HadInput()) session.Idle.ReportInput();
             session.Tick(Time.deltaTime);
         }
 
-        // Any press or pointer movement, or any key, means the player is still there (D16).
-        private static bool HadInput()
-        {
-            Pointer pointer = Pointer.current;
-            if (pointer != null && (pointer.press.wasPressedThisFrame || pointer.delta.ReadValue().sqrMagnitude > 0f)) return true;
-            Keyboard keyboard = Keyboard.current;
-            return keyboard != null && keyboard.anyKey.wasPressedThisFrame;
-        }
     }
 }

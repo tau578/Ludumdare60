@@ -9,6 +9,14 @@ namespace Switchboard.Game.Tests
 {
     public sealed class CallAudioTests
     {
+        // The real file's first call, with the test's own fee.
+        private static CallRequest Order(double fee)
+        {
+            var config = AssetDatabase.LoadAssetAtPath<GameConfig>("Assets/Content/GameConfig.asset");
+            CallScript first = config.LoadEconomy().StartPool[0];
+            return new CallRequest(new CallScript(first.Id, first.Name, first.Icon, first.Message, first.From, first.To, 30, fee, 10));
+        }
+
         [TestCase(0)]
         [TestCase(15)]
         public void RegisterPlaysOnFirstConnectionWithoutDependingOnFeeOrRelayDebounce(int fee)
@@ -25,10 +33,8 @@ namespace Switchboard.Game.Tests
                     AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Sfx/CashRegister.wav"));
                 typeof(CallAudio).GetField("nextFeedback", flags).SetValue(audio, float.MaxValue);
                 var calls = new CallService();
-                var config = AssetDatabase.LoadAssetAtPath<GameConfig>("Assets/Content/GameConfig.asset");
-                var people = config.LoadPeople(config.LoadEconomy(), null);
                 audio.Bind(calls);
-                var call = calls.Add(new CallRequest(people.Callers[0], people.People[1], 10, 30, fee));
+                var call = calls.Add(Order(fee));
                 calls.Take(call.Id);
                 Assert.That(source.isPlaying, Is.False);
                 calls.Connect(call.Id);
@@ -52,9 +58,7 @@ namespace Switchboard.Game.Tests
             {
                 var audio = root.AddComponent<CallAudio>();
                 var calls = new CallService();
-                var config = AssetDatabase.LoadAssetAtPath<GameConfig>("Assets/Content/GameConfig.asset");
-                var people = config.LoadPeople(config.LoadEconomy(), null);
-                var call = calls.Add(new CallRequest(people.Callers[0], people.People[1], 10, 30));
+                var call = calls.Add(Order(0));
                 int cues = 0;
                 audio.ConnectionSucceeded += () => cues++;
                 audio.Bind(calls);

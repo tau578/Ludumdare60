@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Switchboard.Domain
 {
     /// <summary>One one-time entry of Economy.json's upgrades (D40). Its id is stable forever, because saves store it.</summary>
@@ -20,5 +22,8 @@ namespace Switchboard.Domain
 
         /// <summary>The number of caller slots an extra_clients entry sets (D49); 0 for other kinds.</summary>
         int ClientSlots { get; }
+
+        /// <summary>The call queue once an extra_clients entry is bought (D52); empty for other kinds.</summary>
+        IReadOnlyList<CallScript> StagePool { get; }
     }
 }

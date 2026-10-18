@@ -14,7 +14,7 @@
 | 5b. Extra wires and Notepad | done | ✅ 2026-10-18 (22 min) | ✅ 333/333 tests, scope clean | ✅ | 667adda |
 | 5c. Calls and pacing into Economy.json | done | ✅ 2026-10-18 (17 min) | ✅ 388/388 tests, scope clean | ✅ | f70b7df |
 | 6. Board growth (built as 7a) | done | ✅ 2026-10-18 (25 min) | ✅ 439/439 tests, scope clean | ✅ | d166ffa |
-| 7. Hand-written calls and queues | not started | | | | |
+| 7. Hand-written calls and queues | done | ✅ 2026-10-18 (36 min) | ✅ 431/431 tests, scope clean | ✅ | 8e48320 |
 | 8. The new phone book | not started | | | | |
 | 9. Saves, Boot, Web build | not started | | | | |
 | 10. Tutorial | not started | | | | |
@@ -2148,3 +2148,150 @@ Follow-ups:
 - EditMode tests re-run: 475/475 green after the slice fix. Sergei's shop skin, cable artwork, book hover highlight, money counter and 2 starting cords are kept; the book and the bubble stay surname-first (D50).
 - `caller-09`/`caller-10` (Mia's `b9e983b`) were re-exported at 190×190 with 191×191 slices, so Unity dropped them and 9 tests failed. A fix agent set both slices to 190×190 (2 lines per `.meta`), with the lead's approval after a first attempt was blocked by the permission check.
 - Committed and pushed on the lead's request.
+
+### Step 7 report: 2026-10-18
+Result: done
+
+Playable now: press Play in `Final.unity`. Two caller slots fill at once with the first two calls of `startPool`. Each card shows the call's portrait, its pay ("10¢ + 5¢/s") and the caller's name on a small plate under it. Taking a card types out that call's own message in the bubble ("Connect me with Mabel Dunmore, please."). Patching the call's own two jacks pays the fee, then the per-second pay, then "Paid"; a wrong patch says "Wrong number!" with no fine. Either way the slot takes the next queued call once the stamp has shown. "Bigger board" (or dev "Open board") grows the board, opens one more slot, and switches the queue to that board's `stagePool`. Emergencies in the new queues (Doctor, Fire Brigade, Police) show the red badge and countdown ring; a miss fines `penaltyCents` ($2). The Notepad is gone from the shop.
+
+How to test: the Plan's Step 7 playtest script works as written. Notes:
+1. **The next call waits for the stamp.** When a call ends, its "Paid" or "Wrong number!" stamp keeps the slot for about 2 seconds, then the next card appears there. In the rules the next call is already in the slot (deviation 1).
+2. **Emergencies come third** in `board_1`'s queue (`call_103`, Herbert Marlow on D3 wants the Doctor on D4). To reach one quickly: dev "Open board", then "Clear calls"; the queue carries on, so `call_102`–`call_104` appear and `call_103` is the emergency.
+3. Dev panel: "Call now" and "Emergency now" are gone. "Clear calls" lets the queue carry on; "Reset upgrades" restarts `startPool` from `call_001`.
+4. Validator check (script step 7): change `"call_001"` in `startPool` to `"call_201"` (Basil Thorne on A5) and run Validate Content: "Economy file: startPool: call_201 uses A5, but the startingBoard opens only 3x3. …". Changing a call's own `from` to E5 gives the same message for that call.
+
+Created:
+- `Assets/Configs/Calls.json`: 44 hand-written placeholder calls from today's people and jacks: `call_001`–`call_008` (3x3, no emergencies; `call_001` is Ada Moss C3 → Mabel Dunmore A2, the guide's first call), `call_101`–`call_110` (4x4, 2 emergencies to the Doctor D4), `call_201`–`call_212` (5x5, adding the Fire Brigade E5), `call_301`–`call_314` (6x6, adding the Police B6). Regular calls: fee 5–15¢, 3–8¢/s, 15–28 s; emergencies: fee 30–40¢, 7–10¢/s, 12–15 s, 30 s to respond, 200¢ fine. Plain ASCII only.
+- Domain: `Calls/CallScript.cs` (the call type: id, name, icon, message, from, to, duration, fee, rate, emergency, response time, penalty; response time and penalty are 0 for regular calls), `Queue/CallQueue.cs` (pool, position, `Restart()`, `Tick()`).
+- Content: `CallsFileData.cs`, `CallsFileLoader.cs` (parse + checks + `JackLabel`), `CallsCatalog.cs` (`Calls`, `Find`, `IsLeftOut`, `Errors`).
+- Tests: `CallQueueTests.cs`, `CallsFileTests.cs`, `EconomyPoolTests.cs`, `CordStatTests.cs` (the cord part of the old `WiresAndNotepadTests.cs`), with `.meta` files; `Assets/Scripts/Domain/Queue.meta`.
+
+Changed:
+- **Domain:**
+  - `CallRequest`: wraps a `CallScript` (`Script`, `From`, `To`, `CentsPerSecond`, `DurationSeconds`, `ConnectionFeeCents`, `Involves(jack)`); no caller, recipient, type or attempt.
+  - `Call`: the response time comes from the script; `CallerNote`/`RecipientNote` removed.
+  - `CallService`: `IsLive(script)` (by id) replaces `CountLive(type)` and `IsInLiveCall(person)`.
+  - `ConnectionRule`: no directory; compares the plugged pair with the call's own `from`/`to`, either order.
+  - `PenaltyService`: fines only `Missed`, with the script's `PenaltyCents` (0 for regular calls); never multiplied.
+  - `OpenBoard`: `IsOpen(jack)` and `Size` only (`IsInGame` and the directory gone).
+  - `IGameContent`: `StartPool` added; `Pacing`, `CallerTypes`, `People`, `Callers`, `Directory` removed.
+  - `IUpgrade.StagePool`; `StatSheet.CallPool` (last bought `extra_clients` with a non-empty pool, else `startPool`), `HasNotepad` removed, new `startPool` constructor parameter.
+  - `UpgradeKind`: `Notepad = 3` removed (comment: never reuse 3); other values unchanged.
+  - `GameSession`: constructor is `(IGameContent, ISwitchboard)` (no `IRandom`); new `Queue`; `Directory`, `Idle`, `Callbacks`, `Busy`, `Spawner`, `Notepad` removed. `ResetUpgrades` ends live calls, recomputes, `Queue.Restart()`, returns cords in closing jacks, rebuilds the shelf. `ClearCalls` ends live calls and returns all cords; the queue carries on.
+- **Content:**
+  - `EconomyFileLoader.Load(json, CallsCatalog calls = null)`: resolves `startPool` and each `extra_clients`'s `stagePool` (null skips the pools, as `boardJacks` does for people); pool checks; "no longer used" for `pacing`, `calls` and a `notepad` entry; the `notepad` type, pacing and call-type checks removed.
+  - `EconomyFileData`: `startPool`, `UpgradeEntry.stagePool`, markers for the removed sections; `PacingEntry`/`CallEntry`/`RangeEntry` removed. `EconomyCatalog`: `StartPool`; `Pacing`, `CallTypes`, `HasCallType` removed. `UpgradeRecord.StagePool`.
+  - `PeopleFileLoader.Load(json, boardJacks)`: no longer reads or checks `portrait`, `type`, `rate`, `fee` (orchestrator note a); keeps names, sockets, tags. `PeopleFileData`, `PersonRecord` (no `Portrait`), `PeopleCatalog` (no `Callers`) trimmed. `GameContent(EconomyCatalog)`.
+  - `ContentValidator`: `Validate(peopleJson, boardJacks)`; new `ValidateCallJacks(calls, book)` (cross-file check); `ValidateEconomy(json, calls)`; `ValidateStartingBoard`, `ValidateCardStyles` and the recipient check removed.
+  - `GameConfig`: `callsFile`, `LoadCalls()`, `LoadEconomy(calls)`, `LoadPeople(boardJacks)`, `regularCards`/`emergencyCards` (`CardStyleFor(bool emergency)`) replace the `cardStyles` asset list; `Validate()` covers Calls.json, Economy.json, the people file and the cross-file jack check (so `Tools/Switchboard/Validate Content` checks everything; `ContentValidatorMenu.cs` needed no change).
+- **Game layer:**
+  - `GameInstaller`: loads calls, then economy with them, logs calls errors and the cross-file check; builds `GameSession(content, cordBridge)`; portraits come from the call's `icon`; `randomSeed` field and `NotepadBookLink` gone.
+  - `CallQueueView`: binds `Func<CallScript, Sprite>` and `Func<bool, CallCardStyle>`; no Notepad. A call added while every open slot is taken by a card still showing its stamp waits for that stamp, then shows (deviation 1). Upper cards draw over lower ones, so a name plate is never hidden by the card below.
+  - `CallCardView`: new serialized `nameLabel` (the caller's name); the bubble says `Script.Message`; the "Calling again" badge, the noted jacks and the bold-surname text removed; the countdown ring reads the script's response time.
+  - `DevPanel`: "Call now" and "Emergency now" removed. `GameLoopRunner`: no idle reporting. `OpenBoardLink`: comment only.
+- **Book (UI):** the Notepad tap chain is removed (nothing else used it; `BookHoverHighlight` and page turning don't): `PhoneBookView.ContactTapped`/`ContactTapsEnabled`/`ListenToPages`, `PhoneBookPageView.ContactTapped`/`SetTappable`, `PhoneBookContactRow.Tapped`/`IsTappable`/`SetTappable`/`OnPointerClick`. The row keeps its serialized `tapArea` image and turns its raycast off, so `PhoneBook.prefab` is unchanged.
+- **Data:** `Economy.json`: `startingClientSlots` 2, `startPool`, `stagePool` on `board_1`–`board_3`, `clientSlots` 3/4/5, descriptions "4x4, 3 callers", "5x5, 4 callers", "6x6, 5 callers"; `pacing`, `calls` and `notepad` removed. `PhoneBook.json` is byte-identical.
+- **Assets:** `GameConfig.asset` (calls file, the two card styles with the old values: none for regular; "EMERGENCY" and accent (0.78, 0.13, 0.13) for emergencies).
+- **Docs:** `Docs/EconomyFile.md` rewritten: "Calls.json" and "Call queues" sections, cents vs seconds, jack labels, "the book is only for looking things up", the new validator list and messages; "Calls", "Pacing" and "Notepad" removed; `startingCords` corrected to 2–6 and saves to Step 9.
+- **Existing tests adapted:** `Fakes.cs` (scripted calls: `Scripts.Call/Emergency/Pool`, `TestWorld.Request`, `EmergencyWorld.EmergencyRequest/RegularRequest/ServiceJack`; the type/caller/directory fakes and `Crowd` removed), `CallServiceTests`, `CallTransitionTests`, `ConnectionFeeTests`, `EarningsServiceTests`, `HoldTests` (its spawner-load test removed), `OperatorDeskTests`, `PersistentWiringTests` (same assertions, scripted requests), `ResponseTimerTests` (callback test replaced by two: a regular call ignores a given response time; each emergency uses its own), `PenaltyServiceTests` (rewritten for D51), `GameSessionTests` (rewritten), `BoardGrowthTests`, `EconomyFileTests`, `EconomyBoardTests`, `ContentValidatorTests`, `PeopleFileTests`, `UpgradeTests` (the shelf's 4th chain is a later kind, `(UpgradeKind)99`, now that the Notepad is gone), and Sergei's `MergedSystemsTests` (orders are scripted calls on open jacks; the bubble must equal the call's message and the name plate its name; 2 → 3 slots; the Notepad test became `NewCordKeepsConnectionHighlightsCoinsAndAudio` with the same cord, glow, coin and audio checks), `FirstOrderGuideTests` (unchanged, passes), `CallAudioTests` (scripted order), `PhoneBookPageTurnTests` (all 8 kept; the row cases now check that rows let clicks through to page turning and show the page-turn hand).
+
+Deleted files:
+- Domain: `Spawning/CallSpawner.cs`, `Spawning/CallFactory.cs`, `Spawning/PacingSettings.cs`, `Spawning/BusyTracker.cs`, `Callbacks/CallbackScheduler.cs`, `Pacing/IdleGuard.cs`, `Upgrades/Notepad.cs`, `Directory/PhoneDirectory.cs`, `Definitions/ICallerType.cs`, `Definitions/ICaller.cs`, `Definitions/IPacingProfile.cs`, `Definitions/CallerTypeExtensions.cs` (and the empty `Spawning`, `Callbacks`, `Pacing`, `Directory` folders).
+- Content: `CallTypeRecord.cs`, `CallerRecord.cs`, `CallerTypeDefinition.cs`.
+- Game: `NotepadBookLink.cs`.
+- Assets: `Assets/Content/CallerTypes/Regular.asset`, `Emergency.asset` and the folder (their values now live in `GameConfig`).
+- All with their `.meta` files.
+
+Deleted test classes: `BusyTrackerTests`, `CallFactoryTests`, `CallbackSchedulerTests`, `CallSpawnerTests`, `EmergencySpawnTests`, `IdleGuardTests`, `PhoneDirectoryTests`, `FullBoardTests`, `EconomyCallsTests` (its starting-value cases moved to `EconomyPoolTests`), `GrowingCordsSpawnTests` and `NotepadTests` (both in the deleted `WiresAndNotepadTests.cs`; its `CordStatTests` moved to `CordStatTests.cs` without the Notepad cases), `PhoneBookTapTests`.
+
+Scene and prefab changes:
+- `Assets/Prefabs/Game/GameUI.prefab`: the card template gains `NameBadge` (a copy of the rate badge's dark plate without its outline, 150×22, anchored under the rate badge at y −12; `NameLabel` is TMP LiberationSans, auto-size 11–18, ellipsis; raycast off on both), wired to `CallCardView.nameLabel`; `CallbackBadge` removed; stale serialized fields (`jackTextSize`, `callbackBadge`, `stackedBadgeOffset`, an old `closedSlotCover`) dropped on save.
+- `Final.unity`, `MainMenu.unity`, `PhoneBook.prefab`, `Game.prefab` and every other prefab are unchanged (`Game.prefab` keeps a stale `randomSeed` value that Unity ignores).
+
+Tests: 431/431 EditMode (475 before; the drop comes from the deleted classes listed above, partly replaced by the new ones). New: `CallQueueTests` (13: nothing before the first tick, fills every free slot in order, no timer, loops, skips a call still on a card, empty slot when every call is on a card, empty pool, wrong number frees the slot with no fine, a connected call holds its slot and the next takes it in the same tick, buying a board switches pool and fills the new slot at once while old calls stay, a board with an empty pool keeps the queue, `ResetUpgrades` returns to `startPool` (also with nothing bought), "Clear calls" carries on); `CallsFileTests` (34 cases: the sample, NaN markers, tidied labels, missing/unreadable/empty file, empty and duplicate ids, each required field, unknown portrait, duration, negative and non-whole cents, zero pay allowed, off-board jacks ×4, from = to, emergency response time and penalty, the regular-call note, a broken call left out, the real file's ranges and ASCII); `EconomyPoolTests` (19: pools resolve in order, missing/empty `startPool`, unknown and broken ids, calls that don't fit the start or a stage, missing/empty `stagePool` keeps the entry, the fewer-calls note, no pool checks without a calls file, the removed sections and `notepad`, the starting-value cases, the real queues (8/10/12/14, emergencies per ring), `Validate Content` clean, and the call_201 message); plus the new cases in `GameSessionTests`, `PenaltyServiceTests`, `ResponseTimerTests`, `ContentValidatorTests` (cross-file jack check) and `BoardGrowthTests` (the real start pool plays in order on 3x3 in 2 slots).
+
+Console: clean. Only the known MCP "WebSocket is not initialised" line after recompiles and the engine's two "memoryless" lines around screenshots.
+
+Screenshots (`Temp/Captures/`, Game view 1280×720):
+- `step-07.png`: the start: 2 cards ("New order!"), names "Ada Moss" and "Arthur Hollis" under the pay; the other slots hidden; 3x3 board.
+- `step-07-bubble.png`: call_001 taken, its own message typed out; the guide moved on to the book.
+- `step-07-4x4.png`: after "Open board": 4x4, 3 slots filled (call_003, call_004 from the start pool still on their cards, call_101 from the new pool); the earlier cords still plugged.
+- `step-07-emergency.png`: after "Clear calls": call_102, the emergency call_103 (EMERGENCY badge and ring) and call_104.
+
+Checked in Play Mode (stepped frames; cords through `CableController.TryPickUp/TryInsert` and `CordBridge.Synchronize`, card clicks through `CallQueueView.OnCardClicked`):
+- Start: board 3x3, 2 slots, 2 cords, queue at position 2 after `call_001`, `call_002`.
+- Connect: call_001 patched C3–A2 with a real cord: 10¢ fee at once; at 10× speed it finished with $1.10 (10 + 20 × 5) and "Paid", and call_004 took the slot after the stamp.
+- Wrong number: call_002 patched A1–B1: "Wrong number!", fine 0, wallet unchanged; call_003 waited for the stamp, then appeared.
+- Open board: 4x4, 3 slots, pool switched to `call_101` at position 0, the new slot filled at once.
+- Emergency: `call_103` counted down from 30 s; at 0 it ended "Missed", fine 200 requested and taken, stamp "Missed -$2.00"; the slot refilled.
+- MainMenu path: loading build index 0, then 1, started a fresh `Final` with `call_001` and `call_002` in 2 slots, no errors.
+- `Tools/Switchboard/Validate Content`: "no problems found".
+- Editor left clean: not in Play Mode, not paused, `Final.unity` active and not dirty, `timeScale` 1, no callbacks or SessionState keys left; 10 leaked `GuideSilhouette` materials destroyed (known `SlowGuidePulse` leak).
+
+Format-only re-saves: `Assets/Fonts/DellaRespira/Della Respira SDF.asset` (dynamic glyphs after the first test run) discarded with `git checkout`. `TimeManager.asset` and `SampleScene.unity` untouched. Nothing staged or committed (an accidental `git rm` early on was unstaged at once; the index is as it was).
+
+Tick order in `GameSession.Tick(dt)` (for Design §4.4):
+```csharp
+clock.Advance(dt);
+Earnings.Tick(dt);   // pay connected calls for min(dt, time left)
+Calls.Tick(dt);      // finish calls whose duration ran out; miss expired emergencies
+Queue.Tick();        // fill every free open slot from the queue, in order (D52)
+Goal.Tick();         // raise GoalAffordable once, after this tick's money has moved
+```
+So a call that ends in a tick gives its slot to the next call in the same tick. Nothing rings before the first tick, because the views bind after the session is built.
+
+Deviations from Design/Plan:
+1. **A finished card keeps its slot while its stamp shows** (about 1.5 s plus the 0.2 s exit). The rules fill the slot at once (D52), but `CallQueueView` shows the new call's card only when the stamp has gone. Without this, the instant refill would cut every "Paid", "Wrong number!" and "Missed" stamp to nothing (the old rule "a stamp gives up its slot to a new call" assumed a spawn timer). An emergency's countdown starts with the call, so it may run up to ~2 s before its card shows.
+2. **Name plate placement.** The card has no room under the portrait inside the slot (slots are ~15 px apart and the countdown ring reaches 20 px past the card), so the name sits on a small plate directly under the pay badge, reaching into the gap, and upper cards now draw over lower ones so the plate stays readable. It may touch the top 3–4 px of an EMERGENCY or earnings badge on the card below. Readable at 1280×720 (about 12 px text).
+3. **Pool checks leave calls out rather than entries.** An unknown call, a call with a problem in `Calls.json`, or a call outside its stage's board is left out of that queue with a message; an `extra_clients` entry with a missing or empty `stagePool` stays buyable and keeps the current queue (`StatSheet` only switches to a non-empty pool). Duplicate ids in a pool are allowed; the "fewer calls than slots" note counts different calls.
+4. **Card styles are two `GameConfig` fields** (`regularCards`, `emergencyCards`) instead of the two `CallerTypeDefinition` assets, which are deleted with their class. The values (and so the look) are unchanged.
+5. **`PhoneDirectory` deleted**: after this step nothing used it (the book reads `PhoneBook.json` itself, the validator uses `PeopleFileLoader`'s directory list). `IPerson`, `IDirectoryEntry`, `PersonExtensions`, `PeopleFileLoader`, `PeopleCatalog` and `PersonRecord` stay for the book checks until Step 8.
+6. **Starting-board people check removed** (`ContentValidator.ValidateStartingBoard`, Step 6): calls no longer come from people, so "two people without tags on the start" no longer matters; the cross-file jack check and "every call fits its stage" replace it.
+7. **Calls.json text tidying:** `from`/`to` are trimmed and upper-cased (`" c3 "` reads as C3). `connectCents` and `penaltyCents` must be whole cents; an emergency must give `penaltyCents` (0 allowed), so a missing fine is never silently 0.
+8. **Removed-section detection:** `pacing` is reported when any of its five old fields is present (an empty `"pacing": {}` passes silently); `calls` whenever present.
+9. **Closed slots are hidden, not dimmed**: that's how `CallQueueView.SetOpenSlots` already worked before this step (CanvasGroup alpha 0); unchanged.
+
+Follow-ups:
+- **Design.md (orchestrator):** §4.4 tick order above; §5.1 (CallRequest/Call carry the script; no callbacks; the state table's callback and fine rows), §5.2/5.3 replaced by the queue, §5.4 (name plate, message bubble, no "Calling again", the stamp-wait rule), §5.5 (missed emergencies only), §5.6 (`ConnectionRule` uses the call's jacks), §5.7 (no `PhoneDirectory`), §5.9 (no `notepad`; `stagePool`; reset restarts the queue), §6.1 (`GameConfig`: calls file and two card styles; `CallerTypeDefinition` gone), §6.2 (queue state in `CallQueue`, not saved), §6.4 (sections), §3 (`PhoneBookView.ContactTapped`/`ContactTapsEnabled` gone), §9 (new caller = a line in `Calls.json`).
+- **Unused now:** `IRandom`, `SeededRandom`, `RandomExtensions` and `FloatRange` in `Domain/Common` (kept: not in the removal list, and a balance simulator may want them). `GameClock` is still used.
+- **Stamp over the badge:** the "New order!" stamp covers the lower half of the EMERGENCY badge and most of the countdown ring while a call rings (true before this step too). Moving the stamp lower, or the badge higher, would help emergencies read at a glance.
+- **Two calls on one jack:** shipped queues sometimes put two cards on the same person's jack at once (e.g. `call_001` C3 and a later C3 call); the second simply waits (busy line, as specified).
+- **Book rows** still carry the transparent `tapArea` image; Step 8 rebuilds the book and can drop it. `PhoneBookBuilder` still adds it.
+- **Plan §8:** the "held cord drops on book-row clicks" item is now only about buttons (rows no longer take clicks).
+
+#### Verification (orchestrator, 2026-10-18)
+- **Pre-flight and brief check:**
+  - Up to date with origin (`2737b45`); 475/475 green.
+  - Five gaps were settled in the launch notes:
+    - `PhoneBook.json` stays unchanged, and its per-person `portrait`, `type`, `rate` and `fee` are no longer read.
+    - The tap chain also lives in `PhoneBookPageView` and `PhoneBookContactRow`.
+    - The name label needs `GameUI.prefab`.
+    - `Validate Content` covers `Calls.json`.
+    - Dev "Clear calls" keeps the queue's position.
+- **EditMode re-run:** 431/431 green. There were 475 before: the tests of deleted systems were removed, and `CallQueueTests`, `CallsFileTests`, `EconomyPoolTests` and `CordStatTests` are new. Console: only the known MCP WebSocket line.
+- **Scope:** 117 files, all named in the brief or the launch notes.
+  - `GameLoopRunner` only lost the idle guard's input check.
+  - `Final.unity` and `PhoneBook.json` are unchanged.
+  - Nothing is staged.
+  - My test run left no format-only re-saves.
+- **Screenshots checked:**
+  - `step-07.png`: 2 cards, with the names under the pay.
+  - `step-07-bubble.png`: Ada Moss's own message.
+  - `step-07-4x4.png`: 3 slots, all filled.
+  - `step-07-emergency.png`: the EMERGENCY badge. The name plate of the card above covers the badge's top. Left for the playtest.
+- **Closed slots** are hidden rather than dimmed. That comes from Sergei's `041fb90`, not from this step.
+- **Code skim:**
+  - `CallQueue` loops, skips calls on cards and restarts when the pool changes.
+  - `ConnectionRule` compares the call's own jacks in either order.
+  - `PenaltyService` fines only `Missed`, with `penaltyCents`.
+- **Docs updated:**
+  - `Design.md`: the status row, §1, §3, §4.1, §4.4, §5.1–5.7, §5.9, §6.1–6.4, the new §6.5 (`Calls.json`), §7, §9, and the statuses of D10, D16, D18, D23, D37, D43 and D46.
+  - `Plan.md`: §4 (deleting files), §8, §9 and the Step 8 brief.
+- **Deviations for the lead to accept at the playtest:**
+  - the next card shows only after the ~1.7 s stamp
+  - where the name plate sits
+  - pool problems drop the call, not the upgrade
+  - card styles as two `GameConfig` fields
+  - whole-cent fees and fines, and a required `penaltyCents`
+- Committed and pushed on the lead's request (2026-10-18), before the playtest, merged with `f4bdae2` (red bounce on the money counter when an upgrade is too expensive).
+- **Playtest (lead, 2026-10-18):** all good. The deviations listed above are accepted.
