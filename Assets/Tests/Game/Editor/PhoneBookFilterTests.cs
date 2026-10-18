@@ -68,8 +68,8 @@ namespace Switchboard.Game.Tests
             Assert.That(book.PageCount, Is.EqualTo(2));
             string[] names =
             {
-                "Mabel Dunmore", "Irene Godfrey", "Arthur Hollis", "Ada Moss", "Bernard Quigley", "Gertrude Rook",
-                "Mildred Stanhope", "Reginald Underhill", "Lillian Yardley"
+                "Dunmore, Mabel", "Godfrey, Irene", "Hollis, Arthur", "Moss, Ada", "Quigley, Bernard", "Rook, Gertrude",
+                "Stanhope, Mildred", "Underhill, Reginald", "Yardley, Lillian"
             };
             for (int i = 0; i < names.Length; i++) Assert.That(book.ContactAt(i).name, Is.EqualTo(names[i]), "surname order, no services");
             Assert.That(book.CanGoForward, Is.False, "two pages make one spread");

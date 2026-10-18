@@ -97,9 +97,10 @@ namespace Switchboard.Editor
             try
             {
                 ConfigureLayers(root.gameObject);
-                var closed = Rect("ClosedBook", root, new Vector2(360, 360f * 423 / 817));
+                var closedSprite = Sprite("table_book");
+                var closed = Rect("ClosedBook", root, new Vector2(360, 360f * closedSprite.rect.height / closedSprite.rect.width));
                 BottomRight(closed, new Vector2(-50, 12));
-                var closedButton = BookButton(closed, Sprite("table_book"));
+                var closedButton = BookButton(closed, closedSprite);
                 closedButton.GetComponent<Image>().preserveAspect = true;
 
                 var opened = Rect("OpenBook", root, new Vector2(820, 524));

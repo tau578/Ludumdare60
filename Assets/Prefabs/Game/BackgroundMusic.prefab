@@ -163,6 +163,7 @@ MonoBehaviour:
   bookClose: {fileID: 8300000, guid: fc52b655f92523b4793c9677b4c0a24b, type: 3}
   pageTurn: {fileID: 8300000, guid: 873bbc4d70d620b4396bdadfee68efa1, type: 3}
   phoneBabble: {fileID: 5633890158068562176}
+  phoneBabbleSeconds: 2
 --- !u!1 &7077995169312712971
 GameObject:
   m_ObjectHideFlags: 0

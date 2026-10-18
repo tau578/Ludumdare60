@@ -52,7 +52,7 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void RealFileListsTheServicesFirstThenPeopleBySurname()
+        public void RealFileListsServicesFirstThenPeopleBySurname()
         {
             IReadOnlyList<IDirectoryEntry> entries = LoadRealFile().Directory;
             Assert.That(entries[0].Person.FullName(), Is.EqualTo("Police"));
@@ -61,6 +61,23 @@ namespace Switchboard.Domain.Tests
             for (int i = 4; i < entries.Count; i++)
                 Assert.That(string.Compare(entries[i - 1].Person.LastName, entries[i].Person.LastName, StringComparison.OrdinalIgnoreCase),
                     Is.LessThan(0), $"{entries[i - 1].Person.LastName} before {entries[i].Person.LastName}");
+        }
+
+        [Test]
+        public void SurnameFirstNamesKeepTheirOriginalIdentityAndNameParts()
+        {
+            PeopleCatalog catalog = Load(@"{ 'contacts': [
+                { 'name': 'Moss, Ada', 'socket': 'C3', 'portrait': 'caller-01', 'type': 'type.regular' },
+                { 'name': 'Smith, Mary Ann', 'socket': 'A1', 'portrait': 'caller-02', 'type': 'type.regular' } ] }");
+
+            Assert.That(catalog.Errors, Is.Empty);
+            Assert.That(catalog.People[0].FirstName, Is.EqualTo("Ada"));
+            Assert.That(catalog.People[0].LastName, Is.EqualTo("Moss"));
+            Assert.That(catalog.People[0].Id, Is.EqualTo(PeopleFileLoader.PersonId("Ada Moss")));
+            Assert.That(catalog.Callers[0].Id, Is.EqualTo("caller.ada-moss"));
+            Assert.That(catalog.People[1].FirstName, Is.EqualTo("Mary Ann"));
+            Assert.That(catalog.People[1].LastName, Is.EqualTo("Smith"));
+            Assert.That(catalog.People[1].Id, Is.EqualTo(PeopleFileLoader.PersonId("Mary Ann Smith")));
         }
 
         [Test]
@@ -74,6 +91,7 @@ namespace Switchboard.Domain.Tests
             foreach (PeopleFileContact contact in data.contacts)
             {
                 Assert.That(contact.name, Is.Not.Empty);
+                if (!PeopleFileLoader.IsService(contact)) Assert.That(contact.name, Does.Contain(", "));
                 Assert.That(contact.socket, Does.Match("^[A-Z][1-9][0-9]*$"));
             }
         }

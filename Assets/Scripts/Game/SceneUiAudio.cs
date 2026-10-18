@@ -14,7 +14,9 @@ namespace Switchboard.Game
         [SerializeField] private AudioClip bookClose;
         [SerializeField] private AudioClip pageTurn;
         [SerializeField] private AudioSource phoneBabble;
-        private CallQueueView callQueue;
+        [SerializeField, Min(0.1f)] private float phoneBabbleSeconds = 2f;
+        private CallAudio callAudio;
+        private float babbleUntil;
         private AudioSource source;
         private readonly List<Button> buttons = new List<Button>();
         private PhoneBookView book;
@@ -45,9 +47,10 @@ namespace Switchboard.Game
                         button.onClick.AddListener(PlayClick);
                     }
                 if (book == null) book = root.GetComponentInChildren<PhoneBookView>(true);
-                if (callQueue == null) callQueue = root.GetComponentInChildren<CallQueueView>(true);
+                if (callAudio == null) callAudio = root.GetComponentInChildren<CallAudio>(true);
             }
             if (book != null) { wasOpen = book.IsOpen; spread = book.CurrentSpreadIndex; }
+            if (callAudio != null) callAudio.ConnectionSucceeded += PlayConnectionBabble;
         }
 
         private void LateUpdate()
@@ -62,14 +65,16 @@ namespace Switchboard.Game
 
         private void UpdateBabble()
         {
-            if (phoneBabble == null) return;
-            bool talking = callQueue != null && callQueue.isActiveAndEnabled && callQueue.HasSpeakingCaller;
-            if (talking && !phoneBabble.isPlaying && phoneBabble.clip != null)
-            {
-                phoneBabble.loop = true;
-                phoneBabble.Play();
-            }
-            else if (!talking && phoneBabble.isPlaying) phoneBabble.Stop();
+            if (phoneBabble != null && phoneBabble.isPlaying && Time.unscaledTime >= babbleUntil)
+                phoneBabble.Stop();
+        }
+
+        private void PlayConnectionBabble()
+        {
+            if (phoneBabble == null || phoneBabble.clip == null) return;
+            babbleUntil = Time.unscaledTime + phoneBabbleSeconds;
+            phoneBabble.loop = true;
+            if (!phoneBabble.isPlaying) phoneBabble.Play();
         }
 
         private void PlayClick()
@@ -84,7 +89,9 @@ namespace Switchboard.Game
             foreach (Button button in buttons) if (button != null) button.onClick.RemoveListener(PlayClick);
             buttons.Clear();
             book = null;
-            callQueue = null;
+            if (callAudio != null) callAudio.ConnectionSucceeded -= PlayConnectionBabble;
+            callAudio = null;
+            babbleUntil = 0;
             if (phoneBabble != null) phoneBabble.Stop();
         }
         private void OnDisable()

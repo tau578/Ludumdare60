@@ -29,9 +29,11 @@ namespace Switchboard.UI
         private bool highlighted;
         private bool blockedHighlight;
         private bool dimmed;
+        private bool callConnected;
         public bool IsHighlighted => highlighted;
         public bool IsBlockedHighlight => blockedHighlight;
         public bool IsDimmed => dimmed;
+        public bool IsCallConnected => callConnected;
 
         public void SetDimmed(bool value)
         {
@@ -40,7 +42,16 @@ namespace Switchboard.UI
             SetVerticesDirty();
         }
 
+        public void SetCallConnected(bool value)
+        {
+            if (callConnected == value) return;
+            callConnected = value;
+            SetVerticesDirty();
+        }
+
         private Color Tint => dimmed ? color * dimmedTint : color;
+        // A closed jack can't carry a call, so the dimmed look wins over green.
+        private bool ShowsConnected => callConnected && !dimmed;
 
         public void SetHighlighted(bool value, bool blocked = false)
         {
@@ -62,7 +73,8 @@ namespace Switchboard.UI
                 size *= Mathf.Min(rect.width, rect.height) * .88f / Mathf.Max(size.x, size.y);
                 Vector2 min = center - size * .5f, max = center + size * .5f;
                 Vector4 uv = DataUtility.GetOuterUV(faceSprite);
-                Color fill = Tint * (blockedHighlight ? new Color(1f, .38f, .30f) : highlighted ? new Color(1f, .88f, .58f) : Color.white);
+                Color fill = Tint * (blockedHighlight ? new Color(1f, .38f, .30f) : ShowsConnected
+                    ? new Color(.55f, 1f, .65f) : highlighted ? new Color(1f, .88f, .58f) : Color.white);
                 mesh.AddVert(new Vector3(min.x, min.y), fill, new Vector2(uv.x, uv.y));
                 mesh.AddVert(new Vector3(min.x, max.y), fill, new Vector2(uv.x, uv.w));
                 mesh.AddVert(new Vector3(max.x, max.y), fill, new Vector2(uv.z, uv.w));
@@ -73,10 +85,11 @@ namespace Switchboard.UI
             float radius = Mathf.Min(rect.width, rect.height) * 0.40f;
 
             AddDisc(mesh, center + Vector2.down * 3f, radius + 3f, new Color32(35, 36, 35, 255));
-            AddDisc(mesh, center, radius, blockedHighlight ? new Color32(231, 79, 66, 255) : highlighted
+            AddDisc(mesh, center, radius, blockedHighlight ? new Color32(231, 79, 66, 255) : ShowsConnected
+                ? new Color32(105, 207, 130, 255) : highlighted
                 ? new Color32(230, 204, 139, 255) : new Color32(167, 170, 163, 255));
             AddDisc(mesh, center + Vector2.up, radius * 0.86f, blockedHighlight
-                ? new Color32(247, 124, 103, 255) : new Color32(216, 216, 203, 255));
+                ? new Color32(247, 124, 103, 255) : ShowsConnected ? new Color32(166, 242, 182, 255) : new Color32(216, 216, 203, 255));
             AddDisc(mesh, center, radius * 0.70f, new Color32(77, 81, 77, 255));
             AddDisc(mesh, center + Vector2.down, radius * 0.57f, new Color32(22, 26, 24, 255));
         }
@@ -116,6 +129,7 @@ namespace Switchboard.UI
         {
             highlighted = false;
             blockedHighlight = false;
+            callConnected = false;
             base.OnDisable();
         }
     }

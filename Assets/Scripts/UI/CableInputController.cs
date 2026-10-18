@@ -65,14 +65,14 @@ namespace Switchboard.UI
             holder.SetActive(false);
             CableController cable = Instantiate(source, holder.transform, false);
             StoredCableView slot = Instantiate(sourceSlot, sourceSlot.transform.parent, false);
-            foreach (var outline in slot.GetComponentsInChildren<Outline>(true)) Destroy(outline);
+            foreach (var outline in slot.GetComponentsInChildren<Outline>(true)) DestroyCopyPart(outline);
             int number = cables.Length + 1;
             cable.name = $"Cable_{number:00}";
             slot.name = $"StoredCable_{number:00}";
             cable.SetTrayCableView(slot);
             cable.SetCableColor(color);
             cable.transform.SetParent(source.transform.parent, false);
-            Destroy(holder);
+            DestroyCopyPart(holder);
 
             var inventory = new CableController[cables.Length + 1];
             cables.CopyTo(inventory, 0);
@@ -80,6 +80,12 @@ namespace Switchboard.UI
             cables = inventory;
             LayoutTray();
             return cable;
+        }
+
+        private static void DestroyCopyPart(Object part)
+        {
+            if (Application.isPlaying) Destroy(part);
+            else DestroyImmediate(part);
         }
 
         public static float TraySpacing(int count) =>

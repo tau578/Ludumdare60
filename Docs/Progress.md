@@ -13,7 +13,7 @@
 | 5a. Economy file, shop, income, secret | done | ✅ 2026-10-18 (23 min) | ✅ 304/304 tests, scope clean | ✅ | e115c59 |
 | 5b. Extra wires and Notepad | done | ✅ 2026-10-18 (22 min) | ✅ 333/333 tests, scope clean | ✅ | 667adda |
 | 5c. Calls and pacing into Economy.json | done | ✅ 2026-10-18 (17 min) | ✅ 388/388 tests, scope clean | ✅ | f70b7df |
-| 7a. Board growth | done | ✅ 2026-10-18 (25 min) | ✅ 439/439 tests, scope clean | ✅ | |
+| 7a. Board growth | done | ✅ 2026-10-18 (25 min) | ✅ 439/439 tests, scope clean | ✅ | d166ffa |
 | 6. Saves, Boot, Web build | not started | | | | |
 | 7b. Pacing and tutorial | not started | | | | |
 | 8. Sound and feel | not started | | | | |
@@ -1777,6 +1777,13 @@ Follow-ups:
 - Design.md updated: implementation row, §6.1 (`GameConfig`, `CallerTypeDefinition`, `PacingProfile`), §6.4 sections, §9 "New caller type", and the pacing mentions in §5.
 - **Playtest (lead, 2026-10-18):** all looks good.
 
+### 2026-10-18 — Merge origin/main into Sergei's_branch
+
+- Resolved CordBridge, GameInstaller and CallQueueView by retaining active-call socket highlights, fee coins, sound and first-order guidance alongside main's purchased cords, Notepad and Economy.json configuration. CallQueueView receives both the Notepad and money counter; the bridge receives both desk and calls.
+- Added CordBridge.CableAdded so purchased cords participate in an already-running tutorial without restarting it. Picking up a purchased cord clears all hints. Cord cloning cleans up temporary objects in both Edit and Play Mode.
+- Updated the audio regression test for the new economy-first people loader. Added MergedSystemsTests covering actual Final bootstrap, purchase during cable hints, notes in speech text, real cable insertion, green socket highlights, fee coins, audio cues and hold/resume without duplicate rewards.
+- Verification: Unity compiled; 377 NUnit cases invoked directly with setup/teardown passed (0 failures), avoiding Unity TestRunner scene saves. Integration tests use isolated preview scenes. Report: Temp/MergeVerification/tests.txt. Final.unity and GameUI.prefab unchanged by resolution; unsaved editor scene preserved. No merge commit or push.
+
 ### Step 7a prep (orchestrator, 2026-10-18)
 - **Pre-flight:** `git fetch`: up to date with upstream. Editor idle on `Final.unity`, console cleared, 388/388 EditMode tests pass, no format-only re-saves.
 - **Brief check against the code:** the brief matches. Extra notes passed to the agent: `GameSession.DefaultMaxWaitingCalls`, `IGameContent.MaxWaitingCalls` and `CallQueueView`'s "check maxWaitingCalls" warning go with `GameConfig.maxWaitingCalls`; lamps light only through `SocketView.IsNavigationHighlighted`; the 4 untracked store-image `.meta` files stay untouched (Plan §8).
@@ -1886,3 +1893,76 @@ Follow-ups:
 - Design.md updated: implementation row, §1 rules, §3 members, 5.2 (cap and who), 5.7 (filter), 5.9 (7a deviations), 6.1, 6.4, §9 "Bigger board", D17. Plan.md: §8 (art imports, slot covers, EconomyFile wording), a cheat-sheet row for art merges, and 7a notes in the Step 6 outline.
 - **Playtest (lead, 2026-10-18):** OK. Committed and pushed with the store-image `.meta` files and the portrait slice fix.
 
+
+### Merge of Sergei's branch (e7acec5) into main: report (2026-10-18)
+Result: done. The merge is resolved in the working tree but **not staged or committed**: `git status` still shows `UU` for the three conflict files until the orchestrator stages them.
+
+Playable now: the game starts on 3×3 with 3 open caller slots, as after 7a, and has all of Sergei's polish: the first-order guide, green jacks for a connected call, coins flying to the money counter, the cash-register sound, the bigger socket and lamp art, and the "Surname, First" book.
+
+Conflicts resolved:
+- **`Assets/Configs/PhoneBook.json`:** Sergei's "Surname, First" names for all 33 people, plus our 7a swap: Fire Brigade on E5 and "Underhill, Reginald" on C2. The services are still first, the surname order is unchanged, `contactsPerPage` is 6, one entry per line, and 36 unique sockets.
+- **`Assets/Scripts/UI/SocketGraphic.cs`:** both features kept: `SetDimmed`/`IsDimmed` plus the `Tint` from 7a, and `SetCallConnected`/`IsCallConnected` from Sergei. A private `ShowsConnected => callConnected && !dimmed` drives the green in the sprite face and both disc colours, so a closed jack always reads as closed. The dimmed tint multiplies every colour as before.
+- **`Assets/Scripts/Game/GameInstaller.cs`:** `new GameContent(people, economy)` (7a) together with `cordBridge.Bind(Session.Desk, Session.Calls)` (Sergei). Everything else had already auto-merged correctly: the starting-board check, the `MostClientSlots` warning, `OpenBoardLink`, `callQueue.Bind(… notes:, syncBoard:, counter: moneyCounter)`, `audio.Bind(Session.Calls, Session.Earnings)`, and the `FirstOrderGuide` binding. No `MaxWaitingCalls` reference is left.
+
+Auto-merged files checked (no edits needed):
+- **`CallQueueView`:** our `SetOpenSlots` and covers sit alongside his `counter`, `OrderShown`, `CardOpened` and coin flight.
+- **`SocketView`:** `SetCallConnected` only greens an occupied socket, and a closed socket can't be occupied, so the two features can't clash. `Release` and `OnDisable` clear the green.
+- **`CableInputController`:** his `DestroyCopyPart` is kept, and so is our closed-socket refusal.
+- **`PhoneBookView`:** `FirstContactWithSurname` (comma and service rule) loops over the filtered `directory`, so `HasLetter` and the tabs still follow the open board. `OpenChanged` and `ClosedBookGraphic` were added.
+- **`CordBridge`:** call highlights and `CableAdded` sit next to our `ReturnToTray`. `ReturnCordsWhere` and the reset path are unaffected.
+- **`CallAudio`:** it is Sergei's version only.
+- **`PeopleFileLoader.SplitName`:** it reads both name forms, so the bubble still says "Arthur Hollis". The Notepad matches book taps by socket, so the new name form doesn't affect it.
+
+Changed by me (beyond the conflict resolution):
+- `Assets/Tests/Game/Editor/PhoneBookFilterTests.cs`: the expected 3×3 names now use the file's form ("Dunmore, Mabel", …, "Yardley, Lillian"). The order, count, pages and assertions are unchanged.
+- `Assets/Tests/Game/Editor/MergedSystemsTests.cs`: the `AcceptOrder` helper now picks a caller and a recipient who are on open jacks (`session.Board.IsInGame`). Before, it took the first caller in the file (Abbott on F6, which is closed at 3×3), so `NotepadAndNewCordKeepConnectionHighlightsCoinsAndAudio` failed at `TryInsert(a)` because a closed jack correctly refuses the plug. Its intent (Notepad note, bought cord, green jacks, coins, audio cues, hold and resume without paying twice) and every assertion are unchanged.
+
+Scene and prefab changes: none. `Final.unity` was never dirty, and I reloaded it from disk at the end. Sergei's scene and prefab versions are as merged.
+
+Tests: **455/455 EditMode** (453/455 before my two test fixes). No format-only re-saves of `TimeManager.asset` or `SampleScene.unity`.
+
+Console: clean (only the engine's two "Ignoring depth surface … memoryless" lines around screenshots); cleared at the end.
+
+Play Mode smoke test (`Final.unity`, stepped frames, clicks through `CableInputController.ProcessPointer` in a one-shot `Canvas.willRenderCanvases` handler):
+- **Start:** 3×3 board, 3 slots, 9 sockets open and 27 dimmed. Lamps 4–6 and D–F are dimmed on the new art, and the book has 9 contacts. Closed slots 4–6 have covers.
+- **First call:** Arthur Hollis (A1) wants Irene Godfrey (B2), both on open jacks. The guide was at stage `Portrait` with 1 pulse showing, and the card showed its "New order!" label.
+- **Cords:** I took the card and picked up `Cable_01` from the tray. Hovering D4 didn't highlight it, and clicking D4 left it empty with the cord still held. A1 then B2 connected: the call was `Connected`, A1 and B2 were green, coins were flying, and the wallet got the 11¢ fee. The guide went to `Cancelled` because I skipped the book step, which is its intended out-of-order behaviour.
+- **Dev "Open board"** (`TryGrantNext(ExtraClients)`): 4×4, 4 slots, 16 open, the book had 16 entries with the Doctor first, and the green A1/B2 call stayed connected.
+- **MainMenu path:** loading build index 0 (MainMenu) and then the next index gave `Final` (index 1) with a working 3×3 session, the guide at `Portrait`, and no errors.
+- **Editor left clean:** not in Play Mode, `Final.unity` active and not dirty, `timeScale` 1, the Game view size unchanged, SessionState keys erased, no callbacks left, console cleared.
+
+Screenshots (`Temp/Captures/`):
+- `merge-sergei.png`: 3×3 start with the first order and the guide.
+- `merge-sergei-connected.png`: A1–B2 green, with coins flying.
+- `merge-sergei-4x4.png`: after "Open board".
+
+Docs that describe how a name is written in `PhoneBook.json` (none edited; `EconomyFile.md` doesn't describe the name format):
+- `Docs/Design.md`:
+  - §5.7, around line 362: "the first surname (the last word of the name)". This is now wrong for "Surname, First".
+  - D31, line 610: lists the fields but not the name form. It's a good place to state "Surname, First" (services: their whole name).
+  - §6.3, line 510: name style only.
+  - Line 326: the bubble shows "Ada Moss", which is still true.
+  - Sergei's branch added a "Merge integration" note at the end of the file (staged with the merge).
+- `Docs/Plan.md`:
+  - Line 316: the Step 1b example `"Ada Moss"`.
+  - Line 319: "Each person's surname is the last word of `name`".
+  - Line 535: "Single-word names are fine for his parser".
+  - Line 607: "ShowLetter takes the first name whose last word starts with the letter".
+  - Line 249: historical `DirectoryListView` "Surname, First — C4".
+  - These are mostly historical briefs. Plan §8 or the Step 7b notes may want a line on the new form.
+- `Docs/EconomyFile.md`, line 166: the Notepad's "Ada Moss (C3)" is the bubble text, which is still correct.
+- `CLAUDE.md`, line 66: "keep the surname sort order" (still true).
+- There is no designer guide for `PhoneBook.json` itself.
+
+Deviations: none from Design. Where both flags are set, dimmed wins over green in `SocketGraphic`, as the brief asked.
+
+Follow-ups:
+- Design.md §5.7, D31 and §3 need updating: the "Surname, First" form, and the new public members `SocketGraphic`/`SocketView.SetCallConnected`, `CordBridge.CableAdded`, `CableController.PickedUp`, `PhoneBookView.OpenChanged`/`ClosedBookGraphic`, `CallQueueView.OrderShown`/`CardOpened`, and `CallAudio.ConnectionSucceeded`.
+- The full guide sequence (portrait, text, book, cords) was only checked by Sergei's EditMode tests (`FirstOrderGuideTests`, `MergedSystemsTests`), not stepped end to end in Play Mode. Worth including in the lead's playtest.
+
+#### Merge verification (orchestrator, 2026-10-18)
+- EditMode tests re-run: 455/455 green. No conflict markers left; `PhoneBook.json` has 36 people on 36 jacks in surname order, with Fire Brigade E5 and "Underhill, Reginald" C2.
+- The four store-image `.meta` files keep Sergei's GUIDs (ours from `8311221` are replaced; neither set was referenced anywhere).
+- Screenshots: `merge-sergei.png` (3×3 start, guide on the first card), `merge-sergei-connected.png` (A1–B2 green, coins flying), `merge-sergei-4x4.png`.
+- Design.md: a row for Sergei's branch, §3 hooks, §5.7 and D31 ("Surname, First"). Plan.md: 7b builds on `FirstOrderGuide`; Step 8 builds on the coins and cash-register sound.
+- **Playtest (lead, 2026-10-18):** OK.

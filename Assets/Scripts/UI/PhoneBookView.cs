@@ -39,6 +39,8 @@ namespace Switchboard.UI
         }
 
         public bool IsOpen { get; private set; }
+        public event System.Action<bool> OpenChanged;
+        public Graphic ClosedBookGraphic => closedBook != null ? closedBook.targetGraphic : null;
         public int CurrentSpreadIndex { get; private set; }
         /// <summary>The contacts the book shows, after the socket filter.</summary>
         public int ContactCount => directory.contacts.Length;
@@ -116,8 +118,11 @@ namespace Switchboard.UI
             letter = char.ToUpperInvariant(letter);
             for (int i = 0; i < directory.contacts.Length; i++)
             {
-                string name = directory.contacts[i].name;
-                if (char.ToUpperInvariant(name[name.LastIndexOf(' ') + 1]) == letter) return i;
+                var contact = directory.contacts[i];
+                string name = contact.name;
+                bool service = contact.tags != null && System.Array.IndexOf(contact.tags, "emergency-service") >= 0;
+                int initial = service || name.IndexOf(',') >= 0 ? 0 : name.LastIndexOf(' ') + 1;
+                if (char.ToUpperInvariant(name[initial]) == letter) return i;
             }
             return -1;
         }
@@ -213,9 +218,11 @@ namespace Switchboard.UI
 
         public void SetOpen(bool value)
         {
+            bool changed = IsOpen != value;
             IsOpen = value;
             closedBook.gameObject.SetActive(!value);
             openBook.gameObject.SetActive(value);
+            if (changed) OpenChanged?.Invoke(value);
         }
     }
 }

@@ -1274,7 +1274,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 - **Pacing:**
   - `PacingProfile` curves driven by progress (D19).
   - Caller type weights, with emergencies appearing later.
-- **Tutorial:** scripted opening calls with hints such as "Click the ringing card", "Find them in the book" and "Connect the two jacks".
+- **Tutorial:** scripted opening calls with hints such as "Click the ringing card", "Find them in the book" and "Connect the two jacks". **Sergei's `FirstOrderGuide` (merged `e7acec5`) already pulses the card, the book and the cords on the first call; build on it instead of adding a second guide**, and check with the lead what else 7b's tutorial needs.
 - **Tests:**
   - Weights follow progress.
   - The tutorial sequence.
@@ -1284,7 +1284,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 - **From Step 3:** replace the placeholder `card-take-click.wav` (set on `UiClickSound` in `GameUI.prefab`) with a real sound, and fill `CallCardView.OnCharacterShown` with the callers' talking sound (lead request).
 - **Audio:** `AudioService`, `AudioCueLibrary` and `FeedbackDirector` (Design §5.11):
   - One ringing loop and one alarm loop.
-  - Coin ticks.
+  - Coin ticks. (Sergei's merge `e7acec5` added a cash-register sound and fee coins flying to the counter; build on them.)
   - Cues for paid, hung up, missed and fined.
 - **Animation:**
   - Cards: a ringing wobble, sliding in and out, and stamps.
