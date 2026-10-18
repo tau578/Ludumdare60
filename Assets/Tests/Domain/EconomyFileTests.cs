@@ -49,24 +49,24 @@ namespace Switchboard.Domain.Tests
             EconomyCatalog catalog = EconomyFileLoader.Load(file.text);
             Assert.That(catalog.Errors, Is.Empty);
             Assert.That(catalog.Upgrades.Count, Is.EqualTo(11));
-            Assert.That(catalog.Upgrades[0].Id, Is.EqualTo("income_1"));
-            Assert.That(catalog.Upgrades[0].Kind, Is.EqualTo(UpgradeKind.ExtraIncome));
-            Assert.That(catalog.Upgrades[0].CostCents, Is.EqualTo(800));
-            Assert.That(catalog.Upgrades[0].IncomeMultiplier, Is.EqualTo(1.5));
+            Assert.That(catalog.Upgrades[6].Id, Is.EqualTo("income_1"));
+            Assert.That(catalog.Upgrades[6].Kind, Is.EqualTo(UpgradeKind.ExtraIncome));
+            Assert.That(catalog.Upgrades[6].CostCents, Is.EqualTo(800));
+            Assert.That(catalog.Upgrades[6].IncomeMultiplier, Is.EqualTo(1.5));
             int[] wires = { 4, 5, 6 };
             long[] costs = { 500, 800, 1300 };
             for (int i = 0; i < 3; i++)
             {
-                Assert.That(catalog.Upgrades[3 + i].Id, Is.EqualTo("wires_" + (i + 1)));
-                Assert.That(catalog.Upgrades[3 + i].Kind, Is.EqualTo(UpgradeKind.ExtraWires));
-                Assert.That(catalog.Upgrades[3 + i].Wires, Is.EqualTo(wires[i]));
-                Assert.That(catalog.Upgrades[3 + i].CostCents, Is.EqualTo(costs[i]));
+                Assert.That(catalog.Upgrades[i].Id, Is.EqualTo("wires_" + (i + 1)));
+                Assert.That(catalog.Upgrades[i].Kind, Is.EqualTo(UpgradeKind.ExtraWires));
+                Assert.That(catalog.Upgrades[i].Wires, Is.EqualTo(wires[i]));
+                Assert.That(catalog.Upgrades[i].CostCents, Is.EqualTo(costs[i]));
             }
-            Assert.That(catalog.Upgrades[6].Id, Is.EqualTo("notepad"));
-            Assert.That(catalog.Upgrades[6].Kind, Is.EqualTo(UpgradeKind.Notepad));
-            Assert.That(catalog.Upgrades[6].CostCents, Is.EqualTo(300));
+            Assert.That(catalog.Upgrades[9].Id, Is.EqualTo("notepad"));
+            Assert.That(catalog.Upgrades[9].Kind, Is.EqualTo(UpgradeKind.Notepad));
+            Assert.That(catalog.Upgrades[9].CostCents, Is.EqualTo(300));
             for (int i = 0; i < 3; i++)
-                Assert.That(catalog.Upgrades[7 + i].Kind, Is.EqualTo(UpgradeKind.ExtraClients), "the board entries follow the Notepad");
+                Assert.That(catalog.Upgrades[3 + i].Kind, Is.EqualTo(UpgradeKind.ExtraClients), "the board entries follow the cords");
             Assert.That(catalog.Upgrades[10].Kind, Is.EqualTo(UpgradeKind.Secret));
             Assert.That(catalog.Upgrades[10].CostCents, Is.EqualTo(25000));
         }
@@ -76,32 +76,29 @@ namespace Switchboard.Domain.Tests
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
             Assert.That(config.LoadEconomy().Upgrades.Count, Is.EqualTo(11));
-            Assert.That(config.LoadEconomy().StartingCords, Is.EqualTo(3));
+            Assert.That(config.LoadEconomy().StartingCords, Is.EqualTo(2));
             Assert.That(config.ExtraCordColors.Count, Is.EqualTo(3));
             Assert.That(config.Validate(), Is.Empty);
         }
 
         [Test]
-        public void TheRealShelfOffersIncomeWiresAndTheNotepadThenTheBiggerBoard()
+        public void TheRealShelfMatchesTheArtworkAndReplacesCompletedChains()
         {
             var file = AssetDatabase.LoadAssetAtPath<TextAsset>(EconomyFilePath);
             var upgrades = new UpgradeService(EconomyFileLoader.Load(file.text).Upgrades, new Wallet(100000));
             var shelf = new ShopShelf(upgrades);
             Assert.That(new[] { shelf.OfferAt(0).Id, shelf.OfferAt(1).Id, shelf.OfferAt(2).Id },
-                Is.EqualTo(new[] { "income_1", "wires_1", "notepad" }));
-
-            Assert.That(upgrades.TryBuy("notepad"), Is.True);
-            Assert.That(shelf.OfferAt(2).Id, Is.EqualTo("board_1"), "the board chain takes the sold-out slot");
-            Assert.That(shelf.OfferAt(0).Id, Is.EqualTo("income_1"));
-            Assert.That(shelf.OfferAt(1).Id, Is.EqualTo("wires_1"));
-
+                Is.EqualTo(new[] { "wires_1", "board_1", "income_1" }));
             Assert.That(upgrades.TryBuy("board_1"), Is.True);
             Assert.That(upgrades.TryBuy("board_2"), Is.True);
-            Assert.That(shelf.OfferAt(2).Id, Is.EqualTo("board_3"));
+            Assert.That(shelf.OfferAt(1).Id, Is.EqualTo("board_3"));
             Assert.That(upgrades.TryBuy("board_3"), Is.True);
-            Assert.That(shelf.OfferAt(2), Is.Null, "nothing is left for slot 3 after 6x6");
+            Assert.That(shelf.OfferAt(1).Id, Is.EqualTo("notepad"));
+            Assert.That(shelf.OfferAt(0).Id, Is.EqualTo("wires_1"));
+            Assert.That(shelf.OfferAt(2).Id, Is.EqualTo("income_1"));
+            Assert.That(upgrades.TryBuy("notepad"), Is.True);
+            Assert.That(shelf.OfferAt(1), Is.Null);
         }
-
         [Test]
         public void AValidFilePasses() => Assert.That(Load(Income("income_1", 800, 1.5f), Secret).Errors, Is.Empty);
 
@@ -149,8 +146,8 @@ namespace Switchboard.Domain.Tests
         [Test]
         public void ReportsWiresNotAboveTheStartingCords()
         {
-            AssertSingleError(Load(Wires("wires_1", 500, 3), Secret),
-                "Upgrade 1 \"wires_1\"", "wires 3 is not above the 3 cords the game starts with", "4 or more");
+            AssertSingleError(Load(Wires("wires_1", 500, 2), Secret),
+                "Upgrade 1 \"wires_1\"", "wires 2 is not above the 2 cords the game starts with", "3 or more");
             AssertSingleError(EconomyFileLoader.Load(JsonStartingWith(4, Wires("wires_1", 500, 4), Secret)), "wires 4", "5 or more");
         }
 

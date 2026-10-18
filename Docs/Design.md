@@ -529,7 +529,7 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
 `Assets/Configs/Economy.json` belongs to the designer, who edits it by hand. Keep it readable, with one entry per line. The format is documented for him in `Docs/EconomyFile.md`.
 - **Sections:**
   - `upgrades` [5a]: see 5.9.
-  - `startingCents`, `startingCords` (3–6) [5c].
+  - `startingCents`, `startingCords` [5c]: 2–6 since Sergei's `041fb90` (the tray is trimmed to the starting count; lead 2026-10-18), 3 before.
   - `startingBoard {cols, rows}` (1–6 per side) and `startingClientSlots` (1–6) [6]. If either is missing or wrong, the game opens the full board and 6 slots, with a message.
   - `pacing` [5c]: first-call delay, base interval, jitter, load factor and idle timeout.
   - `calls` [5c]: one entry per call type: `id`, `name`, `spawnWeight`, ranges `{min, max}` for rate, fee, duration and callback delay, response time, fines, callback flags, `maxSimultaneous`, `everyoneCalls`, `recipientTag`. Missing required fields are reported, never silently 0.

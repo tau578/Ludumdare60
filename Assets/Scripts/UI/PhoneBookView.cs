@@ -188,6 +188,9 @@ namespace Switchboard.UI
 
         private void ConfigurePageInput()
         {
+            foreach (var cover in new[] { closedBook, openBook })
+                if (cover != null && cover.targetGraphic != null && cover.targetGraphic.GetComponent<BookHoverHighlight>() == null)
+                    cover.targetGraphic.gameObject.AddComponent<BookHoverHighlight>();
             // Keep the artwork as the hit area; clicks bubble to this book instead of its old close button.
             if (openBook != null)
             {

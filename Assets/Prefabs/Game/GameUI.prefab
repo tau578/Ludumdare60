@@ -235,7 +235,9 @@ MonoBehaviour:
   cardTemplate: {fileID: 6140175107872869293}
   cardArea: {fileID: 7702424201287875913}
   slideSpeed: 14
+  callerFrame: {fileID: 21300000, guid: 334abe67356188d4589e014d293d7520, type: 3}
   takeSound: {fileID: 7137156963589572439}
+  closedSlotCover: {r: 0.06, g: 0.05, b: 0.04, a: 0.72}
 --- !u!1 &1259796148952775976
 GameObject:
   m_ObjectHideFlags: 0
@@ -1844,6 +1846,7 @@ MonoBehaviour:
   speechBubble: {fileID: 6533502445742123560}
   speechLabel: {fileID: 5348750625164458506}
   charactersPerSecond: 40
+  jackTextSize: 85
   feePopup: {fileID: 3946425803740230300}
   cordRing: {fileID: 958743191443472046}
   callbackBadge: {fileID: 6951941536909647226}

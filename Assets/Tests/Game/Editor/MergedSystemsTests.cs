@@ -33,6 +33,10 @@ namespace Switchboard.Game.Tests
         {
             // A preview scene keeps the user's open scene and unsaved edits intact.
             scene = EditorSceneManager.OpenPreviewScene("Assets/Scenes/Final.unity");
+            // Startup removes spare tray objects; allow those runtime changes only in the disposable scene.
+            foreach (var transform in All<Transform>().Where(t => PrefabUtility.IsOutermostPrefabInstanceRoot(t.gameObject)).ToArray())
+                if (PrefabUtility.IsOutermostPrefabInstanceRoot(transform.gameObject))
+                    PrefabUtility.UnpackPrefabInstance(transform.gameObject, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
             Canvas.ForceUpdateCanvases();
             foreach (var canvas in All<Canvas>().Where(c => c.isRootCanvas))
                 LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)canvas.transform);
@@ -64,6 +68,42 @@ namespace Switchboard.Game.Tests
             var card = All<CallCardView>().Single(c => c.Call == call);
             Invoke(queue, "OnCardClicked", card);
             return card;
+        }
+
+        [Test]
+        public void FreshGameHidesLockedPlacesAndShopPurchasesRevealThem()
+        {
+            Assert.That(session.Stats.Cords, Is.EqualTo(2));
+            Assert.That(bridge.CordCount, Is.EqualTo(2));
+            Assert.That(All<CableController>().Count(c => c.gameObject.activeInHierarchy), Is.EqualTo(2));
+            Assert.That(All<CableController>().Where(c => c.gameObject.activeInHierarchy)
+                .All(c => c.TrayView.Artwork != null && c.TrayView.Artwork.enabled), Is.True);
+            var sockets = All<SocketView>();
+            Assert.That(sockets.Count(s => s.GetComponent<SocketGraphic>().enabled), Is.EqualTo(9));
+            Assert.That(sockets.Where(s => !s.IsOpen).All(s => !s.GetComponent<SocketGraphic>().raycastTarget), Is.True);
+            var callerSlots = Field<RectTransform[]>(queue, "slots");
+            Assert.That(callerSlots.Count(s => s.GetComponent<CanvasGroup>().alpha > 0), Is.EqualTo(3));
+            var shop = All<ShopView>().Single();
+            session.Wallet.Earn(10000);
+            Invoke(shop, "LateUpdate");
+            var slots = All<UpgradeSlotView>().OrderByDescending(s => s.transform.position.y).ToArray();
+            Assert.That(Field<TMPro.TMP_Text>(slots[0], "title").text, Is.EqualTo("More Cables"));
+            Assert.That(Field<TMPro.TMP_Text>(slots[1], "title").text, Is.EqualTo("More Clients"));
+            Assert.That(Field<Image>(slots[1], "background").sprite.name, Does.Contain("buy_btn"));
+            long before = session.Wallet.Cents;
+            Field<Button>(slots[1], "button").onClick.Invoke();
+            Assert.That(session.Wallet.Cents, Is.EqualTo(before - 1000));
+            Assert.That(sockets.Count(s => s.GetComponent<SocketGraphic>().enabled), Is.EqualTo(16));
+            Assert.That(callerSlots.Count(s => s.GetComponent<CanvasGroup>().alpha > 0), Is.EqualTo(4));
+            Field<Button>(slots[0], "button").onClick.Invoke();
+            Assert.That(bridge.CordCount, Is.EqualTo(4));
+            var card = AcceptOrder();
+            var text = Field<TMPro.TMP_Text>(card, "speechLabel").text;
+            Assert.That(text, Does.Contain("<b>" + card.Call.Request.CallerPerson.LastName + "</b>"), "D50: the book is sorted by surname");
+            Assert.That(text, Does.Not.Contain("<b>" + card.Call.Request.CallerPerson.FirstName + "</b>"));
+            Assert.That(session.Upgrades.TryBuy("wires_2") && session.Upgrades.TryBuy("wires_3"), Is.True);
+            Assert.That(All<CableController>().Where(c => c.gameObject.activeInHierarchy)
+                .Select(c => c.CableColor).Distinct().Count(), Is.EqualTo(6), "Buying the removed third cord restores its colour before the extra colours");
         }
 
         [Test]
@@ -134,7 +174,7 @@ namespace Switchboard.Game.Tests
             Assert.That(bridge.CordCount, Is.EqualTo(4));
             var bought = All<CableController>().Single(c => c.name == "Cable_04");
             var hints = bought.TrayView.GetComponentsInChildren<SlowGuidePulse>();
-            Assert.That(hints.Length, Is.EqualTo(3));
+            Assert.That(hints.Length, Is.EqualTo(1), "The complete coiled-cord sprite is highlighted");
             Assert.That(hints.All(p => p.IsShowing), Is.True, "Cloned and newly registered hints must work together");
             foreach (var hint in hints) Invoke(hint, "Update");
             Assert.That(bought.TryPickUp(), Is.True);

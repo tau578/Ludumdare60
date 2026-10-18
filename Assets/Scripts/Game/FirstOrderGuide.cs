@@ -47,7 +47,7 @@ namespace Switchboard.Game
 
         private void RegisterCable(CableController cable)
         {
-            if (cable == null || cables.Contains(cable)) return;
+            if (cable == null || !cable.gameObject.activeInHierarchy || cables.Contains(cable)) return;
             cables.Add(cable);
             cable.PickedUp += OnCablePickedUp;
             // A bought cord joins the current hint without restarting the tutorial.
@@ -118,7 +118,7 @@ namespace Switchboard.Game
                 foreach (var cable in cables)
                     if (cable != null && cable.IsInTray && cable.TrayView != null)
                         foreach (var graphic in cable.TrayView.GetComponentsInChildren<Graphic>())
-                            if (graphic is CableGraphic || graphic is PlugGraphic) Show(graphic);
+                            if (graphic is CableGraphic || graphic is PlugGraphic || graphic == cable.TrayView.Artwork) Show(graphic);
         }
 
         private void Show(Graphic graphic, bool portrait = false, bool silhouette = false)

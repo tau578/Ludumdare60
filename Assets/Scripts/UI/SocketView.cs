@@ -27,7 +27,7 @@ namespace Switchboard.UI
         public RectTransform PlugAnchor => plugAnchor;
         public bool IsOccupied => occupyingCable != null;
 
-        /// <summary>A closed socket (D42) is dimmed, ignores hover and clicks, and takes no plug.</summary>
+        /// <summary>A closed socket (D42) is hidden, ignores hover and clicks, and takes no plug.</summary>
         public bool IsOpen => open;
         public bool IsNavigationHighlighted => isActiveAndEnabled && open && pointerHovered && pointerCable != null;
         public CableController OccupyingCable => occupyingCable;
@@ -63,6 +63,8 @@ namespace Switchboard.UI
                 pointerCable = null;
             }
             Graphic.SetDimmed(!open);
+            Graphic.enabled = open;
+            Graphic.raycastTarget = open;
             RefreshHighlight();
         }
 

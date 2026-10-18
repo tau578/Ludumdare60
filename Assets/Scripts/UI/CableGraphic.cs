@@ -11,6 +11,8 @@ namespace Switchboard.UI
         private Vector2 first, second;
         [SerializeField] private Color insulationColor = new Color32(178, 99, 51, 255);
         [SerializeField] private float maximumSag = 155f;
+        [SerializeField] private float thicknessScale = 1f;
+        public float ThicknessScale { get => thicknessScale; set { thicknessScale = value; SetVerticesDirty(); } }
         public float MaximumSag { get => maximumSag; set { maximumSag = Mathf.Max(28, value); SetVerticesDirty(); } }
         public Color InsulationColor { get => insulationColor; set { insulationColor = value; SetVerticesDirty(); } }
 
@@ -42,6 +44,7 @@ namespace Switchboard.UI
 
         private void Strip(VertexHelper mesh, float halfWidth, Vector2 offset, Color tint)
         {
+            halfWidth *= thicknessScale;
             int start = mesh.currentVertCount;
             for (int i = 0; i <= Segments; i++)
             {

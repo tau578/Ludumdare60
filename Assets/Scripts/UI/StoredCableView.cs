@@ -11,6 +11,26 @@ namespace Switchboard.UI
         [SerializeField] private CableGraphic wire;
         [SerializeField] private PlugGraphic firstPlug;
         [SerializeField] private PlugGraphic secondPlug;
+        [SerializeField, HideInInspector] private Image artwork;
+        public Graphic Artwork => artwork;
+
+        public void SetArtwork(Sprite sprite, Color tint)
+        {
+            if (sprite == null) return;
+            if (artwork == null)
+            {
+                artwork = new GameObject("Coiled cable", typeof(RectTransform)).AddComponent<Image>();
+                artwork.transform.SetParent(transform, false);
+                artwork.rectTransform.anchorMin = Vector2.zero;
+                artwork.rectTransform.anchorMax = Vector2.one;
+                artwork.rectTransform.offsetMin = artwork.rectTransform.offsetMax = Vector2.zero;
+                artwork.preserveAspect = true;
+                artwork.raycastTarget = false;
+            }
+            artwork.sprite = sprite; artwork.color = tint;
+            artwork.enabled = Available;
+            if (preview != null) preview.gameObject.SetActive(false);
+        }
         private Image hitArea;
         private Outline[] hoverOutlines;
         private bool highlighted;
@@ -49,7 +69,8 @@ namespace Switchboard.UI
         {
             if (!available) SetHighlighted(false);
             HitArea.enabled = available;
-            if (preview != null) preview.gameObject.SetActive(available);
+            if (preview != null) preview.gameObject.SetActive(available && artwork == null);
+            if (artwork != null) artwork.enabled = available;
         }
 
         public void SetHighlighted(bool value)
@@ -59,7 +80,8 @@ namespace Switchboard.UI
             highlighted = value;
             if (value && hoverOutlines == null)
             {
-                hoverOutlines = new[] { CreateOutline(wire), CreateOutline(firstPlug), CreateOutline(secondPlug) };
+                hoverOutlines = artwork != null ? new[] { CreateOutline(artwork) }
+                    : new[] { CreateOutline(wire), CreateOutline(firstPlug), CreateOutline(secondPlug) };
             }
             if (hoverOutlines != null)
                 foreach (var outline in hoverOutlines) if (outline != null) outline.enabled = value;

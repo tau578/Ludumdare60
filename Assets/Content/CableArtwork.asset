@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61cb448121af60946aec8ef527e057cd, type: 3}
+  m_Name: CableArtwork
+  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.CableArtwork
+  variants:
+  - color: {r: 0.69803923, g: 0.3882353, b: 0.2, a: 1}
+    stored: {fileID: -3044055176492259856, guid: c9c109f6e684149de843530bf8904e38, type: 3}
+    held: {fileID: -1503751511077909094, guid: 2a88d3f70ec1fa64a97d369c8e2be2d5, type: 3}
+    inserted: {fileID: 1149282559561142150, guid: 8b6b82cf2e521a84397bd06606b80c35, type: 3}
+  - color: {r: 0, g: 0, b: 1, a: 1}
+    stored: {fileID: -5966461618538700238, guid: 3c06949b3823146e08ad7a557cbdfca4, type: 3}
+    held: {fileID: 2689229271172912352, guid: bca072e92d0da4e3a84d95a7622f3c3d, type: 3}
+    inserted: {fileID: 9142326053265384769, guid: a35e335cc4be64ad4aef453c9d67b2f4, type: 3}
+  - color: {r: 1, g: 0, b: 0, a: 1}
+    stored: {fileID: 6663645106827378927, guid: dedf3dcfcc2c34043ad33fdb7140d298, type: 3}
+    held: {fileID: 7749450372054959837, guid: b176067e884614de2bd828a88b3f1a6f, type: 3}
+    inserted: {fileID: 3918470632290592856, guid: 034e4485507c44996ab0857803df6631, type: 3}
+  - color: {r: 0.6, g: 0, b: 0.8, a: 1}
+    stored: {fileID: -131603072231441027, guid: 0ebbe79bd7bf74dd09a4a316279fb27f, type: 3}
+    held: {fileID: 7075944494478820041, guid: 32adb600fc4f84d75ac5f8d00e7033e7, type: 3}
+    inserted: {fileID: -6717122379298413897, guid: b65985753f53a4077ac0f80287e88a46, type: 3}
+  - color: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+    stored: {fileID: 7963501479280200550, guid: 98493829ad275408a9d625df9f1adc58, type: 3}
+    held: {fileID: -7898041412995760802, guid: 7de3aa4495fb04432813bcc42ff4d4f0, type: 3}
+    inserted: {fileID: -987549461902839776, guid: e51c92ddc67ca4c728a0fb29b641c038, type: 3}

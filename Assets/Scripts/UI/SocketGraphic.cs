@@ -148,11 +148,18 @@ namespace Switchboard.UI
             return (localPoint - rect.center).sqrMagnitude <= radius * radius;
         }
 
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            RefreshHalo();
+        }
+
         protected override void OnDisable()
         {
             highlighted = false;
             blockedHighlight = false;
-            callConnected = false;
+            // Closing a board section hides its graphic, but an existing call can survive a dev reset.
+            if (!dimmed) callConnected = false;
             if (halo != null) halo.gameObject.SetActive(false);
             base.OnDisable();
         }

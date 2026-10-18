@@ -66,8 +66,15 @@ namespace Switchboard.Game.Tests
             PhoneBookView book = Book();
 
             Assert.That(book.ContactCount, Is.EqualTo(raw.contacts.Length));
+            bool inPeople = false;
             for (int i = 0; i < raw.contacts.Length; i++)
-                Assert.That(book.ContactAt(i).name, Is.EqualTo(raw.contacts[i].name.Trim()), $"entry {i + 1}");
+            {
+                var shown = book.ContactAt(i);
+                Assert.That(shown.name, Is.EqualTo(raw.contacts[i].name.Trim()), $"entry {i + 1}");
+                Assert.That(shown.socket, Is.EqualTo(raw.contacts[i].socket.Trim().ToUpperInvariant()), $"entry {i + 1} keeps its socket");
+                if (!shown.IsEmergencyService) inPeople = true;
+                else Assert.That(inPeople, Is.False, $"entry {i + 1}: services come first");
+            }
             Assert.That(book.ContactAt(raw.contacts.Length - 1).name, Does.Contain(", "), "people stay \"Surname, First\"");
         }
 

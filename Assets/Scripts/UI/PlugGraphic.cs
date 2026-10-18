@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Sprites;
 
 namespace Switchboard.UI
 {
@@ -9,11 +10,38 @@ namespace Switchboard.UI
     {
         [SerializeField] private Color sleeveColor = new Color32(166, 91, 48, 255);
         public Color SleeveColor { get => sleeveColor; set { sleeveColor = value; SetVerticesDirty(); } }
-        public Vector2 TailOffset => new Vector2(0, -64);
+        [SerializeField] private Sprite heldSprite, insertedSprite;
+        [SerializeField] private Color artworkTint = Color.white;
+        private bool inserted;
+        private Sprite CurrentSprite => inserted ? insertedSprite : heldSprite;
+        public override Texture mainTexture => CurrentSprite != null ? CurrentSprite.texture : base.mainTexture;
+        public Vector2 TailOffset => CurrentSprite != null ? new Vector2(0, inserted ? -54 : -128) : new Vector2(0, -64);
+
+        public void SetArtwork(Sprite held, Sprite connected, Color tint)
+        { heldSprite = held; insertedSprite = connected; artworkTint = tint; SetAllDirty(); }
+
+        public void SetInserted(bool value)
+        { if (inserted == value) return; inserted = value; SetAllDirty(); }
 
         protected override void OnPopulateMesh(VertexHelper mesh)
         {
             mesh.Clear();
+            if (CurrentSprite != null)
+            {
+                var sprite = CurrentSprite;
+                float height = inserted ? 84 : 132;
+                float width = height * sprite.rect.width / sprite.rect.height;
+                // The inserted artwork includes transparent space above its socket centre.
+                float top = inserted ? 30 : 0;
+                Vector4 uv = DataUtility.GetOuterUV(sprite);
+                Color tint = color * artworkTint;
+                mesh.AddVert(new Vector2(-width / 2, top - height), tint, new Vector2(uv.x, uv.y));
+                mesh.AddVert(new Vector2(-width / 2, top), tint, new Vector2(uv.x, uv.w));
+                mesh.AddVert(new Vector2(width / 2, top), tint, new Vector2(uv.z, uv.w));
+                mesh.AddVert(new Vector2(width / 2, top - height), tint, new Vector2(uv.z, uv.y));
+                mesh.AddTriangle(0, 1, 2); mesh.AddTriangle(2, 3, 0);
+                return;
+            }
             Box(mesh, -13, -52, 28, 37, new Color32(15, 18, 15, 150));
             Box(mesh, -4, -23, 8, 23, new Color32(171, 168, 139, 255));
             Box(mesh, -3, -21, 3, 20, new Color32(242, 230, 186, 255));

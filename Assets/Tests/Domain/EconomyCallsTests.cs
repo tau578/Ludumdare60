@@ -77,7 +77,7 @@ namespace Switchboard.Domain.Tests
             Assert.That(catalog.Errors, Is.Empty);
 
             Assert.That(catalog.StartingCents, Is.EqualTo(0));
-            Assert.That(catalog.StartingCords, Is.EqualTo(3));
+            Assert.That(catalog.StartingCords, Is.EqualTo(2));
             Assert.That(catalog.Pacing.FirstCallDelaySeconds, Is.EqualTo(2));
             Assert.That(catalog.Pacing.BaseIntervalSeconds, Is.EqualTo(8));
             Assert.That(catalog.Pacing.IntervalJitter, Is.EqualTo(0.3).Within(1e-6));
@@ -294,7 +294,7 @@ namespace Switchboard.Domain.Tests
 
             Assert.That(catalog.Errors, Is.Empty);
             Assert.That(catalog.StartingCents, Is.EqualTo(0));
-            Assert.That(catalog.StartingCords, Is.EqualTo(3));
+            Assert.That(catalog.StartingCords, Is.EqualTo(2));
         }
 
         [Test]
@@ -306,15 +306,15 @@ namespace Switchboard.Domain.Tests
             Assert.That(catalog.StartingCords, Is.EqualTo(6));
         }
 
-        [TestCase(2, "below the 3 cords the tray is built with")]
+        [TestCase(1, "below the 2 cords the tray is built with")]
         [TestCase(7, "more than the tray holds")]
-        public void StartingCordsOutsideThreeToSixFallBackToThree(int cords, string message)
+        public void StartingCordsOutsideTwoToSixFallBackToTwo(int cords, string message)
         {
             EconomyCatalog catalog = Load(Sample(start: "'startingCords': " + cords));
 
-            Assert.That(catalog.StartingCords, Is.EqualTo(3));
+            Assert.That(catalog.StartingCords, Is.EqualTo(2));
             Assert.That(catalog.Errors.Count, Is.GreaterThanOrEqualTo(1), string.Join("\n", catalog.Errors));
-            Assert.That(catalog.Errors[0], Does.Contain("startingCords " + cords).And.Contain(message).And.Contain("Use 3 to 6"));
+            Assert.That(catalog.Errors[0], Does.Contain("startingCords " + cords).And.Contain(message).And.Contain("Use 2 to 6"));
         }
 
         [Test]

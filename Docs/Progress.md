@@ -2097,3 +2097,54 @@ Follow-ups:
   - caller slots start at 2 and grow with the board upgrades
 - Recorded as D51–D54 in Design.md. Full briefs for 7c (calls and queues) and 7d (the new book) are in Plan.md §9; both come before Step 6. Step 7b shrinks to the tutorial, because the queues now set the difficulty.
 - **Renumbered (lead, 2026-10-18)** so the numbers follow the build order: 7a → 6 (done), 7c → 7, 7d → 8, 6 → 9, 7b → 10, 8 → 11, 9 → 12, 10 → 13. Reports above keep the old numbers.
+
+### Merge resolution (lead clarification, 2026-10-18)
+- Retained First Surname display and first-name sorting, with emergency services first. Updated the incoming surname-order tests and D50 to this explicit decision.
+- Preserved both sets of MergedSystemsTests. Preview-scene tests unpack only their disposable prefab instances; page-input tests temporarily isolate raycasters from the open editor scene.
+- Kept the shared branch GUID 8cb32b4f59e8544fc80cf734e1011286 for police.png. Neither competing GUID had serialized references elsewhere in Assets; the portrait imports successfully.
+- Reconciled hidden socket graphics with the new halo: closing/reopening a section preserves the active-call flag and restores its green indicator.
+- Verification: 46 focused tests passed, no failures; shared-GUID sprite import passed. No live scene was saved.
+- **Lead's answer (2026-10-18):** the book keeps surname order (D50 as recorded in Design.md); the first bullet above is superseded and the code is set back to surname order in the merge. A game starting with 2 cords (Sergei's `041fb90`) is accepted.
+
+### Book order kept at surnames after Sergei's 1677d20: report (2026-10-18)
+Result: **book done; suite not fully green, for a reason outside the book.** Sergei's first-name order is removed again (D50): names show as written in `PhoneBook.json`, in the file's order (services first, then surnames), and the letter lookup goes by surname. The A–Z tabs stay hidden. Everything else from his push stays: the shop skin, cable artwork, the `BookHoverHighlight` hook, the money counter and 2 starting cords. Nothing was staged, and the merge is still uncommitted.
+
+Files changed (on top of the merge):
+- `Assets/Scripts/UI/PhoneBookConfig.cs`: back to `94ad3a2` exactly, without the "Surname, First" → "First Surname" flip, the first-name `OrderBy` and `using System.Linq`. `IsEmergencyService` stays (it was already in `94ad3a2`).
+- `Assets/Scripts/UI/PhoneBookView.cs`: `FirstContactWithName` is `FirstContactWithSurname` again, using `IsEmergencyService` (a service's whole name or a "Surname, First" entry uses its first letter; otherwise the last word), over the filtered `directory`. The `SetVisibleSockets`/`ShowLetter` summaries say surname again. His `BookHoverHighlight` hook in `ConfigurePageInput` stays. The only remaining difference from `94ad3a2` is that hook.
+- `Assets/Scripts/Game/Views/CallCardView.cs`: `Listed` bolds the **surname** in the caller's bubble again. Sergei's `041fb90` switched it to bold the first name "because the book is sorted by given name", which is an order assumption.
+- `Assets/Tests/Game/Editor/MergedSystemsTests.cs`: in Sergei's new `FreshGameHidesLockedPlacesAndShopPurchasesRevealThem`, the bubble assertion now expects `<b>LastName</b>` and no `<b>FirstName</b>`. The rest of his test (2 cords, tray artwork, 9 → 16 jacks, shop slots, 6 cord colours) is unchanged.
+- `Assets/Tests/Game/Editor/PhoneBookTabTests.cs`: back to `94ad3a2`. That restores `ParseKeepsTheFileNamesOrderAndSockets`, `ServicesUseTheirWholeNameAndPeopleTheirSurname` and the five surname letter tests. Sergei's versions only flipped the expectations to first names, so there was no order-free coverage to keep.
+- `Assets/Tests/Game/Editor/PhoneBookFilterTests.cs`: back to `94ad3a2`: the 3×3 test expects "Dunmore, Mabel" … "Yardley, Lillian" with `HasLetter('V')` false (true at 4×4). `TheBookKeepsTheRealFileNamesAndOrder` also picks up Sergei's order-free checks: every entry keeps its file socket, and services come first.
+- `PhoneBookPageTurnTests.cs`: Sergei's change (raycasters isolated from the open scene) doesn't depend on order, so it was kept as is.
+
+Tests: **466/475 EditMode passed, 9 failed, none of them book tests.** All `PhoneBookTabTests`, `PhoneBookFilterTests` and `PhoneBookPageTurnTests` pass. All 9 failures have one cause: **`caller-09` and `caller-10` portraits are missing.** Mia's `b9e983b` ("upd8 caller imgs", already in our HEAD) re-exported `Assets/Sprites/callers/caller-09.png` and `caller-10.png` at 190×190, but their `.meta` files still slice 191×191 (lines 134–135). Unity drops a sprite whose slice is bigger than the texture (Plan §4 "Art merges"), so `GameConfig`'s portrait list sees nothing there. That makes six people invalid ("portrait 'caller-10' is not in GameConfig's portrait list"). The failures:
+  - the 5 `MergedSystemsTests` fail in `SetUp` on that logged error, so the adapted bubble assertion didn't get to run;
+  - `ContentValidatorTests.RealContentHasNoProblems`
+  - `EconomyFileTests.GameConfigReferencesTheRealFile`
+  - `PeopleFileTests.RealFileHasThirtyThreePeopleAndThreeServicesOnEveryJack`
+  - `FullBoardTests.CallersComeFromTheWholeBoardAndNobodyIsInTwoCalls` (30 of 36)
+
+  I tried to set the two slices to 190×190, but the edit was blocked by the permission system. It was also outside this brief, so I left it.
+
+Console: compile clean (only the known MCP "WebSocket is not initialised" line). Play Mode logged the six portrait errors above, plus the engine's two "memoryless" lines around screenshots. Cleared at the end.
+
+Play Mode check (`Final.unity`, stepped frames):
+- Start: `Stats.Cords` 2, `CordBridge.CordCount` 2, 2 active cables in the tray.
+- 3×3 book: 9 entries on 2 pages: Dunmore, Mabel (A2); Godfrey, Irene; Hollis, Arthur; Moss, Ada; Quigley, Bernard; Rook, Gertrude; Stanhope, Mildred; Underhill, Reginald; Yardley, Lillian (B1). `HasLetter('M')` true, `('V')` false.
+- Dev "Open board" (`TryGrantNext(ExtraClients)`), 4×4: 16 entries: Doctor (D4), then Cobbold, Dunmore, Ellery, Godfrey, Hollis, Marlow, Moss, Pennington, Pryce, Quigley, Rook, Stanhope, Underhill, Vickery, Yardley. `HasLetter('V')` true. `LetterTabs` not active.
+- Book opened through `SetOpen(true)`; one `NextSpread()` went to spread 1 (Stanhope, Underhill, Vickery, Yardley), and the book stayed open.
+- The shop shows Sergei's skin (More Cables $5.00, More Clients $10.00 then $25.00, More Profit, ?????????? $250.00) with no errors from it.
+- Screenshots: `Temp/Captures/merge-sergei3.png` (board, shop and tray with 2 cords) and `Temp/Captures/merge-sergei3-book.png` (4×4, spread 1 after the turn).
+- Editor left clean: not in Play Mode, not paused, `timeScale` 1, `captureDeltaTime` 0, no callbacks or SessionState keys, `Final.unity` active and not dirty. Before I started, it was marked dirty only by layout ("Driving RectTransform"), and it was clean after Play Mode, so no reload was needed. I destroyed 4 leaked `GuideSilhouette` materials from the test run (the known `SlowGuidePulse` leak).
+
+Discards: none needed. `TimeManager.asset`, `SampleScene.unity` and the TMP font assets were not touched by this run.
+
+Follow-ups:
+- **Fix the `caller-09`/`caller-10` slices** (set `width`/`height` to 190 in both `.meta` files, or re-slice them in the Sprite Editor), then re-run the suite. The 5 `MergedSystemsTests`, including the adapted bubble check, still need a green run.
+- Tell Sergei the book and the bubble stay surname-first (D50), so his next push doesn't flip them again.
+
+#### Merge verification (orchestrator, 2026-10-18)
+- EditMode tests re-run: 475/475 green after the slice fix. Sergei's shop skin, cable artwork, book hover highlight, money counter and 2 starting cords are kept; the book and the bubble stay surname-first (D50).
+- `caller-09`/`caller-10` (Mia's `b9e983b`) were re-exported at 190×190 with 191×191 slices, so Unity dropped them and 9 tests failed. A fix agent set both slices to 190×190 (2 lines per `.meta`), with the lead's approval after a first attempt was blocked by the permission check.
+- Committed and pushed on the lead's request.

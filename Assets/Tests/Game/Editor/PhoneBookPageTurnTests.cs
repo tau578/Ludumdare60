@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Linq;
 using Switchboard.Cables;
 using NUnit.Framework;
 using Switchboard.UI;
@@ -160,8 +161,11 @@ namespace Switchboard.Game.Tests
             camera.orthographicSize = 540;
             var texture = new RenderTexture(1920, 1080, 24);
             camera.targetTexture = texture;
+            // An open game's overlay canvas must not intercept this isolated camera-canvas test.
+            var otherRaycasters = RaycasterManager.GetRaycasters().Where(r => r != raycaster && r.isActiveAndEnabled).ToArray();
             try
             {
+                foreach (var other in otherRaycasters) other.enabled = false;
                 EventSystem.current = eventSystem;
                 var canvas = root.GetComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceCamera;
@@ -251,6 +255,7 @@ namespace Switchboard.Game.Tests
                 Object.DestroyImmediate(texture);
                 Object.DestroyImmediate(events);
                 if (previousEventSystem != null) EventSystem.current = previousEventSystem;
+                foreach (var other in otherRaycasters) if (other != null) other.enabled = true;
             }
         }
     }
