@@ -6,8 +6,8 @@
 | 1b. Fee, book, layout | done | ✅ 2026-10-17 (20 min) | ✅ 91/91 tests, scope clean | ✅ | 60c7a88 |
 | 1c. Money slot in shop header | done | ✅ 2026-10-17 (8 min) | ✅ 91/91 tests | ✅ | 47735c1 |
 | 2a. Queue, callbacks, dev panel | done | ✅ 2026-10-17 (24 min) | ✅ 156/156 tests, scope clean | ✅ | 2b00ac7 |
-| 2b. Hold and resume | done | ✅ 2026-10-18 (12 min) | ✅ 187/187 tests, scope clean | ✅ | |
-| 3. Phone book and cards | not started | | | | |
+| 2b. Hold and resume | done | ✅ 2026-10-18 (12 min) | ✅ 187/187 tests, scope clean | ✅ | 4c5ac50 |
+| 3. Phone book and cards | done | ✅ 2026-10-18 (16 min + 8 min fix + 3 min fix) | ✅ 211/211 tests, scope clean | ✅ | |
 | 4. Emergencies and fines | not started | | | | |
 | 5. Upgrades, shop, goal | not started | | | | |
 | 6. Saves, Boot, Web build | not started | | | | |
@@ -688,3 +688,230 @@ Follow-ups:
 
 #### Step 2b playtest (lead, 2026-10-18)
 - Everything looks correct. The lead asked to commit.
+
+### Step 3 prep (orchestrator, 2026-10-18)
+- **Decisions:** D34 (book tabs as a coordinated change) and D35 (36 people) are decided. The lead approved changes to the Sergei files listed in the Step 3 brief and nothing else of his, and has told Sergei his book files are about to change.
+- **Portraits:** reuse `caller-01`…`caller-12` three times each (lead confirmed).
+- **Pre-flight:**
+  - `git fetch`: up to date with upstream, no teammate changes.
+  - Unity connected, idle, not in Play Mode, `Game.unity` active. Console cleared.
+  - EditMode tests: 187/187 passed. The working tree is clean after the run.
+
+
+### Step 3 report: 2026-10-18
+Result: done
+
+Playable now: Open the book. A–M tabs sit on the left page edge and N–Z on the right. Tapping a letter jumps to the spread with the first surname starting with it. Only X is greyed out, because no surname starts with X, and tapping it does nothing. The tabs for the spread on show are lighter. The left and right arrow keys also turn the pages while the book is open. All 36 jacks A1–F6 have a person, over 3 spreads, sorted by surname, and callers come from the whole board. Cards are easier to read:
+- **In hand:** a bigger bubble with the surnames in bold ("Herbert **Marlow** / wants / Ada **Moss**"), because the book is sorted by surname.
+- **On hold:** the cord ring and the earnings are dimmed.
+- **Stamps:** a different ink for each outcome: green "Paid $X", red "Wrong number!" and brown "Cut off".
+- **Fee popup:** the "+N¢" popup no longer covers the earnings badge.
+- **Badges:** they now have a light outline, like the panel frame.
+
+How to test: the Plan's Step 3 playtest script.
+
+Created:
+- `Assets/Scripts/UI/PhoneBookTab.cs`: one letter tab, a thin view over `PhoneBookView.ShowLetter`. Approved coordinated change.
+- `Assets/Scripts/Content/ContentValidator.cs`: runs `PeopleFileLoader`'s own checks, then adds the checks that need the whole file or the type list:
+  - caller types: ids present and unique; ranges min ≤ max; rate, fee and callback delay ≥ 0; duration > 0
+  - `contactsPerPage` between 1 and 12
+  - duplicate surnames, and the file sorted by surname
+  - every caller type has someone to call
+- `Assets/Scripts/Game/Editor/ContentValidatorMenu.cs`: the menu item `Tools/Switchboard/Validate Content`.
+- Tests: `Assets/Tests/Domain/ContentValidatorTests.cs`, `Assets/Tests/Domain/FullBoardTests.cs`, `Assets/Tests/Game/Editor/PhoneBookTabTests.cs`.
+
+Changed:
+- **Sergei's files (approved coordinated change, D34):**
+  - `PhoneBookView.cs`: new public `ShowLetter(char)` (returns false and does nothing when no surname starts with that letter), `HasLetter(char)` and `ConfigureTabs(...)`. Tabs refresh with the pages, and the arrow keys turn pages. The existing public API is unchanged.
+  - `PhoneBookBuilder.cs`: a new menu item `Tools/Switchboard/Update Phone Book Tabs` (`UpdateTabs`), built the same way as his "Update Phone Book Layers". `CreatePrefab` also calls it, so a rebuilt book gets tabs.
+  - `PhoneBookContactRow.cs` and `PhoneBookPageView.cs` were not changed.
+- **`Assets/Configs/PhoneBook.json` (shared):** 24 new people, 36 in all.
+  - One person on every jack A1–F6, still sorted by surname, `contactsPerPage` still 6, and his format kept.
+  - Surnames cover every letter except X.
+  - Portraits `caller-01`…`caller-12` are used three times each. They are all grey placeholder circles for now.
+  - All are `type.regular` with no overrides.
+- **Ours:**
+  - `GameConfig.cs`: new `PeopleFileText` and `Validate()`.
+  - `CallCardView.cs`:
+    - surnames in bold in the bubble
+    - on hold: ring and earnings at 45% opacity
+    - stamp ink per end reason, with a new `stampOutline` field
+  - `PeopleFileTests.cs`: the real file now has 36 people.
+
+Scene and prefab changes:
+- **`PhoneBook.prefab`:** gains `OpenBook/LetterTabs` (26 tabs).
+  - Each tab is an Image, a Button, his uGUI `Text` with his body font, and a `PhoneBookTab`.
+  - The tabs are the first child of `OpenBook`, so they draw under the pages and look tucked in.
+  - They were built by running the new builder menu item. All 109 original objects keep their file IDs; the large diff is new objects plus git aligning moved blocks.
+- **`GameUI.prefab` (card):**
+  - The speech bubble is 150×150 (was 124×140) and sits at x −24.
+  - The bubble text auto-sizes from 14 to 26 with tighter line spacing.
+  - The fee popup starts at y −20 and rises 30 (was +24 and 48).
+  - The four badges are a slightly lighter dark green with a cream `Outline`.
+  - `stampOutline` is wired.
+  - No new raycast targets.
+- **Scenes:** `Game.unity` not changed. `Level.unity` was opened once, only to play it on its own, and was never dirtied or saved. `MainMenu.unity` was not opened.
+
+Tests: 205/205 EditMode. That's 187 before, plus 18 new:
+- PhoneBookTabTests (4):
+  - jumps to the right spread
+  - works on the first and last spread
+  - ignores letters with no surname
+  - takes the last word of the name as the surname
+- ContentValidatorTests (13):
+  - the real content passes
+  - the board has 36 jacks
+  - a valid file passes
+  - each of these is reported: duplicate socket, unknown jack, missing portrait, unknown type, duplicate surname, unsorted file, bad `contactsPerPage`, nobody to call, bad type ranges, duplicate type ids
+- FullBoardTests (1): 20 game minutes with the real 36 people, connecting every call. Nobody is ever in two live calls, and more than 30 different callers rang.
+- One existing test was renamed and updated from 12 to 36 people.
+
+Console: clean. No errors or warnings from compiling, two test runs, Play Mode in `Game.unity`, or a standalone `Level.unity` run. The only lines were the known Metal "memoryless" lines from screenshots. "Validate Content" logs "no problems found".
+
+Screenshots (`Temp/Captures/`):
+- `step-03.png` and `step-03-1280x720.png`: the book open on spread 2 (Hollis…Pryce), plus cards in hand, connected, on hold and "Calling again".
+- `step-03-book.png`: spread 1 with all tabs (X greyed).
+- `step-03-full-queue.png`: 6 ringing cards from jacks A6, B4, B6, D3, E1 and F5.
+- `step-03-states.png`: in hand, connected, on hold, a "Calling again" callback and ringing cards.
+- `step-03-stamps.png`: the "Wrong number!", "Paid $2.10" and "Cut off" stamps.
+- `step-03-phone-844x390.png`: the phone-landscape view.
+
+Checked in Play Mode:
+- **Simulated taps:** real EventSystem taps (raycast, then click), run inside a one-shot `Canvas.willRenderCanvases` handler.
+  - The tab was the topmost hit every time.
+  - M opened spread 2 of 3, Z spread 3, A spread 1. X did nothing, and the book stayed open.
+- **Card states:** set through the desk's own methods, with the domain advanced by `Session.Tick`, because stepping frames is slow while Unity is in the background.
+- **Standalone `Level.unity`:** the book loads 36 contacts, `ShowLetter('Z')` works, and 3 cables are present.
+- **Game view size:** changed with `PlayModeWindow.SetCustomRenderingResolution` and set back to 1920×1080. This leaves two extra custom sizes in the Game view's size list; that's an editor preference, not a project file.
+- **Clean-up:** `Time.timeScale` is back to 1, and no callbacks or SessionState keys are left.
+
+Deviations from Design/Plan:
+1. **The tab test isn't next to `CableConnectionTests`.** That folder's asmdef (`Switchboard.CableTests`) can't see `PhoneBookView`, which lives in Assembly-CSharp. The test is in our new folder `Assets/Tests/Game/Editor/`. It has no asmdef, so it compiles into Assembly-CSharp-Editor and runs with the other EditMode tests. Nothing in `Assets/Tests/Editor/` was added.
+2. **The menu item is in `Assets/Scripts/Game/Editor/`.** Design 4.1 names a `Switchboard.Content.Editor` asmdef, but the brief allowed either folder, and one editor folder of ours is simpler. The validator logic itself is in the Content assembly.
+3. **Extra validator checks:** `contactsPerPage` 1–12 (his book's own limit) and the surname sort order. The book shows contacts in file order, so the tabs rely on that order.
+4. **Arrow keys added; swipe left as a follow-up.** The arrow keys are 5 lines in his `PhoneBookView.Update`, using `Keyboard.current`.
+
+Follow-ups:
+- **Phone readability (Step 9).** At 844×390 everything fits and nothing overlaps, but all text is small (rate badges about 10 px). Sergei's canvas and ours both scale the 1920×1080 layout to 36%. Making it readable needs a phone layout or a different scaling rule for both canvases, which is beyond restyling cards. The same goes for touch-sized tabs.
+- **In-hand bubble width.** The bubble is as wide as the gap left of the caller panel allows at 16:9 (150 reference px). Long names wrap onto two lines.
+- **Swipe page-turning** for touch, when Sergei moves the cord input to `Pointer.current` (Step 6).
+- **Portraits.** All 12 are identical grey placeholders, so callers can only be told apart by their bubble and their stamp until Mia draws them.
+- **Tell Sergei** about the new builder menu item `Update Phone Book Tabs`. His `Update Phone Book Directory` still points at the missing `Assets/Settings/PhoneBook.json`.
+
+#### Step 3 verification (orchestrator, 2026-10-18)
+- **Tests:** an independent EditMode run passed 205/205. The console is clean (0 errors, 0 warnings). The editor is idle, not in Play Mode, with `Game.unity` active.
+- **Scope:**
+  - Sergei's files changed only within the approved list: `PhoneBookView.cs`, `PhoneBookBuilder.cs`, `PhoneBook.prefab`, plus the new `PhoneBookTab.cs`. `PhoneBookPageView.cs` and `PhoneBookContactRow.cs` are untouched, and nothing was added to `Assets/Tests/Editor/`.
+  - `PhoneBook.prefab`: all 109 original objects are still there, and the only edits to them are additive: one new child (`LetterTabs`) under `OpenBook` and the `tabs` array on `PhoneBookView`. The rest of the 7,000-line diff is the 288 new tab objects.
+  - The shared `PhoneBook.json` has 36 people on 36 different jacks, `contactsPerPage` 6, sorted by surname, each portrait used three times.
+  - The rest is ours: `GameConfig`, `CallCardView`, `GameUI.prefab`, the new `ContentValidator`, the menu in `Assets/Scripts/Game/Editor/`, and tests. No scene, ProjectSettings or Packages file changed.
+- **Code review:**
+  - `ShowLetter` and `HasLetter` scan the sorted contacts for the first surname (the last word of the name) with that letter. The tabs are a thin view over `ShowLetter`, and his existing public API is unchanged.
+  - The arrow keys use `Keyboard.current` only while the book is open.
+  - The tab state refreshes on page changes, not every frame.
+- **Screenshots:**
+  - `step-03-book.png`: A–M tabs on the left page edge, N–Z on the right, and X greyed out.
+  - `step-03-states.png`: the in-hand bubble with bold surnames, "On the line", and "On hold" with dimmed earnings.
+  - `step-03-stamps.png`: green "Paid $2.10", red "Wrong number!", brown "Cut off".
+  - `step-03-phone-844x390.png`: everything fits, but the text is about 10 px. This is left to Step 9.
+- **Accepted deviations,** recorded in Design.md:
+  - 1: the tab test is in our new `Assets/Tests/Game/Editor/` (Assembly-CSharp-Editor), because `Assets/Tests/Editor/`'s asmdef can't see `PhoneBookView`.
+  - 2: the Validate Content menu lives in `Assets/Scripts/Game/Editor/`, not a `Switchboard.Content.Editor` asmdef.
+  - 3: the validator also checks the surname sort order and `contactsPerPage`.
+- **For the lead to pass on to Sergei:** his book now has a builder menu item `Tools/Switchboard/Update Phone Book Tabs`, which `CreatePrefab` also calls.
+- **Raised for Step 4:** the 36 people now fill every jack, so the emergency services (Police, Fire Brigade, Doctor) have no free line. Decide before Step 4 (see Plan, Step 4).
+
+#### Step 3 playtest (lead, 2026-10-18)
+1. **Holding a cord and clicking the book sends the cord back to the tray.** This is Sergei's `CableInputController.ProcessPointer`: any click that isn't on a jack drops the held cord (or restores a pulled plug), and that includes buttons, book tabs and caller cards. The lead chose to **leave it as it is** and pass it to Sergei as feedback.
+2. **X tab greyed out.** That's by design: no surname starts with X. The lead chose to keep it greyed.
+3. **No character photos.** Expected: Mia's `caller-01`…`caller-12` are 12 identical grey placeholder circles (same file). The portraits are wired, so her drawings will show up when she replaces the files, with no code change.
+4. **New request: feedback when a caller is clicked, and typed-out speech.** Visual and sound feedback on taking a caller. The sound is a generated placeholder click (lead's choice), until the team has real sounds. The bubble text appears letter by letter, like typing, not too slow. A talking sound per caller comes later.
+5. **Tabs for the spread on show need to stand out more** (brighter or darker than the others).
+
+
+### Step 3 fix report: 2026-10-18
+Result: done
+
+Playable now: Clicking a ringing card (or swapping to another one) gives a quick squash-and-bounce of the card with a short white flash on the portrait, plus a soft click sound that follows the Sfx volume slider. The speech bubble types out letter by letter at 40 characters a second (a full "Name / wants / Name" line takes under a second); "On the line" and "On hold" type out too. In the open book, the tabs of the spread on show are now near-white, bold and stick out 8 px from the page; the other live tabs are a darker tan, and X stays greyed.
+
+How to test:
+1. Play from `Game.unity`. Click a ringing card: the card squashes and bounces, the portrait flashes, a soft click plays. Click another ringing card: same again (swap).
+2. Watch the bubble: the names type out quickly. Connect the call: "On the line" types out. Pull a plug: "On hold" types out.
+3. Move the Sfx slider in the volume panel: the click gets quieter or louder.
+4. Open the book and use the tabs: the letters for the spread on show are bright, bold and stick out; the others are darker; X is grey and does nothing.
+
+Created:
+- `Assets/Scripts/Game/Views/TypingReveal.cs`: plain helper that counts how many characters show (first one at once, then N per second).
+- `Assets/Scripts/Game/Views/UiClickSound.cs`: plays a serialized `AudioClip` with a small random pitch (0.94–1.08) through `PlayOneShot`. Volume is left to Sergei's `AudioChannelSource` on the same object.
+- `Assets/Content/Audio/card-take-click.wav`: generated 60 ms placeholder (a soft 520 Hz knock plus a quieter 1.65 kHz tick, fast decay, peak about 38%).
+- `Assets/Tests/Game/Editor/TypingRevealTests.cs` (6 tests).
+
+Changed:
+- `CallCardView.cs`: `charactersPerSecond` (40), typed speech through TMP `maxVisibleCharacters` (restarts only when the words change; resets when the bubble hides or the card is reused), an empty `OnCharacterShown(int)` hook for the later talking sound, and `PlayPress()` (0.2 s squash to 86% and overshoot to 106%, flash from 45% alpha, unscaled time, no allocations).
+- `CallQueueView.cs`: plays the press and the click only when `TryTake` succeeds; new `takeSound` field.
+- Sergei's files (approved for this pass): `PhoneBookTab.cs` (colours: available 196,166,108, current 255,248,222, unavailable unchanged; current label bold; `SetRest` stores the rest position and an outward nudge), `PhoneBookBuilder.cs` (`TabNudge = 8`, calls `SetRest`). `PhoneBookView.cs` not changed.
+
+Scene and prefab changes:
+- `GameUI.prefab`: `CallCard/Portrait/PressFlash` (inactive Image, raycast off); `CardTakeSound` under the root with AudioSource (no play on awake, 2D), `AudioChannelSource` (Sfx, base 0.6) and `UiClickSound`; card `pressTarget`/`pressFlash` and queue `takeSound` wired. No new raycast targets.
+- `PhoneBook.prefab`: tabs rebuilt with `Tools/Switchboard/Update Phone Book Tabs`, so the new colours and nudge are serialized (26 tabs, `PhoneBookView.tabs` re-linked).
+- Scenes: none changed. `Level.unity` and `MainMenu.unity` not opened.
+
+Tests: 211/211 EditMode (new: TypingRevealTests ×6).
+Console: clean (only the known Metal "memoryless" lines from screenshots).
+Screenshots: `Temp/Captures/step-03-fix-book-tabs.png` (spread 2: I–P stand out), `step-03-fix-card-press.png` (top card mid-squash), `step-03-fix-bubble-typing.png` ("Reginald Und…" mid-typing).
+Checked in Play Mode (stepped frames): press returns to scale 1 and hides the flash after 0.2 s; typing reaches the full count; a swap plays the press and the click (source volume 0.3 = 0.6 × Sfx 0.5); re-taking a swapped-out card retypes its line. `Time.timeScale` 1, no callbacks or SessionState keys left.
+
+Deviations from Design/Plan: none.
+Follow-ups:
+- Tell Sergei: his tabs now have a `SetRest` nudge and new colours; rebuilding the book with his builder keeps them.
+- Step 8: replace `card-take-click.wav` with a real sound and fill `OnCharacterShown` with the talking sound.
+- Typing uses centre-aligned final line positions, so a line grows from where its full text starts rather than re-centring as it types (intended, keeps the layout still).
+
+#### Step 3 fix verification (orchestrator, 2026-10-18)
+- **Tests:** an independent EditMode run passed 211/211. The console is clean.
+- **Scope:**
+  - Sergei's files: only `PhoneBookTab.cs`, `PhoneBookBuilder.cs` and `PhoneBook.prefab`, all approved for this pass. His 109 original book objects are still only changed by the Step 3 tab additions.
+  - Ours: `CallCardView`, `CallQueueView`, `GameUI.prefab`, the new `TypingReveal`, `UiClickSound`, `card-take-click.wav` and `TypingRevealTests`.
+  - His `AudioChannelSource` is used unchanged on our click sound, so his Sfx slider sets its volume. No scene, ProjectSettings or Packages file changed.
+- **Code review:**
+  - The press and the click play only when `TryTake` succeeds.
+  - The typing uses `maxVisibleCharacters` through a small testable `TypingReveal`.
+  - `OnCharacterShown` is the hook for the talking sound in Step 8.
+- **Screenshots:**
+  - `step-03-fix-book-tabs.png`: on spread 2, I–P are near-white, bold and stand out from the page; the others are darker tan, and X is grey.
+  - `step-03-fix-bubble-typing.png`: "Reginald Und…" mid-typing.
+
+### Step 3 fix 2 report: 2026-10-18
+Result: done
+
+Playable now: The phone book's A–Z tabs are hidden for the playtest. Nothing was removed: the 26 tabs and their code are still there. To bring them back, tick the `OpenBook/LetterTabs` object active in `PhoneBook.prefab`.
+
+How to test:
+1. Play from `Game.unity` and open the book: no letter tabs along the page edges.
+2. Use the page arrows and the left/right arrow keys: the spreads still turn.
+
+Changed:
+- `Assets/Prefabs/UI/PhoneBook.prefab` (Sergei's, approved for Step 3): `OpenBook/LetterTabs` is inactive (`m_IsActive: 0`). Saved with `LoadPrefabContents`/`SaveAsPrefabAsset`. No builder menu was run, and no code changed.
+
+Checks:
+- `PhoneBookView` with the tabs inactive: `Awake` binds the inactive tabs and `RefreshPages` calls `Show` on them (both only set serialized fields), with no errors or logs. In stepped Play Mode, the book opened, the LetterTabs object was inactive in the hierarchy, and the page buttons moved spread 0, then 1, then 0.
+- Arrow keys: couldn't be driven through MCP, because Unity drops queued keyboard events while the editor window isn't focused. They call the same `NextSpread`/`PreviousSpread` methods as the buttons, and that path doesn't touch the tabs, so the risk is low. The lead should press them once in the playtest.
+- Tests: 211/211 EditMode. `PhoneBookTabTests` builds its own objects and doesn't load the prefab, so it doesn't depend on the tabs being active.
+- Console: clean (only the known Metal "memoryless" lines from the screenshot).
+- Screenshot: `Temp/Captures/step-03-tabs-hidden.png` (book open on spread 1, no tabs).
+- Editor left clean: not in Play Mode, `Game.unity` active and not dirty, `timeScale` 1, console cleared.
+
+Deviations from Design/Plan: none.
+Follow-ups:
+- **Builder re-shows the tabs.** `ConfigureTabs` destroys `LetterTabs` and builds a new, active one. Two menus run it, so either brings the tabs back:
+  - `Tools/Switchboard/Update Phone Book Tabs`, every time it runs.
+  - `Create Phone Book`, but only when the prefab is missing and `CreatePrefab` rebuilds it.
+  After any rebuild, untick `LetterTabs` again. "Update Phone Book Directory" and "Update Phone Book Layers" don't touch the tabs.
+
+#### Step 3 fix 2 verification (orchestrator, 2026-10-18)
+- The lead asked to hide the A–Z tabs for the playtest and keep the code and assets. Only `OpenBook/LetterTabs` changed: it is now inactive in `PhoneBook.prefab`.
+- An independent EditMode run passed 211/211. The console is clean, apart from the MCP plugin's own connection warning.
+- **To show the tabs again,** tick `LetterTabs` active in the prefab. Sergei's `Update Phone Book Tabs` menu (and `Create Phone Book`, when the prefab is missing) rebuilds them active, so untick them again after running either.
+
+#### Step 3 final playtest (lead, 2026-10-18)
+- Looks good with the tabs hidden. The lead asked to commit, and to push if upstream has no new commits.

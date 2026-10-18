@@ -17,6 +17,7 @@ namespace Switchboard.Game
         [SerializeField] private RectTransform cardArea;
         [SerializeField, Min(0), Tooltip("How fast cards slide to a new slot; 0 snaps.")]
         private float slideSpeed = 14f;
+        [SerializeField] private UiClickSound takeSound;
 
         private readonly List<CallCardView> pool = new List<CallCardView>();
         private readonly List<CallCardView> shown = new List<CallCardView>();
@@ -123,7 +124,12 @@ namespace Switchboard.Game
 
         private void OnConnectionFeePaid(ConnectionFeePaidArgs e) => CardOf(e.Call)?.ShowConnectionFee(e.Cents);
 
-        private void OnCardClicked(CallCardView clicked) => desk?.TryTake(clicked.Call.Id);
+        private void OnCardClicked(CallCardView clicked)
+        {
+            if (desk == null || !desk.TryTake(clicked.Call.Id)) return;
+            clicked.PlayPress();
+            if (takeSound != null) takeSound.Play();
+        }
 
         private void OnCardFinished(CallCardView card)
         {

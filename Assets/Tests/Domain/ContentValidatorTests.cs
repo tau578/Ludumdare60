@@ -1,0 +1,109 @@
+using System;
+using System.Collections.Generic;
+using NUnit.Framework;
+using Switchboard.Content;
+using UnityEditor;
+
+namespace Switchboard.Domain.Tests
+{
+    public sealed class ContentValidatorTests
+    {
+        private const string GameConfigPath = "Assets/Content/GameConfig.asset";
+
+        private static readonly ICallerType Regular = new FakeCallerType(new FloatRange(3, 8), new FloatRange(15, 30));
+
+        private static string Contact(string name, string socket, string portrait = "caller-01", string type = "type.regular") =>
+            $"{{ 'name': '{name}', 'socket': '{socket}', 'portrait': '{portrait}', 'type': '{type}', 'rate': 0, 'fee': 0 }}";
+
+        private static List<string> Validate(int perPage, params string[] contacts) =>
+            Validate(new[] { Regular }, perPage, contacts);
+
+        private static List<string> Validate(IReadOnlyList<ICallerType> types, int perPage, params string[] contacts)
+        {
+            string json = $"{{ 'contactsPerPage': {perPage}, 'contacts': [ {string.Join(", ", contacts)} ] }}";
+            return ContentValidator.Validate(json.Replace('\'', '"'), types,
+                name => name != null && name.StartsWith("caller-", StringComparison.Ordinal), ContentValidator.BoardJacks());
+        }
+
+        private static List<string> ValidPair(params string[] more)
+        {
+            var contacts = new List<string> { Contact("Ada Moss", "A1"), Contact("Basil Thorne", "B2") };
+            contacts.AddRange(more);
+            return Validate(6, contacts.ToArray());
+        }
+
+        private static void AssertSingleError(List<string> errors, string fragment)
+        {
+            Assert.That(errors.Count, Is.EqualTo(1), string.Join("\n", errors));
+            Assert.That(errors[0], Does.Contain(fragment));
+        }
+
+        [Test]
+        public void RealContentHasNoProblems()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
+            Assert.That(config, Is.Not.Null, GameConfigPath);
+
+            Assert.That(config.Validate(), Is.Empty);
+        }
+
+        [Test]
+        public void BoardHasThirtySixJacks()
+        {
+            List<string> jacks = ContentValidator.BoardJacks();
+            Assert.That(jacks.Count, Is.EqualTo(36));
+            Assert.That(jacks, Is.Unique);
+            Assert.That(jacks[0], Is.EqualTo("A1"));
+            Assert.That(jacks[35], Is.EqualTo("F6"));
+        }
+
+        [Test]
+        public void AValidFilePasses() => Assert.That(ValidPair(), Is.Empty);
+
+        [Test]
+        public void ReportsADuplicateSocket() => AssertSingleError(ValidPair(Contact("Clara Whitlock", "A1")), "already used");
+
+        [Test]
+        public void ReportsAnUnknownJack() => AssertSingleError(ValidPair(Contact("Clara Whitlock", "G7")), "not on the board");
+
+        [Test]
+        public void ReportsAMissingPortrait() => AssertSingleError(ValidPair(Contact("Clara Whitlock", "C3", "nobody")), "portrait");
+
+        [Test]
+        public void ReportsAnUnknownType() => AssertSingleError(ValidPair(Contact("Clara Whitlock", "C3", type: "type.vip")), "type.vip");
+
+        [Test]
+        public void ReportsADuplicateSurname() => AssertSingleError(ValidPair(Contact("Ivy Thorne", "C3")), "surname Thorne");
+
+        [Test]
+        public void ReportsAFileNotSortedBySurname() =>
+            AssertSingleError(Validate(6, Contact("Basil Thorne", "B2"), Contact("Ada Moss", "A1")), "sort the file by surname");
+
+        [Test]
+        public void ReportsAPageSizeTheBookRejects() =>
+            AssertSingleError(Validate(13, Contact("Ada Moss", "A1"), Contact("Basil Thorne", "B2")), "contactsPerPage");
+
+        [Test]
+        public void ReportsATypeWithNobodyToCall() => AssertSingleError(Validate(6, Contact("Ada Moss", "A1")), "nobody to call");
+
+        [Test]
+        public void ReportsBadTypeRanges()
+        {
+            var broken = new FakeCallerType(new FloatRange(8, 3), new FloatRange(0, 30));
+
+            List<string> errors = Validate(new[] { broken }, 6, Contact("Ada Moss", "A1"), Contact("Basil Thorne", "B2"));
+
+            Assert.That(errors.Count, Is.EqualTo(2), string.Join("\n", errors));
+            Assert.That(errors[0], Does.Contain("rate range"));
+            Assert.That(errors[1], Does.Contain("duration range"));
+        }
+
+        [Test]
+        public void ReportsDuplicateTypeIds()
+        {
+            List<string> errors = Validate(new[] { Regular, Regular }, 6, Contact("Ada Moss", "A1"), Contact("Basil Thorne", "B2"));
+
+            AssertSingleError(errors, "listed twice");
+        }
+    }
+}

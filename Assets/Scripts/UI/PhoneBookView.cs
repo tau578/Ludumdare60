@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace Switchboard.UI
@@ -14,6 +15,7 @@ namespace Switchboard.UI
         [SerializeField] private PhoneBookPageView rightPage;
         [SerializeField] private Button previousSpread;
         [SerializeField] private Button nextSpread;
+        [SerializeField] private PhoneBookTab[] tabs = new PhoneBookTab[0];
         private PhoneBookConfig directory = new PhoneBookConfig();
         private string configError;
 
@@ -22,6 +24,7 @@ namespace Switchboard.UI
         public int ContactCount => directory.contacts.Length;
         public bool CanGoBack => CurrentSpreadIndex > 0;
         public bool CanGoForward => (CurrentSpreadIndex + 1) * 2 * directory.contactsPerPage < ContactCount;
+        private int ContactsPerSpread => 2 * directory.contactsPerPage;
 
         public void ConfigureDirectory(TextAsset config, PhoneBookPageView left, PhoneBookPageView right, Button previous, Button next)
         {
@@ -30,6 +33,31 @@ namespace Switchboard.UI
             rightPage = right;
             previousSpread = previous;
             nextSpread = next;
+        }
+
+        public void ConfigureTabs(PhoneBookTab[] letterTabs) => tabs = letterTabs;
+
+        public bool HasLetter(char letter) => FirstContactWithSurname(letter) >= 0;
+
+        /// <summary>Opens the spread with the first surname starting with the letter; the contacts are sorted by surname.</summary>
+        public bool ShowLetter(char letter)
+        {
+            int index = FirstContactWithSurname(letter);
+            if (index < 0) return false;
+            CurrentSpreadIndex = index / ContactsPerSpread;
+            RefreshPages();
+            return true;
+        }
+
+        private int FirstContactWithSurname(char letter)
+        {
+            letter = char.ToUpperInvariant(letter);
+            for (int i = 0; i < directory.contacts.Length; i++)
+            {
+                string name = directory.contacts[i].name;
+                if (char.ToUpperInvariant(name[name.LastIndexOf(' ') + 1]) == letter) return i;
+            }
+            return -1;
         }
 
         [ContextMenu("Reload Contacts")]
@@ -71,6 +99,12 @@ namespace Switchboard.UI
             if (rightPage != null) rightPage.Render(directory, CurrentSpreadIndex * 2 + 1);
             if (previousSpread != null) previousSpread.gameObject.SetActive(CanGoBack);
             if (nextSpread != null) nextSpread.gameObject.SetActive(CanGoForward);
+            foreach (var tab in tabs)
+            {
+                if (tab == null) continue;
+                int index = FirstContactWithSurname(tab.Letter);
+                tab.Show(index >= 0, index >= 0 && index / ContactsPerSpread == CurrentSpreadIndex);
+            }
         }
 
         public void Configure(Button closed, Button opened)
@@ -87,6 +121,7 @@ namespace Switchboard.UI
             openBook.onClick.AddListener(Toggle);
             if (previousSpread != null) previousSpread.onClick.AddListener(PreviousSpread);
             if (nextSpread != null) nextSpread.onClick.AddListener(NextSpread);
+            foreach (var tab in tabs) if (tab != null) tab.Bind(this);
             ReloadContacts();
             SetOpen(false);
         }
@@ -97,6 +132,15 @@ namespace Switchboard.UI
             if (openBook != null) openBook.onClick.RemoveListener(Toggle);
             if (previousSpread != null) previousSpread.onClick.RemoveListener(PreviousSpread);
             if (nextSpread != null) nextSpread.onClick.RemoveListener(NextSpread);
+            foreach (var tab in tabs) if (tab != null) tab.Unbind();
+        }
+
+        private void Update()
+        {
+            var keyboard = Keyboard.current;
+            if (!IsOpen || keyboard == null) return;
+            if (keyboard.leftArrowKey.wasPressedThisFrame) PreviousSpread();
+            else if (keyboard.rightArrowKey.wasPressedThisFrame) NextSpread();
         }
 
         public void Toggle() => SetOpen(!IsOpen);

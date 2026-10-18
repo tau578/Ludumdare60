@@ -11,7 +11,8 @@ Last updated 2026-10-18 · Plan: [Plan.md](Plan.md) · Progress: [Progress.md](P
 | 1 | Done (`e6f44e5`) | One call at a time, through Incoming → Taken → Connected → Ended. See below. |
 | 1b + 1c | Done (`60c7a88`, `47735c1`) | Connection fee (D32); one people file `PhoneBook.json`, read by Sergei's book and by us (D31); the money counter in the header strip of Sergei's shop panel; a speech bubble left of the caller card; a "+N¢" popup; the temporary Directory list removed. `GameConfig` references the JSON; a plain `GameContent` class implements `IGameContent`. |
 | 2a | Done (`2b00ac7`) | Up to 6 live calls, one card per caller slot. Taking a card swaps (D03). Connecting while a cord is half-patched. `BusyTracker` (D18), `CallbackScheduler` with "Calling again" cards, and a `PacingProfile`-driven spawner. Connected cards stay in their slot with a cord-colour ring and their own earnings. A dev panel (F1). |
-| 2b | Done (2026-10-18) | Hold and resume (D07): a pulled plug puts the call OnHold (pay and duration paused, card says "On hold" with frozen earnings); the same pair closing again resumes it with no second fee; the plug in another jack or the cord to the tray cuts it off. Ringing halos draw behind all card content. |
+| 2b | Done (`4c5ac50`) | Hold and resume (D07): a pulled plug puts the call OnHold (pay and duration paused, card says "On hold" with frozen earnings); the same pair closing again resumes it with no second fee; the plug in another jack or the cord to the tray cuts it off. Ringing halos draw behind all card content. |
+| 3 | Done (2026-10-18) | A–Z tabs in Sergei's book (D34): `PhoneBookTab` plus `PhoneBookView.ShowLetter`/`HasLetter`, with letters that have no surname greyed out, and arrow keys while the book is open. 36 people on every jack A1–F6 (D35). Restyled cards: bold surnames in the in-hand bubble, on-hold dimming, coloured stamp inks. `ContentValidator` (Content) with `Tools/Switchboard/Validate Content`. Accepted deviations: the tab test lives in `Assets/Tests/Game/Editor/`, the validator menu in `Assets/Scripts/Game/Editor/` (see 4.1), and the validator also checks the surname order and `contactsPerPage`. After the lead's playtest: a press reaction and a placeholder click when a card is taken, typed-out bubble text, and clearer tabs for the spread on show. |
 
 What Step 1 built:
 - **Operator desk.** A right pair connects the call. A wrong pair ends it as "Wrong number!". Patching with no call in hand is refused. Pulling a plug cut the call off (replaced by hold in Step 2b).
@@ -115,10 +116,11 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 |---|---|---|---|
 | Domain | `Assets/Scripts/Domain/` | `Switchboard.Domain`, `noEngineReferences: true` | All rules: calls, spawning, callbacks, the operator desk, the directory, the economy, penalties, stats, upgrades, progression, and the save data model. |
 | Content | `Assets/Scripts/Content/` | `Switchboard.Content`, references Domain | ScriptableObject definitions. They implement small read-only Domain interfaces. |
-| Content editor tools | `Assets/Scripts/Content/Editor/` | `Switchboard.Content.Editor` (Editor platform only) | Content validator and asset helpers. |
+| Content editor tools | `Assets/Scripts/Game/Editor/` | **no asmdef** (Assembly-CSharp-Editor) | The `Tools/Switchboard/Validate Content` menu (3). The validator itself, `ContentValidator`, is in `Switchboard.Content`. |
 | Game | `Assets/Scripts/Game/` | **no asmdef** (Assembly-CSharp) | Composition root, game loop, `CordBridge`, views, input glue, audio, storage, dev tools. |
 | Tests | `Assets/Tests/Domain/` | `Switchboard.Domain.Tests`, EditMode, references Domain and Content | Unit tests for Domain, plus content validation. |
-| Content assets | `Assets/Content/` | n/a | `.asset` files only. |
+| Game tests | `Assets/Tests/Game/Editor/` | **no asmdef** (Assembly-CSharp-Editor) | EditMode tests that need Assembly-CSharp types, such as Sergei's `PhoneBookView` (3). |
+| Content assets | `Assets/Content/` | n/a | `.asset` files, plus our audio in `Assets/Content/Audio/` (3). |
 | Our prefabs | `Assets/Prefabs/Game/` | n/a | `GameUI.prefab` and our other prefabs. |
 | Our scenes | `Assets/Scenes/Game.unity` (later also `Boot.unity`) | n/a | |
 | Team code (unchanged) | `Assets/Scripts/UI/`, `Assets/Scripts/Cables/Core/` | Assembly-CSharp, `Switchboard.CableLogic` | Cord interaction and graphics. |
@@ -309,13 +311,13 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
   - `CallCardView`: pooled.
 - **What the card shows in each state:**
   - Waiting: portrait, type badge, rate (e.g. "5¢/s"), and a countdown ring for types with a response time.
-  - In hand: also the caller's name and the name of the person they want. From Step 1b they appear in a speech bubble next to the caller's portrait in the left column: "Ada Moss" / "wants Basil Thorne", and "On the line" once connected. This replaces the Step 1 ticket in the right column.
+  - In hand: also the caller's name and the name of the person they want. From Step 1b they appear in a speech bubble next to the caller's portrait in the left column: "Ada Moss" / "wants Basil Thorne", and "On the line" once connected. This replaces the Step 1 ticket in the right column. From Step 3 the surnames are bold, because the book is sorted by surname, and the bubble text types out letter by letter (`charactersPerSecond`, 40 by default). "On the line" and "On hold" type out too.
   - Connected: the cord's colour (a ring around the portrait, read through `CordBridge.ColorOf`), the cents earned so far (a top badge), and an "On the line" bubble. Waiting cards show no bubble.
-  - On hold: the cord ring and the earnings badge stay, the earnings frozen, and the bubble reads "On hold" (2b).
-  - Ended: a stamp, such as "Paid $1.20", "Wrong number!", "Cut off" or "Missed −$5".
+  - On hold: the cord ring and the earnings badge stay, the earnings frozen, and the bubble reads "On hold" (2b). From Step 3 the ring and earnings are dimmed.
+  - Ended: a stamp, such as "Paid $1.20", "Wrong number!", "Cut off" or "Missed −$5". From Step 3 each stamp has its own ink: green for paid, red for wrong number, brown for cut off.
 
   The duration is never shown.
-- **Interaction:** clicking or tapping a waiting card takes it. No UI path removes a card; only the rules end calls.
+- **Interaction:** clicking or tapping a waiting card takes it. A successful take plays a 0.2 s squash and flash on the card and a soft click, a placeholder `card-take-click.wav` played on Sergei's Sfx channel (3). No UI path removes a card; only the rules end calls.
 - **Emergencies** get a badge, a label and the ring, not colour alone.
 
 ### 5.5 Penalties [4]
@@ -344,8 +346,8 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
 - **Book view [3].**
   - The closed book on the desk (`Sprites/book/table_book.png`) opens an overlay drawn with the `cover`, `page` and `back` sprites.
   - Rows are generated from data, N per page, and pooled.
-  - A–Z tabs.
-  - Pages flip with tap, swipe or arrow keys.
+  - A–Z tabs (3, D34): `PhoneBookTab` components call `PhoneBookView.ShowLetter(char)`, which opens the spread with the first surname (the last word of the name) starting with that letter. Letters with no surname are greyed out. The tabs for the spread on show are near-white, bold, and stick out 8 px. **Hidden for now** (lead, 2026-10-18): `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab`, with the code and objects kept.
+  - Pages flip with tap or arrow keys (3). Swipe waits for `Pointer.current` in the cord input (Step 6).
   - Opening the book never pauses the game (D20).
 
 ### 5.8 Economy [1]

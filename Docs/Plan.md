@@ -104,6 +104,8 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Keyboard in Play Mode (2a) | The project uses `PointersAndKeyboardsRespectGameViewFocus`, so simulated keys (e.g. F1) don't reach Play Mode unless the Game view has focus. Call the action through the same method the key uses, and leave the real key press to the lead's playtest. |
 | Screenshot names (2a) | `manage_camera screenshot` adds "-1" to the name instead of overwriting an existing file. Delete the old file first if the name matters. |
 | Nested canvas sorting in a prefab (2b) | To give a child its own sorting order inside a prefab (e.g. the halo's order 9), set `m_OverrideSorting` through `SerializedObject`. `manage_prefabs` and the `overrideSorting` setter leave it off, because inside prefab contents the nested canvas counts as a root canvas. |
+| Game view size (3) | Set it with `PlayModeWindow.SetCustomRenderingResolution`, for example 1280×720 or 844×390, and set it back to 1920×1080 afterwards. Each new size stays in the Game view's size list as an editor preference, not a project file. |
+| Tests on Assembly-CSharp types (3) | `Assets/Tests/Editor/` (Sergei's asmdef) can't see Assembly-CSharp types such as `PhoneBookView`. Put such tests in our `Assets/Tests/Game/Editor/`, which has no asmdef and compiles into Assembly-CSharp-Editor. |
 | Dev panel (2a) | F1 or the "Dev" button in the top-right corner: + $10, Call now, Speed ×5/×1, Show/Hide times, Clear calls. Editor and development builds only. Its IMGUI clicks also reach the cord input as "empty space" clicks. |
 
 ## 5. Definition of done (every step)
@@ -148,6 +150,7 @@ Follow-ups: <ideas, debts, questions>
 | Before Step 2 | Done (2026-10-17): the lead confirmed D07. Pulling a plug puts the call on hold, using the new restore feature. | Lead (and Sergei) |
 | Before Step 5 | A way to add cords at runtime: a cable prefab plus a tray slot, and a way to register them with `CableInputController` and the tray. | Sergei |
 | Before Step 5 | Notepad upgrade (D23): Sergei's phone book reports when an entry is tapped (e.g. a public event with the contact's name and socket), so we can note the jack on the call in hand. | Sergei |
+| Feedback (Step 3 playtest) | Holding a cord and clicking a button (the book, a tab, a caller card) drops the cord back in the tray, because any click off a jack counts as "empty space". The lead would find it easier if clicks on buttons kept the cord in hand. His call; we didn't change it. | Sergei |
 | Before Step 6 | Touch input in the cord code: use `Pointer.current` instead of `Mouse.current` in `CableInputController.Update`, and hide the hand cursor on touch. | Sergei |
 | Before Step 6, or earlier if Sergei's cord work settles | Merge into one scene (D29). Agree a time when Sergei isn't editing `Level.unity`; the merge itself takes about 5 minutes. | Sergei |
 | Done in Step 1c (lead approved) | The upgrade panel's top header is now a 96 px `HeaderSlot` plaque holding our money counter. Sergei keeps the names `UpgradeShopPanel` and `HeaderSlot`. | Sergei |
@@ -489,6 +492,7 @@ Steps 1–3 are fully specified. Steps 4–10 are outlines. The orchestrator tur
 ---
 
 ### Step 4: Emergencies and fines (outline)
+- **Decide first (raised in Step 3):** the 36 people fill every jack A1–F6 (D35), so the emergency services have no free line. Options: they replace three people on existing jacks, or they get their own lines (for example a separate small panel, or a 7th row). The validator also needs to allow single-word names such as "Police" and keep the surname rules for people only.
 - **Caller types:** the fields that Design §6.1 marks [4].
 - **Emergency type:** a short response time, fines, and `maxSimultaneous` 1.
 - **Emergency services** in the directory, tagged `emergency-service`: Police, Fire Brigade, Doctor.
@@ -567,6 +571,7 @@ Steps 1–3 are fully specified. Steps 4–10 are outlines. The orchestrator tur
 - **Playtest:** a 30-minute session ramps up noticeably.
 
 ### Step 8: Sound and feel (outline)
+- **From Step 3:** replace the placeholder `card-take-click.wav` (set on `UiClickSound` in `GameUI.prefab`) with a real sound, and fill `CallCardView.OnCharacterShown` with the callers' talking sound (lead request).
 - **Audio:** `AudioService`, `AudioCueLibrary` and `FeedbackDirector` (Design §5.11):
   - One ringing loop and one alarm loop.
   - Coin ticks.

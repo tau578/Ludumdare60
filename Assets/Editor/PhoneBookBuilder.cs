@@ -13,6 +13,9 @@ namespace Switchboard.Editor
     public static class PhoneBookBuilder
     {
         private const string PrefabPath = "Assets/Prefabs/UI/PhoneBook.prefab";
+        private const int TabsPerEdge = 13;
+        private const float TabX = 420, TabTop = 216, TabStep = 36, TabNudge = 8;
+        private static readonly Vector2 TabSize = new Vector2(52, 34);
 
         [MenuItem("Tools/Switchboard/Update Phone Book Directory")]
         public static void UpdateDirectory()
@@ -23,6 +26,20 @@ namespace Switchboard.Editor
             try
             {
                 ConfigureDirectory(root.GetComponent<PhoneBookView>());
+                PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        [MenuItem("Tools/Switchboard/Update Phone Book Tabs")]
+        public static void UpdateTabs()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Exit Play Mode first.");
+            var root = PrefabUtility.LoadPrefabContents(PrefabPath);
+            try
+            {
+                ConfigureTabs(root.GetComponent<PhoneBookView>());
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
@@ -95,6 +112,7 @@ namespace Switchboard.Editor
                 var view = root.gameObject.AddComponent<PhoneBookView>();
                 view.Configure(closedButton, openButton);
                 ConfigureDirectory(view);
+                ConfigureTabs(view);
                 return PrefabUtility.SaveAsPrefabAsset(root.gameObject, PrefabPath);
             }
             finally { Object.DestroyImmediate(root.gameObject); }
@@ -126,6 +144,55 @@ namespace Switchboard.Editor
             view.ConfigureDirectory(config, left, right, previous, next);
             previous.gameObject.SetActive(false);
             next.gameObject.SetActive(false);
+        }
+
+        // A thumb index: A-M along the left page edge, N-Z along the right, tucked under the pages.
+        private static void ConfigureTabs(PhoneBookView view)
+        {
+            var opened = view.transform.Find("OpenBook");
+            var existing = opened.Find("LetterTabs");
+            if (existing != null) Object.DestroyImmediate(existing.gameObject);
+            var strip = Rect("LetterTabs", opened, Vector2.zero);
+            strip.anchorMin = Vector2.zero;
+            strip.anchorMax = Vector2.one;
+            strip.SetSiblingIndex(0);
+            var tabs = new PhoneBookTab[26];
+            for (int i = 0; i < tabs.Length; i++)
+            {
+                bool left = i < TabsPerEdge;
+                float y = TabTop - (i % TabsPerEdge) * TabStep;
+                tabs[i] = Tab((char)('A' + i), strip, new Vector2(left ? -TabX : TabX, y), left);
+            }
+            view.ConfigureTabs(tabs);
+        }
+
+        private static PhoneBookTab Tab(char letter, Transform parent, Vector2 position, bool left)
+        {
+            var rect = Rect($"Tab{letter}", parent, TabSize);
+            rect.anchoredPosition = position;
+            var image = rect.gameObject.AddComponent<Image>();
+            image.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            image.type = Image.Type.Sliced;
+            image.raycastTarget = true;
+            var shadow = rect.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0, 0, 0, .3f);
+            shadow.effectDistance = new Vector2(left ? -2 : 2, -2);
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            var colors = button.colors;
+            colors.normalColor = colors.selectedColor = colors.disabledColor = Color.white;
+            colors.highlightedColor = new Color(1.1f, 1.1f, 1.05f, 1);
+            colors.pressedColor = new Color(.8f, .8f, .75f, 1);
+            colors.fadeDuration = .08f;
+            button.colors = colors;
+            // The inner edge sits under the page, so the letter is centred on the part that shows.
+            var label = Label("Letter", rect, letter.ToString(), new Vector2(left ? -3 : 3, 0), TabSize, 22, FontStyle.Normal, TextAnchor.MiddleCenter);
+            label.horizontalOverflow = HorizontalWrapMode.Overflow;
+            var tab = rect.gameObject.AddComponent<PhoneBookTab>();
+            tab.Configure(letter, button, image, label);
+            tab.SetRest(position, new Vector2(left ? -TabNudge : TabNudge, 0));
+            return tab;
         }
 
         private static PhoneBookPageView DirectoryPage(string name, Transform parent, float x)

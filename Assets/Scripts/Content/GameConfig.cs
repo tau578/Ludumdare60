@@ -23,8 +23,13 @@ namespace Switchboard.Content
         public IPacingProfile Pacing => pacing != null ? pacing : null;
         public IReadOnlyList<ICallerType> CallerTypes => callerTypes ?? new CallerTypeDefinition[0];
 
+        public string PeopleFileText => peopleFile != null ? peopleFile.text : null;
+
         public PeopleCatalog LoadPeople(IEnumerable<string> boardJacks) =>
-            PeopleFileLoader.Load(peopleFile != null ? peopleFile.text : null, CallerTypes, HasPortrait, boardJacks);
+            PeopleFileLoader.Load(PeopleFileText, CallerTypes, HasPortrait, boardJacks);
+
+        public List<string> Validate() =>
+            ContentValidator.Validate(PeopleFileText, CallerTypes, HasPortrait, ContentValidator.BoardJacks());
 
         public bool HasPortrait(string name) => Portrait(name) != null;
 

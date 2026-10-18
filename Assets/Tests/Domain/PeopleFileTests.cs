@@ -34,14 +34,14 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void RealFileHasTwelveValidPeople()
+        public void RealFileHasThirtySixValidPeopleOnEveryJack()
         {
             PeopleCatalog catalog = LoadRealFile();
 
             Assert.That(catalog.Errors, Is.Empty);
-            Assert.That(catalog.People.Count, Is.EqualTo(12));
-            Assert.That(catalog.Callers.Count, Is.EqualTo(12));
-            Assert.That(catalog.Directory.Count, Is.EqualTo(12));
+            Assert.That(catalog.People.Count, Is.EqualTo(36));
+            Assert.That(catalog.Callers.Count, Is.EqualTo(36));
+            Assert.That(catalog.Directory.Count, Is.EqualTo(36));
         }
 
         [Test]

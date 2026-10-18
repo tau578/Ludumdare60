@@ -15,7 +15,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), team coordination (§8) and the step briefs (§9).
 3. `Docs/Design.md`: the source of truth for game rules, architecture, ownership and decisions D01–D35. If the code or a brief disagrees with it, stop and ask; don't improvise.
 
-**Next step:** see the first "not started" row in `Docs/Progress.md`. As of 2026-10-18 that is **Step 3: phone book and cards**.
+**Next step:** see the first "not started" row in `Docs/Progress.md`. As of 2026-10-18, Step 3 is done, and the next is **Step 4: emergencies and fines**, which first needs a decision on where the emergency services' jacks go (see the Step 4 outline in Plan.md).
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).
@@ -64,14 +64,14 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 | Sergei | `Assets/Scenes/Level.unity`, `Assets/Scenes/MainMenu.unity`, the prefabs in `Assets/Prefabs/` and `Assets/Prefabs/UI/` | Same. Never save `Level.unity` or `MainMenu.unity` when opening them to inspect. |
 | Sergei | Phone book (`PhoneBookView`), `UpgradeShopPanel`, main menu, `Assets/Tools/rodrigo_menu_tools`, volume panel | Same. |
 | Mia (art) | `Assets/Sprites/`, `Assets/Fonts/` | Read-only. |
-| Ours | `Assets/Scripts/Domain/`, `Assets/Scripts/Content/`, `Assets/Scripts/Game/`, `Assets/Tests/Domain/`, `Assets/Content/`, `Assets/Prefabs/Game/`, `Assets/Scenes/Game.unity`, `Docs/`, `CLAUDE.md` | Agents change these. |
+| Ours | `Assets/Scripts/Domain/`, `Assets/Scripts/Content/`, `Assets/Scripts/Game/`, `Assets/Tests/Domain/`, `Assets/Tests/Game/`, `Assets/Content/`, `Assets/Prefabs/Game/`, `Assets/Scenes/Game.unity`, `Docs/`, `CLAUDE.md` | Agents change these. |
 | Shared | `Assets/Configs/PhoneBook.json` | The single people file (D31). Sergei's book reads `name` and `socket`; our game reads every field. Keep his format, `contactsPerPage`, and the surname sort order. |
 
 **Division of work (D30):** Sergei builds the UI components; we build the rules and data and wire his components to them. Before building any UI, check whether Sergei already has one.
 
 **Approved changes to his files so far:**
 - The `UpgradeShopPanel` prefab and `UpgradeShopPanelBuilder` constants (Step 1c: the `HeaderSlot` money plaque).
-- Step 3 (D34, A–Z tabs in the phone book): `PhoneBookView.cs`, `PhoneBookPageView.cs`, `PhoneBookContactRow.cs`, a new tab component in `Assets/Scripts/UI/`, `PhoneBookBuilder.cs`, `PhoneBook.prefab`, and a test in `Assets/Tests/Editor/` for the tab jump.
+- Step 3 (D34, A–Z tabs in the phone book): `PhoneBookView.cs`, `PhoneBookPageView.cs`, `PhoneBookContactRow.cs`, a new tab component in `Assets/Scripts/UI/`, `PhoneBookBuilder.cs`, `PhoneBook.prefab`, and a test in `Assets/Tests/Editor/` for the tab jump. Used: `PhoneBookView.cs`, the new `PhoneBookTab.cs`, `PhoneBookBuilder.cs` (new menu `Tools/Switchboard/Update Phone Book Tabs`) and `PhoneBook.prefab`. The test went to our `Assets/Tests/Game/Editor/` instead.
 
 ## Architecture in brief (details in Design.md §4–§7)
 - **Scene flow (D33).** `MainMenu` → `Game` → `Level`. Sergei's menu loads the next build index. Our `Game.unity` loads his `Level.unity` additively.
@@ -128,6 +128,9 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 - **Before Step 6:** merge the two scenes into one (D29).
 - **Ongoing:** keep the names `CallerQueuePanel`, `UpgradeShopPanel` and `HeaderSlot`, and keep the extra fields in `PhoneBook.json`.
 - **His `PhoneBookBuilder`** points at a missing `Assets/Settings/PhoneBook.json`.
+- **A–Z tabs are hidden** (lead, 2026-10-18): `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab`; the code, objects and tests stay. His `Update Phone Book Tabs` menu rebuilds them active, so untick them again afterwards.
+- **Feedback for Sergei (Step 3 playtest):** a click on a button or card while holding a cord drops the cord; the lead would prefer it kept in hand. Not changed by us.
+- **Tell Sergei (Step 3):** his book has A–Z tabs now, built by the new `Tools/Switchboard/Update Phone Book Tabs` menu, which `CreatePrefab` also calls. The tabs for the spread on show are highlighted and nudged out (`PhoneBookTab.SetRest`). Our card click sound uses his `AudioChannelSource` (Sfx) unchanged.
 
 ## Open decisions (Design §10)
 - D15: what the mystery upgrade does.
