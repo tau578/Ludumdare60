@@ -1213,3 +1213,16 @@ Follow-ups:
   - CLAUDE.md: ownership, the scene flow, the git conflict spots, and the next step.
   - The playtest scripts of older steps still say "Play from `Game.unity`"; read that as `Final.unity`.
 
+
+#### Upstream merge and sfx revert (orchestrator, 2026-10-18)
+- **Commits (lead approved):**
+  - `3002ea8`: the scene merge.
+  - `b5a6b68`: the merge of upstream (Mia `f623cd6`, Sergei `9eed19b`).
+  - `25a2633`: reverts Sergei's "edited sfx".
+- **Why the revert:** it was built on the reverted scene layout, and its call sounds sat on an unpacked copy of our `Game` object in `Level.unity`. The lead's call: Sergei redoes it on `Final.unity` with prefabs; his sounds stay in git history.
+- **Net result:** the scene merge plus Mia's four art files.
+- **Problem from Mia's art:**
+  - Her new `caller-02.png` is 190×190, but its unchanged `.meta` still slices a 190×191 sprite (`caller-02_0`). Unity drops the out-of-bounds sprite, so `GameConfig`'s `caller-02` portrait is missing.
+  - The 3 people who use it fail validation and are left out.
+  - EditMode: 252/255. Failing: `ContentValidatorTests.RealContentHasNoProblems`, `PeopleFileTests.RealFileHasThirtyThreePeopleAndThreeServicesOnEveryJack`, and `FullBoardTests` (33 of 36 jacks used).
+  - This is already on GitHub `main`. Not pushed; waiting for the lead.
