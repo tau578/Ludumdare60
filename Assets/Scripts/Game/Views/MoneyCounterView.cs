@@ -1,4 +1,5 @@
 using Switchboard.Domain;
+using System.Globalization;
 using TMPro;
 using UnityEngine;
 
@@ -21,6 +22,9 @@ namespace Switchboard.Game
         private Vector3 alignedMax;
         private IncomeCoinsView incomeCoins;
         private bool artworkHasCurrencySymbol;
+        private TMP_Text[] reels;
+        private TMP_Text decimalPoint;
+        private const int ReelCount = 6;
 
         /// <param name="headerSlot">The shop panel's header plaque to sit in; null keeps the prefab position.</param>
         public void Bind(Wallet source, RectTransform headerSlot, PenaltyService fines, UpgradeService shop)
@@ -40,7 +44,8 @@ namespace Switchboard.Game
             if (label != null)
             {
                 if (artworkHasCurrencySymbol) label.color = new Color32(35, 76, 40, 255);
-                if (wallet != null) label.text = FormatBalance(shownCents);
+                ConfigureReels();
+                if (wallet != null) ShowBalance(shownCents);
             }
             if (artworkHasCurrencySymbol && plate != null)
                 foreach (var graphic in plate.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
@@ -49,6 +54,68 @@ namespace Switchboard.Game
         }
 
         private string FormatBalance(long cents) => artworkHasCurrencySymbol ? MoneyFormat.Dollars(cents).TrimStart('$') : MoneyFormat.Dollars(cents);
+
+        private void ConfigureReels()
+        {
+            if (artworkHasCurrencySymbol && reels == null)
+            {
+                reels = new TMP_Text[ReelCount];
+                for (int i = 0; i < ReelCount; i++)
+                {
+                    reels[i] = CreateReel("Balance digit " + i);
+                    var rect = reels[i].rectTransform;
+                    rect.anchorMin = new Vector2(i / (float)ReelCount, 0);
+                    rect.anchorMax = new Vector2((i + 1) / (float)ReelCount, 1);
+                    rect.offsetMin = rect.offsetMax = Vector2.zero;
+                }
+                decimalPoint = CreateReel("Balance decimal point");
+                decimalPoint.text = ".";
+            }
+            label.enabled = !artworkHasCurrencySymbol;
+            if (reels == null) return;
+            foreach (var reel in reels) reel.gameObject.SetActive(artworkHasCurrencySymbol);
+            decimalPoint.gameObject.SetActive(artworkHasCurrencySymbol);
+        }
+
+        private TMP_Text CreateReel(string name)
+        {
+            var text = Instantiate(label, plate);
+            text.name = name;
+            text.enabled = true;
+            text.margin = Vector4.zero;
+            text.enableAutoSizing = false;
+            text.alignment = TextAlignmentOptions.MidlineGeoAligned;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.overflowMode = TextOverflowModes.Overflow;
+            text.raycastTarget = false;
+            return text;
+        }
+
+        private void ShowBalance(long cents)
+        {
+            label.text = FormatBalance(cents); // Keep the exact amount for the original layout and coin target.
+            if (!artworkHasCurrencySymbol || reels == null) return;
+            decimal dollars = cents / 100m;
+            string suffix = "";
+            // Large balances still fit the six physical reels without clipping significant digits.
+            if (dollars >= 10000)
+            {
+                const string units = "KMBTQ";
+                int unit = -1;
+                do { dollars /= 1000; unit++; } while (decimal.Round(dollars, 2) >= 1000 && unit < units.Length - 1);
+                suffix = units[unit].ToString();
+            }
+            string amount = dollars.ToString("0.00", CultureInfo.InvariantCulture) + suffix;
+            string characters = amount.Replace(".", "");
+            int padding = ReelCount - characters.Length;
+            for (int i = 0; i < ReelCount; i++) reels[i].text = i < padding ? "" : characters[i - padding].ToString();
+            float separator = (padding + amount.IndexOf('.')) / (float)ReelCount;
+            var point = decimalPoint.rectTransform;
+            point.anchorMin = point.anchorMax = new Vector2(separator, .32f);
+            point.pivot = new Vector2(.5f, .5f);
+            // Keep the dot on the lit face of the dollar reel, clear of the dark divider.
+            point.anchoredPosition = new Vector2(-plate.rect.width / ReelCount * .14f, 0);
+        }
 
         private void OnDisable()
         {
@@ -104,7 +171,7 @@ namespace Switchboard.Game
             // This is presentation only: income, upgrade eligibility and rounding stay in the domain.
             if (incomeCoins != null && incomeCoins.IsFlying && shownCents >= 0 && wallet.Cents > shownCents) return;
             shownCents = wallet.Cents;
-            label.text = FormatBalance(shownCents);
+            ShowBalance(shownCents);
         }
 
         // The slot lives on the team's canvas, so keep following it through resolution and layout changes.
@@ -122,6 +189,14 @@ namespace Switchboard.Game
             RectTransformUtility.ScreenPointToLocalPointInRectangle(area, alignedMax, null, out Vector2 max);
             plate.localPosition = (min + max) * 0.5f;
             plate.sizeDelta = max - min;
+            if (artworkHasCurrencySymbol && reels != null)
+            {
+                float size = plate.rect.width / ReelCount;
+                foreach (var reel in reels) reel.fontSize = size;
+                decimalPoint.fontSize = size;
+                decimalPoint.rectTransform.sizeDelta = new Vector2(size * .3f, size);
+                decimalPoint.rectTransform.anchoredPosition = new Vector2(-size * .14f, 0);
+            }
         }
     }
 }

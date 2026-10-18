@@ -12,6 +12,7 @@ namespace Switchboard.Game
         private Image silhouetteHalo;
         private Material silhouetteMaterial;
         private float elapsed;
+        private bool hovered;
         public bool IsShowing { get; private set; }
 
         public void UseSilhouetteHalo()
@@ -39,7 +40,7 @@ namespace Switchboard.Game
             silhouetteMaterial = new Material(Resources.Load<Shader>("GuideSilhouette")) { hideFlags = HideFlags.HideAndDontSave };
             silhouetteHalo.material = silhouetteMaterial;
             child.AddComponent<SoftGuideOutline>();
-            child.SetActive(IsShowing);
+            child.SetActive(IsShowing || hovered);
             if (outline != null) outline.enabled = false;
         }
 
@@ -75,13 +76,21 @@ namespace Switchboard.Game
             }
             if (outline != null) outline.enabled = value && portraitHalo == null && silhouetteHalo == null;
             if (portraitHalo != null) portraitHalo.gameObject.SetActive(value);
-            if (silhouetteHalo != null) silhouetteHalo.gameObject.SetActive(value);
+            if (silhouetteHalo != null) silhouetteHalo.gameObject.SetActive(value || hovered);
             if (value) { elapsed = portraitHalo != null || silhouetteHalo != null ? 1.2f : .6f; Refresh(); }
+        }
+
+        public void SetHovered(bool value)
+        {
+            hovered = value;
+            if (silhouetteHalo == null) return;
+            silhouetteHalo.gameObject.SetActive(IsShowing || hovered);
+            Refresh();
         }
 
         private void Update()
         {
-            if (!IsShowing) return;
+            if (!IsShowing || hovered) return;
             elapsed += Time.unscaledDeltaTime;
             Refresh();
         }
@@ -92,12 +101,12 @@ namespace Switchboard.Game
             if (portraitHalo != null)
                 portraitHalo.color = new Color(1f, .83f, .20f, Mathf.Lerp(.45f, 1f, wave));
             else if (silhouetteHalo != null)
-                silhouetteMaterial.SetColor("_Color", new Color(1f, .83f, .20f, Mathf.Lerp(.45f, 1f, wave)));
+                silhouetteMaterial.SetColor("_Color", new Color(1f, .83f, .20f, hovered ? 1f : Mathf.Lerp(.45f, 1f, wave)));
             else if (outline != null)
                 outline.effectColor = new Color(1f, .83f, .20f, Mathf.Lerp(.22f, .85f, wave));
         }
 
-        private void OnDisable() => SetShowing(false);
+        private void OnDisable() { SetHovered(false); SetShowing(false); }
 
         private void OnDestroy()
         {

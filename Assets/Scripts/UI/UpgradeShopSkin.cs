@@ -32,7 +32,8 @@ namespace Switchboard.UI
             var art = Picture("Store artwork", root, 0, 0, 469, 1004, store);
             art.transform.SetAsFirstSibling();
             var header = (RectTransform)transform.Find("HeaderSlot");
-            Place(header, 110, 65, 270, 78);
+            // Six numeric reels, each 45 artwork pixels wide, after the painted dollar sign.
+            Place(header, 106, 65, 270, 80);
             Place((RectTransform)transform.Find("UpgradeSlots"), 0, 0, 469, 1004);
             var board = transform.parent.GetComponentsInChildren<RectTransform>(true).FirstOrDefault(r => r.name == "SwitchboardPanel");
             if (board != null)
@@ -74,7 +75,8 @@ namespace Switchboard.UI
             button.transition = Selectable.Transition.SpriteSwap;
             button.spriteState = new SpriteState { highlightedSprite = neutral, pressedSprite = pressed, selectedSprite = neutral, disabledSprite = dark };
             button.navigation = new Navigation { mode = Navigation.Mode.None };
-            var price = Label("Price", background.rectTransform, 4, 4, 174, 49, 36);
+            var price = Label("Price", background.rectTransform, 12, 8, 158, 48, 36);
+            price.alignment = TextAlignmentOptions.MidlineGeoAligned;
             var placeholder = Rect("Unused", row, 0, 0, 1, 1).gameObject;
             placeholder.SetActive(false);
             var fillArea = Rect("Savings", background.transform, 12, 60, 158, 3);
