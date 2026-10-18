@@ -102,6 +102,7 @@ namespace Switchboard.Domain.Tests
     {
         public long StartingCents { get; set; }
         public int MaxWaitingCalls { get; set; } = 6;
+        public int StartingCords { get; set; } = 3;
         public IPacingProfile Pacing { get; set; } = PacingSettings.Default;
         public IReadOnlyList<ICallerType> CallerTypes { get; set; } = Array.Empty<ICallerType>();
         public IReadOnlyList<IPerson> People { get; set; } = Array.Empty<IPerson>();
@@ -112,12 +113,13 @@ namespace Switchboard.Domain.Tests
 
     internal sealed class FakeUpgrade : IUpgrade
     {
-        public FakeUpgrade(string id, UpgradeKind kind, long costCents, double incomeMultiplier = 0)
+        public FakeUpgrade(string id, UpgradeKind kind, long costCents, double incomeMultiplier = 0, int wires = 0)
         {
             Id = id;
             Kind = kind;
             CostCents = costCents;
             IncomeMultiplier = incomeMultiplier;
+            Wires = wires;
         }
 
         public string Id { get; }
@@ -126,6 +128,25 @@ namespace Switchboard.Domain.Tests
         public string Description => string.Empty;
         public long CostCents { get; }
         public double IncomeMultiplier { get; }
+        public int Wires { get; }
+
+        public static FakeUpgrade WireUpgrade(string id, long costCents, int wires) =>
+            new FakeUpgrade(id, UpgradeKind.ExtraWires, costCents, wires: wires);
+
+        public static FakeUpgrade NotepadUpgrade(long costCents = 300) => new FakeUpgrade("notepad", UpgradeKind.Notepad, costCents);
+
+        /// <summary>The 5b shop of D43: income, then 4, 5 and 6 cords for $5, $8 and $13, the $3 Notepad and the secret.</summary>
+        public static IUpgrade[] FullShop() => new IUpgrade[]
+        {
+            Income("income_1", 800, 1.5),
+            Income("income_2", 2000, 2.0),
+            Income("income_3", 5000, 3.0),
+            WireUpgrade("wires_1", 500, 4),
+            WireUpgrade("wires_2", 800, 5),
+            WireUpgrade("wires_3", 1300, 6),
+            NotepadUpgrade(),
+            new FakeUpgrade("secret", UpgradeKind.Secret, 25000)
+        };
 
         public static FakeUpgrade Income(string id, long costCents, double multiplier) =>
             new FakeUpgrade(id, UpgradeKind.ExtraIncome, costCents, multiplier);

@@ -3,15 +3,16 @@ using Switchboard.Domain;
 
 namespace Switchboard.Content
 {
-    /// <summary>What the domain sees of the content: GameConfig's settings plus the people file and the economy file.</summary>
+    /// <summary>What the domain sees of the content: the economy file's money, pacing and call types, the people file, and GameConfig's slot count.</summary>
     public sealed class GameContent : IGameContent
     {
         public GameContent(GameConfig config, PeopleCatalog people, EconomyCatalog economy)
         {
-            StartingCents = config.StartingCents;
+            StartingCents = economy.StartingCents;
             MaxWaitingCalls = config.MaxWaitingCalls;
-            Pacing = config.Pacing;
-            CallerTypes = config.CallerTypes;
+            StartingCords = economy.StartingCords;
+            Pacing = economy.Pacing;
+            CallerTypes = economy.CallTypes;
             People = people.People;
             Callers = people.Callers;
             Directory = people.Directory;
@@ -20,6 +21,7 @@ namespace Switchboard.Content
 
         public long StartingCents { get; }
         public int MaxWaitingCalls { get; }
+        public int StartingCords { get; }
         public IPacingProfile Pacing { get; }
         public IReadOnlyList<ICallerType> CallerTypes { get; }
         public IReadOnlyList<IPerson> People { get; }

@@ -17,7 +17,7 @@ namespace Switchboard.Game.Tests
                 var audio = root.AddComponent<CallAudio>();
                 var calls = new CallService();
                 var config = AssetDatabase.LoadAssetAtPath<GameConfig>("Assets/Content/GameConfig.asset");
-                var people = config.LoadPeople(null);
+                var people = config.LoadPeople(config.LoadEconomy(), null);
                 var call = calls.Add(new CallRequest(people.Callers[0], people.People[1], 10, 30));
                 int cues = 0;
                 audio.ConnectionSucceeded += () => cues++;

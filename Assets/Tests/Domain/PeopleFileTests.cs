@@ -31,7 +31,7 @@ namespace Switchboard.Domain.Tests
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
             Assert.That(config, Is.Not.Null, GameConfigPath);
-            return config.LoadPeople(Board());
+            return config.LoadPeople(config.LoadEconomy(), Board());
         }
 
         [Test]

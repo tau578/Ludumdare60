@@ -7,8 +7,9 @@ using UnityEngine;
 namespace Switchboard.Content
 {
     /// <summary>
-    /// Parses and checks the designer's economy file (D39, D40; Design 6.4). An entry with a problem is left out
-    /// and reported in plain words naming the entry and the fix, and the game still starts.
+    /// Parses and checks the designer's economy file (D39, D40, D47; Design 6.4): starting money and cords, pacing,
+    /// call types and upgrades. An entry with a problem is left out, and a bad starting or pacing value falls back to
+    /// its default; each is reported in plain words naming the entry and the fix, and the game still starts.
     /// </summary>
     public static class EconomyFileLoader
     {
@@ -17,34 +18,45 @@ namespace Switchboard.Content
         private static readonly TypeInfo[] Types =
         {
             new TypeInfo("extra_income", UpgradeKind.ExtraIncome, null),
-            new TypeInfo("extra_wires", UpgradeKind.ExtraWires, "Step 5b"),
-            new TypeInfo("notepad", UpgradeKind.Notepad, "Step 5b"),
+            new TypeInfo("extra_wires", UpgradeKind.ExtraWires, null),
+            new TypeInfo("notepad", UpgradeKind.Notepad, null),
             new TypeInfo("extra_clients", UpgradeKind.ExtraClients, "Step 7"),
             new TypeInfo("secret", UpgradeKind.Secret, null)
         };
+
+        private static readonly FloatRange DefaultCallbackDelay = new FloatRange(20, 40);
 
         public static EconomyCatalog Load(string json)
         {
             var errors = new List<string>();
             var upgrades = new List<IUpgrade>();
+            var callTypes = new List<ICallerType>();
+            long startingCents = 0;
+            int startingCords = StatSheet.DefaultStartingCords;
+            IPacingProfile pacing = PacingSettings.Default;
             EconomyFileData data = Parse(json, errors);
             if (data != null)
             {
+                startingCents = CheckStartingCents(data.startingCents, errors);
+                startingCords = CheckStartingCords(data.startingCords, errors);
+                pacing = CheckPacing(data.pacing, errors);
+                CheckCalls(data.calls, callTypes, errors);
+
                 var ids = new Dictionary<string, int>(StringComparer.Ordinal);
                 var lastInChain = new Dictionary<UpgradeKind, UpgradeRecord>();
-                int secretAt = -1;
+                var rules = new ChainRules(startingCords);
                 for (int i = 0; i < data.upgrades.Length; i++)
                 {
-                    UpgradeRecord record = Check(i, data.upgrades[i], ids, lastInChain, ref secretAt, errors);
+                    UpgradeRecord record = Check(i, data.upgrades[i], ids, lastInChain, rules, errors);
                     if (record == null) continue;
                     upgrades.Add(record);
                     lastInChain[record.Kind] = record;
                 }
-                if (secretAt < 0)
+                if (rules.SecretAt < 0)
                     errors.Add("There is no secret upgrade. Add exactly one entry with \"type\": \"secret\": " +
                         "the most expensive one, which the player saves for.");
             }
-            return new EconomyCatalog(upgrades, errors);
+            return new EconomyCatalog(startingCents, startingCords, pacing, callTypes, upgrades, errors);
         }
 
         public static string KnownTypes()
@@ -81,8 +93,163 @@ namespace Switchboard.Content
             return data;
         }
 
+        private static long CheckStartingCents(long cents, List<string> errors)
+        {
+            if (cents >= 0) return cents;
+            errors.Add($"startingCents {cents} is negative. Use 0 or more, in cents (500 is $5.00). The game starts with 0 for now.");
+            return 0;
+        }
+
+        // The team's tray is built with 3 cords, and cords can't be taken away, so a game starts with 3 to 6.
+        private static int CheckStartingCords(int cords, List<string> errors)
+        {
+            const int fallback = StatSheet.DefaultStartingCords;
+            if (cords == EconomyFileData.Unset) return fallback;
+            if (cords < fallback)
+                errors.Add($"startingCords {cords} is below the {fallback} cords the tray is built with. " +
+                    $"Use {fallback} to {StatSheet.MaxCords}. The game starts with {fallback} for now.");
+            else if (cords > StatSheet.MaxCords)
+                errors.Add($"startingCords {cords} is more than the tray holds. " +
+                    $"Use {fallback} to {StatSheet.MaxCords}. The game starts with {fallback} for now.");
+            else return cords;
+            return fallback;
+        }
+
+        private static IPacingProfile CheckPacing(PacingEntry entry, List<string> errors)
+        {
+            PacingSettings fallback = PacingSettings.Default;
+            if (entry == null || float.IsNaN(entry.firstCallDelaySeconds) && float.IsNaN(entry.baseIntervalSeconds) &&
+                float.IsNaN(entry.intervalJitter) && float.IsNaN(entry.loadFactor) && float.IsNaN(entry.idleTimeoutSeconds))
+            {
+                errors.Add("There is no pacing section, so the game uses the default pacing: " +
+                    $"firstCallDelaySeconds {Number(fallback.FirstCallDelaySeconds)}, baseIntervalSeconds {Number(fallback.BaseIntervalSeconds)}, " +
+                    $"intervalJitter {Number(fallback.IntervalJitter)}, loadFactor {Number(fallback.LoadFactor)}, " +
+                    $"idleTimeoutSeconds {Number(fallback.IdleTimeoutSeconds)}. Add the section; see Docs/EconomyFile.md.");
+                return fallback;
+            }
+            return new PacingSettings(
+                PacingValue(entry.firstCallDelaySeconds, "firstCallDelaySeconds", fallback.FirstCallDelaySeconds, 0, null, errors),
+                PacingValue(entry.baseIntervalSeconds, "baseIntervalSeconds", fallback.BaseIntervalSeconds, 0.1, null, errors),
+                PacingValue(entry.intervalJitter, "intervalJitter", fallback.IntervalJitter, 0, 0.95, errors),
+                PacingValue(entry.loadFactor, "loadFactor", fallback.LoadFactor, 0, null, errors),
+                PacingValue(entry.idleTimeoutSeconds, "idleTimeoutSeconds", fallback.IdleTimeoutSeconds, 0, null, errors));
+        }
+
+        // A float widens to double exactly as the old asset did, so the same file plays the same.
+        private static double PacingValue(float value, string field, double fallback, double lowest, double? highest, List<string> errors)
+        {
+            string instead = $"The game uses {Number(fallback)} for now.";
+            if (float.IsNaN(value))
+                errors.Add($"pacing: {field} is missing. Add \"{field}\": {Number(fallback)}. {instead}");
+            else if (highest.HasValue && (value < lowest || value > highest.Value))
+                errors.Add($"pacing: {field} {Number(value)} is outside {Number(lowest)} to {Number(highest.Value)}. " +
+                    $"Use a value such as {Number(fallback)}. {instead}");
+            else if (value < lowest)
+                errors.Add(lowest == 0
+                    ? $"pacing: {field} {Number(value)} is negative. Use 0 or more. {instead}"
+                    : $"pacing: {field} {Number(value)} is below {Number(lowest)}. Use {Number(lowest)} or more. {instead}");
+            else return value;
+            return fallback;
+        }
+
+        private static void CheckCalls(CallEntry[] entries, List<ICallerType> callTypes, List<string> errors)
+        {
+            if (entries == null || entries.Length == 0)
+            {
+                errors.Add("The calls section is missing or empty, so no calls would ring. Add \"calls\": [ ... ] with at least " +
+                    "one call type, such as type.regular; see Docs/EconomyFile.md.");
+                return;
+            }
+            var ids = new Dictionary<string, int>(StringComparer.Ordinal);
+            bool anySpawns = false;
+            for (int i = 0; i < entries.Length; i++)
+            {
+                CallTypeRecord record = CheckCall(i, entries[i], ids, errors);
+                if (record == null) continue;
+                callTypes.Add(record);
+                if (record.SpawnWeight > 0) anySpawns = true;
+            }
+            if (!anySpawns)
+                errors.Add("No call type has a spawnWeight above 0, so no calls would ever ring. Give one a weight, such as 1.");
+        }
+
+        private static CallTypeRecord CheckCall(int index, CallEntry entry, Dictionary<string, int> ids, List<string> errors)
+        {
+            string id = entry?.id?.Trim() ?? string.Empty;
+            string where = id.Length == 0 ? $"Call type {index + 1}" : $"Call type {index + 1} \"{id}\"";
+            if (entry == null)
+            {
+                errors.Add($"{where} is empty. Fill it in or remove it.");
+                return null;
+            }
+            int errorsBefore = errors.Count;
+
+            if (id.Length == 0)
+                errors.Add($"{where}: the id is empty. Give it an id such as type.vip; the people file's \"type\" uses it.");
+            else if (ids.TryGetValue(id, out int first))
+                errors.Add($"{where}: this id is already used by call type {first + 1}. Every id must be different.");
+            else ids.Add(id, index);
+
+            if (string.IsNullOrWhiteSpace(entry.name))
+                errors.Add($"{where}: the name is empty. Type a short name, such as \"Regular\".");
+            if (float.IsNaN(entry.spawnWeight))
+                errors.Add($"{where}: spawnWeight is missing. Add how often this type rings compared with the others, " +
+                    "such as \"spawnWeight\": 1.");
+            else if (entry.spawnWeight < 0)
+                errors.Add($"{where}: spawnWeight {Number(entry.spawnWeight)} is negative. Use 0 or more; 0 means it never rings.");
+
+            FloatRange rate = Range(where, "rateCentsPerSecond", entry.rateCentsPerSecond, null, false, "{ \"min\": 3, \"max\": 8 }", errors);
+            FloatRange fee = Range(where, "feeCents", entry.feeCents, null, false, "{ \"min\": 5, \"max\": 15 }", errors);
+            FloatRange duration = Range(where, "durationSeconds", entry.durationSeconds, null, true, "{ \"min\": 15, \"max\": 30 }", errors);
+            FloatRange callback = Range(where, "callbackDelaySeconds", entry.callbackDelaySeconds, DefaultCallbackDelay, false,
+                "{ \"min\": 20, \"max\": 40 }", errors);
+            NotNegative(where, "responseTimeSeconds", entry.responseTimeSeconds, errors);
+            NotNegative(where, "fineMissedCents", entry.fineMissedCents, errors);
+            NotNegative(where, "fineEarlyDisconnectCents", entry.fineEarlyDisconnectCents, errors);
+            NotNegative(where, "maxSimultaneous", entry.maxSimultaneous, errors);
+            if (errors.Count > errorsBefore) return null;
+
+            return new CallTypeRecord(id, entry.name.Trim(), entry.spawnWeight, rate, fee, duration, callback)
+            {
+                ResponseTimeSeconds = entry.responseTimeSeconds,
+                FineMissedCents = entry.fineMissedCents,
+                FineEarlyDisconnectCents = entry.fineEarlyDisconnectCents,
+                CallbackAfterMiss = entry.callbackAfterMiss,
+                CallbackAfterDisconnect = entry.callbackAfterDisconnect,
+                MaxSimultaneous = entry.maxSimultaneous,
+                EveryoneCalls = entry.everyoneCalls,
+                RecipientTag = entry.recipientTag?.Trim() ?? string.Empty
+            };
+        }
+
+        /// <param name="fallback">Used when the file leaves the range out; null makes the range required.</param>
+        private static FloatRange Range(string where, string field, RangeEntry range, FloatRange? fallback, bool aboveZero,
+            string example, List<string> errors)
+        {
+            if (range == null || range.IsMissing)
+            {
+                if (fallback.HasValue) return fallback.Value;
+                errors.Add($"{where}: {field} is missing. Add it as \"{field}\": {example}.");
+                return default;
+            }
+            if (range.IsPartial)
+                errors.Add($"{where}: {field} needs both a min and a max, such as {example}.");
+            else if (range.min > range.max)
+                errors.Add($"{where}: {field} min {Number(range.min)} is above its max {Number(range.max)}. Swap them.");
+            else if (aboveZero && range.min <= 0)
+                errors.Add($"{where}: {field} min {Number(range.min)} must be above 0. Raise it.");
+            else if (range.min < 0)
+                errors.Add($"{where}: {field} min {Number(range.min)} is negative. Use 0 or more.");
+            return new FloatRange(range.min, range.max);
+        }
+
+        private static void NotNegative(string where, string field, double value, List<string> errors)
+        {
+            if (value < 0) errors.Add($"{where}: {field} {Number(value)} is negative. Use 0 or more; 0 means off.");
+        }
+
         private static UpgradeRecord Check(int index, UpgradeEntry entry, Dictionary<string, int> ids,
-            Dictionary<UpgradeKind, UpgradeRecord> lastInChain, ref int secretAt, List<string> errors)
+            Dictionary<UpgradeKind, UpgradeRecord> lastInChain, ChainRules rules, List<string> errors)
         {
             string id = entry?.id?.Trim() ?? string.Empty;
             string where = id.Length == 0 ? $"Upgrade {index + 1}" : $"Upgrade {index + 1} \"{id}\"";
@@ -131,15 +298,34 @@ namespace Switchboard.Content
                     errors.Add($"{where}: incomeMultiplier {Number(multiplier)} is not higher than {previous.Id}'s " +
                         $"{Number(previous.IncomeMultiplier)}. Values in a chain must grow.");
             }
+            int wires = 0;
+            if (type.Kind == UpgradeKind.ExtraWires)
+            {
+                wires = entry.wires;
+                lastInChain.TryGetValue(type.Kind, out UpgradeRecord previous);
+                if (wires <= rules.StartingCords)
+                    errors.Add($"{where}: wires {wires} is not above the {rules.StartingCords} cords the game starts with. " +
+                        $"wires is the total number of cords, so use {rules.StartingCords + 1} or more.");
+                else if (wires > StatSheet.MaxCords)
+                    errors.Add($"{where}: wires {wires} is more than the tray holds. Use {StatSheet.MaxCords} or less.");
+                else if (previous != null && wires <= previous.Wires)
+                    errors.Add($"{where}: wires {wires} is not higher than {previous.Id}'s {previous.Wires}. Values in a chain must grow.");
+            }
             if (type.Kind == UpgradeKind.Secret && errors.Count == errorsBefore)
             {
-                if (secretAt >= 0)
-                    errors.Add($"{where}: there is already a secret upgrade (upgrade {secretAt + 1}). Keep exactly one secret entry.");
-                else secretAt = index;
+                if (rules.SecretAt >= 0)
+                    errors.Add($"{where}: there is already a secret upgrade (upgrade {rules.SecretAt + 1}). Keep exactly one secret entry.");
+                else rules.SecretAt = index;
+            }
+            if (type.Kind == UpgradeKind.Notepad && errors.Count == errorsBefore)
+            {
+                if (rules.NotepadAt >= 0)
+                    errors.Add($"{where}: there is already a notepad (upgrade {rules.NotepadAt + 1}). Keep at most one notepad entry.");
+                else rules.NotepadAt = index;
             }
             if (errors.Count > errorsBefore) return null;
             return new UpgradeRecord(id, type.Kind, entry.name.Trim(), entry.description?.Trim() ?? string.Empty,
-                entry.costCents, multiplier);
+                entry.costCents, multiplier, wires);
         }
 
         private static TypeInfo FindType(string name)
@@ -166,6 +352,17 @@ namespace Switchboard.Content
         }
 
         private static string Number(double value) => value.ToString("0.###", Invariant);
+
+        // What the checks remember from one entry to the next.
+        private sealed class ChainRules
+        {
+            public ChainRules(int startingCords) =>
+                StartingCords = startingCords > 0 ? startingCords : StatSheet.DefaultStartingCords;
+
+            public int StartingCords { get; }
+            public int SecretAt { get; set; } = -1;
+            public int NotepadAt { get; set; } = -1;
+        }
 
         private sealed class TypeInfo
         {

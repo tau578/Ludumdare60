@@ -18,6 +18,15 @@ namespace Switchboard.Game
             Visible = (int)progress;
         }
 
+        /// <summary>The line changed length mid-way: a finished line stays finished, one still typing goes on.</summary>
+        public void Resize(int characterCount)
+        {
+            bool finished = !IsTyping;
+            Total = Math.Max(0, characterCount);
+            progress = finished ? Total : Math.Min(progress, Total);
+            Visible = progress >= Total ? Total : (int)progress;
+        }
+
         public int Advance(float seconds, float charactersPerSecond)
         {
             if (!IsTyping) return Visible;

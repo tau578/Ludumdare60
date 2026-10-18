@@ -21,7 +21,7 @@ namespace Switchboard.Domain
             Idle = new IdleGuard(pacing.IdleTimeoutSeconds);
             Calls = new CallService();
             Upgrades = new UpgradeService(content.Upgrades, Wallet);
-            Stats = new StatSheet(Upgrades);
+            Stats = new StatSheet(Upgrades, content.StartingCords);
             Shelf = new ShopShelf(Upgrades);
             Goal = new GoalProgress(Upgrades, Wallet);
             Earnings = new EarningsService(Calls, Wallet, () => Stats.IncomeMultiplier);
@@ -31,6 +31,7 @@ namespace Switchboard.Domain
             Spawner = new CallSpawner(Calls, new CallFactory(random), Directory, content.Callers, random, Busy,
                 pacing, maxLiveCalls, () => switchboard.CordCount, Callbacks, Idle);
             Desk = new OperatorDesk(Calls, new ConnectionRule(Directory), switchboard);
+            Notepad = new Notepad(Calls, Directory, Stats);
         }
 
         public IGameClock Clock => clock;
@@ -48,6 +49,7 @@ namespace Switchboard.Domain
         public BusyTracker Busy { get; }
         public CallSpawner Spawner { get; }
         public OperatorDesk Desk { get; }
+        public Notepad Notepad { get; }
 
         public void Tick(double dt)
         {
@@ -61,7 +63,10 @@ namespace Switchboard.Domain
             Goal.Tick();
         }
 
-        /// <summary>A dev tool: forgets every purchase (no refund) and puts the shop back to its start.</summary>
+        /// <summary>
+        /// A dev tool: forgets every purchase (no refund) and puts the shop back to its start. Cords already added
+        /// stay, because a cord can't be taken away safely mid-call.
+        /// </summary>
         public void ResetUpgrades()
         {
             Upgrades.ClearOwned();

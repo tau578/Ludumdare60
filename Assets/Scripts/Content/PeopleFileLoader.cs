@@ -177,7 +177,7 @@ namespace Switchboard.Content
             if (callerTypes != null)
                 foreach (ICallerType type in callerTypes)
                     if (type != null && !string.IsNullOrEmpty(type.Id)) ids.Add(type.Id);
-            return ids.Count > 0 ? string.Join(", ", ids) : "(no caller types are set up in GameConfig)";
+            return ids.Count > 0 ? string.Join(", ", ids) : "(Economy.json has no usable call types)";
         }
 
         private static void SplitName(string name, out string firstName, out string lastName)

@@ -12,21 +12,24 @@ namespace Switchboard.Game
         private CallQueueView queue;
         private CallService calls;
         private PhoneBookView book;
-        private CableController[] cables;
+        private readonly List<CableController> cables = new List<CableController>();
+        private CordBridge cordBridge;
         private Call firstCall;
         private CallCardView firstCard;
         private FirstOrderGuideStage? renderedStage;
         private readonly Dictionary<Graphic, SlowGuidePulse> pulses = new Dictionary<Graphic, SlowGuidePulse>();
         public FirstOrderGuideStage Stage => sequence.Stage;
 
-        public void Bind(CallQueueView callQueue, CallService service, PhoneBookView phoneBook, CableController[] wires)
+        public void Bind(CallQueueView callQueue, CallService service, PhoneBookView phoneBook, CableController[] wires,
+            CordBridge bridge = null)
         {
             Unbind();
             sequence = new FirstOrderGuideSequence();
             renderedStage = null;
             firstCall = null;
             firstCard = null;
-            queue = callQueue; calls = service; book = phoneBook; cables = wires;
+            queue = callQueue; calls = service; book = phoneBook; cordBridge = bridge;
+            if (cordBridge != null) cordBridge.CableAdded += RegisterCable;
             queue.OrderShown += OnOrderShown;
             queue.CardOpened += OnCardOpened;
             calls.CallEnded += OnCallEnded;
@@ -35,11 +38,21 @@ namespace Switchboard.Game
                 book.OpenChanged += OnBookChanged;
                 if (book.IsOpen) sequence.BreakOrder();
             }
-            foreach (var cable in cables)
+            foreach (var cable in wires)
             {
-                cable.PickedUp += OnCablePickedUp;
-                if (!cable.IsInTray) sequence.BreakOrder();
+                RegisterCable(cable);
+                if (cable != null && !cable.IsInTray) sequence.BreakOrder();
             }
+        }
+
+        private void RegisterCable(CableController cable)
+        {
+            if (cable == null || cables.Contains(cable)) return;
+            cables.Add(cable);
+            cable.PickedUp += OnCablePickedUp;
+            // A bought cord joins the current hint without restarting the tutorial.
+            renderedStage = null;
+            RefreshHints();
         }
 
         private void OnOrderShown(CallCardView card)
@@ -101,7 +114,7 @@ namespace Switchboard.Game
                 Show(firstCard.PortraitRect.GetComponent<Graphic>());
             else if (Stage == FirstOrderGuideStage.Book && book != null)
                 Show(book.ClosedBookGraphic);
-            else if (Stage == FirstOrderGuideStage.Cables && cables != null)
+            else if (Stage == FirstOrderGuideStage.Cables)
                 foreach (var cable in cables)
                     if (cable != null && cable.IsInTray && cable.TrayView != null)
                         foreach (var graphic in cable.TrayView.GetComponentsInChildren<Graphic>())
@@ -126,10 +139,13 @@ namespace Switchboard.Game
             if (queue != null) { queue.OrderShown -= OnOrderShown; queue.CardOpened -= OnCardOpened; }
             if (calls != null) calls.CallEnded -= OnCallEnded;
             if (book != null) book.OpenChanged -= OnBookChanged;
-            if (cables != null) foreach (var cable in cables) if (cable != null) cable.PickedUp -= OnCablePickedUp;
+            if (cordBridge != null) cordBridge.CableAdded -= RegisterCable;
+            foreach (var cable in cables) if (cable != null) cable.PickedUp -= OnCablePickedUp;
+            cables.Clear();
+            cordBridge = null;
             foreach (var pulse in pulses.Values) if (pulse != null) pulse.SetShowing(false);
             pulses.Clear();
-            queue = null; calls = null; book = null; cables = null;
+            queue = null; calls = null; book = null;
         }
     }
 }

@@ -20,10 +20,14 @@ namespace Switchboard.Game
         private CallService calls;
         private SocketView[] sockets = new SocketView[0];
         private readonly HashSet<SocketView> connectedSockets = new HashSet<SocketView>();
+        private CableInputController input;
+        private IReadOnlyList<Color> extraColors = new Color[0];
+        private int added;
 
         public int CordCount => cables.Length;
+        public event System.Action<CableController> CableAdded;
 
-        public void Attach(Scene scene)
+        public void Attach(Scene scene, IReadOnlyList<Color> extraCordColors)
         {
             ClearCallHighlights();
             sockets = LevelScene.FindAll<SocketView>(scene).ToArray();
@@ -32,6 +36,34 @@ namespace Switchboard.Game
             cables = found.ToArray();
             observed = new CordState[cables.Length];
             for (int i = 0; i < cables.Length; i++) observed[i] = CordState.Of(cables[i]);
+            extraColors = extraCordColors ?? new Color[0];
+            List<CableInputController> inputs = LevelScene.FindAll<CableInputController>(scene);
+            input = inputs.Count == 1 ? inputs[0] : null;
+            if (input == null)
+                Debug.LogError($"CordBridge needs exactly one CableInputController in the scene '{scene.name}' to add cords, but found {inputs.Count}.", this);
+        }
+
+        /// <summary>Adds cords through the team's cord input until there are <paramref name="total"/> (5b).</summary>
+        public void EnsureCords(int total)
+        {
+            if (input == null) return;
+            while (cables.Length < total)
+            {
+                Color color = extraColors.Count > 0 ? extraColors[added % extraColors.Count] : Color.white;
+                CableController cable = input.AddCable(color);
+                if (cable == null) return;
+                added++;
+                // Observed as it is now, so the next LateUpdate reports nothing for the new cord.
+                var grownCables = new CableController[cables.Length + 1];
+                var grownObserved = new CordState[cables.Length + 1];
+                cables.CopyTo(grownCables, 0);
+                observed.CopyTo(grownObserved, 0);
+                grownCables[cables.Length] = cable;
+                grownObserved[cables.Length] = CordState.Of(cable);
+                cables = grownCables;
+                observed = grownObserved;
+                CableAdded?.Invoke(cable);
+            }
         }
 
         public void Bind(OperatorDesk operatorDesk, CallService callService = null)

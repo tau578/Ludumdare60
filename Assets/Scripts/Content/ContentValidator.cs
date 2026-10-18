@@ -6,8 +6,9 @@ using UnityEngine;
 namespace Switchboard.Content
 {
     /// <summary>
-    /// Checks the people file and the caller types together (Design 6.3). Per-contact checks come from
-    /// <see cref="PeopleFileLoader"/>; this adds what needs the whole file or the type catalog.
+    /// Checks the people file against the economy file's call types (Design 6.3). Per-contact checks come from
+    /// <see cref="PeopleFileLoader"/>; this adds what needs the whole file or the type catalog. The call types'
+    /// own rules live in <see cref="EconomyFileLoader"/>.
     /// Messages are for the designer who edits the file by hand: each names the contact and the fix.
     /// </summary>
     public static class ContentValidator
@@ -28,7 +29,6 @@ namespace Switchboard.Content
             Func<string, bool> hasPortrait, IEnumerable<string> boardJacks)
         {
             var errors = new List<string>();
-            CheckTypes(callerTypes, errors);
             PeopleFileData data = TryParse(peopleJson);
             CheckPageSize(data, errors);
             CheckServicesFirst(data, errors);
@@ -42,50 +42,33 @@ namespace Switchboard.Content
         /// <summary>Checks Economy.json (Design 6.4). Every rule lives in the loader, which the game uses too.</summary>
         public static IReadOnlyList<string> ValidateEconomy(string economyJson) => EconomyFileLoader.Load(economyJson).Errors;
 
-        private static void CheckTypes(IReadOnlyList<ICallerType> types, List<string> errors)
+        /// <summary>
+        /// Checks GameConfig's card styles against the economy file's call types. A call type with no style gets
+        /// plain cards, so only styles that match no call type are reported.
+        /// </summary>
+        /// <param name="styleIds">The id of each style asset in GameConfig's list; null for an empty slot.</param>
+        public static List<string> ValidateCardStyles(IReadOnlyList<string> styleIds, IReadOnlyList<ICallerType> callTypes)
         {
-            if (types == null || types.Count == 0)
+            var errors = new List<string>();
+            if (styleIds == null) return errors;
+            for (int i = 0; i < styleIds.Count; i++)
             {
-                errors.Add("There are no caller types. Add at least one to GameConfig's caller types.");
-                return;
+                string id = styleIds[i];
+                if (id == null)
+                    errors.Add($"GameConfig's card style {i + 1} is empty. Pick a card style asset or remove the slot.");
+                else if (!HasType(callTypes, id))
+                    errors.Add($"GameConfig's card style {i + 1} is for \"{id}\", but Economy.json has no call type with that id. " +
+                        "Add the call type to the file's calls, or correct the style asset's id.");
             }
-            var ids = new HashSet<string>(StringComparer.Ordinal);
-            bool anySpawns = false;
-            for (int i = 0; i < types.Count; i++)
-            {
-                ICallerType type = types[i];
-                if (type == null)
-                {
-                    errors.Add($"Caller type {i + 1} in GameConfig is empty. Pick an asset or remove the slot.");
-                    continue;
-                }
-                string where = $"Caller type '{type.Id}'";
-                if (string.IsNullOrWhiteSpace(type.Id)) errors.Add($"Caller type {i + 1} has no id. Give it one, such as type.regular.");
-                else if (!ids.Add(type.Id)) errors.Add($"{where} is listed twice in GameConfig. Remove one of them.");
-                CheckRange(where, "rate", type.CentsPerSecond, 0, errors);
-                CheckRange(where, "connection fee", type.ConnectionFeeCents, 0, errors);
-                CheckRange(where, "duration", type.DurationSeconds, float.Epsilon, errors);
-                CheckRange(where, "callback delay", type.CallbackDelaySeconds, 0, errors);
-                CheckNotNegative(where, "response time", type.ResponseTimeSeconds, errors);
-                CheckNotNegative(where, "missed fine", type.FineMissedCents, errors);
-                CheckNotNegative(where, "early disconnect fine", type.FineEarlyDisconnectCents, errors);
-                CheckNotNegative(where, "max simultaneous", type.MaxSimultaneous, errors);
-                CheckNotNegative(where, "spawn weight", type.SpawnWeight, errors);
-                if (type.SpawnWeight > 0) anySpawns = true;
-            }
-            if (!anySpawns) errors.Add("No caller type has a spawn weight above 0, so no calls would ever ring. Give one a weight, such as 1.");
+            return errors;
         }
 
-        private static void CheckRange(string where, string what, FloatRange range, float lowest, List<string> errors)
+        private static bool HasType(IReadOnlyList<ICallerType> types, string id)
         {
-            if (range.min > range.max)
-                errors.Add($"{where}: the {what} range has min {range.min} above max {range.max}. Swap them.");
-            if (range.min < lowest) errors.Add($"{where}: the {what} range starts at {range.min}, below {lowest}. Raise the min.");
-        }
-
-        private static void CheckNotNegative(string where, string what, double value, List<string> errors)
-        {
-            if (value < 0) errors.Add($"{where}: the {what} is {value}. Use 0 or more.");
+            if (types == null) return false;
+            foreach (ICallerType type in types)
+                if (type != null && string.Equals(type.Id, id, StringComparison.Ordinal)) return true;
+            return false;
         }
 
         private static PeopleFileData TryParse(string json)
@@ -160,12 +143,12 @@ namespace Switchboard.Content
                 if (!string.IsNullOrEmpty(type.RecipientTag))
                 {
                     if (recipients == 0)
-                        errors.Add($"Caller type '{type.Id}' sends its calls to contacts tagged \"{type.RecipientTag}\", but no contact " +
-                            "has that tag. Add the tag to a contact, or clear the type's recipient tag.");
+                        errors.Add($"Call type '{type.Id}' sends its calls to contacts tagged \"{type.RecipientTag}\", but no contact " +
+                            "has that tag. Add the tag to a contact, or clear the type's recipientTag in Economy.json.");
                 }
                 // A caller can't call themselves, so people calling people need at least two.
                 else if (HasCaller(catalog.Callers, type) && recipients < 2)
-                    errors.Add($"Caller type '{type.Id}' has nobody to call. Add at least two people without tags.");
+                    errors.Add($"Call type '{type.Id}' has nobody to call. Add at least two people without tags.");
             }
         }
 

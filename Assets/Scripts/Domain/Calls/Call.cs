@@ -29,5 +29,11 @@ namespace Switchboard.Domain
 
         /// <summary>The fine actually taken when the call ended; 0 if none.</summary>
         public long FineCents { get; internal set; }
+
+        /// <summary>The caller's jack once the Notepad has noted it (D23); null until then.</summary>
+        public JackId? CallerNote { get; internal set; }
+
+        /// <summary>The wanted person's jack once the Notepad has noted it (D23); null until then.</summary>
+        public JackId? RecipientNote { get; internal set; }
     }
 }

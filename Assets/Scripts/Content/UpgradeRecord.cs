@@ -4,7 +4,7 @@ namespace Switchboard.Content
 {
     public sealed class UpgradeRecord : IUpgrade
     {
-        public UpgradeRecord(string id, UpgradeKind kind, string name, string description, long costCents, double incomeMultiplier)
+        public UpgradeRecord(string id, UpgradeKind kind, string name, string description, long costCents, double incomeMultiplier, int wires = 0)
         {
             Id = id;
             Kind = kind;
@@ -12,6 +12,7 @@ namespace Switchboard.Content
             Description = description;
             CostCents = costCents;
             IncomeMultiplier = incomeMultiplier;
+            Wires = wires;
         }
 
         public string Id { get; }
@@ -20,5 +21,6 @@ namespace Switchboard.Content
         public string Description { get; }
         public long CostCents { get; }
         public double IncomeMultiplier { get; }
+        public int Wires { get; }
     }
 }

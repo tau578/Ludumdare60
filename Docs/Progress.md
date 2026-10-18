@@ -10,9 +10,9 @@
 | 3. Phone book and cards | done | ✅ 2026-10-18 (16 min + 8 min fix + 3 min fix) | ✅ 211/211 tests, scope clean | ✅ | |
 | 4. Emergencies and fines | done | ✅ 2026-10-18 (26 min) | ✅ 255/255 tests, scope clean | ✅ | 14fd59c |
 | Scene merge: `Final` (D38) | done | ✅ 2026-10-18 (11 min) | ✅ 255/255 tests, scope clean | ✅ | 3002ea8 |
-| 5a. Economy file, shop, income, secret | done | ✅ 2026-10-18 (23 min) | ✅ 304/304 tests, scope clean | ✅ | |
-| 5b. Extra wires and Notepad | not started | | | | |
-| 5c. Calls and pacing into Economy.json | not started | | | | |
+| 5a. Economy file, shop, income, secret | done | ✅ 2026-10-18 (23 min) | ✅ 304/304 tests, scope clean | ✅ | e115c59 |
+| 5b. Extra wires and Notepad | done | ✅ 2026-10-18 (22 min) | ✅ 333/333 tests, scope clean | ✅ | 667adda |
+| 5c. Calls and pacing into Economy.json | done | ✅ 2026-10-18 (17 min) | ✅ 388/388 tests, scope clean | ✅ | f70b7df |
 | 6. Saves, Boot, Web build | not started | | | | |
 | 7. Board growth and pacing | not started | | | | |
 | 8. Sound and feel | not started | | | | |
@@ -1395,3 +1395,390 @@ Follow-ups:
 
 #### Step 5a playtest (lead, 2026-10-18)
 - All checks passed ("all works well"). The lead asked to commit and push.
+
+#### Step 5b prep (orchestrator and lead, 2026-10-18)
+- **Pre-flight:**
+  - Nothing new upstream (`main` = `origin/main` at `e115c59`), so Sergei hasn't touched his cord, tray or book files.
+  - Unity is idle in `Final.unity`, and the console is clean, with no `CallerPortraitSliceCheck` warning.
+  - EditMode tests pass 304/304.
+- **What Sergei's code has today:**
+  - His cord input uses only the cables in its own list that are active (`Owns`/`Usable`), and `Configure` replaces the whole list.
+  - The 3 cords live in `Final.unity`, and the 3 tray slots in `CableTray.prefab` (270 px apart). The tray's felt is about 830 px wide, so 6 slots need closer spacing.
+  - The book's row labels aren't raycast targets, so a tap on a row hits the open book's button and closes the book.
+- **What our code has today:**
+  - The spawner already reads `CordCount` live.
+  - `ShopShelf` and `ShopView` take the new chains as they are.
+- **Approach:**
+  - New cords are added while the game runs by copying an existing cord and its tray slot, so the scene and the tray prefab don't change.
+  - The three new colours live in our `GameConfig`.
+- **The lead approved 6 of Sergei's files (D44):**
+  - `CableInputController.cs`
+  - `PhoneBookContactRow.cs`
+  - `PhoneBookPageView.cs`
+  - `PhoneBookView.cs`
+  - `PhoneBook.prefab` (the row hit area as a prefab part)
+  - `PhoneBookBuilder.cs` (builds the same part; the menu is not run)
+- **Design gaps answered by the lead:**
+  - A Notepad tap on someone not on the call in hand, or with no call in hand, does nothing, and the book stays open.
+  - Rows are tappable only while the Notepad is owned. Before that, a row tap closes the book as today.
+- **Plan:** §9 has the full 5b brief.
+
+### Step 5b report: 2026-10-18
+Result: done
+
+Playable now: the shop sells "Extra cord / 4 cords / $5.00" in slot 2 and "Notepad / Tap a name: note its jack / $3.00" in slot 3. Buying Extra cord puts a new cord in the tray at once: green, then violet, then ivory, up to 6. The tray closes up so all of them fit. The new cords patch, hold, restore, pay and go back to the tray like the originals. After the Notepad is bought, tapping the caller's or the wanted person's name in the open book adds their jack to the bubble, e.g. "Otis **Bramble** (F3) / wants / Sidney **Hargreaves** (D6)", and the book stays open. A tap on anyone else does nothing. Without the Notepad, a row tap closes the book as before.
+
+How to test: as in the plan's playtest script. Notes:
+- Dev "Reset upgrades" keeps cords already added, so after a reset the shop offers "4 cords" again while 4–6 cords are in the tray. Buying it adds nothing until the chain passes the current count. Reset also turns row taps off.
+- Known issue (Sergei's input, not changed): tapping a book row, or any button, while holding a cord drops the cord back in the tray.
+
+Created:
+- Domain: `Assets/Scripts/Domain/Upgrades/Notepad.cs`.
+- Game: `Assets/Scripts/Game/NotepadBookLink.cs`, a plain class that wires the book to the Notepad and is owned by `GameInstaller`.
+- Tests:
+  - `Assets/Tests/Domain/WiresAndNotepadTests.cs`
+  - `Assets/Tests/Game/Editor/CableTrayLayoutTests.cs`
+  - `Assets/Tests/Game/Editor/PhoneBookTapTests.cs`
+
+Changed (ours):
+- `Assets/Configs/Economy.json`: `wires_1`–`wires_3` and `notepad` after `income_3`, one per line, with the secret still last. The texts fit at 1280×720; "Tap a name: note its jack" wraps to two lines, so nothing was shortened.
+- `Docs/EconomyFile.md`:
+  - `extra_wires` and `notepad` marked ready, with their fields
+  - `wires` explained as a total: above the starting 3, at most 6, growing
+  - at most one `notepad`, and deleting it removes the feature
+  - an example message for each new rule
+  - `extra_clients` still "Coming in Step 7"
+- Domain:
+  - `IUpgrade.Wires`; `IGameContent.StartingCords`.
+  - `Call.CallerNote` and `Call.RecipientNote` (`JackId?`): notes live on the call.
+  - `StatSheet`:
+    - new members `Cords`, `HasNotepad`, `MaxCords = 6` and `DefaultStartingCords = 3`
+    - the `Changed` event, raised after every `Recompute`, including `ResetUpgrades`
+    - takes `startingCords`
+  - `GameSession`: builds `Notepad`, and passes `content.StartingCords` to `StatSheet`. The spawner already read `CordCount` live, so it is unchanged.
+- Content:
+  - `UpgradeEntry.wires`, `UpgradeRecord.Wires`.
+  - `EconomyFileLoader.Load(json, startingCords)` loads `extra_wires` and `notepad`. It checks that `wires` is above the starting cords, is at most 6 and grows along the chain, and that there is at most one notepad. `extra_clients` still reports "arrives in Step 7".
+  - `ContentValidator.ValidateEconomy(json, startingCords)`.
+  - `GameConfig`: `startingCords` (3, `Min(1)`) and `extraCordColors` (green 92,184,92; violet 156,104,214; ivory 240,232,206), both passed to the loader and the validator. `GameContent.StartingCords`.
+- Game:
+  - **`CordBridge`:**
+    - `Attach(scene, extraCordColors)` also finds the one `CableInputController` by type, and logs a clear error otherwise.
+    - `EnsureCords(total)` calls `AddCable` with the next colour until the total is reached or `AddCable` returns null.
+    - Each new cable is appended to `cables` and to `observed` with its current state. New cord ids are 3, 4, 5.
+  - **`GameInstaller`:**
+    - Warns if the scene's cord count differs from `startingCords`.
+    - Calls `EnsureCords(Stats.Cords)` at start and on `Stats.Changed`.
+    - Finds the one `PhoneBookView` and builds `NotepadBookLink`, which sets `ContactTapsEnabled = HasNotepad` and routes `ContactTapped` to `Notepad.Note(new JackId(socket))`.
+    - Unsubscribes in `OnDestroy`.
+  - **`CallQueueView.Bind`** takes the Notepad (optional) and forwards `Noted` to the card.
+  - **`CallCardView`:**
+    - The in-hand bubble adds " (F3)" after a noted name at 85 % size (`jackTextSize`), keeping the bold surname.
+    - `ShowNotes()` swaps in the new text without re-typing: a finished bubble stays finished, and one still typing goes on from where it was (`TypingReveal.Resize`).
+- `Assets/Content/GameConfig.asset`: `startingCords` 3 and the 3 colours.
+- Tests: `Fakes.cs` (`FakeContent.StartingCords`, `FakeUpgrade.Wires`, `WireUpgrade`, `NotepadUpgrade`, `FullShop`), `EconomyFileTests.cs`, `TypingRevealTests.cs`.
+
+Changed (Sergei's, the 6 approved coordinated changes, D44):
+- **`Assets/Scripts/UI/CableInputController.cs`:**
+  - `MaxCables = 6` and `public CableController AddCable(Color)`. It works in these steps:
+    1. copies the last cable under an inactive holder, so the copy's `OnEnable` can't bind the source's tray slot
+    2. copies that cable's `StoredCableView` under the tray
+    3. destroys any hover `Outline` copied across
+    4. names the copies `Cable_NN` / `StoredCable_NN`
+    5. calls `SetTrayCableView` and `SetCableColor`
+    6. reparents the cable, which starts it with a fresh connection in the tray
+    7. appends it to the list, re-spaces the tray and returns it (or null when full or there is nothing to copy)
+  - Before copying, the source slot's highlight is cleared.
+  - Tray maths in public statics: `TraySpacing(count)` = min(270, 830 ÷ count), `TraySlotPosition`, `TraySlotSize` (width scales with the spacing; the height stays 94.5) and `TrayPreviewScaleFor` (0.45 × spacing ÷ 270). With 3 cords these give exactly today's −270/0/270, 252×94.5 and 0.45.
+  - Nothing else in the file changed.
+- **`PhoneBookContactRow.cs`:**
+  - An optional third `Configure` argument for the `tapArea` image, plus `SetTappable(bool)`, `IsTappable`, and `event Action<PhoneBookContact> Tapped`.
+  - It implements `IPointerClickHandler` (left button, only while tappable) and an empty `IPointerDownHandler` (see deviation 1).
+- **`PhoneBookPageView.cs`:** subscribes the rows it creates, forwards `ContactTapped`, and applies `SetTappable` to new and existing rows.
+- **`PhoneBookView.cs`:** `event Action<string, string> ContactTapped` (name, socket) and `ContactTapsEnabled` (off by default), passed to both pages. Pages are subscribed in `Awake` and in `ConfigureDirectory`, and unsubscribed in `OnDestroy`. Page turns are unchanged.
+- **`PhoneBook.prefab`** (edited with `PrefabUtility.LoadPrefabContents`; no menu was run):
+  - Both `ContactTemplate` rows get a `CanvasRenderer` and a transparent `Image` (`raycastTarget` off), assigned to `tapArea`.
+  - The diff has only these additions; `OpenBook/LetterTabs` is still inactive.
+- **`PhoneBookBuilder.cs`:** `DirectoryPage` builds the same image and passes it to `Configure`. The menu was not run.
+
+Scene and prefab changes:
+- `Final.unity`: no diff. `CableTray.prefab`, `CableController`, `StoredCableView`, `CableBuilder`, `CableTrayBuilder` and `MainMenu.unity` are untouched.
+- `GameUI.prefab` and `Game.prefab`: unchanged. The new `jackTextSize` uses its code default of 85.
+
+Tests: 333/333 EditMode (304 before; 29 new):
+- `CordStatTests` (5): starting cords with nothing bought; set, not stacked (4 then 5 gives 5); `HasNotepad` false, then true; `Changed` on purchase and on reset; a session reset turns the Notepad off.
+- `GrowingCordsSpawnTests` (1): with 5 waiting calls, the load drops from 2 to 1.5 to 1 as the fake switchboard's cord count goes 3, 4, 6.
+- `NotepadTests` (8):
+  - does nothing without the upgrade
+  - notes the caller and the recipient once each and raises `Noted`
+  - ignores a jack not on the call
+  - does nothing with no call in hand
+  - notes survive a swap and don't leak
+  - a callback starts with no notes
+  - works for an emergency's service recipient
+  - a reset turns it off
+- `EconomyFileTests`:
+  - The real file loads 8 entries with no problems, and `GameConfig` validates clean.
+  - The real shelf is `income_1`, `wires_1`, `notepad`; after buying the notepad, slot 3 goes empty and slots 1–2 stay.
+  - Checks for wires and the Notepad: they load; wires not growing (the exact message); wires ≤ starting cords (also with 4 starting cords); wires > 6; a second notepad.
+  - "Not built yet" now uses `extra_clients`, which reports Step 7.
+- `CableTrayLayoutTests` (4): 3 slots match today's layout; 4, 5 and 6 slots fit 830 px with no overlap, centred, with the preview no wider than its slot.
+- `PhoneBookTapTests` (3): with taps on, a click on a row raises its name and socket (the book's own upper-case socket); with taps off, the hit area isn't a raycast target and a click raises nothing; rows made after taps are on are tappable too.
+- `TypingRevealTests` (2): a finished line stays finished when it grows; a line still typing goes on.
+
+Console: clean. The only messages during the work:
+- the known MCP WebSocket line after recompiles
+- two URP "Ignoring depth surface load/store action as it is memoryless" lines after switching the Game view to 1280×720 (engine, not our code)
+- one "FindAllObjectsOfType: Invalid Type" from a failed probe of mine (a wrong assembly name for the menu's `Menu` type), not from game code
+
+No `CallerPortraitSliceCheck` warning appeared. No format-only re-saves happened (`TimeManager.asset` and `SampleScene.unity` untouched), so nothing was discarded.
+
+Screenshots (`Temp/Captures/`):
+- `step-05b.png`: the shop at the start: Better rates, Extra cord / 4 cords, Notepad, the secret; 3 cords in the tray.
+- `step-05b-six-connected.png`: all 6 cords connected to 6 real calls, each card ringed in its cord's colour.
+- `step-05b-cords.png`: 6 cords; the new violet one connected on the board, the other 5 in the tray.
+- `step-05b-notepad.png`: the book open, and the bubble "Otis Bramble (F3) / wants / Sidney Hargreaves (D6)".
+- `step-05b-720.png`: 1280×720, the tray with 6 cords (5 in the tray, 1 connected), all readable.
+- `step-05b-720-shop.png`: 1280×720 after dev "Reset upgrades": the shop back at its start (Extra cord and Notepad readable), the 6 cords kept.
+
+Checked in Play Mode (stepped frames, clicks inside `Canvas.willRenderCanvases`; `timeScale` set to 10 once, reset to 1):
+- **Wires bought by raycast clicks** on shop button 2 (`UpgradeButton_02` was the top hit), three times: 4, 5, then 6 cords. Money fell $5, $8, then $13; the button went to "+".
+- **Tray:** 6 slots at ±345.8 / ±207.5 / ±69.2, each 129×94.5 with preview scale 0.23. None carries an outline.
+- **All 6 cords** picked up from the tray and patched with `ProcessPointer` onto 6 real calls. All 6 connected, paid their fee and earned.
+- **Hold and restore on a new cord:** pulling a plug of Cable_04 put its call on hold; a click off the board restored it, and pay resumed with no second fee. Earlier, a test click 75 px from B6 landed on jack A6's hit area and re-patched a cord to the wrong jack, which correctly cut that call off. That was my test's mistake, not a bug.
+- **Back to the tray:** pulling both plugs of Cable_06 returned it to the tray and cut the call off. Cable_04's call finished (Paid 156¢) and the cord went back to the tray.
+- **Buying while cords are busy** (fresh session): with all 3 originals connected, buying wires_1 put Cable_04 in the tray, and the 3 calls stayed connected. Buying wires_2 while Cable_04 was held, and wires_3 while it was half-patched, gave fresh tray cords and disturbed nothing.
+- **Hover highlight:** with Cable_03's tray slot highlighted by hover, buying wires_1 gave a new slot that isn't highlighted. The copied outlines were destroyed by the next frame (0 left), and the source's highlight was cleared.
+- **Notepad:**
+  - Before buying: a raycast click on a row hits `OpenBook`, and the book closes.
+  - After buying via shop button 3, with a call in hand: clicks on the caller's row and the recipient's row (the top hits were the rows themselves) noted F3 and D6, and the book stayed open. A click on another row changed nothing, and the book stayed open.
+  - Swapping to another call and back kept both notes; the other call had none.
+  - The violet cord then connected that call using the noted jacks.
+- **Bubble fit:** the 4 longest names with jacks (e.g. "Reginald Underhill (E5)") fit the 134×134 bubble with no overflow, auto-sizing to about 20 pt (about 22 pt without notes). No shrink beyond the 85 % jack size was needed.
+- **Dev "Reset upgrades":** taps off; 6 cords kept; `Stats.Cords` back to 3; shelf back to income_1, wires_1, notepad.
+- **MainMenu → Start** (`Menu.onPlayButtonClick`) lands in `Final` (index 1) with 3 cords, taps off and the shelf on wires_1. No errors.
+- **Validator:**
+  - With `wires_2` set to 4 (in memory only), the check reports `Economy file: Upgrade 5 "wires_2": wires 4 is not higher than wires_1's 4. Values in a chain must grow.`
+  - `Tools/Switchboard/Validate Content` on the real file reports "no problems found".
+- **Editor left clean:** not in Play Mode, `Final.unity` active and not dirty, `timeScale` 1, Game view 1920×1080, no SessionState keys or callbacks left, console cleared.
+
+Deviations from Design/Plan:
+1. **`PhoneBookContactRow` also implements an empty `IPointerDownHandler`.** Without it, the press on a tappable row bubbles up to the open book's `Button`, which flashes its pressed tint over the whole book. The click itself goes to the row either way.
+2. **`PhoneBookContactRow.Configure`** takes the hit area as an optional third argument, so existing callers still compile.
+3. **Only the tray slot's width narrows** with more cords; the height stays 94.5. The brief asked for a narrower hit area; keeping the height keeps the slots easy to tap.
+4. **The tray slot's preview is found by its builder name, `Preview`** (`rect.Find("Preview")`), because `StoredCableView.preview` is private and that file wasn't approved.
+5. **The cords stat after a reset:** Dev "Reset upgrades" sets `Stats.Cords` back to 3 while the added cords stay in the tray. As the brief allows, no cord is removed.
+
+Follow-ups:
+- **Tell Sergei (D44, after):**
+  - `CableInputController.AddCable(Color)`, `MaxCables = 6` and the `Tray*` statics
+  - the book's `ContactTapped` / `ContactTapsEnabled`, the rows' `tapArea` and `Tapped`
+  - the new `Image` on both `ContactTemplate`s
+  - `PhoneBookBuilder.DirectoryPage` builds it
+  - Keep `StoredCable_NN`'s child name `Preview`; the re-spacing scales it.
+- **Design docs** (orchestrator): 5.9 (`StatSheet.Cords` / `HasNotepad` / `Changed`, `Notepad`), 4.5 (`EnsureCords`), 6.1 (`startingCords`, `extraCordColors`) and 3 (the new public members used).
+- **The 830 px usable width** is a constant in Sergei's file. If Mia's tray art changes, it needs updating.
+- **With 6 cords** each tray preview is about 51 % of today's size. That is readable at 720, but a playtest should confirm it on a phone (Step 9).
+
+#### Step 5b verification (orchestrator, 2026-10-18)
+- **Tests:** an independent EditMode run passed 333/333 (304 before, 29 new). The console has no errors or warnings, and there is no `CallerPortraitSliceCheck` warning.
+- **Scope (`git status`):**
+  - Sergei's files: exactly the 6 approved (`CableInputController.cs`, `PhoneBookContactRow.cs`, `PhoneBookPageView.cs`, `PhoneBookView.cs`, `PhoneBook.prefab`, `PhoneBookBuilder.cs`).
+  - `PhoneBook.prefab`'s diff only adds the transparent `Image` (not a raycast target) to the two `ContactTemplate` rows. `LetterTabs` is untouched.
+  - `Final.unity`, `MainMenu.unity`, `CableTray.prefab`, `GameUI.prefab`, `Game.prefab` and `PhoneBook.json` are unchanged. There were no format-only re-saves.
+- **Code skim:**
+  - `AddCable` copies the last cord under an inactive holder, so the copy can't bind the source's tray slot. It drops copied outlines and re-spaces the tray with public static maths, which give today's layout for 3 cords.
+  - `CordBridge.EnsureCords` grows its arrays only on a purchase and records each new cord's current state, so nothing spurious is reported.
+  - `Notepad` notes only the caller's or recipient's jack on the call in hand, with the notes stored on the `Call`.
+  - `NotepadBookLink` turns row taps on and off with `HasNotepad`.
+- **Screenshots checked:**
+  - `step-05b-six-connected.png`: 6 cords connected on the board, in green, violet and ivory alongside Sergei's 3.
+  - `step-05b-notepad.png`: the bubble reads "Otis Bramble (F3) / wants / Sidney Hargreaves (D6)" with the book open. A long surname pushes its jack onto its own line, which is still readable.
+  - `step-05b-720.png`: the tray with 6 cords at 1280×720. The previews are small but distinct.
+- **Accepted deviations:** the 5 in the report. Two are worth knowing:
+  - The tray preview is found by its child name `Preview`, so Sergei should keep that name.
+  - After dev "Reset upgrades", the shop offers "4 cords" again while 6 are in the tray (dev only).
+- **Docs updated:** Design status table, §3 (new public members), 4.5 (adding cords), 5.9. Plan §4 lesson and §8. CLAUDE.md.
+
+#### Step 5b playtest (lead, 2026-10-18)
+- All checks passed ("all good"). The lead asked to commit.
+
+### Step 5b fix report: 2026-10-18
+Result: done
+
+Playable now: after the team merge (a173e75), the Notepad follows the new "accept many calls" rules. A tapped book name notes that person's jack on every accepted call still waiting to connect (Taken or Connecting) where they are the caller or the person wanted. Each card's bubble shows its own notes when it is clicked. Callers 04 and 05 have their portraits again.
+
+How to test:
+1. Play `Final.unity`. F1, then "+ $10" a few times; buy the Notepad.
+2. Accept two cards, ideally two that share a person. Open the book and tap that person: both calls get the jack. Tap the other names on each call too.
+3. Click each accepted card. Each bubble shows its own jacks, e.g. "Doris Cobbold (D1) / wants / Rose Ellery (A4)", and nothing needs tapping again.
+4. Tap the name of someone on a ringing (not yet accepted) card, or on a connected or held call: nothing changes, and the book stays open.
+5. Buy Extra cord, connect a call with the new green cord: it pays, and the cord stays plugged after the call ends.
+
+Created: none.
+
+Changed:
+- `Assets/Scripts/Domain/Upgrades/Notepad.cs`:
+  - `Note(jack)` walks `CallService.Live` (on a tap, so no per-tick work) and notes the jack on every call in `Taken` or `Connecting` whose caller or recipient is listed at that jack.
+  - It no longer uses `CallService.InHand`.
+  - It returns true if at least one call got a new note, and raises `Noted(CallId)` once per call that got one. A person who is both caller and recipient on the same call is impossible, but would still raise once.
+  - Ringing, connected, on-hold and ended calls are never noted. Without the Notepad, or with no matching accepted call, nothing happens.
+- `Assets/Tests/Domain/WiresAndNotepadTests.cs` (`NotepadTests`):
+  - The swap test is gone.
+  - Two tests are renamed for the new rule: `IgnoresAJackNotOnAnyAcceptedCall`, and `DoesNothingWithoutTheUpgrade`, which now has two accepted calls.
+  - New: `TwoAcceptedCallsSharingAPersonBothGetTheNote` (Noted once per call), `TappingTheSamePersonTwiceAddsNothingNew`, `ARingingCallGetsNoNote` (it replaces "no call in hand"), `AConnectingCallGetsNotes`, `ConnectedAndOnHoldCallsGetNoNote` and `NotesStayWhenAnotherCardIsAccepted` (no leak to the later call; a shared person then notes both).
+  - Kept: the caller and recipient noted once each, a callback starts with no notes, an emergency's service recipient, and a reset turning it off.
+- **Mia's folder (the one approved coordinated change):** `Assets/Sprites/callers/caller-04.png.meta` and `caller-05.png.meta`. The slice rect height is now 190 instead of 191; the diff is one line in each. Sprite names (`caller-04_0`, `caller-05_0`), `spriteID` and `internalID` are unchanged. Both were force-reimported and each loads its sprite again. `CallerPortraitSliceCheck` logged nothing.
+
+Scene and prefab changes: none. `Final.unity`, `GameUI.prefab` and `Game.prefab` didn't need changes. The merged `CallCardView` works as it is: bubbles are built from `InHandText()` when a card's details turn visible, so notes written while another card's bubble is open show when that card is clicked. `ShowNotes()` updates an open bubble in place.
+
+Tests: 361/361 EditMode (357 after the merge, with 5 failing). All 5 now pass:
+- 4 from the portrait fix: `RealContentHasNoProblems`, `GameConfigReferencesTheRealFile`, `RealFileHasThirtyThreePeopleAndThreeServicesOnEveryJack` and `CallersComeFromTheWholeBoardAndNobodyIsInTwoCalls`.
+- The swap test was replaced.
+- Count: 2 removed (the swap test and `DoesNothingWithNoCallInHand`), 6 added. `NotepadTests` went from 8 to 12.
+
+Console: clean. The only messages during the work were:
+- the known MCP WebSocket line after a recompile
+- two URP "Ignoring depth surface load/store action as it is memoryless" lines in Play Mode (engine)
+
+Screenshots (`Temp/Captures/`):
+- `step-05b-fix-notepad.png`: book open; card 1's bubble reads "Doris Cobbold (D1) / wants / Rose Ellery (A4)".
+- `step-05b-fix-notepad-card2.png`: the same moment after clicking card 2; its bubble reads "Otis Bramble (F3) / wants / Doris Cobbold (D1)".
+- `step-05b-fix-cords.png`: the green 4th cord still plugged in D1–A4 after its call finished; 3 cords in the tray; Notepad slot at "+".
+
+Checked in Play Mode (stepped frames; clicks with EventSystem raycasts inside `Canvas.willRenderCanvases`):
+- **Setup:** bought `notepad` and `wires_1` (4 cords, row taps on). Added three calls with people on the open spread: Doris (D1) wants Rose (A4); Otis (F3) wants Doris; and a third, Stanley (B5) wants Doris, left ringing.
+- **Accepting:** clicked cards 1 and 2. The top hit was each card's `Portrait`, and both calls went to Taken.
+- **Tapping rows:** the top hits were the rows themselves.
+  - Doris noted D1 on both accepted calls: caller on call 1, recipient on call 2.
+  - Rose noted A4 on call 1, and Otis noted F3 on call 2.
+  - Ivy (C6, on no call) changed nothing.
+  - The ringing call 3 got no note, although Doris is on it.
+  - The book stayed open throughout.
+- **Bubbles:** clicking card 1, then card 2, showed each one's own jacks, fully typed: 41 of 41 and 42 of 42 characters. Only the clicked card shows a bubble.
+- **Cords:** picked up `Cable_04` from the tray with `ProcessPointer` and patched D1, then A4. The call connected on cord id 3 and paid its 50¢ fee. At timeScale 5 (reset to 1 afterwards) it finished: "Finished", 20¢ earned. `Cable_04` stayed Connected in D1/A4 afterwards, as the new rules want.
+- **Editor left clean:** not in Play Mode, `Final.unity` active and not dirty, `timeScale` 1, Game view 1920×1080, SessionState keys erased, no callbacks left, console cleared.
+- One leftover existed only for that Play session: a test subscription to `CallEnded`. It went when Play Mode stopped.
+
+Format-only re-saves: none. `TimeManager.asset` and `SampleScene.unity` are untouched, so nothing was discarded. Sergei's files: none changed. Mia's: only the two `.meta` files above.
+
+Deviations from Design/Plan: none from the lead's new Notepad rule. The 5b brief's "call in hand" wording (Plan, Design 5.9) is now out of date; the orchestrator is updating those docs.
+
+Follow-ups:
+- **Tell Mia:** `caller-04` and `caller-05` were re-exported at 190×190 while their slices stayed 190×191. We set the slice height to 190. Next time, re-slice in the Sprite Editor, or keep the image size.
+- **A person in two calls:** the spawner normally avoids putting one person in two live calls ("nobody is in two calls"), so a shared person mostly happens through callbacks or emergencies. The Notepad handles it either way.
+- **Stale hidden bubble text:** a pooled card that has never shown its bubble keeps an old label text while hidden (seen on a ringing card). It is never visible, because `Refresh` rewrites the text when the bubble opens. Cosmetic only; no action needed.
+
+#### Upstream merge and Step 5b fix verification (orchestrator, 2026-10-18)
+- **Merge `a173e75`:** brought in 7 upstream commits.
+  - Mia's art, and Sergei's `2fc3810` "added sfx, edit view, edit game balance".
+  - The 2 text conflicts (`GameInstaller.cs`, `CallQueueView.cs`) were one Bind argument each from both sides; both were kept.
+  - Unity asked to reload `Final.unity` (the lead clicked Reload).
+  - The merge compiled. EditMode was 352/357: 4 portrait failures and our Notepad swap test.
+- **Lead decisions:**
+  - Sergei's persistent wiring is adopted as the design (D45, replacing D03).
+  - The Notepad notes on every accepted call that person is part of, including duplicates (D46).
+  - Fixing the two portrait slices in Mia's folder is approved as a one-off.
+- **Portraits:** Mia's new `caller-04`/`caller-05` are 190×190, but their slices were 190×191, so Unity dropped both sprites. The fix pass set the height to 190 (one line per `.meta`; the ids are unchanged).
+- **Verification:**
+  - An independent EditMode run passed 361/361, and the console is clean.
+  - `git status`: only `Notepad.cs`, `WiresAndNotepadTests.cs`, the two `.meta` files and the docs changed.
+  - `Notepad.Note` loops over `Calls.Live` on a tap only and notes Taken/Connecting calls.
+  - `step-05b-fix-notepad.png` shows "Doris Cobbold (D1) / wants / Rose Ellery (A4)" with two accepted cards and two "New order!" cards.
+- **Docs:** Design (D45, D46, core loop, 5.1, 5.6, 5.9, §3, status table), CLAUDE.md (notes for Sergei), Plan §8 (tell Mia).
+
+
+### Step 5c prep (orchestrator, 2026-10-18)
+- **Pre-flight:** `git fetch`: up to date. Unity idle on `Final.unity`, not in Play Mode, console cleared. EditMode tests 361/361 green; no format-only re-saves.
+- **Decisions (lead, D47):** `startingCords` moves into the file too; the old asset fields are deleted (no fallback); ranges are `{min, max}` objects.
+- **Checked:** `OperatorDesk` (Sergei's D45 wiring) reads none of the moving fields; everything goes through `ICallerType`/`IPacingProfile`. Current values recorded in the Plan's 5c brief.
+
+## Step 5c report: 2026-10-18
+Result: done
+
+Playable now: the game plays as before, but every money and timing value now comes from `Assets/Configs/Economy.json`: the starting money and cords, the pacing, and both call types. Unity only keeps how cards look. If you edit the file and press Play, the change is live.
+
+How to test: follow the Plan's 5c playtest script. Step 5 (`startingCords` 4) is wired: 4 cords sit in the tray from the start, and the shop's first cord offer is "5 cords". The console also shows the expected message that `wires_1` (4) is no longer above the 4 starting cords.
+
+Created:
+- `Assets/Scripts/Content/CallTypeRecord.cs`: a call type read from the file (`ICallerType`).
+- `Assets/Tests/Domain/EconomyCallsTests.cs`.
+
+Changed:
+- **Economy loading:**
+  - `EconomyFileData`: new `startingCents`, `startingCords`, `pacing` (`PacingEntry`) and `calls` (`CallEntry`, `RangeEntry`). A missing value starts as a marker: NaN, or `Unset` for `startingCords`.
+  - `EconomyFileLoader`: new checks for the starting values, pacing and calls. `Load(json)` no longer takes `startingCords`; the wires checks use the file's own value.
+  - `EconomyCatalog`: now also exposes `StartingCents`, `StartingCords`, `Pacing` and `CallTypes`.
+- **Game content and validation:**
+  - `GameContent`: money, cords, pacing and types now come from the economy catalog. Only `MaxWaitingCalls` still comes from `GameConfig`.
+  - `GameConfig`: `startingCents`, `startingCords` and `pacing` are deleted. `callerTypes` is renamed to `cardStyles` with `[FormerlySerializedAs("callerTypes")]`. `LoadPeople(economy, jacks)` replaces the old overload. `Validate()` adds a "People file: " prefix to people messages and checks card styles.
+  - `CallerTypeDefinition`: now only `id` and `cardStyle`, and it is no longer an `ICallerType`.
+  - `ContentValidator`: `CheckTypes`/`CheckRange` moved into the loader. New `ValidateCardStyles(styleIds, callTypes)`. The recipient messages now say "Call type" and point at Economy.json.
+  - `PeopleFileLoader`: the "no types" text now points at Economy.json.
+- **Game layer:** `GameInstaller` loads the economy file first, then the people. The cord warning now fires only if the scene has more cords than `startingCords`, so it stays quiet for 4–6.
+- **Shipped data:** `Assets/Configs/Economy.json` gains `startingCents`, `startingCords`, `pacing` and `calls`, with today's values. The upgrades are unchanged.
+- **Assets:** `Assets/Content/GameConfig.asset`, `CallerTypes/Regular.asset` and `CallerTypes/Emergency.asset` were re-serialized to drop the dead fields. Both card-style references survive under `cardStyles`.
+- **Deleted through Unity, metas included:** `PacingProfile.cs`, `Assets/Content/Pacing/Default.asset` and the `Pacing` folder.
+- **Tests:**
+  - `EconomyFileTests`: its helper now writes a valid start, pacing and calls section, and the starting-cords test uses `startingCords` in the file.
+  - `ContentValidatorTests`: the 5 type-rule tests moved to `EconomyCallsTests`.
+  - `PeopleFileTests` and `FullBoardTests` use the new `LoadPeople`.
+- **Docs:** `Docs/EconomyFile.md` has new sections: "Starting money and cords", "Pacing" and "Calls". It also has a full-file outline, a cents and seconds note, per-person overrides, new validator messages, and the sections table set to "Yes (5c)".
+
+Scene and prefab changes: none. `Final.unity` and all prefabs are untouched.
+
+Tests: 388/388 EditMode, up from 361. New tests are in `EconomyCallsTests`:
+- **Values:** `EconomyFileCallsMatchStep5bValues` checks every value of both types, plus pacing, `startingCents` 0 and `startingCords` 3. Before the asset fields were deleted, a temporary `TheRealFileMatchesTheOldAssets` compared the file field by field with `Regular.asset`, `Emergency.asset`, `Default.asset` and `GameConfig`. All 389 tests passed then, and that test was removed with the fields.
+- **Parsing:** `JsonUtilityKeepsTheMarkersForFieldsTheFileLeavesOut` proves that field initializers survive `FromJson`, including in nested objects inside arrays. `TheFullSampleParses`.
+- **Missing values:** `EachRequiredFieldMissingGivesItsMessage` ×6, `ReportsARangeWithOnlyAMin`, `OptionalFieldsLeftOutMeanOff`.
+- **Bad call values:** min above max (exact brief message), a negative range, a duration of 0, a negative fine, negative limits and times, a negative weight, a duplicate id, no type with a weight.
+- **Pacing:** jitter out of range, an interval below 0.1, a negative load factor, a missing section (one message, defaults used), a missing value named.
+- **Starting values:**
+  - Left out, they give 0¢ and 3 cords with no message; 500¢ and 6 cords load.
+  - `startingCords` 2 or 7 gets a message and falls back to 3. A negative `startingCents` gets a message.
+  - With `startingCords` 4, `wires_1` = 4 is reported.
+- **Other checks:**
+  - No `calls` section: one message, no callers, and a 120 s session rings nothing.
+  - A card style with an unknown id, or an empty slot, gets a message; a type with no style gets none.
+  - A `PhoneBook.json` type that isn't in the file gets a message.
+- The existing real-file tests (`RealContentHasNoProblems`, `GameConfigReferencesTheRealFile`) still require `config.Validate()` to be empty.
+
+Console: clean. Two engine "Ignoring depth surface … memoryless" lines appear only around screenshots.
+
+Screenshot: `Temp/Captures/step-05c.png` (calls ringing with the EMERGENCY badge, 3 cords, the shop). There is also `Temp/Captures/step-05c-four-cords.png`, taken with a temporary `startingCords` of 4.
+
+Smoke test:
+- **Final directly:** the spawner types are `CallTypeRecord`: Regular w=5, and Emergency w=1 with a 30 s response time. The first call rang at about 2 s.
+- **Dev panel:** its timed label is "Emergency now", taken from the file's `name`. Its spawn rang an emergency with a 35¢ fee at 5¢/s.
+- **Validate Content:** "no problems found".
+- **MainMenu path:** loading build index 0, then 1, gives a working session in `Final` with no errors.
+- **`startingCords` 4 (temporary edit, restored):** `Stats.Cords` = 4, the bridge has 4 cords and the tray shows 4. The first cord offer is `wires_2` "5 cords", and there is no cord-count warning.
+- **Editor left clean:** not in Play Mode, `timeScale` 1, `Final.unity` active and not dirty, no callbacks or SessionState keys. Format-only re-saves: none, so nothing was discarded.
+
+`CallService` check (D45): `CallService` reads only `Request.Type` by reference (for `CountLive`) and `Call.HasResponseTime`. It reads none of the moved fields directly; everything goes through `ICallerType`, as in `OperatorDesk`.
+
+Deviations from Design/Plan:
+- **Field names:** as proposed, no renames in the file. `GameConfig`'s list is now called `cardStyles` (was `callerTypes`), as the brief allowed.
+- **Small rules added:** a negative `startingCents` is reported and falls back to 0. A range with only a min or only a max is reported. Both follow the brief's "no silent 0" rule.
+- **`startingCords` above 6** also falls back to 3, not 6. That keeps the wires chain valid; the message says "Use 3 to 6".
+- **Validate Content** now prefixes people messages with "People file: ", as the game already does at runtime.
+- **Missing economy file:** if `Economy.json` is missing or unreadable, no call types exist, so no calls ring. Its error is logged. Before 5c, call types came from the assets.
+
+Follow-ups:
+- **Design.md (orchestrator):** the §6.1 rows for `GameConfig`, `CallerTypeDefinition` and `PacingProfile` and the §6.4 sections list are now out of date. So is §9 "New caller type": it is now a line in `Economy.json`, plus an optional card-style asset.
+- **Step 7:** `maxWaitingCalls` and the cord colours remain in `GameConfig`, per D47.
+
+### Step 5c verification (orchestrator, 2026-10-18)
+- EditMode tests re-run: 388/388 green. Console: no errors or warnings.
+- `git status`: only our files (Content scripts, Game installer, Content assets, `Economy.json`, Domain tests, docs). No team-owned file, scene or prefab changed; no format-only re-saves.
+- `GameConfig.asset` keeps both card-style references under `cardStyles`; `Emergency.asset` keeps its badge and accent.
+- Screenshots: `step-05c.png` (calls ringing, emergency badge, 3 cords) and `step-05c-four-cords.png` (`startingCords` 4: four cords, shop offers "5 cords").
+- Design.md updated: implementation row, §6.1 (`GameConfig`, `CallerTypeDefinition`, `PacingProfile`), §6.4 sections, §9 "New caller type", and the pacing mentions in §5.
+- **Playtest (lead, 2026-10-18):** all looks good.
+
+### 2026-10-18 — Merge origin/main into Sergei's_branch
+
+- Resolved CordBridge, GameInstaller and CallQueueView by retaining active-call socket highlights, fee coins, sound and first-order guidance alongside main's purchased cords, Notepad and Economy.json configuration. CallQueueView receives both the Notepad and money counter; the bridge receives both desk and calls.
+- Added CordBridge.CableAdded so purchased cords participate in an already-running tutorial without restarting it. Picking up a purchased cord clears all hints. Cord cloning cleans up temporary objects in both Edit and Play Mode.
+- Updated the audio regression test for the new economy-first people loader. Added MergedSystemsTests covering actual Final bootstrap, purchase during cable hints, notes in speech text, real cable insertion, green socket highlights, fee coins, audio cues and hold/resume without duplicate rewards.
+- Verification: Unity compiled; 377 NUnit cases invoked directly with setup/teardown passed (0 failures), avoiding Unity TestRunner scene saves. Integration tests use isolated preview scenes. Report: Temp/MergeVerification/tests.txt. Final.unity and GameUI.prefab unchanged by resolution; unsaved editor scene preserved. No merge commit or push.

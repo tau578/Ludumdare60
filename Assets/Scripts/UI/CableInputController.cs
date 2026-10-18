@@ -3,6 +3,7 @@ using Switchboard.Cables;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 namespace Switchboard.UI
 {
@@ -12,6 +13,13 @@ namespace Switchboard.UI
     [DisallowMultipleComponent]
     public sealed class CableInputController : MonoBehaviour
     {
+        public const int MaxCables = 6;
+        private const float TraySlotSpacing = 270;
+        private const float TrayUsableWidth = 830;
+        private const float TraySlotY = -140;
+        private const float TraySlotWidth = 252;
+        private const float TraySlotHeight = 94.5f;
+        private const float TrayPreviewScale = .45f;
         [SerializeField] private RectTransform tray;
         [SerializeField] private HandCursorGraphic handCursor;
         [SerializeField] private CableController[] cables = new CableController[0];
@@ -40,6 +48,69 @@ namespace Switchboard.UI
             tray = cableTray;
             cables = inventory;
             handCursor = cursor;
+        }
+
+        /// <summary>Adds a cable at runtime by copying the last one and its tray slot; null when the tray is full.</summary>
+        public CableController AddCable(Color color)
+        {
+            if (cables.Length == 0 || cables.Length >= MaxCables) return null;
+            CableController source = cables[cables.Length - 1];
+            StoredCableView sourceSlot = source != null ? source.TrayView : null;
+            if (sourceSlot == null) return null;
+            if (hoveredStoredCable == sourceSlot) hoveredStoredCable = null;
+            sourceSlot.SetHighlighted(false);
+
+            // Copied under an inactive holder, so the copy's OnEnable can't bind the source's tray slot.
+            var holder = new GameObject("CableCopy");
+            holder.SetActive(false);
+            CableController cable = Instantiate(source, holder.transform, false);
+            StoredCableView slot = Instantiate(sourceSlot, sourceSlot.transform.parent, false);
+            foreach (var outline in slot.GetComponentsInChildren<Outline>(true)) DestroyCopyPart(outline);
+            int number = cables.Length + 1;
+            cable.name = $"Cable_{number:00}";
+            slot.name = $"StoredCable_{number:00}";
+            cable.SetTrayCableView(slot);
+            cable.SetCableColor(color);
+            cable.transform.SetParent(source.transform.parent, false);
+            DestroyCopyPart(holder);
+
+            var inventory = new CableController[cables.Length + 1];
+            cables.CopyTo(inventory, 0);
+            inventory[cables.Length] = cable;
+            cables = inventory;
+            LayoutTray();
+            return cable;
+        }
+
+        private static void DestroyCopyPart(Object part)
+        {
+            if (Application.isPlaying) Destroy(part);
+            else DestroyImmediate(part);
+        }
+
+        public static float TraySpacing(int count) =>
+            count > 0 ? Mathf.Min(TraySlotSpacing, TrayUsableWidth / count) : TraySlotSpacing;
+
+        public static Vector2 TraySlotPosition(int index, int count) =>
+            new Vector2((index - (count - 1) * .5f) * TraySpacing(count), TraySlotY);
+
+        public static Vector2 TraySlotSize(int count) =>
+            new Vector2(TraySlotWidth * TraySpacing(count) / TraySlotSpacing, TraySlotHeight);
+
+        public static float TrayPreviewScaleFor(int count) => TrayPreviewScale * TraySpacing(count) / TraySlotSpacing;
+
+        private void LayoutTray()
+        {
+            for (int i = 0; i < cables.Length; i++)
+            {
+                StoredCableView slot = cables[i] != null ? cables[i].TrayView : null;
+                if (slot == null) continue;
+                var rect = (RectTransform)slot.transform;
+                rect.anchoredPosition = TraySlotPosition(i, cables.Length);
+                rect.sizeDelta = TraySlotSize(cables.Length);
+                Transform preview = rect.Find("Preview");
+                if (preview != null) preview.localScale = Vector3.one * TrayPreviewScaleFor(cables.Length);
+            }
         }
 
         private void OnEnable()
