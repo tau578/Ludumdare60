@@ -159,6 +159,7 @@ Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs 
 | Stale paths in editor menus | `LevelBackgroundBuilder` and `GamePresentationBuilder` still name `Assets/Scenes/Level.unity` (now `Final.unity`, same GUID). `PhoneBookBuilder` points at a missing `Assets/Settings/PhoneBook.json` (the file is `Assets/Configs/PhoneBook.json`). | cleanup, any step |
 | A–Z tabs are hidden | `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab` (lead, 2026-10-18); the code, objects and tests stay. `Tools/Switchboard/Update Phone Book Tabs` rebuilds them active, so untick them again after running it. | |
 | Loose scene objects | `SwitchboardCanvas` and `EventSystem` are loose in `Final.unity`; making them prefabs would keep scene merges small. | optional |
+| Missing `.meta` files for Mia's shop images | `61dae7a` added `buy_btn.png`, `powerup-backdrop.png`, `powerup01.png` and `powerup01-hover.png` in `Assets/Sprites/store/` without their `.meta` files; the lead asked Mia to push them. Until she does: never commit the `.meta` files our Unity generates for these 4 images (stage files by name, not `git add -A`), and don't reference the images in any prefab or scene. When hers arrive, delete our untracked copies and pull. Remove this row then. | waiting on Mia |
 | Sound effects | Ring, alarm, coins, paid, fine, hang-up: find them or generate them. | before Step 8 |
 | Art imports | `caller-04` and `caller-05` were re-exported at 190×190 while their slices stayed 191 tall, so Unity dropped them (fixed). After resizing a sprite sheet, re-slice it in the Sprite Editor. | tip |
 
@@ -178,12 +179,13 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 5b | Extra wires and the Notepad | Buy cords and the Notepad (changes to the cord input and the book) |
 | 5c | Calls and pacing into `Economy.json` | The designer tunes the whole economy in one file |
 | 6 | Saves, Boot scene, first Web build | Plays in a browser, and progress survives a reload |
-| 7 | Board growth and pacing | The board and the difficulty grow over a session |
+| 7a | Board growth (before 6) | Start on 3×3 with 3 caller slots; buy 4×4, 5×5, 6×6 |
+| 7b | Pacing and tutorial | The difficulty grows over a session; a guided first call |
 | 8 | Sound and feel | Rings, alarms, coins and animations |
 | 9 | Mobile and Web polish | Good on phones and desktop browsers |
 | 10 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–5c are fully specified. Steps 6–10 are outlines. The orchestrator turns each one into a full brief before launching it.
+Steps 1–5c and 7a are fully specified (7a is built before 6). Steps 6, 7b and 8–10 are outlines. The orchestrator turns each one into a full brief before launching it.
 
 ---
 
@@ -1154,18 +1156,123 @@ No team-owned file changes. `Final.unity` and the prefabs shouldn't need to chan
   - Close and reopen the tab: progress is restored.
   - On a phone, tap to patch.
 
-### Step 7: Board growth and pacing (outline)
-- **Board growth (D42):**
-  - Start on a 3×3 board (rows A–C, columns 1–3). `extra_clients` entries in `Economy.json` set `boardSize {cols, rows}` and `clientSlots`.
-  - Exactly the people on open jacks are in the game, and the book lists only them. The designer chooses the starting group by placing people on A1–C3. The services move off A–C 1–3 (Fire Brigade is on C2 today), so emergencies come later.
-  - Closed jacks dimmed and not clickable, with their row and column labels dimmed (a change to the board code).
-  - Check the 6-slot caller panel against `clientSlots`.
+### Step 7a: Board growth (D42, D48, D49)
+
+**Goal.** The game starts on a small board and the player buys it bigger. A new game opens only rows A–C and columns 1–3 (9 jacks) and 3 caller slots. Three `extra_clients` upgrades open 4×4, 5×5 and 6×6, each also adding a caller slot. Only people on open jacks are in the game: they call, they're called, and they're in the book. Built before Step 6 (lead, 2026-10-18). **Recommended effort:** high.
+
+**Playable result.**
+- **Start.**
+  - Press Play: only the top-left 3×3 of the board is live. The other jacks, and their row (D–F) and column (4–6) lamps and labels, are visibly dimmed. They don't react to hover or clicks, and a held cord can't go in.
+  - Only 3 caller slots take calls. The other 3 look closed.
+  - The book lists only the 9 people on A1–C3. There are no emergencies yet, because no emergency service is on the open board.
+- **Buying "Bigger board" (4×4).**
+  - Row D and column 4 light up at once, the 7 new people join the book and start calling, and a 4th slot opens.
+  - The Doctor (D4) is now on the board, so emergencies can ring.
+  - 5×5 brings the Fire Brigade (E5) and 6×6 the Police (B6), so emergencies come more often as the board grows.
+- **The full board** at 6×6 plays exactly like today.
+
+**Decisions** (lead, 2026-10-18; D49):
+- **Three steps:** 4×4, 5×5, 6×6, as `extra_clients` entries in `Economy.json` (D40: values set the result, chains grow).
+- **Caller slots grow with the board:** 3, then 4, 5 and 6. The same upgrade sets both.
+- **Services, one per new ring:**
+  - The Doctor stays on D4 (4×4).
+  - The Fire Brigade moves from C2 to E5 (5×5), swapping with Reginald Underhill, who goes to C2.
+  - The Police stays on B6 (6×6).
+  - The services stay first in `PhoneBook.json`.
+  - The starting nine are then Arthur Hollis A1, Mabel Dunmore A2, Mildred Stanhope A3, Lillian Yardley B1, Irene Godfrey B2, Gertrude Rook B3, Bernard Quigley C1, Reginald Underhill C2 and Ada Moss C3.
+- **Pacing curves and the tutorial are Step 7b**, not this step.
+- **No ownership split (D48).** Change the board, lamp, socket, cord-input, caller-panel and phone-book code directly where needed. List every changed file in the report.
+
+**The board is controlled from `Economy.json`** (lead, 2026-10-18). Every board value comes from the file, and nothing about sizes is hard-coded:
+- the starting board size and the starting caller slots
+- each upgrade's board size, caller slots, price, name and description
+- how many board upgrades there are: the designer adds or removes `extra_clients` lines, with no code change
+- where people and services sit: `PhoneBook.json`, so who joins at which size follows from their jacks
+
+No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests outside test fixtures. The only fixed limit is the physical board in `Final.unity` (6×6 sockets) and the 6 caller slots in the scene. The game reads those from the scene; the validator uses the known 6×6 board (`ContentValidator.BoardJacks`) and 6 slots, and reports a size beyond them.
+
+**Economy file additions** (the field names are a proposal, as in 5c):
+```json
+"startingBoard": { "cols": 3, "rows": 3 },
+"startingClientSlots": 3,
+...
+{ "id": "board_1", "type": "extra_clients", "name": "Bigger board", "description": "4x4, 4 callers", "costCents": 1000, "boardSize": { "cols": 4, "rows": 4 }, "clientSlots": 4 },
+{ "id": "board_2", "type": "extra_clients", "name": "Bigger board", "description": "5x5, 5 callers", "costCents": 2500, "boardSize": { "cols": 5, "rows": 5 }, "clientSlots": 5 },
+{ "id": "board_3", "type": "extra_clients", "name": "Bigger board", "description": "6x6, 6 callers", "costCents": 6000, "boardSize": { "cols": 6, "rows": 6 }, "clientSlots": 6 },
+```
+- **Prices** are placeholders ($10, $25, $60) for the designer to tune.
+- **Use "x", not "×"** in texts, unless the glyph is confirmed in the static LiberationSans atlas.
+- **Where the entries go:** after `notepad`, before `secret`. Since the shop shows the first 3 chains in file order, "Bigger board" appears once a chain sells out: the $3 Notepad, usually. The designer can reorder the lines.
+- **`cols` and `rows`:** columns are 1–6 and rows are A–F. The open area is always the top-left rectangle: rows A to the `rows`-th letter, and columns 1 to `cols`.
+- **Validator rules,** in plain words like the others:
+  - `startingBoard` and each `boardSize` are 1–6 per side. Along the chain, neither side shrinks and at least one grows. The first entry is bigger than `startingBoard`.
+  - `startingClientSlots` and `clientSlots` are 1–6, the caller panel's slots, and never shrink along the chain.
+  - Missing `startingBoard` or `startingClientSlots`: a plain message, and the game falls back to the full board and 6 slots, so it still starts. The shipped file always has both.
+  - Remove the "arrives in Step 7" gate for `extra_clients`.
+- **`GameConfig.maxWaitingCalls` goes away.** `startingClientSlots` and `clientSlots` replace it (D17's rule becomes "live calls never outnumber the open slots"). The installer warns if the scene's caller panel has fewer slots than the file can open.
+
+**How it fits together:**
+- **Domain:**
+  - `StatSheet` gains `BoardCols`, `BoardRows` and `ClientSlots`: starting values plus the last bought `extra_clients`, raising `Changed`.
+  - A small `OpenBoard` helper (or similar) answers `IsOpen(JackId)`.
+- **Spawner and callbacks** read the live slot count instead of the fixed `maxLiveCalls`. The spawner only picks callers and recipients on open jacks. A type with no open recipient (an emergency before 4×4) or no open caller doesn't spawn, and `SpawnWeight` is shared among the types that can.
+  - Callbacks are always for people already in the game. The board never shrinks in play, so they stay valid.
+- **The board:**
+  - A closed jack is dimmed and ignores hover, clicks and cord placement. That's a `SocketView` open flag, honoured by `CableInputController`'s jack hit-testing.
+  - The lamps for closed rows and columns are dimmed and never light. The F label is plain text.
+  - `CordBridge` or a small Game-layer view pushes the open area to the board whenever `StatSheet.Changed` fires.
+- **The caller panel:** closed slots get a dark, translucent cover with raycasts off, and cards only use open slots. Check that the `CallerQueuePanel` art still reads well, and include a screenshot.
+- **The book:**
+  - The phone book shows only contacts on open jacks. Add a filter to `PhoneBookView`, such as `SetVisibleSockets(...)` or a predicate. Pages re-paginate, services stay first, and the surname order holds.
+  - Hidden A–Z tabs stay hidden. `HasLetter` must respect the filter.
+  - The Notepad keeps working.
+- **People-file checks:**
+  - "Each type has enough recipients" is judged on the **full** board. A call type whose recipients are all on closed jacks is fine.
+  - New check: the starting board needs at least 2 untagged people, or no call could ever ring. Report it plainly.
+- **Dev panel:**
+  - "Emergency now" does nothing (or says why in its label) while no service is open.
+  - Add "Open board" to buy the next `extra_clients` for free, like the other dev shortcuts.
+  - "Reset upgrades" closes the board again. To stay safe, it also clears live calls and returns cords whose plugs sit in jacks that are closing. Report what it does.
+- **No saves yet (Step 6):** a reload starts again on 3×3, as for all upgrades.
+
+**Tests:**
+- **Loader and validator:** every rule above, including defaults when the fields are missing.
+- **`StatSheet`:** board and slot values follow purchases and the reset.
+- **Spawner:**
+  - It never picks a closed-jack caller or recipient.
+  - Emergencies don't spawn until a service is open, then do.
+  - Live calls never exceed the open slots, and callbacks respect them.
+  - A 3×3 session of 10 minutes (seeded) only ever involves the starting nine.
+- **People file:** the move (Fire Brigade E5, Reginald Underhill C2), and the real file passes `Validate Content`.
+- **Book filter:** an EditMode test in `Assets/Tests/Game/Editor/` showing the visible contacts and pages for a 3×3 open area.
+- **Board:** a closed `SocketView` refuses a cord (EditMode, if `CableConnectionTests` style allows; otherwise Play Mode smoke).
+
+**Playtest script:**
+1. **Start small.**
+   - Press Play in `Final.unity`. Only A–C × 1–3 is bright. Dimmed jacks don't light on hover, and a held cord can't be plugged into them.
+   - The other row and column lamps stay dark.
+   - Three caller slots take calls; the other three look closed.
+2. **The book.** Open it: only 9 people, on 2 pages, and no services. Calls only ever involve these 9.
+3. **Buy 4×4.** Earn $10 (the dev panel's "+ $100" is fine) and buy "Bigger board". Row D and column 4 open at once, 7 new people appear in the book, a 4th slot opens, and the Doctor is listed first.
+4. **Emergencies.** Within a minute or two (or with "Emergency now"), an emergency rings that wants the Doctor.
+5. **Buy 5×5 and 6×6.** The Fire Brigade (E5) joins at 5×5 and the Police (B6) at 6×6. At 6×6 the board, book and slots are as before this step.
+6. **Shop.** "Bigger board" showed up once a chain sold out, and is gone after 6×6.
+7. **Validator.** In `Economy.json`, set `board_2`'s `boardSize` to `{ "cols": 4, "rows": 4 }` and run `Validate Content`: a plain message says the board must grow. Undo it.
+8. **Reset.** "Reset upgrades" in the dev panel: the board shrinks back to 3×3 with no errors.
+
+**Out of scope:**
+- pacing curves and the tutorial (7b)
+- cover-plate art (only if Mia draws it)
+- animations and sounds for opening jacks (8)
+- saving (6)
+- balancing prices (10)
+
+### Step 7b: Pacing and tutorial (outline)
 - **Pacing:**
   - `PacingProfile` curves driven by progress (D19).
   - Caller type weights, with emergencies appearing later.
 - **Tutorial:** scripted opening calls with hints such as "Click the ringing card", "Find them in the book" and "Connect the two jacks".
 - **Tests:**
-  - The spawner respects unlocked lines.
   - Weights follow progress.
   - The tutorial sequence.
 - **Playtest:** a 30-minute session ramps up noticeably.
