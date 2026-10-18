@@ -382,6 +382,7 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
   - `OnPurchased(IEffectContext, level)` runs once (an ending, a cutscene, a celebration).
 
   The mystery upgrade's effect plugs in here.
+- **Notepad (D23).** A cheap one-level upgrade whose effect, while owned, makes a tapped phone-book entry note its jack on the call in hand.
 - **Examples:**
   - Extra cord: `{CordCount, Add, 1}`.
   - Bigger board: `{BoardSections, Add, 1}`, with `maxLevel` = number of sections − 1.
@@ -551,7 +552,7 @@ Statuses:
 | D20 | The book and the shop never pause the game. | default | 3 |
 | D21 | Board growth uses pre-laid-out sections with cover plates. | default | 7 |
 | D22 | Jack assignments are fixed in data. | default | 1 |
-| D23 | Book QoL: does tapping an entry note its jack on the card in hand? | open | 3 |
+| D23 | Book QoL: tapping an entry in the phone book notes its jack on the call in hand (e.g. "Ada Moss (C3) / wants Basil Thorne (A5)"). Not built in from the start: it is sold in the shop as a cheap upgrade (working name "Notepad"), as a lasting `UpgradeEffect`. Needs Sergei's book to report a tapped entry. | decided (lead, 2026-10-18) | 5 |
 | D24 | Portrait on phones shows a "rotate your device" screen. | default | 9 |
 | D25 | Save progression only; no in-flight calls and no offline earnings. | default | 6 |
 | D26 | Hosting target (itch.io, own site, …). It affects storage and compression settings. | open | 6 |

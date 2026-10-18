@@ -121,7 +121,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 - **Leave the editor clean:** idle, not in Play Mode, compiled, `Game.unity` saved as the active scene, console clean, and no temporary callbacks or editor state left behind.
 
 ## Pending coordination with Sergei (Plan §8)
-- **Step 5:** a way to add cords at runtime.
+- **Step 5:** a way to add cords at runtime, and the phone book reporting a tapped entry (Notepad upgrade, D23).
 - **Step 6:** touch input in `CableInputController` (`Pointer.current`).
 - **Before Step 6:** merge the two scenes into one (D29).
 - **Ongoing:** keep the names `CallerQueuePanel`, `UpgradeShopPanel` and `HeaderSlot`, and keep the extra fields in `PhoneBook.json`.
@@ -129,7 +129,6 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 
 ## Open decisions (Design §10)
 - D15: what the mystery upgrade does.
-- D23: phone book quality-of-life features.
 - D26: hosting target.
 - D27: currency scale and target playtime.
 

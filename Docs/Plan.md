@@ -147,6 +147,7 @@ Follow-ups: <ideas, debts, questions>
 | Before Step 1 | `Game.unity` will load `Level.unity` additively. We rely on the public members listed in Design §3 and on the name `CallerQueuePanel`. Please say before renaming any of them. | Sergei |
 | Before Step 2 | Done (2026-10-17): the lead confirmed D07. Pulling a plug puts the call on hold, using the new restore feature. | Lead (and Sergei) |
 | Before Step 5 | A way to add cords at runtime: a cable prefab plus a tray slot, and a way to register them with `CableInputController` and the tray. | Sergei |
+| Before Step 5 | Notepad upgrade (D23): Sergei's phone book reports when an entry is tapped (e.g. a public event with the contact's name and socket), so we can note the jack on the call in hand. | Sergei |
 | Before Step 6 | Touch input in the cord code: use `Pointer.current` instead of `Mouse.current` in `CableInputController.Update`, and hide the hand cursor on touch. | Sergei |
 | Before Step 6, or earlier if Sergei's cord work settles | Merge into one scene (D29). Agree a time when Sergei isn't editing `Level.unity`; the merge itself takes about 5 minutes. | Sergei |
 | Done in Step 1c (lead approved) | The upgrade panel's top header is now a 96 px `HeaderSlot` plaque holding our money counter. Sergei keeps the names `UpgradeShopPanel` and `HeaderSlot`. | Sergei |
@@ -446,7 +447,7 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
   - pooled rows
   - flipping by tap, swipe or keys
 
-  Add D23 only if it has been decided.
+  D23 is decided (2026-10-18) as the Notepad upgrade in Step 5; Step 3 doesn't build it.
 - **People:** the directory grows to 36 people, one per jack. Portraits are reused, or silhouettes are used. Names follow Design §6.3.
 - **Cards:** every state from Design §5.4, in TextMeshPro, styled to match the caller panel, with a ringing animation.
 - **`ContentValidator`:** an editor menu item plus an EditMode test (Design §6.3).
@@ -481,7 +482,7 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
 ### Step 5: Upgrades, shop and the mystery goal (outline). Wire Sergei's `UpgradeShopPanel` to our `UpgradeService` instead of building our own `ShopView` (D30).
 - **Stats and upgrades:**
   - `StatSheet`, `UpgradeService`, `UpgradeDefinition`, `StatModifier` and `UpgradeEffect` (Design §5.9).
-  - Assets: Extra Cord, Earnings Multiplier, and Mystery (`isGoal`, with `MysteryPlaceholderEffect`).
+  - Assets: Extra Cord, Earnings Multiplier, Notepad (D23: while owned, tapping a book entry notes its jack on the call in hand), and Mystery (`isGoal`, with `MysteryPlaceholderEffect`).
 - **Shop:**
   - `ShopView`: the store tab on the right (`Sprites/store/store.png`) opens a list showing cost, level and a buy button.
   - The savings bar (D14).
@@ -496,6 +497,7 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
   - Effect hooks: `Apply` on load versus `OnPurchased` once.
 - **Playtest:**
   - Buy a cord and see it in the tray.
+  - Buy the Notepad, then tap names in the book and see their jacks on the call in hand.
   - Buy the multiplier and see income rise.
   - Watch the savings bar fill.
   - Buy the mystery and see "to be continued".
