@@ -17,6 +17,7 @@ Level art pass (2026-10-18, lead requested): `BackgroundPanel.prefab` groups `ma
 | 3 | Done (2026-10-18) | A–Z tabs in Sergei's book (D34): `PhoneBookTab` plus `PhoneBookView.ShowLetter`/`HasLetter`, with letters that have no surname greyed out, and arrow keys while the book is open. 36 people on every jack A1–F6 (D35). Restyled cards: bold surnames in the in-hand bubble, on-hold dimming, coloured stamp inks. `ContentValidator` (Content) with `Tools/Switchboard/Validate Content`. Accepted deviations: the tab test lives in `Assets/Tests/Game/Editor/`, the validator menu in `Assets/Scripts/Game/Editor/` (see 4.1), and the validator also checks the surname order and `contactsPerPage`. After the lead's playtest: a press reaction and a placeholder click when a card is taken, typed-out bubble text, and clearer tabs for the spread on show. |
 | 4 | Done (2026-10-18) | Emergencies and fines (D36, D37): `type.emergency` (30 s response ring, $2 miss or wrong-patch fine, $1 cut-off fine, 20–40¢ + 5–10¢/s for 10–20 s, at most one at a time, spawn weight 1 against Regular 5, `everyoneCalls`, `recipientTag` `emergency-service`). Police B6, Fire Brigade C2 and Doctor D4 head `PhoneBook.json`. `PenaltyService` with `FineApplied`, the "Missed -$X" stamp and a red fine popup under the money counter. `IdleGuard` (60 s, `PacingProfile.idleTimeoutSeconds`) blocks fined types and their callbacks. A presentation-only `CallCardStyle` per type (badge, accent). Dev panel "Emergency now". Accepted deviations: the countdown ring is cream on a dark track, turning orange-red in the last 10 s (a red ring was invisible on the red halo); the type badge hides once connected; a `type` given on a service is ignored. |
 | Scene merge | Done (2026-10-18) | One `Final.unity` built from prefabs (D38): our `Game.prefab` and `GameUI.prefab` next to Sergei's board; build list `MainMenu` (0), `Final` (1); `Game.unity` removed; `GameInstaller` finds the views by type in its own scene. |
+| 5a | Done (2026-10-18) | The designer's `Assets/Configs/Economy.json` (`upgrades` only) and `Docs/EconomyFile.md`. Domain `UpgradeService` (with `PurchaseCheck`), `StatSheet`, `ShopShelf`, `GoalProgress`, `Wallet.TrySpend`; the live income multiplier on fee and pay. `EconomyFileLoader` with plain-English checks, shown by `Validate Content`. Sergei's 4 shop buttons (coordinated, D44) carry `UpgradeSlotView` (title, description, price, savings fill, gold frame) and are 204 px wide; menu `Tools/Switchboard/Update Upgrade Shop Buttons`. Our `ShopView`, a neutral "-$X" spend popup and the "To be continued..." dialog (`GoalPanelView`). Dev panel "+ $100" and "Reset upgrades" (no refund). Accepted deviations: see 5.9 and 4.3. |
 
 What Step 1 built:
 - **Operator desk.** A right pair connects the call. A wrong pair ends it as "Wrong number!". Patching with no call in hand is refused. Pulling a plug cut the call off (replaced by hold in Step 2b).
@@ -63,14 +64,15 @@ A casual simulator. The player is a telephone switchboard operator in the era of
   Fines and response times are set per caller type.
 - **Money never goes below zero.**
 - **The directory book** can be opened at any time.
-- **Upgrades**, bought with money:
-  - Extra cord: +1 cord per purchase.
-  - Bigger board: more jacks and more people.
-  - Earnings multiplier.
-  - The mystery upgrade: the most expensive, with an effect still to be decided. It must be definable later as data, without reworking systems.
+- **Upgrades**, bought with money. Every upgrade is a one-time entry in the designer's `Assets/Configs/Economy.json` (D39, D40). Entries of the same type form a chain, bought in file order:
+  - Extra income: sets the earnings multiplier (e.g. ×1.5, then ×2, then ×3).
+  - Extra wires: sets the number of cords [5b].
+  - Notepad: tapping a book entry notes its jack on the call in hand (D23) [5b].
+  - Extra clients: sets the board size, so more jacks and more people [7].
+  - The secret (mystery) upgrade: one entry, the most expensive, with an effect still to be decided (D15).
 
-  New upgrades must be addable without code.
-- **Goal UI.** The screen shows progress toward the mystery upgrade as a savings bar.
+  New upgrades of an existing type are added to the file without code.
+- **Goal UI.** The secret upgrade's shop button doubles as the savings bar (D41).
 
 ### Platform
 - Unity 6000.3.6f1, URP with the 2D Renderer, 2D.
@@ -107,7 +109,7 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 - `CablePhase` values: `Ready` (in the tray), `Held` (picked up, nothing plugged in), `OneEndConnected`, `Connected`.
 - `SocketView`: `Address` (e.g. `"C4"`), `Row`, `Column`, `PlugAnchor`, `IsOccupied`.
 - The cord input model: click a cord in the tray to pick it up, then click a jack to plug in. Clicking a plugged jack pulls that plug out. If the player pulls one plug of a connected cord and then clicks empty space, the plug snaps back to its jack ("restore", `ReconnectSocket`).
-- Sergei's objects in `Final.unity` are found **by component type, never by name**: `CableController`, `SocketView` and `CableInputController`.
+- Sergei's objects in `Final.unity` are found **by component type, never by name**: `CableController`, `SocketView`, `CableInputController` and, from Step 5a, the shop's `UpgradeSlotView`s (D41, D44).
 - Two exceptions are found by name, because they have no component of their own. Ask Sergei to keep these names:
   - The caller slots: the children of the `VerticalLayoutGroup` under `CallerQueuePanel`.
   - The money slot: `UpgradeShopPanel/HeaderSlot`, a plaque added in Step 1c with Sergei's panel approved as a coordinated change.
@@ -153,6 +155,8 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 - **Text glyphs.** Use only characters that exist in the static LiberationSans SDF atlas. "¢" and "—" are there; "→" is not. A missing glyph makes TextMeshPro write it into the fallback font asset at runtime, which dirties a file under `Assets/TextMesh Pro/`.
 - **Turn off `raycastTarget` on anything that isn't meant to be clicked.** The cord input takes the topmost raycast hit across all canvases, so a stray raycast target over the board or tray blocks cords. Modal overlays (the open book, the shop) block clicks on purpose.
 - Call cards line up with the caller panel's slots by reading the slots' positions at runtime. We never edit the panel prefab.
+- **Popups by the money counter** (5a): the fine popup sits under the counter; the neutral "-$X" spend popup sits to its left, over the board's frame (briefly covering the "6" column label, never a jack), so the two never collide.
+- **The "To be continued..." dialog** (5a) is the `Goal` object in `GameUI.prefab` with its own canvas at sorting order 15: above the open book (10), below the hand cursor and held plugs (20), so the pointer stays visible. Its backdrop blocks clicks while it is open (a deliberate modal); it is inactive otherwise.
 
 ### 4.4 Composition root and tick order
 - **`GameSession`** (Domain, plain C#) creates every domain service in dependency order and owns the tick order. Tests and the balance simulator build it without Unity.
@@ -173,6 +177,7 @@ public void Tick(double dt)
     calls.Tick(dt);      // finish calls whose duration ran out; miss expired emergencies (Step 4)
     callbacks.Tick();    // re-queue due callbacks if there's room (Step 2)
     spawner.Tick(dt);    // new calls if there's room
+    goal.Tick();         // raise GoalAffordable once, after this tick's money has moved (Step 5a)
 }
 ```
 
@@ -360,51 +365,54 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
   - The fraction is carried forward, and saved [6], so nothing is lost to rounding.
   - Never use `float` for money: at $100,000, a float can't register the fraction of a cent a call earns each frame.
   - Floating-point noise: when the remainder is within 1e-9 ¢ of a whole cent, that cent is credited.
-- **`EarningsService`** pays each connected call `min(dt, secondsLeft) × centsPerSecond × multiplier` every tick, so a finished call earns exactly duration × rate × multiplier. The multiplier is read live, so an upgrade bought mid-call applies at once (D12). It is a constant 1 until `StatSheet` exists [5].
+- **`EarningsService`** pays each connected call `min(dt, secondsLeft) × centsPerSecond × multiplier` every tick, so a finished call earns exactly duration × rate × multiplier. The multiplier is read live from `StatSheet.IncomeMultiplier`, so an upgrade bought mid-call applies at once (D12) [5a].
 - **Display:** dollars and cents, e.g. `$12.34`, formatted with the invariant culture. `MoneyFormat` lives in Domain so it can be unit-tested. It formats `$1,234.56` and rates such as `5¢/s`.
 - **Cheap UI updates:**
   - Views poll the wallet in `LateUpdate`.
   - They update the text only when the displayed value changes.
   - The HUD sits on its own nested canvas.
 
-### 5.9 Stats and upgrades [5]
-- **`UpgradeDefinition`:**
-  - id, name, description, icon
-  - `baseCostCents`, `costGrowth`; cost(level) = base × growth^level
-  - `maxLevel` (0 = unlimited)
-  - `StatModifier[] modifiers`
-  - `UpgradeEffect[] effects`
-  - `isGoal`
-- **`StatModifier`** is `{ StatId stat; ModifierOp op; float perLevel }` with:
-  - `ModifierOp { Add = 0, AddPercent = 1, Multiply = 2 }`
-  - `StatId { CordCount = 1, BoardSections = 2, EarningsMultiplier = 3 }`
+### 5.9 Upgrades and stats [5a, 5b, 7]
+The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition` assets with levels, a cost formula, stat modifiers and `UpgradeEffect` hooks.
+- **Entries.** `Economy.json` holds a flat list of one-time upgrades. Every entry has:
+  - `id`: stable forever, because saves store bought ids
+  - `type`
+  - `name` and `description`, shown in the shop
+  - `costCents`
 
-  Serialized enums keep these explicit values.
-- **`StatSheet`** recomputes every stat from the owned levels whenever a level changes or a save loads:
-  `(base + ΣAdd) × (1 + ΣAddPercent) × ΠMultiply`.
-  Recomputing from scratch means nothing can be applied twice.
-- **`UpgradeEffect`** is an abstract ScriptableObject with two hooks:
-  - `Apply(IEffectContext, level)` runs on purchase and on every load. It must describe a lasting state ("while owned, X is true").
-  - `OnPurchased(IEffectContext, level)` runs once (an ending, a cutscene, a celebration).
+  Each type adds its own fields:
 
-  The mystery upgrade's effect plugs in here.
-- **Notepad (D23).** A cheap one-level upgrade whose effect, while owned, makes a tapped phone-book entry note its jack on the call in hand.
-- **Examples:**
-  - Extra cord: `{CordCount, Add, 1}`.
-  - Bigger board: `{BoardSections, Add, 1}`, with `maxLevel` = number of sections − 1.
-  - Earnings: `{EarningsMultiplier, Add, 0.25}`.
-- The shop lists every upgrade in the catalog, so a new upgrade is just a new asset.
+  | `type` | Fields | Effect | Step |
+  |---|---|---|---|
+  | `extra_income` | `incomeMultiplier` | **Sets** the earnings multiplier. | 5a |
+  | `secret` | none | The goal. Exactly one. Its effect is code (D15); for now it shows "to be continued". | 5a |
+  | `extra_wires` | `wires` | **Sets** the total number of cords. | 5b |
+  | `notepad` | none | While owned, a tapped book entry notes its jack on the call in hand (D23). | 5b |
+  | `extra_clients` | `boardSize {cols, rows}`, `clientSlots` | **Sets** the open part of the board and the number of caller slots (D42). | 7 |
 
-### 5.10 Progression and the goal [5]
-- **`ProgressionService`:**
-  - The goal is whichever upgrade has `isGoal` set. Nothing in code says "mystery".
-  - `GoalProgress = clamp01(balance ÷ goal price)` drives the savings bar (D14).
-  - `GoalAffordable` fires once when progress reaches 1.
-  - Buying the goal raises `GoalPurchased` and then runs the effects' `OnPurchased`. The placeholder shows "to be continued".
-- **`CareerStats`:** lifetime earnings, calls connected, fines paid, time played.
+- **Chains.** Entries of the same type form a chain in file order. Only the next unbought entry of a chain can be bought; there's no skipping. Values in a chain must grow.
+- **`UpgradeService`** (Domain) owns the set of bought ids.
+  - `CanBuy(id)` returns a `PurchaseCheck` (`Ok`, `Unknown`, `Owned`, `NotNext`, `TooExpensive`).
+  - `TryBuy(id)` checks that the entry exists, isn't owned, is next in its chain and is affordable, then spends through `Wallet.TrySpend` and raises `UpgradeBought`. Otherwise it changes nothing and returns false.
+  - A save restores the bought ids without spending [6].
+- **`StatSheet`** recomputes every stat from the bought ids whenever they change. A stat is the value of the last bought entry in its chain, or the base value from `GameConfig` if none is bought (multiplier 1). Recomputing from scratch means nothing can be applied twice.
+- **`ShopShelf`** (Domain) decides what the shop's buttons show (D41). It has 3 rotating slots, each holding one chain. A slot keeps its chain until the chain is bought out, then takes the next chain (in order of first appearance in the file) that isn't shown yet. The secret is never on the shelf; it has its own pinned button.
+- **Multiplier.** It applies to the fee and the per-second pay, live, including calls already connected (D12, D32). Fines are never multiplied (D37).
+- **Shop buttons as built (5a, accepted deviations from D41):**
+  - Empty and too-expensive buttons stay clickable but do nothing; disabling Unity's `Button` would tint Sergei's "+" look. Too-expensive offers are dimmed instead (grey button image, faded text).
+  - The owned secret shows its name and "Owned", with a full fill, no price, no frame, and does nothing on click.
+- **Checks.** The economy file's checks live in `EconomyFileLoader` (as the people-file checks live in `PeopleFileLoader`); `ContentValidator.ValidateEconomy` passes them on with the prefix "Economy file: ". There is no separate `EconomyValidator`.
+
+### 5.10 Progression and the goal [5a]
+- **`GoalProgress`** (Domain):
+  - The goal is the one `secret` entry. Code reacts to the type, never to an id or the word "mystery".
+  - `Progress = clamp01(balance ÷ secret cost)` drives the savings fill on the secret's button (D14, D41).
+  - `GoalAffordable` fires the first time progress reaches 1.
+  - Buying the secret raises `GoalPurchased`. For now the Game layer shows a "To be continued" panel, and play goes on.
+- **`CareerStats`** [6]: lifetime earnings, calls connected, fines paid, time played.
 
 ### 5.11 Feedback: UI and audio [1 HUD, 8 full]
-- **Views:** `MoneyCounterView`, `SavingsBarView`, `ShopView`, `FloatingTextPool` (+$ and −$ popups).
+- **Views:** `MoneyCounterView`, `ShopView` (drives Sergei's shop buttons, including the savings fill; D41), `FloatingTextPool` (+$ and −$ popups).
 - **`FeedbackDirector`** maps domain events to sound cues and popups.
 - **`AudioService`:** a small pool of audio sources, looping sounds, and volume per category. Web builds have limited mixer and DSP support, so volume is handled in code.
 - **Sounds:**
@@ -418,8 +426,7 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
 - **Saved:**
   - version
   - balance and fraction
-  - upgrade levels as `{id, level}`
-  - whether the goal was bought
+  - the bought upgrade ids (the secret among them)
   - career stats
   - settings and tutorial flags
 
@@ -427,7 +434,7 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
 - **Not saved:** calls, cords, the queue and callbacks. Each session starts with an empty board (D25).
 - **Format:**
   - `JsonUtility`, with lists instead of dictionaries.
-  - Content is referenced only by stable string ids. Unknown ids are ignored, and missing ones default to level 0.
+  - Content is referenced only by stable string ids. Unknown ids are ignored, and missing ones count as not bought.
   - The version number drives step-by-step migrations.
 - **Storage.** `ISaveStorage` has two implementations:
   - `PlayerPrefsStorage` for the editor.
@@ -447,15 +454,14 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
 
 | Asset | Fields, with the step that adds them | Notes |
 |---|---|---|
-| `GameConfig` | catalogs of all definitions; `startingCents` [1]; `maxWaitingCalls` = 6 [2]; base stats: cords, sections, multiplier = 1 [5]; goal reference [5] | The one asset `GameInstaller` references. Implements `IGameContent`. |
+| `GameConfig` | catalogs of all definitions; `startingCents` [1]; `maxWaitingCalls` = 6 [2]; the `Economy.json` reference [5a]; base stats: cords, board size [5b, 7] | The one asset `GameInstaller` references. `startingCents` and the call economy move into `Economy.json` in Step 5c. |
 | `CallerTypeDefinition` | `id`, `displayName`, `centsPerSecond` (range), `durationSeconds` (range) [1]; `callbackDelaySeconds` (range) [2]; `responseTimeSeconds` (0 = none), `fineMissedCents`, `fineEarlyDisconnectCents`, `callbackAfterMiss`, `callbackAfterDisconnect`, `recipientTag`, `maxSimultaneous`, `spawnWeight` (temporary, D37), `everyoneCalls`, card style [4]; `weightByProgress` [7] | Regular [1], Emergency [4]. VIP and long distance later. |
 | `CallerDefinition` | `id`, `person`, `type`, `weight`, optional `centsPerSecondOverride` [1]; optional favourite recipients [7] | The "caller config". This is how some callers become worth much more. |
 | ~~`PersonDefinition`~~, ~~`CallerDefinition`~~, ~~`PhoneDirectoryDefinition`~~ | Replaced in Step 1b by `Assets/Configs/PhoneBook.json` (D31). | Loaded and validated at startup. Errors are logged clearly, and a test runs the same check. |
 | `PhoneDirectoryDefinition` | entries `{ person, jackLabel }` | Jack labels are the `SocketView.Address` values, A1–F6. |
 | `PacingProfile` | base interval, jitter, load factor, first-call delay [2]; curves by progress, opening calls, idle timeout [7] | `Assets/Content/Pacing/Default.asset`: 2 s first call, 8 s base, ±30 % jitter, load factor 0.5. Referenced by `GameConfig`. |
 | `BoardLayoutDefinition` | sections: which jack labels each unlocks [7] | |
-| `UpgradeDefinition` | as described in 5.9 [5] | Extra Cord and Earnings Multiplier [5], Bigger Board [7], Mystery [5]. |
-| `UpgradeEffect` subclasses | depend on the effect [5] | `MysteryPlaceholderEffect` for now. |
+| ~~`UpgradeDefinition`~~, ~~`UpgradeEffect`~~ | Replaced by the `upgrades` section of `Assets/Configs/Economy.json` (D39, D40). | See 6.4. |
 | `AudioCueLibrary` | event → cue [8] | Game layer only. |
 
 - **Shared types** live in Domain as `[Serializable]` structs with public fields, so Unity can serialize them inside Content assets. Example: `FloatRange { public float min, max; }`.
@@ -469,9 +475,10 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
 | State | Owner | Saved |
 |---|---|---|
 | Balance and fraction | `Wallet` | Yes |
-| Upgrade levels | `UpgradeService` | Yes |
+| Bought upgrade ids | `UpgradeService` | Yes |
 | Current stat values | `StatSheet` | No, recomputed |
-| Goal bought, career stats | `ProgressionService` | Yes |
+| What the shop's buttons show | `ShopShelf` | No, rebuilt from the bought ids |
+| Career stats | `CareerStats` | Yes |
 | Settings | Game layer | Yes |
 | Calls, queue, call in hand | `CallService` | No |
 | Pending callbacks | `CallbackScheduler` | No |
@@ -489,8 +496,28 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
   - every caller's person is in the directory
   - every jack label exists on the board and is used once
   - every range has min ≤ max
-  - exactly one goal upgrade exists [5]
   - each type has enough possible recipients
+  - `Economy.json` (6.4) [5a]
+
+### 6.4 `Economy.json` [5a, 5c] (D39)
+`Assets/Configs/Economy.json` belongs to the designer, who edits it by hand. Keep it readable, with one entry per line. The format is documented for him in `Docs/EconomyFile.md`.
+- **Sections:**
+  - `upgrades` [5a]: see 5.9.
+  - `calls` [5c]: the money fields of each caller type (fee, rate and duration ranges, fines, response time, spawn weight).
+  - `pacing` [5c]: the spawn timing and the idle timeout.
+  - `startingCents` [5c].
+
+  Presentation stays in Unity assets, for example the emergency card's badge and colour.
+- **Upgrade ids** follow the designer's style: lowercase letters, digits and `_`, such as `income_1`. This is an accepted exception to the `type.regular` id style.
+- **Money** is whole cents (`costCents`), like the wallet.
+- **The validator** (also an EditMode test and part of `Tools/Switchboard/Validate Content`) reports, each in plain words naming the entry and the fix:
+  - a missing or unreadable file
+  - an empty, badly formed or duplicate id
+  - an unknown type (the message lists the known types)
+  - a missing name
+  - a cost of 0 or less
+  - a chain value that doesn't grow (e.g. `incomeMultiplier` 1.2 after 1.5), or an income multiplier of 1 or less
+  - not exactly one `secret`
 
 ## 7. Communication rules
 - **Down: method calls.** Views call verbs on narrow interfaces such as `OperatorDesk.TryTake` or `IShop.TryBuy`. Services validate and return `bool`.
@@ -517,15 +544,12 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
 
   The validator checks it. No code.
 - **New caller type (VIP, long distance):** create a `CallerTypeDefinition`. Only new behaviour needs code: a `ConnectionRule`, or a small behaviour hook that `CallService` calls. Code never checks which type a call is.
-- **New upgrade:** create an `UpgradeDefinition`. Only a new kind of stat needs code:
-  - a `StatId` value
-  - a base value in `GameConfig`
+- **New upgrade:** add an entry to `Economy.json`. Only a new `type` needs code:
+  - the type name and its fields in the loader and validator
+  - the stat in `StatSheet`, with a base value
   - the system that reads it
 - **Bigger board:** add a section to `BoardLayoutDefinition`, and add people for its jacks to the directory.
-- **Mystery effect:**
-  1. Subclass `UpgradeEffect` and implement `Apply` and `OnPurchased` against `IEffectContext`.
-  2. Put it in the Mystery asset.
-  3. If it needs a new system, register that system in `GameSession`.
+- **Mystery effect (D15):** react to `GoalPurchased` (once) and, from Step 6, to a loaded save with the secret bought (a lasting state). If it needs a new system, register that system in `GameSession`.
 
 ## 10. Decisions
 Statuses:
@@ -549,30 +573,36 @@ Statuses:
 | D11 | Rate comes from the type's range, with an optional per-caller override. | default | 1 |
 | D12 | The multiplier applies live, including to connected calls. | default | 5 |
 | D13 | Money is a `long` of cents plus a fraction, displayed as `$0.00`. | decided | 1 |
-| D14 | Savings bar = balance ÷ goal price. | default | 5 |
+| D14 | Savings bar = balance ÷ goal price. It is drawn as a fill inside the secret upgrade's shop button (D41). | decided (lead, 2026-10-18) | 5a |
 | D15 | What happens after the mystery upgrade (ending, prestige, or play continues). The save keeps career and run data apart either way. | open | before the real goal effect |
 | D16 | Idle guard: types that carry fines stop spawning after 60 s without input. | default | 4 |
 | D17 | Waiting-card cap = 6 (the caller panel has 6 slots). | default | 2 |
 | D18 | A person can't be in two calls at once. | default | 2 |
 | D19 | Difficulty is driven by lifetime earnings. | default | 7 |
 | D20 | The book and the shop never pause the game. | default | 3 |
-| D21 | Board growth uses pre-laid-out sections with cover plates. | default | 7 |
+| D21 | Board growth uses pre-laid-out sections with cover plates. **Superseded by D42** (dimmed closed jacks; plates only if Mia draws them later). | superseded | 7 |
 | D22 | Jack assignments are fixed in data. | default | 1 |
-| D23 | Book QoL: tapping an entry in the phone book notes its jack on the call in hand (e.g. "Ada Moss (C3) / wants Basil Thorne (A5)"). Not built in from the start: it is sold in the shop as a cheap upgrade (working name "Notepad"), as a lasting `UpgradeEffect`. Needs Sergei's book to report a tapped entry. | decided (lead, 2026-10-18) | 5 |
+| D23 | Book QoL: tapping an entry in the phone book notes its jack on the call in hand (e.g. "Ada Moss (C3) / wants Basil Thorne (A5)"). Not built in from the start: it is sold in the shop as a cheap one-entry upgrade, `type` `notepad` in `Economy.json` (D40). The designer can drop it by deleting the entry. Sergei's book gets a tapped-entry event as a coordinated change by our agent (D44). | decided (lead, 2026-10-18) | 5b |
 | D24 | Portrait on phones shows a "rotate your device" screen. | default | 9 |
 | D25 | Save progression only; no in-flight calls and no offline earnings. | default | 6 |
 | D26 | Hosting target (itch.io, own site, …). It affects storage and compression settings. | open | 6 |
-| D27 | Currency, number scale, and target time to the mystery upgrade. Placeholder numbers until then. | open | 10 |
+| D27 | Currency, number scale, and target time to the mystery upgrade. Placeholder numbers until then (D43). The designer tunes them in `Economy.json`. | open | 10 |
 | D28 | Touch input in the cord code (`Pointer.current`). This is the cord owner's change. | coordinate | 6 |
 | D30 | Division of work: Sergei builds the UI components (phone book, shop panel, main menu, visuals); our agents build the rules and data, and wire his components to them. Steps 3, 5 and 6 become wiring steps. | decided (lead, 2026-10-17) | 1b |
 | D31 | One people file. `Assets/Configs/PhoneBook.json` is the single source of people, jacks and per-caller settings. Each contact has `name`, `socket`, `portrait` (sprite name), `type` (call type id) and optional `rate` / `fee` overrides (0 = use the type). Sergei's book reads only `name` and `socket` from it, unchanged; our game reads every field. The per-person ScriptableObjects from Step 1 are removed. Call types and game settings stay ScriptableObjects. Portraits appear on the call card, not in the book. Names are in English. | decided (lead, 2026-10-17) | 1b |
 | D32 | Connection fee. On a correct connection the caller pays a one-off fee, then the per-second rate. The fee comes from a range on the caller type, with an optional per-caller override (the same simple config as the rate; no tiers). It is paid once per call: not on a wrong connection, not again after hold and resume. The multiplier applies: earnings = (fee + seconds × rate) × multiplier. The card shows both, e.g. "10¢ + 5¢/s". The "Paid" stamp includes the fee, and "+10¢" pops up on connection. | decided (lead, 2026-10-17) | 1b |
 | D33 | Scene flow: `MainMenu` → `Game` → `Level` (build indices 0, 1, 2). Sergei's menu loads the next build index, which is `Game`; `Game` loads `Level` additively. Superseded by D38: `MainMenu` → `Final`. | superseded | 1b |
 | D34 | Phone book A–Z tabs are added to Sergei's `PhoneBookView` by our Step 3 agent as a coordinated change (approved files are listed in the Step 3 brief). | decided (lead, 2026-10-18) | 3 |
-| D35 | The directory grows to 36 people, one on every jack A1–F6, in Step 3. Portraits are reused until more are drawn. Step 7 may later hide lines behind locked board sections. | decided (lead, 2026-10-18) | 3 |
+| D35 | The directory grows to 36 people, one on every jack A1–F6, in Step 3. Portraits are reused until more are drawn. From Step 7 the game starts on a 3×3 part of the board and the book shows only the people on open jacks (D42). | decided (lead, 2026-10-18) | 3 |
 | D36 | Emergency services (Police, Fire Brigade, Doctor) replace 3 of the 36 people on their jacks (33 people + 3 services). They are listed **first** in `PhoneBook.json`, so the book shows them at the top of page 1; the people follow, sorted by surname. The validator allows that leading block of `emergency-service` entries. Sergei's book code is unchanged (it shows file order). | decided (lead, 2026-10-18) | 4 |
 | D37 | Step 4 numbers: an emergency must be connected within **30 s**. Fines: **$2** for a miss or a wrong patch, **$1** for cutting a connected emergency off early (not multiplied). Emergency pay: fee 20–40¢, 5–10¢/s, 10–20 s calls. About **1 call in 6** is an emergency (a temporary `spawnWeight` on each caller type: Regular 5, Emergency 1, until Step 7's `weightByProgress`), and at most one at a time. Any person can place an emergency call (`everyoneCalls`); services never call, and regular calls never go to a service (`recipientTag` empty = untagged people only). Services are JSON entries with `"tags": ["emergency-service"]` and no portrait or type. | decided (lead, 2026-10-18) | 4 |
 | D38 | One final scene, `Final.unity` (formerly `Level.unity`), built from prefab instances: Sergei's prefabs plus our `Game.prefab` and `GameUI.prefab`. Build list: `MainMenu` (0), `Final` (1); `Game.unity` is removed. The scene is shared and the prefabs are owned: each owner edits only their own prefabs, and edits to the scene file itself (adding or removing a root prefab) are announced to the team first. No serialized links between owners' prefabs; our code finds Sergei's objects by type at start. Sergei's first merge (`1c20569`, unpacked copies) was reverted in `cdc5876`. This carries out D29. | decided (lead, 2026-10-18) | before 5 |
+| D39 | Economy config file. The economy is controlled by the designer through one hand-edited file, `Assets/Configs/Economy.json`, with sections: `upgrades` [5a]; `calls`, `pacing` and `startingCents` [5c]. Presentation (card badges, colours) stays in Unity assets. Domain rules keep reading values through interfaces, so only Content loaders, the validator and tests change. A format guide for the designer lives in `Docs/EconomyFile.md`. | decided (lead, 2026-10-18) | 5a |
+| D40 | Upgrade model (the designer's proposal, adapted): a flat list of one-time entries with `id`, `type`, `name`, `description`, `costCents` and the type's fields. Types: `extra_income` (`incomeMultiplier`), `extra_wires` (`wires`), `notepad`, `extra_clients` (`boardSize`, `clientSlots`), `secret` (exactly one). Every value **sets** the resulting state (wires total, not wires added). Entries of one type form a chain in file order; only the next unbought one can be bought; values in a chain must grow. Ids are never renamed once players have saves. No levels, cost formula or stat modifiers; this replaces the old 5.9 plan. The designer's `clientPool` is dropped (D42). | decided (lead, 2026-10-18) | 5a |
+| D41 | The shop is Sergei's `UpgradeShopPanel` with its 4 buttons. The bottom button is pinned to the `secret` upgrade and shows the savings fill (D14). The top 3 rotate: each shows the next offer of one chain, and when a chain is bought out its button takes the next chain not yet shown, in file order (`ShopShelf`). A button with nothing to offer shows Sergei's placeholder look and can't be clicked. The name, description and price are drawn inside his button prefab by a small component in his folder, added as a coordinated change (D44); our `ShopView` drives it. | decided (lead, 2026-10-18) | 5a |
+| D42 | Board growth [7]. The game starts on a 3×3 part of the board (rows A–C, columns 1–3). Exactly the people whose jack is on the open part are in the game, and the book shows only them, so the designer picks the starting group by placing people on those jacks. `extra_clients` sets the open board size and the caller slots. Closed jacks are dimmed and can't be clicked (cover plates only if Mia draws them). The emergency services join when the board opens over their jacks, so emergencies come later in a session. Needs coordinated changes to Sergei's board and book. Supersedes D21. | decided (lead, 2026-10-18) | 7 |
+| D43 | Placeholder upgrade prices (until the designer's file; D27): income ×1.5 for $8, ×2.0 for $20, ×3.0 for $50; the secret $250. From 5b: wires 4, 5 and 6 for $5, $8 and $13 (start 3); Notepad $3. | default | 5a |
+| D44 | Sergei's missing hooks are built by our agents as coordinated changes (lead, 2026-10-18), each brief listing the approved files: the shop button texts and savings fill [5a]; adding cords at runtime to his cord input and tray [5b]; a tapped-entry event in his phone book [5b]. | decided (lead, 2026-10-18) | 5a |
 | D29 | Merge into one scene. The `Game.unity` + `Level.unity` split is temporary; it keeps Sergei's actively edited scene conflict-free. Once his cord work settles, and with his agreement, move the `Game` object and the `GameUI` prefab into one scene, then remove `Game.unity` and the additive loading. Do it at the latest before the first Web build. **Done as D38 (2026-10-18).** | done | 6 |
 
 ## 11. Glossary

@@ -26,6 +26,14 @@ namespace Switchboard.Domain
             Fraction = Math.Max(0, total - whole);
         }
 
+        /// <summary>Spends whole cents if the balance covers them; otherwise changes nothing. The fraction stays.</summary>
+        public bool TrySpend(long cents)
+        {
+            if (cents <= 0 || cents > Cents) return false;
+            Cents -= cents;
+            return true;
+        }
+
         public long ApplyFine(long cents)
         {
             if (cents <= 0) return 0;

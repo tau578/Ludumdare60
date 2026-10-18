@@ -64,6 +64,7 @@ namespace Switchboard.Game
             if (!open) return;
 
             if (Button(x, ref y, "+ $10")) session.Wallet.Earn(1000);
+            if (Button(x, ref y, "+ $100")) session.Wallet.Earn(10000);
             if (Button(x, ref y, "Call now")) session.Spawner.TrySpawn();
             for (int i = 0; i < timedTypes.Count; i++)
                 if (Button(x, ref y, timedLabels[i])) session.Spawner.TrySpawn(timedTypes[i]);
@@ -72,6 +73,8 @@ namespace Switchboard.Game
                 callQueue.ShowDurations = !callQueue.ShowDurations;
             // Clearing ends calls as Cleared, which never fines or calls back.
             if (Button(x, ref y, "Clear calls")) session.ClearCalls();
+            // Forgets purchases without a refund, so the shop is back to its start.
+            if (Button(x, ref y, "Reset upgrades")) session.ResetUpgrades();
         }
 
         private bool Button(float x, ref float y, string label)

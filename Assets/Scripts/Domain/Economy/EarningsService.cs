@@ -9,7 +9,7 @@ namespace Switchboard.Domain
         private readonly Wallet wallet;
         private readonly Func<double> multiplier;
 
-        // StatSheet supplies a live multiplier from Step 5 (D12); until then it is 1.
+        // The multiplier is read live, so an upgrade bought mid-call applies at once (D12). Null means 1.
         public EarningsService(CallService calls, Wallet wallet, Func<double> multiplier = null)
         {
             this.calls = calls ?? throw new ArgumentNullException(nameof(calls));
