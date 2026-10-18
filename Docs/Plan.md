@@ -106,7 +106,8 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Nested canvas sorting in a prefab (2b) | To give a child its own sorting order inside a prefab (e.g. the halo's order 9), set `m_OverrideSorting` through `SerializedObject`. `manage_prefabs` and the `overrideSorting` setter leave it off, because inside prefab contents the nested canvas counts as a root canvas. |
 | Game view size (3) | Set it with `PlayModeWindow.SetCustomRenderingResolution`, for example 1280×720 or 844×390, and set it back to 1920×1080 afterwards. Each new size stays in the Game view's size list as an editor preference, not a project file. |
 | Tests on Assembly-CSharp types (3) | `Assets/Tests/Editor/` (Sergei's asmdef) can't see Assembly-CSharp types such as `PhoneBookView`. Put such tests in our `Assets/Tests/Game/Editor/`, which has no asmdef and compiles into Assembly-CSharp-Editor. |
-| Dev panel (2a) | F1 or the "Dev" button in the top-right corner: + $10, Call now, Speed ×5/×1, Show/Hide times, Clear calls. Editor and development builds only. Its IMGUI clicks also reach the cord input as "empty space" clicks. |
+| Dev panel (2a) | F1 or the "Dev" button in the top-right corner: + $10, Call now, Emergency now (4), Speed ×5/×1, Show/Hide times, Clear calls. Editor and development builds only. Its IMGUI clicks also reach the cord input as "empty space" clicks. |
+| Format-only re-saves (4) | Test runs and Play Mode can re-save `ProjectSettings/TimeManager.asset` (as well as `SampleScene.unity`) with only format changes. Discard them with `git checkout -- <file>` and mention it in the report. |
 
 ## 5. Definition of done (every step)
 - [ ] The project compiles. The console has no errors and no new warnings from our code.
@@ -174,7 +175,7 @@ Follow-ups: <ideas, debts, questions>
 | 9 | Mobile and Web polish | Good on phones and desktop browsers |
 | 10 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–3 are fully specified. Steps 4–10 are outlines. The orchestrator turns each one into a full brief before launching it.
+Steps 1–4 are fully specified. Steps 5–10 are outlines. The orchestrator turns each one into a full brief before launching it.
 
 ---
 
@@ -491,27 +492,156 @@ Steps 1–3 are fully specified. Steps 4–10 are outlines. The orchestrator tur
 
 ---
 
-### Step 4: Emergencies and fines (outline)
-- **Decide first (raised in Step 3):** the 36 people fill every jack A1–F6 (D35), so the emergency services have no free line. Options: they replace three people on existing jacks, or they get their own lines (for example a separate small panel, or a 7th row). The validator also needs to allow single-word names such as "Police" and keep the surname rules for people only.
-- **Caller types:** the fields that Design §6.1 marks [4].
-- **Emergency type:** a short response time, fines, and `maxSimultaneous` 1.
-- **Emergency services** in the directory, tagged `emergency-service`: Police, Fire Brigade, Doctor.
-- **Rules and feedback:**
-  - The response timer and Missed.
-  - `PenaltyService`, with fines floored at 0.
-  - `FineApplied` popups.
-  - Emergency card style with a countdown ring (D09).
-  - The idle guard (D16). Our Game layer reports input activity.
-- **Tests:**
-  - Fines for each reason.
-  - The floor at zero.
-  - The timer stopping on a correct connection.
-  - Missed clearing the call in hand.
-  - The idle guard.
-  - A wrong connection giving both a fine and a callback.
-- **Playtest:**
-  - Emergencies feel urgent but fair.
-  - Leaving the game idle for 2 minutes doesn't drain your money.
+### Step 4: Emergencies and fines
+
+**Goal.** Timed emergency calls to Police, Fire Brigade and Doctor, with fair fines, and an idle guard so walking away never drains your money. **Recommended effort:** high.
+
+**Playable result.**
+- About 1 call in 6 is an emergency (never more than one at a time). Its card looks different: an "EMERGENCY" badge, a red accent and a countdown ring around the portrait that empties over 30 s.
+- Taking it shows, for example, "Ada Moss" / "wants Police". The services are at the top of page 1 in the book.
+- Connected correctly in time: it pays a bigger fee (20–40¢) and 5–10¢/s for a short 10–20 s call.
+- Missed (the ring runs out): the card stamps "Missed -$2.00" and $2 is taken. A wrong patch: "Wrong number!", $2 is taken, and the caller rings again later. Cutting a connected emergency off: "Cut off" and $1 is taken. Every fine pops up in red near the money counter.
+- Money never goes below $0.00. After 60 s with no input, no new emergencies ring.
+
+**Decisions for this step** (lead, 2026-10-18; recorded as D36 and D37 in Design §10):
+- **D36:** Police, Fire Brigade and Doctor replace 3 people on their jacks (33 people + 3 services). They are listed first in `PhoneBook.json`, and the people follow, sorted by surname.
+- **D37 (Step 4 numbers):** a response time of 30 s; fines of $2 for a miss or a wrong patch (200¢) and $1 for an early disconnect (100¢); emergency pay of fee 20–40¢, 5–10¢/s and 10–20 s duration; about 1 call in 6 is an emergency (type spawn weights Regular 5, Emergency 1).
+- **Defaults confirmed** (Design §1, §5, D09, D10, D16):
+  - The services never place calls, and regular calls never go to a service.
+  - Any of the 33 people can place an emergency call.
+  - A wrong patch gives the fine and a callback.
+  - A miss or an early disconnect gives no callback (D10 flags off).
+  - Fines are not multiplied by the earnings multiplier.
+  - The idle timeout is 60 s.
+
+**Build**
+1. **People file (`Assets/Configs/PhoneBook.json`, shared, D31/D36).**
+   - Replace 3 people with the services. The services must be on 3 different rows. Remove people whose surname letter is shared with another person (for example one of Kemble/Kettering), so the surnames stay spread across the alphabet. Remove those people from the file entirely; their jacks go to the services.
+   - The services go **first**, in this order: Police, Fire Brigade, Doctor. A service entry looks like this, with no portrait, type, rate or fee:
+     `{ "name": "Police", "socket": "C4", "tags": ["emergency-service"] }`
+   - The people keep their exact format. Don't add a `tags` field to them; a missing `tags` means none.
+   - Keep `contactsPerPage` 6 and the surname order for the people. Sergei's book reads only `name` and `socket` and ignores the other fields. Single-word names are fine for his parser.
+   - The designer edits this file by hand. Keep one entry per line, as now.
+2. **Content: loader and catalog.**
+   - `PeopleFileContact` gets `tags` (a string array). Domain `IPerson.Tags` is filled from it.
+   - Services go into the directory (so their jacks connect) but get **no** caller record, so they never ring.
+   - Callers for "anyone can call" types: for a type with `everyoneCalls` set, Content adds one caller per untagged person for that type (weight 1, no overrides). People keep their own JSON `type` for their ordinary calls.
+3. **Caller types (Design §6.1 [4]).**
+   - Add these to `ICallerType` and `CallerTypeDefinition`:
+     - `responseTimeSeconds` (0 = none)
+     - `fineMissedCents`
+     - `fineEarlyDisconnectCents`
+     - `callbackAfterMiss`
+     - `callbackAfterDisconnect`
+     - `recipientTag` (empty = any untagged person)
+     - `maxSimultaneous` (0 = no limit)
+     - `spawnWeight` (temporary until Step 7's `weightByProgress`)
+     - `everyoneCalls`
+   - Add a presentation-only **card style** (badge text, accent colour). It stays out of the Domain interface; the Game layer looks it up by type id through `GameConfig`.
+   - `Regular.asset`: `spawnWeight` 5; everything else in this list stays 0, false or empty.
+   - New `Assets/Content/CallerTypes/Emergency.asset`, registered in `GameConfig`:
+     - id `type.emergency`, display name "Emergency"
+     - fee 20–40¢, rate 5–10¢/s, duration 10–20 s, callback delay 20–40 s
+     - response time 30 s, fines 200 / 100
+     - both callback flags off
+     - `recipientTag` `emergency-service`, `maxSimultaneous` 1, `spawnWeight` 1, `everyoneCalls` on
+     - badge "EMERGENCY", accent red
+4. **Spawning (Design §5.2 "Which type").**
+   - Pick the type first: a weighted pick among the types that are allowed right now. A type is allowed when:
+     - it is under its `maxSimultaneous`, counting its live calls plus pending callbacks of that type
+     - it isn't blocked by the idle guard
+     - it has at least one free caller and one free recipient
+   - Then pick a caller of that type, then a recipient by the type's `recipientTag`. The busy rule (D18) applies to everyone, services included.
+   - Callbacks: a due callback also waits while its type is at `maxSimultaneous` (live calls), or while the idle guard blocks its type.
+   - Use no LINQ and allocate nothing per tick.
+5. **Response timer and Missed (D09, Design §5.1).**
+   - `Call` gets the response time left. It counts down in Incoming, Taken and Connecting, from `CallService.Tick`.
+   - It stops for good on Connected and doesn't restart after hold.
+   - When it reaches 0 the call ends as `Missed`. A callback starts with a fresh full timer (it is a new call).
+   - When the missed call is in hand, nothing is in hand afterwards and the bubble hides. A half-patched cord stays where it is, because it's the player's; closing it afterwards is refused, as usual. Make sure `OperatorDesk`'s half-patch tracking stays consistent.
+   - `CallbackScheduler` honours `callbackAfterMiss` and `callbackAfterDisconnect` (D10).
+6. **Penalties (Design §5.5).**
+   - Add `PenaltyService` in Domain, which listens for `CallEnded`:
+     - `Missed` and `WrongConnection` use `fineMissedCents`.
+     - `DisconnectedEarly` uses `fineEarlyDisconnectCents`.
+     - `Finished` and `Cleared` never fine.
+   - It calls `Wallet.ApplyFine` (floored at 0) and raises `FineApplied(call, reason, requested, taken)`, a readonly struct.
+   - Build it in `GameSession`.
+7. **Idle guard (D16).**
+   - Add `IdleGuard` in Domain, ticked from `GameSession.Tick` before the spawner. `ReportInput()` resets it. It is idle after `idleTimeoutSeconds`, a new `PacingProfile` field (default 60; set it in `Default.asset`).
+   - While idle, types that carry a fine (either fine > 0) neither spawn nor ring as callbacks. Regular calls continue.
+   - The Game layer reports input: any pointer press or pointer move, or any key press, through the new Input System (`Pointer.current`, `Keyboard.current`), with no per-frame allocations. Put it in `GameLoopRunner` or a small component of ours. Don't touch Sergei's input code.
+8. **Cards and feedback (ours: `CallCardView`, `CallQueueView`, `GameUI.prefab`).**
+   - **Emergency card:** the type's badge text ("EMERGENCY") and accent on the card, plus a countdown ring around the portrait. Use a radial-filled `Image`, polled in `LateUpdate` with a change check; it gets more urgent in the last 10 s, through a colour shift or a pulse.
+     - The ring shows only for types with a response time, and hides once connected.
+     - Not colour alone (Design §5.4): the badge text and the ring carry the meaning.
+     - The cord-colour ring for connected calls still works. Make sure the two rings don't fight.
+   - **Stamps:** "Missed -$2.00" (the amount actually taken; just "Missed" if nothing could be taken), in a dark red ink. "Wrong number!" and "Cut off" stay as they are; their fine shows as the popup.
+   - **Fine popup:** on `FineApplied` with taken > 0, show "-$2.00" in red near the money counter. Reuse `FloatingTextView` the way the "+10¢" fee popup does. Check that no popups overlap when a fee and a fine land close together.
+   - **Glyphs:** only those in the static LiberationSans SDF atlas. Check whether "−" (U+2212) is in it; if not, use "-".
+   - **Halo and raycasts:** keep the halo's sorting order 9 and add no new raycast targets.
+9. **Validator (`ContentValidator`, Design §6.3, D36).** Messages must be plain enough for a non-programmer, and each should name the contact and the fix. For example: `Contact 5 "Fire Brigade": emergency services must be listed at the top of the file, before the people.`
+   - Services (entries tagged `emergency-service`) must form one block at the top of the file.
+   - Services may have single-word names and need no portrait or type.
+   - The surname rules (unique, sorted, period names) apply to people only.
+   - Every type with a `recipientTag` has at least one entry with that tag.
+   - Response time, fines, `maxSimultaneous` and `spawnWeight` are all ≥ 0.
+   - At least one type has `spawnWeight` > 0.
+   - Names stay unique across everyone, and the sockets stay valid and used once.
+10. **Dev panel:**
+    - An "Emergency now" button.
+    - "Show times" also shows the response seconds left.
+    - "Clear calls" must not fine anyone (it uses `Cleared`).
+11. **Sergei's book: unchanged (D36).** Don't edit `PhoneBookView`. His `ShowLetter` takes the first name whose last word starts with the letter, so with the services first, "P" would jump to Police on spread 1. The tabs are hidden (lead, 2026-10-18), so leave it, and list it as a follow-up for when they're re-shown. The `OpenBook/LetterTabs` object stays inactive. Don't run his builder menus.
+
+**Tests** (`Switchboard.Domain.Tests`, plus Content tests where they already live)
+- The response timer:
+  - counts down in Incoming, Taken and Connecting
+  - stops on a correct connection and stays stopped through hold and resume
+  - reaching 0 ends the call as Missed
+- Missed clearing the call in hand: nothing in hand afterwards, the desk is consistent, and a half-patched cord closing afterwards is refused.
+- Fines for each reason: Missed and WrongConnection 200, DisconnectedEarly 100, Finished and Cleared none, and a regular call never fines.
+- The floor at zero: with a balance of 150¢, a 200¢ fine takes 150, and `FineApplied` reports requested 200 and taken 150.
+- A wrong connection on an emergency gives both a fine and a callback. A miss gives no callback with the flag off, and one with the flag on.
+- Type pick:
+  - the weights are respected over many spawns, roughly 1 in 6
+  - `maxSimultaneous` 1 is never exceeded, counting pending callbacks
+  - emergency recipients are always services
+  - regular calls never go to a service
+  - services never call
+- The idle guard:
+  - after 60 s without input, no emergencies spawn or ring as callbacks, but regular calls still do
+  - `ReportInput` re-enables them
+  - two idle game minutes with an emergency already waiting cost at most one missed fine
+- The validator: the real file passes. Each of these is reported: a service below the people, an unsorted person, a type whose `recipientTag` has no entries, and a negative fine.
+- Update `PeopleFileTests` and `FullBoardTests` for 33 people and 3 services.
+
+**Done when** §5 is met and every test above passes. Take screenshots of:
+- an emergency card ringing with its ring part-empty (`step-04.png`)
+- the in-hand bubble for an emergency
+- the "Missed" stamp and a fine popup
+- the book on spread 1 showing the 3 services at the top
+
+**Playtest script (you)**
+1. Play from `Game.unity`. Within a minute or two (or with dev panel F1, "Emergency now"), a card rings with an "EMERGENCY" badge and a ring around the portrait that slowly empties.
+2. Open the book: Police, Fire Brigade and Doctor are at the top of page 1, and the people follow in surname order.
+3. Take the emergency and connect it in time. The ring disappears, the fee pops up (20–40¢), and it pays for a short call.
+4. Let the next emergency run out. The card stamps "Missed -$2.00", and "-$2.00" pops up in red by the money counter.
+5. Patch an emergency wrong on purpose. You see "Wrong number!" and a $2 fine, and the same caller rings again later.
+6. Connect an emergency, pull a plug and click the tray. You see "Cut off" and a $1 fine.
+7. With less than $2, get fined. Money stops at $0.00 and never goes negative.
+8. Leave the game alone for 2 minutes (don't touch the mouse). At most one emergency gets missed; no new ones ring while you're away, and regular cards still pile up.
+9. Only one emergency is ever on the board at a time.
+10. Run `Tools/Switchboard/Validate Content`: no problems. Break the file on purpose, for example by moving "Doctor" below a person, run it again, and read the message; then undo.
+
+**Out of scope:**
+- the alarm sound and ringing loop (Step 8)
+- type weights by progress and emergencies arriving later in a session (Step 7)
+- upgrades (Step 5)
+- re-showing the A–Z tabs
+- the 5-versus-6 caller window layout (Sergei)
+
+---
 
 ### Step 5: Upgrades, shop and the mystery goal (outline). Wire Sergei's `UpgradeShopPanel` to our `UpgradeService` instead of building our own `ShopView` (D30).
 - **Stats and upgrades:**

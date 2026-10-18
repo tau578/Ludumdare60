@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Switchboard.Content;
 using Switchboard.Domain;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -25,7 +26,9 @@ namespace Switchboard.Game
         private CallService calls;
         private OperatorDesk desk;
         private EarningsService earnings;
+        private PenaltyService penalties;
         private Func<IPerson, Sprite> portraitOf;
+        private Func<ICallerType, CallCardStyle> styleOf;
         private Func<CordId, Color> cordColorOf;
         private RectTransform[] slots = new RectTransform[0];
         private Vector2[] slotCentres = new Vector2[0];
@@ -47,13 +50,16 @@ namespace Switchboard.Game
         }
 
         public void Bind(CallService callService, OperatorDesk operatorDesk, EarningsService earningsService,
-            RectTransform[] callerSlots, Func<IPerson, Sprite> portraits, Func<CordId, Color> cordColors)
+            PenaltyService penaltyService, RectTransform[] callerSlots, Func<IPerson, Sprite> portraits,
+            Func<CordId, Color> cordColors, Func<ICallerType, CallCardStyle> cardStyles)
         {
             Unsubscribe();
             calls = callService;
             desk = operatorDesk;
             earnings = earningsService;
+            penalties = penaltyService;
             portraitOf = portraits;
+            styleOf = cardStyles;
             cordColorOf = cordColors;
             slots = callerSlots ?? new RectTransform[0];
             slotCentres = new Vector2[slots.Length];
@@ -63,6 +69,7 @@ namespace Switchboard.Game
             calls.CallAdded += OnCallAdded;
             calls.CallStateChanged += OnCallStateChanged;
             earnings.ConnectionFeePaid += OnConnectionFeePaid;
+            if (penalties != null) penalties.FineApplied += OnFineApplied;
             foreach (CallCardView card in pool)
             {
                 card.Clicked += OnCardClicked;
@@ -82,6 +89,7 @@ namespace Switchboard.Game
                 calls.CallStateChanged -= OnCallStateChanged;
             }
             if (earnings != null) earnings.ConnectionFeePaid -= OnConnectionFeePaid;
+            if (penalties != null) penalties.FineApplied -= OnFineApplied;
             foreach (CallCardView card in pool)
             {
                 if (card == null) continue;
@@ -90,6 +98,7 @@ namespace Switchboard.Game
             }
             calls = null;
             earnings = null;
+            penalties = null;
         }
 
         private void BuildPool(int size)
@@ -115,7 +124,8 @@ namespace Switchboard.Game
                 return;
             }
             card.ShowDuration = showDurations;
-            card.Show(e.Call, portraitOf?.Invoke(e.Call.Request.CallerPerson), cordColorOf);
+            CallCardStyle style = styleOf != null ? styleOf(e.Call.Request.Type) : default;
+            card.Show(e.Call, portraitOf?.Invoke(e.Call.Request.CallerPerson), cordColorOf, style);
             shown.Add(card);
             SnapToSlot(card, shown.Count - 1);
         }
@@ -123,6 +133,9 @@ namespace Switchboard.Game
         private void OnCallStateChanged(CallStateChangedArgs e) => CardOf(e.Call)?.Refresh();
 
         private void OnConnectionFeePaid(ConnectionFeePaidArgs e) => CardOf(e.Call)?.ShowConnectionFee(e.Cents);
+
+        // "Missed -$2.00" names the amount actually taken, which is known only once the fine lands.
+        private void OnFineApplied(FineAppliedArgs e) => CardOf(e.Call)?.RefreshStamp();
 
         private void OnCardClicked(CallCardView clicked)
         {

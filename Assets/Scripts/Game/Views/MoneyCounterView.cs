@@ -8,21 +8,41 @@ namespace Switchboard.Game
     {
         [SerializeField] private TMP_Text label;
         [SerializeField] private RectTransform plate;
+        [SerializeField, Tooltip("\"-$2.00\" in red when a fine is taken.")] private FloatingTextView finePopup;
 
         private readonly Vector3[] slotCorners = new Vector3[4];
         private Wallet wallet;
+        private PenaltyService penalties;
         private long shownCents = -1;
         private RectTransform slot;
         private Vector3 alignedMin;
         private Vector3 alignedMax;
 
         /// <param name="headerSlot">The shop panel's header plaque to sit in; null keeps the prefab position.</param>
-        public void Bind(Wallet source, RectTransform headerSlot)
+        public void Bind(Wallet source, RectTransform headerSlot, PenaltyService fines)
         {
+            Unsubscribe();
             wallet = source;
+            penalties = fines;
+            if (penalties != null) penalties.FineApplied += OnFineApplied;
+            if (finePopup != null) finePopup.Hide();
             shownCents = -1;
             slot = headerSlot;
             alignedMin = alignedMax = Vector3.zero;
+        }
+
+        private void OnDisable() => Unsubscribe();
+
+        private void Unsubscribe()
+        {
+            if (penalties != null) penalties.FineApplied -= OnFineApplied;
+            penalties = null;
+        }
+
+        // Nothing taken, nothing to show: the balance was already at zero.
+        private void OnFineApplied(FineAppliedArgs e)
+        {
+            if (finePopup != null && e.TakenCents > 0) finePopup.Show(MoneyFormat.Dollars(-e.TakenCents));
         }
 
         private void LateUpdate()

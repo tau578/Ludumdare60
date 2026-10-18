@@ -15,6 +15,7 @@ Level art pass (2026-10-18, lead requested): `BackgroundPanel.prefab` groups `ma
 | 2a | Done (`2b00ac7`) | Up to 6 live calls, one card per caller slot. Taking a card swaps (D03). Connecting while a cord is half-patched. `BusyTracker` (D18), `CallbackScheduler` with "Calling again" cards, and a `PacingProfile`-driven spawner. Connected cards stay in their slot with a cord-colour ring and their own earnings. A dev panel (F1). |
 | 2b | Done (`4c5ac50`) | Hold and resume (D07): a pulled plug puts the call OnHold (pay and duration paused, card says "On hold" with frozen earnings); the same pair closing again resumes it with no second fee; the plug in another jack or the cord to the tray cuts it off. Ringing halos draw behind all card content. |
 | 3 | Done (2026-10-18) | A–Z tabs in Sergei's book (D34): `PhoneBookTab` plus `PhoneBookView.ShowLetter`/`HasLetter`, with letters that have no surname greyed out, and arrow keys while the book is open. 36 people on every jack A1–F6 (D35). Restyled cards: bold surnames in the in-hand bubble, on-hold dimming, coloured stamp inks. `ContentValidator` (Content) with `Tools/Switchboard/Validate Content`. Accepted deviations: the tab test lives in `Assets/Tests/Game/Editor/`, the validator menu in `Assets/Scripts/Game/Editor/` (see 4.1), and the validator also checks the surname order and `contactsPerPage`. After the lead's playtest: a press reaction and a placeholder click when a card is taken, typed-out bubble text, and clearer tabs for the spread on show. |
+| 4 | Done (2026-10-18) | Emergencies and fines (D36, D37): `type.emergency` (30 s response ring, $2 miss or wrong-patch fine, $1 cut-off fine, 20–40¢ + 5–10¢/s for 10–20 s, at most one at a time, spawn weight 1 against Regular 5, `everyoneCalls`, `recipientTag` `emergency-service`). Police B6, Fire Brigade C2 and Doctor D4 head `PhoneBook.json`. `PenaltyService` with `FineApplied`, the "Missed -$X" stamp and a red fine popup under the money counter. `IdleGuard` (60 s, `PacingProfile.idleTimeoutSeconds`) blocks fined types and their callbacks. A presentation-only `CallCardStyle` per type (badge, accent). Dev panel "Emergency now". Accepted deviations: the countdown ring is cream on a dark track, turning orange-red in the last 10 s (a red ring was invisible on the red halo); the type badge hides once connected; a `type` given on a service is ignored. |
 
 What Step 1 built:
 - **Operator desk.** A right pair connects the call. A wrong pair ends it as "Wrong number!". Patching with no call in hand is refused. Pulling a plug cut the call off (replaced by hold in Step 2b).
@@ -167,6 +168,7 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 public void Tick(double dt)
 {
     clock.Advance(dt);
+    idle.Tick(dt);       // idle guard: time since the last input (Step 4)
     earnings.Tick(dt);   // pay connected calls for min(dt, time left), so the last partial second is paid
     calls.Tick(dt);      // finish calls whose duration ran out; miss expired emergencies (Step 4)
     callbacks.Tick();    // re-queue due callbacks if there's room (Step 2)
@@ -289,7 +291,7 @@ In the diagram, HungUp means `Ended` with reason `WrongConnection`, and Finished
 - **Busy (D18).** Anyone in a waiting, in-hand, connected or on-hold call can't be picked. Both the caller and the recipient of a pending callback can't be picked either.
 - **Progress** = lifetime earnings ÷ the goal's price (D19). `PacingProfile` curves turn it into the spawn interval and the type weights.
 - **Opening calls.** The first few calls of a new game are scripted and double as the tutorial [7].
-- **Idle guard (D16).** After 60 s without player input, types that carry fines stop spawning [4].
+- **Idle guard (D16).** After 60 s without player input, types that carry fines stop spawning [4] Their due callbacks wait too. The timeout is `idleTimeoutSeconds` on `PacingProfile`.
 
 ### 5.3 Callbacks [2]
 `CallbackScheduler` listens for `CallEnded`:
@@ -446,7 +448,7 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
 | Asset | Fields, with the step that adds them | Notes |
 |---|---|---|
 | `GameConfig` | catalogs of all definitions; `startingCents` [1]; `maxWaitingCalls` = 6 [2]; base stats: cords, sections, multiplier = 1 [5]; goal reference [5] | The one asset `GameInstaller` references. Implements `IGameContent`. |
-| `CallerTypeDefinition` | `id`, `displayName`, `centsPerSecond` (range), `durationSeconds` (range) [1]; `callbackDelaySeconds` (range) [2]; `responseTimeSeconds` (0 = none), `fineMissedCents`, `fineEarlyDisconnectCents`, `callbackAfterMiss`, `callbackAfterDisconnect`, `recipientTag`, `maxSimultaneous`, card style [4]; `weightByProgress` [7] | Regular [1], Emergency [4]. VIP and long distance later. |
+| `CallerTypeDefinition` | `id`, `displayName`, `centsPerSecond` (range), `durationSeconds` (range) [1]; `callbackDelaySeconds` (range) [2]; `responseTimeSeconds` (0 = none), `fineMissedCents`, `fineEarlyDisconnectCents`, `callbackAfterMiss`, `callbackAfterDisconnect`, `recipientTag`, `maxSimultaneous`, `spawnWeight` (temporary, D37), `everyoneCalls`, card style [4]; `weightByProgress` [7] | Regular [1], Emergency [4]. VIP and long distance later. |
 | `CallerDefinition` | `id`, `person`, `type`, `weight`, optional `centsPerSecondOverride` [1]; optional favourite recipients [7] | The "caller config". This is how some callers become worth much more. |
 | ~~`PersonDefinition`~~, ~~`CallerDefinition`~~, ~~`PhoneDirectoryDefinition`~~ | Replaced in Step 1b by `Assets/Configs/PhoneBook.json` (D31). | Loaded and validated at startup. Errors are logged clearly, and a test runs the same check. |
 | `PhoneDirectoryDefinition` | entries `{ person, jackLabel }` | Jack labels are the `SocketView.Address` values, A1–F6. |
@@ -568,6 +570,8 @@ Statuses:
 | D33 | Scene flow: `MainMenu` → `Game` → `Level` (build indices 0, 1, 2). Sergei's menu loads the next build index, which is `Game`; `Game` loads `Level` additively. | decided (merge, 2026-10-17) | 1b |
 | D34 | Phone book A–Z tabs are added to Sergei's `PhoneBookView` by our Step 3 agent as a coordinated change (approved files are listed in the Step 3 brief). | decided (lead, 2026-10-18) | 3 |
 | D35 | The directory grows to 36 people, one on every jack A1–F6, in Step 3. Portraits are reused until more are drawn. Step 7 may later hide lines behind locked board sections. | decided (lead, 2026-10-18) | 3 |
+| D36 | Emergency services (Police, Fire Brigade, Doctor) replace 3 of the 36 people on their jacks (33 people + 3 services). They are listed **first** in `PhoneBook.json`, so the book shows them at the top of page 1; the people follow, sorted by surname. The validator allows that leading block of `emergency-service` entries. Sergei's book code is unchanged (it shows file order). | decided (lead, 2026-10-18) | 4 |
+| D37 | Step 4 numbers: an emergency must be connected within **30 s**. Fines: **$2** for a miss or a wrong patch, **$1** for cutting a connected emergency off early (not multiplied). Emergency pay: fee 20–40¢, 5–10¢/s, 10–20 s calls. About **1 call in 6** is an emergency (a temporary `spawnWeight` on each caller type: Regular 5, Emergency 1, until Step 7's `weightByProgress`), and at most one at a time. Any person can place an emergency call (`everyoneCalls`); services never call, and regular calls never go to a service (`recipientTag` empty = untagged people only). Services are JSON entries with `"tags": ["emergency-service"]` and no portrait or type. | decided (lead, 2026-10-18) | 4 |
 | D29 | Merge into one scene. The `Game.unity` + `Level.unity` split is temporary; it keeps Sergei's actively edited scene conflict-free. Once his cord work settles, and with his agreement, move the `Game` object and the `GameUI` prefab into one scene, then remove `Game.unity` and the additive loading. Do it at the latest before the first Web build. | decided (lead, 2026-10-17) | 6 |
 
 ## 11. Glossary

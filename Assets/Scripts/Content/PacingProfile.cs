@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Switchboard.Content
 {
-    /// <summary>When new calls ring (Design 5.2). Progress curves, opening calls and the idle guard come in Step 7.</summary>
+    /// <summary>When new calls ring (Design 5.2). Progress curves and opening calls come in Step 7.</summary>
     [CreateAssetMenu(menuName = "Switchboard/PacingProfile")]
     public sealed class PacingProfile : ScriptableObject, IPacingProfile
     {
@@ -15,10 +15,13 @@ namespace Switchboard.Content
         private float intervalJitter = 0.3f;
         [SerializeField, Min(0), Tooltip("Each waiting call beyond the free cords stretches the interval by this share.")]
         private float loadFactor = 0.5f;
+        [SerializeField, Min(0), Tooltip("Seconds without input before calls that carry fines stop ringing (D16). 0 = never.")]
+        private float idleTimeoutSeconds = 60;
 
         public double FirstCallDelaySeconds => firstCallDelaySeconds;
         public double BaseIntervalSeconds => baseIntervalSeconds;
         public double IntervalJitter => intervalJitter;
         public double LoadFactor => loadFactor;
+        public double IdleTimeoutSeconds => idleTimeoutSeconds;
     }
 }

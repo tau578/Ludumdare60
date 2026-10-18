@@ -15,14 +15,17 @@ namespace Switchboard.Domain
             if (content == null) throw new ArgumentNullException(nameof(content));
             if (switchboard == null) throw new ArgumentNullException(nameof(switchboard));
             int maxLiveCalls = content.MaxWaitingCalls > 0 ? content.MaxWaitingCalls : DefaultMaxWaitingCalls;
+            IPacingProfile pacing = content.Pacing ?? PacingSettings.Default;
             Directory = new PhoneDirectory(content.Directory);
             Wallet = new Wallet(content.StartingCents);
+            Idle = new IdleGuard(pacing.IdleTimeoutSeconds);
             Calls = new CallService();
             Earnings = new EarningsService(Calls, Wallet);
-            Callbacks = new CallbackScheduler(Calls, clock, random, maxLiveCalls);
+            Penalties = new PenaltyService(Calls, Wallet);
+            Callbacks = new CallbackScheduler(Calls, clock, random, maxLiveCalls, Idle);
             Busy = new BusyTracker(Calls, Callbacks);
             Spawner = new CallSpawner(Calls, new CallFactory(random), Directory, content.Callers, random, Busy,
-                content.Pacing, maxLiveCalls, () => switchboard.CordCount);
+                pacing, maxLiveCalls, () => switchboard.CordCount, Callbacks, Idle);
             Desk = new OperatorDesk(Calls, new ConnectionRule(Directory), switchboard);
         }
 
@@ -31,6 +34,8 @@ namespace Switchboard.Domain
         public Wallet Wallet { get; }
         public CallService Calls { get; }
         public EarningsService Earnings { get; }
+        public PenaltyService Penalties { get; }
+        public IdleGuard Idle { get; }
         public CallbackScheduler Callbacks { get; }
         public BusyTracker Busy { get; }
         public CallSpawner Spawner { get; }
@@ -40,6 +45,7 @@ namespace Switchboard.Domain
         {
             if (!(dt > 0)) return;
             clock.Advance(dt);
+            Idle.Tick(dt);
             Earnings.Tick(dt);
             Calls.Tick(dt);
             Callbacks.Tick();

@@ -13,6 +13,7 @@ namespace Switchboard.Domain.Tests
         private const string GameConfigPath = "Assets/Content/GameConfig.asset";
 
         private static readonly ICallerType Regular = new FakeCallerType(new FloatRange(3, 8), new FloatRange(15, 30));
+        private static readonly ICallerType Emergency = FakeCallerType.Emergency();
 
         // The team's board in Level.unity: rows A to F, columns 1 to 6.
         private static IEnumerable<string> Board()
@@ -34,21 +35,30 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void RealFileHasThirtySixValidPeopleOnEveryJack()
+        public void RealFileHasThirtyThreePeopleAndThreeServicesOnEveryJack()
         {
             PeopleCatalog catalog = LoadRealFile();
 
             Assert.That(catalog.Errors, Is.Empty);
             Assert.That(catalog.People.Count, Is.EqualTo(36));
-            Assert.That(catalog.Callers.Count, Is.EqualTo(36));
             Assert.That(catalog.Directory.Count, Is.EqualTo(36));
+            int services = 0;
+            foreach (IPerson person in catalog.People)
+                if (person.HasTag(PeopleFileLoader.ServiceTag)) services++;
+            Assert.That(services, Is.EqualTo(3));
+            // Every person places regular calls and, through everyoneCalls, emergencies; services never call.
+            Assert.That(catalog.Callers.Count, Is.EqualTo(33 * 2));
+            foreach (ICaller caller in catalog.Callers) Assert.That(caller.Person.Tags, Is.Empty, caller.Id);
         }
 
         [Test]
-        public void RealFileIsSortedBySurnameBecauseTheBookShowsFileOrder()
+        public void RealFileListsTheServicesFirstThenPeopleBySurname()
         {
             IReadOnlyList<IDirectoryEntry> entries = LoadRealFile().Directory;
-            for (int i = 1; i < entries.Count; i++)
+            Assert.That(entries[0].Person.FullName(), Is.EqualTo("Police"));
+            Assert.That(entries[1].Person.FullName(), Is.EqualTo("Fire Brigade"));
+            Assert.That(entries[2].Person.FullName(), Is.EqualTo("Doctor"));
+            for (int i = 4; i < entries.Count; i++)
                 Assert.That(string.Compare(entries[i - 1].Person.LastName, entries[i].Person.LastName, StringComparison.OrdinalIgnoreCase),
                     Is.LessThan(0), $"{entries[i - 1].Person.LastName} before {entries[i].Person.LastName}");
         }
@@ -118,6 +128,32 @@ namespace Switchboard.Domain.Tests
             Assert.That(catalog.Errors[2], Does.Contain("Edgar Pennington").And.Contain("portrait 'nobody'"));
             Assert.That(catalog.Errors[3], Does.Contain("Florence Abbott").And.Contain("call type 'type.vip' is unknown"));
             Assert.That(catalog.Errors[4], Does.Contain("Contact 6").And.Contain("name is empty"));
+        }
+
+        [Test]
+        public void AServiceNeedsNoPortraitOrTypeAndNeverCalls()
+        {
+            PeopleCatalog catalog = PeopleFileLoader.Load(@"{ 'contacts': [
+                { 'name': 'Fire  Brigade', 'socket': 'C2', 'tags': ['emergency-service'] },
+                { 'name': 'Ada Moss', 'socket': 'C3', 'portrait': 'caller-01', 'type': 'type.regular' },
+                { 'name': 'Basil Thorne', 'socket': 'A5', 'portrait': 'caller-02', 'type': 'type.regular' } ] }".Replace('\'', '"'),
+                new[] { Regular, Emergency }, name => name != null && name.StartsWith("caller-", StringComparison.Ordinal), Board());
+
+            Assert.That(catalog.Errors, Is.Empty);
+            IPerson brigade = catalog.People[0];
+            Assert.That(brigade.Id, Is.EqualTo("person.fire-brigade"));
+            Assert.That(brigade.FirstName, Is.Empty);
+            Assert.That(brigade.LastName, Is.EqualTo("Fire Brigade"), "a service is listed by its whole name");
+            Assert.That(brigade.Tags, Is.EqualTo(new[] { "emergency-service" }));
+            Assert.That(catalog.Directory[0].JackLabel, Is.EqualTo("C2"));
+            Assert.That(catalog.People[1].Tags, Is.Empty, "a missing tags field means none");
+
+            Assert.That(catalog.Callers.Count, Is.EqualTo(4));
+            Assert.That(catalog.Callers[0].Type, Is.SameAs(Regular));
+            Assert.That(catalog.Callers[2].Id, Is.EqualTo("caller.ada-moss.emergency"));
+            Assert.That(catalog.Callers[2].Type, Is.SameAs(Emergency));
+            Assert.That(catalog.Callers[2].Person, Is.SameAs(catalog.People[1]));
+            Assert.That(catalog.Callers[3].Person, Is.SameAs(catalog.People[2]));
         }
 
         [TestCase("")]

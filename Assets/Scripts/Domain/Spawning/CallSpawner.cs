@@ -6,6 +6,7 @@ namespace Switchboard.Domain
     /// <summary>
     /// Rings new calls on a jittered interval that stretches while waiting calls outnumber free cords (Design 5.2).
     /// An attempt with no room, or with no free caller and recipient, is skipped; the next one comes an interval later.
+    /// Each call picks its type first, then a caller of that type, then a recipient by the type's recipient rule.
     /// </summary>
     public sealed class CallSpawner
     {
@@ -20,10 +21,15 @@ namespace Switchboard.Domain
         private readonly IPacingProfile pacing;
         private readonly int maxLiveCalls;
         private readonly Func<int> cordCount;
+        private readonly CallbackScheduler callbacks;
+        private readonly IdleGuard idle;
+        private readonly List<ICallerType> types = new List<ICallerType>();
+        private readonly double[] typeWeights;
         private double secondsUntilSpawn;
 
         public CallSpawner(CallService calls, CallFactory factory, PhoneDirectory directory, IReadOnlyList<ICaller> callers,
-            IRandom random, BusyTracker busy, IPacingProfile pacing, int maxLiveCalls, Func<int> cordCount)
+            IRandom random, BusyTracker busy, IPacingProfile pacing, int maxLiveCalls, Func<int> cordCount,
+            CallbackScheduler callbacks = null, IdleGuard idle = null)
         {
             this.calls = calls ?? throw new ArgumentNullException(nameof(calls));
             this.factory = factory ?? throw new ArgumentNullException(nameof(factory));
@@ -34,10 +40,21 @@ namespace Switchboard.Domain
             this.pacing = pacing ?? PacingSettings.Default;
             this.maxLiveCalls = maxLiveCalls;
             this.cordCount = cordCount ?? (() => 0);
+            this.callbacks = callbacks;
+            this.idle = idle;
+            for (int i = 0; i < this.callers.Count; i++)
+            {
+                ICallerType type = this.callers[i]?.Type;
+                if (type != null && !types.Contains(type)) types.Add(type);
+            }
+            typeWeights = new double[types.Count];
             secondsUntilSpawn = this.pacing.FirstCallDelaySeconds;
         }
 
         public double SecondsUntilSpawn => secondsUntilSpawn;
+
+        /// <summary>Every type some caller can place, in the order the callers list them.</summary>
+        public IReadOnlyList<ICallerType> Types => types;
 
         public void Tick(double dt)
         {
@@ -53,11 +70,15 @@ namespace Switchboard.Domain
         public bool TrySpawn()
         {
             if (calls.Live.Count >= maxLiveCalls) return false;
-            ICaller caller = PickCaller();
-            IPerson recipient = caller != null ? PickRecipient(caller.Person) : null;
-            if (recipient == null) return false;
-            calls.Add(factory.Create(caller, recipient));
-            return true;
+            ICallerType type = PickType();
+            return type != null && Spawn(type);
+        }
+
+        /// <summary>Rings one call of this type now, whatever its weight, if the type's other rules allow it.</summary>
+        public bool TrySpawn(ICallerType type)
+        {
+            if (type == null || calls.Live.Count >= maxLiveCalls || !IsAllowed(type)) return false;
+            return Spawn(type);
         }
 
         /// <summary>1 while every waiting call has a free cord; each waiting call beyond that adds the load factor.</summary>
@@ -83,18 +104,69 @@ namespace Switchboard.Domain
             return Math.Max(MinimumIntervalSeconds, interval);
         }
 
-        private ICaller PickCaller()
+        private ICallerType PickType()
+        {
+            double totalWeight = 0;
+            int allowed = 0, last = -1;
+            for (int i = 0; i < types.Count; i++)
+            {
+                ICallerType type = types[i];
+                typeWeights[i] = type.SpawnWeight > 0 && IsAllowed(type) ? type.SpawnWeight : 0;
+                if (typeWeights[i] <= 0) continue;
+                totalWeight += typeWeights[i];
+                allowed++;
+                last = i;
+            }
+            if (allowed == 0) return null;
+            // A single choice needs no roll, so content with one type keeps the random sequence it always had.
+            if (allowed == 1) return types[last];
+
+            double roll = random.NextDouble() * totalWeight;
+            for (int i = 0; i < types.Count; i++)
+            {
+                if (typeWeights[i] <= 0) continue;
+                roll -= typeWeights[i];
+                if (roll < 0) return types[i];
+            }
+            return types[last];
+        }
+
+        private bool IsAllowed(ICallerType type)
+        {
+            if (idle != null && idle.Blocks(type)) return false;
+            if (type.MaxSimultaneous > 0)
+            {
+                int taken = calls.CountLive(type) + (callbacks?.CountPending(type) ?? 0);
+                if (taken >= type.MaxSimultaneous) return false;
+            }
+            int recipients = CountRecipients(type, out IPerson lone);
+            for (int i = 0; i < callers.Count; i++)
+                if (CanCall(callers[i], type, recipients, lone)) return true;
+            return false;
+        }
+
+        private bool Spawn(ICallerType type)
+        {
+            int recipients = CountRecipients(type, out IPerson lone);
+            ICaller caller = PickCaller(type, recipients, lone);
+            IPerson recipient = caller != null ? PickRecipient(type, caller.Person) : null;
+            if (recipient == null) return false;
+            calls.Add(factory.Create(caller, recipient));
+            return true;
+        }
+
+        private ICaller PickCaller(ICallerType type, int recipients, IPerson lone)
         {
             double totalWeight = 0;
             for (int i = 0; i < callers.Count; i++)
-                if (CanCall(callers[i])) totalWeight += callers[i].Weight;
+                if (CanCall(callers[i], type, recipients, lone)) totalWeight += callers[i].Weight;
             if (totalWeight <= 0) return null;
 
             double roll = random.NextDouble() * totalWeight;
             ICaller picked = null;
             for (int i = 0; i < callers.Count; i++)
             {
-                if (!CanCall(callers[i])) continue;
+                if (!CanCall(callers[i], type, recipients, lone)) continue;
                 picked = callers[i];
                 roll -= picked.Weight;
                 if (roll < 0) break;
@@ -102,25 +174,40 @@ namespace Switchboard.Domain
             return picked;
         }
 
-        // A caller who isn't in the directory could never be connected.
-        private bool CanCall(ICaller caller) =>
-            caller != null && caller.Weight > 0 && caller.Type != null && directory.Lists(caller.Person) &&
-            !busy.IsBusy(caller.Person);
+        // A caller who isn't in the directory could never be connected, and one whose only free recipient is
+        // themselves has nobody to call.
+        private bool CanCall(ICaller caller, ICallerType type, int recipients, IPerson lone) =>
+            caller != null && caller.Weight > 0 && caller.Type == type && directory.Lists(caller.Person) &&
+            !busy.IsBusy(caller.Person) && (recipients >= 2 || (recipients == 1 && !lone.IsSamePerson(caller.Person)));
 
-        private bool CanReceive(IPerson person, IPerson caller) => !person.IsSamePerson(caller) && !busy.IsBusy(person);
+        private bool CanReceive(ICallerType type, IPerson person) => type.Accepts(person) && !busy.IsBusy(person);
 
-        private IPerson PickRecipient(IPerson caller)
+        private int CountRecipients(ICallerType type, out IPerson lone)
+        {
+            lone = null;
+            int count = 0;
+            IReadOnlyList<IDirectoryEntry> entries = directory.ListedEntries;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (!CanReceive(type, entries[i].Person)) continue;
+                lone = entries[i].Person;
+                count++;
+            }
+            return count;
+        }
+
+        private IPerson PickRecipient(ICallerType type, IPerson caller)
         {
             IReadOnlyList<IDirectoryEntry> entries = directory.ListedEntries;
             int candidates = 0;
             for (int i = 0; i < entries.Count; i++)
-                if (CanReceive(entries[i].Person, caller)) candidates++;
+                if (CanReceive(type, entries[i].Person) && !entries[i].Person.IsSamePerson(caller)) candidates++;
             if (candidates == 0) return null;
 
             int pick = random.Next(0, candidates);
             for (int i = 0; i < entries.Count; i++)
             {
-                if (!CanReceive(entries[i].Person, caller)) continue;
+                if (!CanReceive(type, entries[i].Person) || entries[i].Person.IsSamePerson(caller)) continue;
                 if (pick-- == 0) return entries[i].Person;
             }
             return null;

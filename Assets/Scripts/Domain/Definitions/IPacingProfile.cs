@@ -11,5 +11,8 @@ namespace Switchboard.Domain
 
         // How much slower calls ring per waiting card beyond the free cords.
         double LoadFactor { get; }
+
+        // Seconds without input before types that carry fines stop ringing (D16); 0 turns the guard off.
+        double IdleTimeoutSeconds { get; }
     }
 }

@@ -26,3 +26,15 @@ MonoBehaviour:
   callbackDelaySeconds:
     min: 20
     max: 40
+  responseTimeSeconds: 0
+  fineMissedCents: 0
+  fineEarlyDisconnectCents: 0
+  callbackAfterMiss: 0
+  callbackAfterDisconnect: 0
+  recipientTag: 
+  everyoneCalls: 0
+  maxSimultaneous: 0
+  spawnWeight: 5
+  cardStyle:
+    badgeText: 
+    accent: {r: 0, g: 0, b: 0, a: 0}

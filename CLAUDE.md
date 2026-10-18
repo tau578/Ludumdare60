@@ -13,9 +13,9 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 ## Read first, every session
 1. `Docs/Progress.md`: status table (what's done, what's next), step reports, and verification and playtest notes.
 2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), team coordination (§8) and the step briefs (§9).
-3. `Docs/Design.md`: the source of truth for game rules, architecture, ownership and decisions D01–D35. If the code or a brief disagrees with it, stop and ask; don't improvise.
+3. `Docs/Design.md`: the source of truth for game rules, architecture, ownership and decisions D01–D37. If the code or a brief disagrees with it, stop and ask; don't improvise.
 
-**Next step:** see the first "not started" row in `Docs/Progress.md`. As of 2026-10-18, Step 3 is done, and the next is **Step 4: emergencies and fines**, which first needs a decision on where the emergency services' jacks go (see the Step 4 outline in Plan.md).
+**Next step:** see the first "not started" row in `Docs/Progress.md`. As of 2026-10-18, Step 4 (emergencies and fines, D36/D37) is done, and the next is **Step 5: upgrades, shop and the mystery goal**. It needs the Step 5 coordination items with Sergei first (runtime cords, and the book reporting a tapped entry for the Notepad), and the orchestrator turns its outline in Plan.md into a full brief.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).
@@ -136,5 +136,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 - D15: what the mystery upgrade does.
 - D26: hosting target.
 - D27: currency scale and target playtime.
+
+**Designer:** edits `Assets/Configs/PhoneBook.json` by hand. Keep it human-readable and keep validator messages plain.
 
 Don't assume answers to these; ask the lead when a step needs them.

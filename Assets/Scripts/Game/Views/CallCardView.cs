@@ -1,4 +1,5 @@
 using System;
+using Switchboard.Content;
 using Switchboard.Domain;
 using TMPro;
 using UnityEngine;
@@ -9,7 +10,8 @@ namespace Switchboard.Game
 {
     /// <summary>
     /// A view of one call (Design 5.4): ringing while it waits, a speech bubble while it is in hand or connected,
-    /// the cord's colour and the money earned while connected or on hold, then a stamp.
+    /// the cord's colour and the money earned while connected or on hold, then a stamp. Types with a response time
+    /// (emergencies) also get their badge, their accent and a countdown ring around the portrait.
     /// </summary>
     public sealed class CallCardView : MonoBehaviour, IPointerClickHandler
     {
@@ -22,6 +24,7 @@ namespace Switchboard.Game
         [SerializeField] private Color paidInk = new Color32(38, 104, 58, 255);
         [SerializeField] private Color wrongInk = new Color32(164, 38, 38, 255);
         [SerializeField] private Color cutOffInk = new Color32(92, 80, 68, 255);
+        [SerializeField] private Color missedInk = new Color32(116, 18, 30, 255);
         [SerializeField] private GameObject speechBubble;
         [SerializeField] private TMP_Text speechLabel;
         [SerializeField, Min(1), Tooltip("How fast the bubble's text types out.")]
@@ -30,6 +33,19 @@ namespace Switchboard.Game
         [SerializeField, Tooltip("A ring around the portrait in the colour of the call's cord.")]
         private Graphic cordRing;
         [SerializeField] private GameObject callbackBadge;
+        [SerializeField, Tooltip("How far the callback badge moves down when the type badge takes the top.")]
+        private float stackedBadgeOffset = -34f;
+        [SerializeField, Tooltip("The caller type's badge, e.g. EMERGENCY.")] private GameObject typeBadge;
+        [SerializeField] private TMP_Text typeBadgeLabel;
+        [SerializeField] private Graphic typeBadgeBackground;
+        [SerializeField, Tooltip("Takes the type's accent on cards of a type that has one.")] private Outline rateOutline;
+        [SerializeField, Tooltip("The countdown ring's dark track; shown while a timed call waits.")]
+        private GameObject responseRingRoot;
+        [SerializeField, Tooltip("A radial-filled ring that empties as the response time runs out.")]
+        private Image responseRing;
+        [SerializeField, Min(0), Tooltip("Seconds left when the ring turns urgent.")] private float urgentSeconds = 10f;
+        [SerializeField] private Color urgentRingColor = new Color32(255, 92, 48, 255);
+        [SerializeField, Min(0)] private float urgentPulsesPerSecond = 3f;
         [SerializeField] private GameObject earningsBadge;
         [SerializeField] private TMP_Text earningsLabel;
         [SerializeField, Range(0, 1), Tooltip("How strongly the cord ring and earnings show while the call is on hold.")]
@@ -49,6 +65,13 @@ namespace Switchboard.Game
         private Sprite defaultPortrait;
         private Color pulseColor;
         private Color earningsColor;
+        private Color rateOutlineColor;
+        private Color typeBadgeColor;
+        private Color ringColor;
+        private Color haloColor;
+        private Vector2 callbackBadgePosition;
+        private float shownRingFill = -1;
+        private bool ringWasUrgent;
         private bool initialized;
         private float stampTimeLeft;
         private Func<CordId, Color> cordColors;
@@ -66,7 +89,7 @@ namespace Switchboard.Game
         public Call Call { get; private set; }
         public bool ShowDuration { get; set; }
 
-        public void Show(Call call, Sprite callerPortrait, Func<CordId, Color> cordColorOf)
+        public void Show(Call call, Sprite callerPortrait, Func<CordId, Color> cordColorOf, CallCardStyle style)
         {
             gameObject.SetActive(true);
             Initialize();
@@ -74,6 +97,9 @@ namespace Switchboard.Game
             cordColors = cordColorOf;
             portrait.sprite = callerPortrait != null ? callerPortrait : defaultPortrait;
             rateLabel.text = MoneyFormat.CardRate(call.Request.ConnectionFeeCents, call.Request.CentsPerSecond);
+            ApplyStyle(style);
+            shownRingFill = -1;
+            ringWasUrgent = false;
             feePopup.Hide();
             shownCents = -1;
             shownSeconds = -1;
@@ -91,8 +117,16 @@ namespace Switchboard.Game
             // An on-hold call keeps its cord ring and its earnings, frozen until it resumes (D07).
             bool onCord = state == CallState.Connected || onHold;
 
+            bool waiting = state == CallState.Incoming || inHand;
             ringingPulse.gameObject.SetActive(state == CallState.Incoming);
-            callbackBadge.SetActive(Call.Request.Attempt > 1 && (state == CallState.Incoming || inHand));
+            // The type badge sits on top while the call waits; once connected the earnings take that place.
+            bool showTypeBadge = waiting && typeBadge != null && !string.IsNullOrEmpty(typeBadgeLabel.text);
+            if (typeBadge != null) typeBadge.SetActive(showTypeBadge);
+            callbackBadge.SetActive(Call.Request.Attempt > 1 && waiting);
+            ((RectTransform)callbackBadge.transform).anchoredPosition =
+                callbackBadgePosition + (showTypeBadge ? new Vector2(0, stackedBadgeOffset) : Vector2.zero);
+            // The response timer stops for good on a correct connection (D09), so the ring goes with it.
+            if (responseRingRoot != null) responseRingRoot.SetActive(Call.HasResponseTime && waiting);
             earningsBadge.SetActive(onCord);
             cordRing.gameObject.SetActive(onCord);
             if (onCord && Call.Cord is CordId cord && cordColors != null) cordRing.color = Faded(cordColors(cord), onHold);
@@ -112,6 +146,13 @@ namespace Switchboard.Game
             // Cleared calls leave at once; the others show what happened for a moment.
             stampTimeLeft = Call.EndReason == CallEndReason.Cleared ? 0 : stampSeconds;
             stamp.SetActive(stampTimeLeft > 0);
+            RefreshStamp();
+        }
+
+        /// <summary>The fine is known only after the call has ended, so the stamp is written again when it lands.</summary>
+        public void RefreshStamp()
+        {
+            if (Call == null || Call.State != CallState.Ended) return;
             stampLabel.text = StampText(Call);
             stampLabel.color = stampOutline.effectColor = Ink(Call.EndReason);
         }
@@ -152,7 +193,26 @@ namespace Switchboard.Game
             defaultPortrait = portrait.sprite;
             pulseColor = ringingPulse.color;
             earningsColor = earningsLabel.color;
+            if (rateOutline != null) rateOutlineColor = rateOutline.effectColor;
+            if (typeBadgeBackground != null) typeBadgeColor = typeBadgeBackground.color;
+            if (responseRing != null) ringColor = responseRing.color;
+            callbackBadgePosition = ((RectTransform)callbackBadge.transform).anchoredPosition;
         }
+
+        // Not colour alone (Design 5.4): the badge text and the ring carry the meaning, the accent only adds to it.
+        // The ring keeps its own light colour, so it reads against an accent-tinted halo.
+        private void ApplyStyle(CallCardStyle style)
+        {
+            if (typeBadgeLabel != null) typeBadgeLabel.text = style.HasBadge ? style.badgeText : string.Empty;
+            if (typeBadgeBackground != null) typeBadgeBackground.color = style.HasAccent ? Opaque(style.accent, typeBadgeColor.a) : typeBadgeColor;
+            if (rateOutline != null) rateOutline.effectColor = style.HasAccent ? Opaque(style.accent, rateOutlineColor.a) : rateOutlineColor;
+            haloColor = style.HasAccent ? Opaque(style.accent, pulseColor.a) : pulseColor;
+            if (responseRing == null) return;
+            responseRing.color = ringColor;
+            responseRing.rectTransform.localScale = Vector3.one;
+        }
+
+        private static Color Opaque(Color color, float alpha) => new Color(color.r, color.g, color.b, alpha);
 
         private void Update()
         {
@@ -167,6 +227,7 @@ namespace Switchboard.Game
         private void LateUpdate()
         {
             if (Call == null || Call.State == CallState.Ended) return;
+            if (responseRing != null && responseRingRoot != null && responseRingRoot.activeSelf) UpdateResponseRing();
             if (Call.State == CallState.Connected || Call.State == CallState.OnHold)
             {
                 long cents = (long)Math.Floor(Call.CentsEarned + 1e-9);
@@ -179,16 +240,48 @@ namespace Switchboard.Game
 
             durationBadge.SetActive(ShowDuration);
             if (!ShowDuration) return;
+            // While an emergency waits, the dev badge also shows the seconds left to connect it: "25s / 14s".
+            bool responding = Call.HasResponseTime && Call.State != CallState.Connected && Call.State != CallState.OnHold;
+            int response = responding ? (int)Math.Ceiling(Call.ResponseSecondsLeft) : -1;
             int seconds = (int)Math.Ceiling(Call.SecondsLeft);
-            if (seconds == shownSeconds) return;
-            shownSeconds = seconds;
-            durationLabel.text = seconds + "s";
+            int key = seconds * 1000 + response + 1;
+            if (key == shownSeconds) return;
+            shownSeconds = key;
+            durationLabel.text = responding ? response + "s / " + seconds + "s" : seconds + "s";
+        }
+
+        // The fill changes every frame, so it is only written when it moves by a visible step.
+        private void UpdateResponseRing()
+        {
+            double total = Call.Request.Type.ResponseTimeSeconds;
+            float fill = total > 0 ? Mathf.Clamp01((float)(Call.ResponseSecondsLeft / total)) : 0f;
+            fill = Mathf.Ceil(fill * 360f) / 360f;
+            bool urgent = Call.ResponseSecondsLeft <= urgentSeconds;
+            if (fill != shownRingFill)
+            {
+                shownRingFill = fill;
+                responseRing.fillAmount = fill;
+            }
+            if (urgent)
+            {
+                float wave = 0.5f + 0.5f * Mathf.Sin(Time.time * urgentPulsesPerSecond * Mathf.PI * 2f);
+                Color hot = urgentRingColor;
+                responseRing.color = new Color(hot.r, hot.g, hot.b, 0.55f + 0.45f * wave);
+                responseRing.rectTransform.localScale = Vector3.one * (1f + 0.04f * wave);
+                ringWasUrgent = true;
+            }
+            else if (ringWasUrgent)
+            {
+                ringWasUrgent = false;
+                responseRing.color = ringColor;
+                responseRing.rectTransform.localScale = Vector3.one;
+            }
         }
 
         private void Pulse()
         {
             float wave = 0.5f + 0.5f * Mathf.Sin(Time.time * pulsesPerSecond * Mathf.PI * 2f);
-            ringingPulse.color = new Color(pulseColor.r, pulseColor.g, pulseColor.b, pulseColor.a * (0.35f + 0.65f * wave));
+            ringingPulse.color = new Color(haloColor.r, haloColor.g, haloColor.b, haloColor.a * (0.35f + 0.65f * wave));
             ringingPulse.rectTransform.localScale = Vector3.one * (1f + 0.1f * wave);
         }
 
@@ -256,6 +349,7 @@ namespace Switchboard.Game
             {
                 case CallEndReason.Finished: return paidInk;
                 case CallEndReason.DisconnectedEarly: return cutOffInk;
+                case CallEndReason.Missed: return missedInk;
                 default: return wrongInk;
             }
         }
@@ -267,7 +361,8 @@ namespace Switchboard.Game
                 case CallEndReason.Finished: return "Paid " + MoneyFormat.Dollars((long)Math.Round(call.CentsEarned));
                 case CallEndReason.WrongConnection: return "Wrong number!";
                 case CallEndReason.DisconnectedEarly: return "Cut off";
-                case CallEndReason.Missed: return "Missed";
+                // The amount actually taken; nothing could be taken from an empty wallet.
+                case CallEndReason.Missed: return call.FineCents > 0 ? "Missed " + MoneyFormat.Dollars(-call.FineCents) : "Missed";
                 default: return string.Empty;
             }
         }

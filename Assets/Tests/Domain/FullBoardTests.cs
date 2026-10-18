@@ -5,7 +5,7 @@ using UnityEditor;
 
 namespace Switchboard.Domain.Tests
 {
-    /// <summary>The real 36-person file (D35) with a player who connects every call at once.</summary>
+    /// <summary>The real file, 33 people and 3 services on all 36 jacks (D35, D36), with a player who connects every call at once.</summary>
     public sealed class FullBoardTests
     {
         private const string GameConfigPath = "Assets/Content/GameConfig.asset";
@@ -20,11 +20,21 @@ namespace Switchboard.Domain.Tests
             var session = new GameSession(new GameContent(config, people), new SeededRandom(36), board);
             var callers = new HashSet<string>();
             var inCalls = new HashSet<string>();
+            int emergencies = 0;
+            session.Calls.CallAdded += e =>
+            {
+                Assert.That(e.Call.Request.CallerPerson.Tags, Is.Empty, "services never call");
+                bool toService = e.Call.Request.Recipient.HasTag(PeopleFileLoader.ServiceTag);
+                bool emergency = e.Call.Request.Type.Id == "type.emergency";
+                Assert.That(toService, Is.EqualTo(emergency), e.Call.Request.Recipient.Id);
+                if (emergency) emergencies++;
+            };
             var live = new List<Call>();
             int nextCord = 0;
 
             for (int tick = 0; tick < 20 * 1200; tick++)
             {
+                session.Idle.ReportInput();
                 session.Tick(0.05);
                 live.Clear();
                 live.AddRange(session.Calls.Live);
@@ -43,7 +53,8 @@ namespace Switchboard.Domain.Tests
             }
 
             Assert.That(session.Directory.ListedEntries.Count, Is.EqualTo(36));
-            Assert.That(callers.Count, Is.GreaterThan(30), "distinct callers in 20 minutes");
+            Assert.That(callers.Count, Is.GreaterThan(28), "distinct callers of 33 in 20 minutes");
+            Assert.That(emergencies, Is.GreaterThan(10), "emergencies in 20 minutes");
         }
     }
 }

@@ -5,17 +5,20 @@ namespace Switchboard.Domain.Tests
 {
     internal sealed class FakePerson : IPerson
     {
-        public FakePerson(string firstName, string lastName)
+        public FakePerson(string firstName, string lastName, params string[] tags)
         {
             FirstName = firstName;
             LastName = lastName;
-            Id = $"person.{firstName.ToLowerInvariant()}-{lastName.ToLowerInvariant()}";
+            Tags = tags ?? Array.Empty<string>();
+            Id = string.IsNullOrEmpty(firstName)
+                ? $"person.{lastName.ToLowerInvariant().Replace(' ', '-')}"
+                : $"person.{firstName.ToLowerInvariant()}-{lastName.ToLowerInvariant()}";
         }
 
         public string Id { get; }
         public string FirstName { get; }
         public string LastName { get; }
-        public IReadOnlyList<string> Tags => Array.Empty<string>();
+        public IReadOnlyList<string> Tags { get; }
     }
 
     internal sealed class FakeCallerType : ICallerType
@@ -29,12 +32,38 @@ namespace Switchboard.Domain.Tests
             CallbackDelaySeconds = callbackDelaySeconds ?? new FloatRange(20, 40);
         }
 
-        public string Id => "type.regular";
-        public string DisplayName => "Regular";
+        public string Id { get; set; } = "type.regular";
+        public string DisplayName { get; set; } = "Regular";
         public FloatRange CentsPerSecond { get; }
         public FloatRange ConnectionFeeCents { get; }
         public FloatRange DurationSeconds { get; }
         public FloatRange CallbackDelaySeconds { get; }
+        public double ResponseTimeSeconds { get; set; }
+        public long FineMissedCents { get; set; }
+        public long FineEarlyDisconnectCents { get; set; }
+        public bool CallbackAfterMiss { get; set; }
+        public bool CallbackAfterDisconnect { get; set; }
+        public string RecipientTag { get; set; } = string.Empty;
+        public int MaxSimultaneous { get; set; }
+        public double SpawnWeight { get; set; } = 1;
+        public bool EveryoneCalls { get; set; }
+
+        /// <summary>The Step 4 emergency numbers (D37): 30 s to connect, fines of 200¢ and 100¢, calls only to services.</summary>
+        public static FakeCallerType Emergency(double spawnWeight = 1) =>
+            new FakeCallerType(new FloatRange(5, 10), new FloatRange(10, 20), new FloatRange(20, 40), new FloatRange(20, 40))
+            {
+                Id = "type.emergency",
+                DisplayName = "Emergency",
+                ResponseTimeSeconds = 30,
+                FineMissedCents = 200,
+                FineEarlyDisconnectCents = 100,
+                RecipientTag = ServiceTag,
+                MaxSimultaneous = 1,
+                SpawnWeight = spawnWeight,
+                EveryoneCalls = true
+            };
+
+        public const string ServiceTag = "emergency-service";
     }
 
     internal sealed class FakeCaller : ICaller
@@ -161,5 +190,70 @@ namespace Switchboard.Domain.Tests
 
         public CallRequest Request(int caller, int recipient, double centsPerSecond = 5, double durationSeconds = 20) =>
             new CallRequest(Callers[caller], People[recipient], centsPerSecond, durationSeconds);
+    }
+
+    /// <summary>
+    /// People N1..Nn on jacks J1..Jn, each with a regular and an emergency caller (as Content builds them for
+    /// everyoneCalls), plus Police on S1, Fire Brigade on S2 and Doctor on S3, who never call (D36, D37).
+    /// </summary>
+    internal sealed class EmergencyWorld
+    {
+        public EmergencyWorld(int count = 8, double regularWeight = 5, double emergencyWeight = 1)
+        {
+            Regular = new FakeCallerType(new FloatRange(3, 8), new FloatRange(15, 30), new FloatRange(5, 15)) { SpawnWeight = regularWeight };
+            Emergency = FakeCallerType.Emergency(emergencyWeight);
+            var people = new List<IPerson>();
+            var callers = new List<ICaller>();
+            var entries = new List<IDirectoryEntry>();
+            Services = new IPerson[]
+            {
+                new FakePerson("", "Police", FakeCallerType.ServiceTag),
+                new FakePerson("", "Fire Brigade", FakeCallerType.ServiceTag),
+                new FakePerson("", "Doctor", FakeCallerType.ServiceTag)
+            };
+            for (int i = 0; i < Services.Count; i++)
+            {
+                people.Add(Services[i]);
+                entries.Add(new FakeDirectoryEntry(Services[i], "S" + (i + 1)));
+            }
+            var subscribers = new IPerson[count];
+            for (int i = 0; i < count; i++)
+            {
+                subscribers[i] = new FakePerson("Person", "N" + (i + 1));
+                people.Add(subscribers[i]);
+                entries.Add(new FakeDirectoryEntry(subscribers[i], "J" + (i + 1)));
+                callers.Add(new FakeCaller(subscribers[i], Regular));
+            }
+            foreach (IPerson person in subscribers) callers.Add(new FakeCaller(person, Emergency));
+            People = subscribers;
+            Callers = callers;
+            Directory = new PhoneDirectory(entries);
+            Content = new FakeContent
+            {
+                StartingCents = 10000,
+                CallerTypes = new ICallerType[] { Regular, Emergency },
+                People = people,
+                Callers = callers,
+                Directory = entries
+            };
+        }
+
+        public FakeCallerType Regular { get; }
+        public FakeCallerType Emergency { get; }
+        public IReadOnlyList<IPerson> People { get; }
+        public IReadOnlyList<IPerson> Services { get; }
+        public IReadOnlyList<ICaller> Callers { get; }
+        public PhoneDirectory Directory { get; }
+        public FakeContent Content { get; }
+
+        public ICaller EmergencyCallerOf(int person)
+        {
+            foreach (ICaller caller in Callers)
+                if (caller.Type == Emergency && caller.Person == People[person]) return caller;
+            return null;
+        }
+
+        public CallRequest EmergencyRequest(int caller, int service = 0) =>
+            new CallRequest(EmergencyCallerOf(caller), Services[service], 7, 15, 30);
     }
 }

@@ -1,4 +1,5 @@
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+using System.Collections.Generic;
 using Switchboard.Domain;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -23,11 +24,22 @@ namespace Switchboard.Game
         private CallQueueView callQueue;
         private bool open;
         private GUIStyle style;
+        private readonly List<ICallerType> timedTypes = new List<ICallerType>();
+        private readonly List<string> timedLabels = new List<string>();
 
         public void Bind(GameSession gameSession, CallQueueView queue)
         {
             session = gameSession;
             callQueue = queue;
+            // One "ring now" button per type that must be answered in time, such as "Emergency now".
+            timedTypes.Clear();
+            timedLabels.Clear();
+            foreach (ICallerType type in session.Spawner.Types)
+            {
+                if (type.ResponseTimeSeconds <= 0) continue;
+                timedTypes.Add(type);
+                timedLabels.Add(type.DisplayName + " now");
+            }
         }
 
         private void Update()
@@ -53,9 +65,12 @@ namespace Switchboard.Game
 
             if (Button(x, ref y, "+ $10")) session.Wallet.Earn(1000);
             if (Button(x, ref y, "Call now")) session.Spawner.TrySpawn();
+            for (int i = 0; i < timedTypes.Count; i++)
+                if (Button(x, ref y, timedLabels[i])) session.Spawner.TrySpawn(timedTypes[i]);
             if (Button(x, ref y, fast ? "Speed ×1" : "Speed ×5")) Time.timeScale = fast ? 1f : FastTimeScale;
             if (Button(x, ref y, callQueue.ShowDurations ? "Hide times" : "Show times"))
                 callQueue.ShowDurations = !callQueue.ShowDurations;
+            // Clearing ends calls as Cleared, which never fines or calls back.
             if (Button(x, ref y, "Clear calls")) session.ClearCalls();
         }
 

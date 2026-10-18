@@ -4,8 +4,9 @@ using System.Collections.Generic;
 namespace Switchboard.Domain
 {
     /// <summary>
-    /// Callers who were put through wrongly ring again after their type's delay (Design 5.3).
-    /// It keeps the original request; the callback is a new call with attempt + 1.
+    /// Callers who were put through wrongly ring again after their type's delay (Design 5.3); after a miss or an
+    /// early disconnect only if their type says so (D10). It keeps the original request; the callback is a new
+    /// call with attempt + 1.
     /// </summary>
     public sealed class CallbackScheduler
     {
@@ -13,14 +14,16 @@ namespace Switchboard.Domain
         private readonly IGameClock clock;
         private readonly IRandom random;
         private readonly int maxLiveCalls;
+        private readonly IdleGuard idle;
         private readonly List<PendingCallback> pending = new List<PendingCallback>();
 
-        public CallbackScheduler(CallService calls, IGameClock clock, IRandom random, int maxLiveCalls)
+        public CallbackScheduler(CallService calls, IGameClock clock, IRandom random, int maxLiveCalls, IdleGuard idle = null)
         {
             this.calls = calls ?? throw new ArgumentNullException(nameof(calls));
             this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
             this.random = random ?? throw new ArgumentNullException(nameof(random));
             this.maxLiveCalls = maxLiveCalls;
+            this.idle = idle;
             calls.CallEnded += OnCallEnded;
         }
 
@@ -34,7 +37,16 @@ namespace Switchboard.Domain
             return false;
         }
 
+        public int CountPending(ICallerType type)
+        {
+            int count = 0;
+            for (int i = 0; i < pending.Count; i++)
+                if (pending[i].Request.Type == type) count++;
+            return count;
+        }
+
         // Due callbacks ring in due order when there's room and neither party is on another call.
+        // A callback also waits while its type is at its limit of live calls or held back by the idle guard.
         // They tick before the spawner, so they go ahead of new calls.
         public void Tick()
         {
@@ -44,7 +56,7 @@ namespace Switchboard.Domain
                 PendingCallback callback = pending[i];
                 if (callback.DueAt > clock.Now) break;
                 CallRequest request = callback.Request;
-                if (calls.IsInLiveCall(request.CallerPerson) || calls.IsInLiveCall(request.Recipient))
+                if (calls.IsInLiveCall(request.CallerPerson) || calls.IsInLiveCall(request.Recipient) || IsHeldBack(request.Type))
                 {
                     i++;
                     continue;
@@ -56,11 +68,14 @@ namespace Switchboard.Domain
 
         public void Clear() => pending.Clear();
 
-        // Step 4 adds per-type flags for callbacks after a miss or an early disconnect (D10).
+        private bool IsHeldBack(ICallerType type) =>
+            (idle != null && idle.Blocks(type)) ||
+            (type != null && type.MaxSimultaneous > 0 && calls.CountLive(type) >= type.MaxSimultaneous);
+
         private void OnCallEnded(CallEndedArgs e)
         {
-            if (e.Reason != CallEndReason.WrongConnection) return;
             CallRequest request = e.Call.Request;
+            if (!request.Type.CallsBackAfter(e.Reason)) return;
             FloatRange delay = request.Type.CallbackDelaySeconds;
             Schedule(new PendingCallback(request, clock.Now + random.Between(delay.min, delay.max)));
         }

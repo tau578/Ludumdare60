@@ -8,7 +8,7 @@
 | 2a. Queue, callbacks, dev panel | done | ✅ 2026-10-17 (24 min) | ✅ 156/156 tests, scope clean | ✅ | 2b00ac7 |
 | 2b. Hold and resume | done | ✅ 2026-10-18 (12 min) | ✅ 187/187 tests, scope clean | ✅ | 4c5ac50 |
 | 3. Phone book and cards | done | ✅ 2026-10-18 (16 min + 8 min fix + 3 min fix) | ✅ 211/211 tests, scope clean | ✅ | |
-| 4. Emergencies and fines | not started | | | | |
+| 4. Emergencies and fines | done | ✅ 2026-10-18 (26 min) | ✅ 255/255 tests, scope clean | ✅ | |
 | 5. Upgrades, shop, goal | not started | | | | |
 | 6. Saves, Boot, Web build | not started | | | | |
 | 7. Board growth and pacing | not started | | | | |
@@ -930,4 +930,175 @@ Follow-ups:
 - After the merge: EditMode tests 211/211, a clean compile, and a Play Mode check with no errors. `CallerQueuePanel` and `HeaderSlot` are still found, and the cards and the money counter show.
 - **Follow-up:** Sergei's new background paints 5 portrait windows, but there are still 6 caller slot anchors, so our cards no longer line up with the painted windows. He lists this as a pending layout task.
 - Unity created `.meta` files for Mia's `F01.png` and `F02.png` locally. They were left uncommitted, per the team rule.
+
+#### Step 4 prep decisions (lead, 2026-10-18)
+- **D36:** Police, Fire Brigade and Doctor replace 3 people on their jacks and are listed first in the book (top of `PhoneBook.json`).
+- The designer edits `PhoneBook.json` by hand; that's already how it works (D31).
+- **D37 (Step 4 numbers):** response time 30 s; fines $2 (missed or wrong patch) and $1 (cut off early); emergency pay fee 20–40¢ + 5–10¢/s for 10–20 s; about 1 call in 6 is an emergency. The lead took all four recommended options.
+
+#### Step 4 pre-flight (orchestrator, 2026-10-18)
+- `git fetch`: one upstream commit from Sergei (`8ec771f`, "edited cord UI"), fast-forwarded. It touches only `CableInputController.cs`, `SocketView.cs` and `SwitchboardLampView.cs` (`SetPointerState` now takes the held cable, and the row/column lamps light only for the hovered socket while a plug is held). None of our code calls the changed method.
+- Unity: connected, idle, not in Play Mode, `Game.unity` active. Compiled after the merge; the console was cleared. EditMode tests passed 211/211.
+- The brief is written in Plan.md (Step 4), and D37 is recorded in Design §10.
+- **Not done, per D36:** `ShowLetter` skipping the service block would need an edit to Sergei's `PhoneBookView`. The tabs are hidden, so this is left as a follow-up.
+
+
+### Step 4 report: 2026-10-18
+Result: done
+
+Playable now: About 1 call in 6 is an emergency, and only one is ever on the board or waiting to call back.
+- **Ringing.** The card has a red halo, a red "EMERGENCY" badge, a red outline on the rate badge, and a countdown ring around the portrait: a cream arc on a dark track that empties over 30 s. In the last 10 s it turns orange-red and pulses.
+- **In hand.** The bubble reads, for example, "Herbert **Marlow** / wants / **Police**". Police (B6), Fire Brigade (C2) and Doctor (D4) are at the top of page 1 of the book.
+- **Connected in time.** The ring goes, the cord ring appears, the fee pops up (20–40¢), and it pays 5–10¢/s for 10–20 s.
+- **Missed.** The card stamps "Missed -$2.00" in dark red, and "-$2.00" pops up in red under the money counter.
+- **Wrong patch.** "Wrong number!", a $2 fine, and the same caller rings again 20–40 s later.
+- **Cut off.** "Cut off" and a $1 fine.
+- **Money and idling.** Money stops at $0.00. After 60 s with no mouse movement, click or key press, no new emergencies ring and due emergency callbacks wait; regular calls carry on.
+- **Dev panel (F1).** A new "Emergency now" button. "Show times" now shows "25s / 14s" on an emergency (seconds left to connect / hidden duration).
+
+How to test: the Plan's Step 4 playtest script, with one caveat on step 8 (see Follow-ups): at most one emergency is missed **after the guard trips**, but one more can ring in the first minute after you leave.
+
+Created:
+- **Domain:**
+  - `Definitions/CallerTypeExtensions.cs`: `CarriesFines`, `FineFor(reason)`, `CallsBackAfter(reason)` (D10), and `Accepts(person)`, the recipient-tag rule.
+  - `Pacing/IdleGuard.cs`: D16.
+  - `Penalties/PenaltyService.cs`: `PenaltyService` plus the `FineAppliedArgs` readonly struct.
+- **Content:** `CallCardStyle.cs`, presentation only: badge text and accent colour.
+- **Assets:** `Assets/Content/CallerTypes/Emergency.asset` with the D37 numbers, badge "EMERGENCY" and accent red (200, 33, 33).
+- **Tests:**
+  - `ResponseTimerTests` (8)
+  - `PenaltyServiceTests` (15 with test cases)
+  - `EmergencySpawnTests` (5)
+  - `IdleGuardTests` (7)
+  - an `EmergencyWorld` fixture in `Fakes.cs`
+
+Changed:
+- **Domain:**
+  - **The caller type** (`ICallerType`) has the 9 new fields from the brief.
+  - **Pacing:** `IPacingProfile.IdleTimeoutSeconds`, also on `PacingSettings`, an optional parameter with default 60.
+  - **People:** `PersonExtensions.HasTag`.
+  - **The call** (`Call`) has `HasResponseTime`, `ResponseSecondsLeft` and `FineCents` (the amount actually taken).
+  - **`CallService`:**
+    - The response timer counts down in Incoming, Taken and Connecting.
+    - When it reaches 0, the call ends as `Missed`.
+    - New `CountLive(type)`.
+  - **`CallbackScheduler`:**
+    - The per-type flags decide callbacks.
+    - A due callback waits while its type is at `maxSimultaneous` (live calls), or while the idle guard blocks it.
+    - New `CountPending(type)`.
+  - **`CallSpawner`:**
+    - It picks the type first, by weight among the allowed types: under `maxSimultaneous` (live plus pending), not idle-blocked, and with a free caller who has a free recipient. Then it picks the caller, then the recipient by the type's tag.
+    - New `TrySpawn(type)` for the dev panel, and a `Types` list.
+    - No LINQ, and no allocations per tick.
+    - With only one allowed type it skips the roll, so the old random sequences still hold.
+  - **`GameSession`:** builds `IdleGuard` and `PenaltyService`. Tick order: clock, idle guard, earnings, calls, callbacks, spawner.
+- **Content:**
+  - **`CallerTypeDefinition`:** the new fields, with tooltips, plus `cardStyle`.
+  - **`PacingProfile`:** `idleTimeoutSeconds`, 60 in `Default.asset`.
+  - **The people file:** `PeopleFileContact.tags`, and `PersonRecord.Tags`.
+  - **`PeopleFileLoader`:**
+    - Services, the entries tagged `emergency-service`, need no portrait or type, get no caller record, and keep their whole name as the listing ("Fire Brigade", not "Brigade, Fire").
+    - Types with `everyoneCalls` get one caller per untagged person, for example `caller.ada-moss.emergency`.
+    - All messages are reworded to name the contact and the fix.
+  - **`ContentValidator`:**
+    - the services block at the top
+    - surname rules for people only
+    - each `recipientTag` has at least one contact
+    - non-negative response time, fines, `maxSimultaneous` and `spawnWeight`
+    - at least one type with `spawnWeight` > 0
+    - plain messages that say how to fix
+  - **`GameConfig`:** `CardStyleOf(typeId)`, and Emergency registered.
+  - **`Regular.asset`:** `spawnWeight` 5; the rest 0, false or empty.
+- **Game:**
+  - **`GameLoopRunner`:** reports input to the idle guard: `Pointer.current` press or movement, or `Keyboard.current.anyKey`, with no allocations.
+  - **`CallCardView`:**
+    - the type badge and accent
+    - the countdown ring, polled in `LateUpdate` and written only when the fill moves by 1/360
+    - urgency in the last 10 s
+    - the "Missed -$X" stamp in `missedInk`, rewritten by `RefreshStamp` once the fine lands
+    - the dev times
+  - **`CallQueueView`:** passes the style and the penalties.
+  - **`MoneyCounterView`:** the fine popup.
+  - **`GameInstaller`:** wiring.
+  - **`DevPanel`:** one "<Type> now" button per type that has a response time.
+- **Shared `Assets/Configs/PhoneBook.json` (D36):**
+  - Police B6, Fire Brigade C2 and Doctor D4 are added at the top in that order, one line each, in the brief's format.
+  - They replace Hazel Kettering, Ernest Fenwick and Cyril Sparrow, who shared a surname letter with Kemble, Fairweather and Stanhope.
+  - The rows are B, C and D. The people's lines are untouched, and the file is still sorted, with `contactsPerPage` 6.
+- **Tests updated:**
+  - `PeopleFileTests`: 33 people + 3 services, 66 callers, and the services first. Plus a new service-parsing test.
+  - `FullBoardTests`: also checks that services never call and that only emergencies go to services.
+  - `ContentValidatorTests`: 8 new.
+
+Scene and prefab changes:
+- **`GameUI.prefab`:**
+  - `CallCard/ResponseRing`: a dark 40 px track, a copy of `CordRing`, between `CordRing` and `Portrait`. Its child `Fill` is a cream Radial360 fill from the top.
+  - `CallCard/TypeBadge`: a copy of `CallbackBadge`, at the top. The "Calling again" badge moves down 34 px when both show.
+  - `Hud/MoneyPlate/FinePopup`: a copy of `FeePopup`, under the plate. Red text, 1.4 s, drifts down 30.
+  - All new fields are wired.
+  - Raycast targets: still only the portrait.
+- **Scenes:** none changed. `Level.unity` was opened once to play it on its own. It was never dirtied or saved. `Game.unity` is active and not dirty.
+
+Tests: 255/255 EditMode (was 211). New: ResponseTimerTests ×8, PenaltyServiceTests ×15, EmergencySpawnTests ×5, IdleGuardTests ×7, ContentValidatorTests ×8, PeopleFileTests ×1. Changed: 2 PeopleFileTests, FullBoardTests.
+
+Console: clean. The only lines were the known Metal "memoryless" lines from screenshots and the MCP plugin's WebSocket warning.
+
+Screenshots (`Temp/Captures/`):
+- `step-04.png`: the emergency ringing, ring about 60% full.
+- `step-04-in-hand.png`: "Herbert Marlow / wants / Police".
+- `step-04-missed.png`: the "Missed -$2.00" stamp and the "-$2.00" popup, with $10.00 going to $8.00.
+- `step-04-connected.png`: no countdown ring, blue cord ring, "+34¢".
+- `step-04-book.png`: spread 1 with Police, Fire Brigade and Doctor on top. The book (lower right) doesn't reach the fine popup (top right).
+
+Checked in Play Mode (stepped frames; the domain was advanced with `Session.Tick` for the long waits):
+- An emergency rang, was taken, then missed: 200¢ taken, nothing in hand afterwards.
+- Another one connected: the ring was hidden, the cord ring showed, the type badge was hidden, and the fee was paid.
+- A 600-frame ×5 natural run gave no errors.
+- `Level.unity` plays on its own: Sergei's book parses the new file, 3 cables, no errors.
+- `Validate Content` reports "no problems found".
+- Moving Doctor below a person (in memory only) gives: `Contact 4 "Doctor": emergency services must be listed at the top of the file, before the people. Move this line up to the other services.`
+- Clean-up: `timeScale` is back to 1, Play Mode stopped, and no callbacks or SessionState keys are left.
+- Unity re-saved `ProjectSettings/TimeManager.asset` with only a format change: "Fixed Timestep 0.02" became an equal rational. I discarded it with `git checkout`.
+
+Deviations from Design/Plan:
+1. **The countdown ring isn't in the accent colour.** A red ring disappeared into the red emergency halo (first screenshot). The ring is now a cream fill on a dark track, so it reads on any halo, and it turns orange-red in the last 10 s. The accent tints the badge, the halo and the rate badge outline.
+2. **The type badge hides once the call is connected**, because the earnings badge takes the top of the card. The countdown ring hides at the same time, as the brief says.
+3. **A service is defined as "tagged `emergency-service`"**, as in the brief. Services get no caller record, even if a `type` is given (it is ignored, with no error). "Untagged" means people for `everyoneCalls` and for an empty `recipientTag`.
+4. **Design 4.4's tick snippet** should gain `Idle.Tick(dt)` after the clock, for the orchestrator to update.
+
+Follow-ups:
+- **Playtest step 8 can show two misses (needs a decision).** With the D16 timeout of 60 s and the D37 response time of 30 s:
+  - An emergency ringing when you walk away is missed at most 30 s later.
+  - Another one can still ring before the guard trips at 60 s, and be missed too. With 8 s spawns and a weight of 1 in 6, that's roughly a 40% chance.
+  - After the guard trips, at most the one already waiting is missed. The test `TwoIdleMinutesWithAnEmergencyAlreadyWaitingCostAtMostOneFine` covers that case.
+  - If the lead wants "at most one miss per absence", options are: an idle timeout no longer than the response time (for example 30 s), or blocking fined types while an emergency waits unattended. **Not changed: this is a design call.**
+- **Re-showing the A–Z tabs.** Sergei's `ShowLetter('P')` would now jump to Police on spread 1, as the brief notes.
+- **Dev panel IMGUI clicks.** They count as input for the idle guard (they move the pointer). That's harmless.
+- **Sound (Step 8).** The alarm and ring loop, and fine and miss sounds.
+
+#### Step 4 verification (orchestrator, 2026-10-18)
+- **Tests:** an independent EditMode run passed 255/255. The console is clean (0 errors, 0 warnings).
+- **Scope:**
+  - Only our files plus the shared `PhoneBook.json` changed. No Sergei files, no scenes, no ProjectSettings.
+  - The agent discarded Unity's format-only re-save of `TimeManager.asset`.
+  - Mia's `F01/F02.png.meta` files are still untracked locally. She has been asked to commit her own.
+- **`PhoneBook.json`:**
+  - Police B6, Fire Brigade C2 and Doctor D4 sit first, one line each with `"tags": ["emergency-service"]`.
+  - Hazel Kettering, Ernest Fenwick and Cyril Sparrow were removed.
+  - The 33 people's lines are unchanged and still sorted, with 36 sockets in all.
+- **Code review:**
+  - `PenaltyService` fines on `CallEnded` through `Type.FineFor(reason)` and stores the amount taken on the call for the stamp.
+  - `CallService.Tick` counts the response timer only in Incoming, Taken and Connecting, and ends calls as `Missed` after walking the list.
+  - `IdleGuard` ticks right after the clock, and `GameLoopRunner` reports a pointer press or move or any key through the Input System with no allocations.
+- **Screenshots:**
+  - `step-04.png`: the red EMERGENCY badge, red halo and red rate outline. The countdown ring is a thin cream arc and fairly subtle at 1080p; the lead should judge it.
+  - `step-04-in-hand.png`: "Herbert **Marlow** / wants / **Police**".
+  - `step-04-missed.png`: the "Missed -$2.00" stamp and the red "-$2.00" popup. The popup sits over the top "+" slot of Sergei's upgrade panel for about 1 s; it's not a raycast target.
+  - `step-04-book.png`: spread 1 starts with Police, Fire Brigade and Doctor, then Abbott, Bramble and Burrows.
+- **Open question for the lead (from the agent):** with a 60 s idle timeout and a 30 s response time, walking away can cost two missed emergencies ($4), with roughly a 40% chance, before the guard trips. After that, nothing more is lost.
+
+#### Step 4 playtest (lead, 2026-10-18)
+- "Everything looks good." Accepted as built, including the subtle countdown ring and the fine popup over the shop's top slot.
+- The idle guard stays at 60 s: walking away can cost up to two missed emergencies ($4), then nothing more.
+- The lead asked to commit, and to push if upstream has no new commits.
 

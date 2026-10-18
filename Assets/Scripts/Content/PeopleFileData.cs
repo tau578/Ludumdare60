@@ -22,5 +22,8 @@ namespace Switchboard.Content
         public string type;
         public float rate;
         public float fee;
+
+        // Missing in the file means none. Entries tagged emergency-service are services, not people (D36).
+        public string[] tags;
     }
 }

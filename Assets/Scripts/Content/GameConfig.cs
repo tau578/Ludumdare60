@@ -31,6 +31,15 @@ namespace Switchboard.Content
         public List<string> Validate() =>
             ContentValidator.Validate(PeopleFileText, CallerTypes, HasPortrait, ContentValidator.BoardJacks());
 
+        /// <summary>How cards of a caller type look; a type with no style gets plain cards.</summary>
+        public CallCardStyle CardStyleOf(string typeId)
+        {
+            if (callerTypes == null || string.IsNullOrEmpty(typeId)) return default;
+            foreach (CallerTypeDefinition type in callerTypes)
+                if (type != null && type.Id == typeId) return type.CardStyle;
+            return default;
+        }
+
         public bool HasPortrait(string name) => Portrait(name) != null;
 
         public Sprite Portrait(string name)

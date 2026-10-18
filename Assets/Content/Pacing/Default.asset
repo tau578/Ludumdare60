@@ -16,3 +16,4 @@ MonoBehaviour:
   baseIntervalSeconds: 8
   intervalJitter: 0.3
   loadFactor: 0.5
+  idleTimeoutSeconds: 60

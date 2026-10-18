@@ -50,11 +50,12 @@ namespace Switchboard.Game
             int seed = randomSeed != 0 ? randomSeed : Random.Range(1, int.MaxValue);
             Session = new GameSession(new GameContent(config, people), new SeededRandom(seed), cordBridge);
             cordBridge.Bind(Session.Desk);
-            moneyCounter.Bind(Session.Wallet, LevelScene.FindShopHeader(level));
+            moneyCounter.Bind(Session.Wallet, LevelScene.FindShopHeader(level), Session.Penalties);
             RectTransform[] callerSlots = LevelScene.FindCallerSlots(level);
             if (callerSlots.Length < config.MaxWaitingCalls)
                 Debug.LogWarning($"The caller panel has {callerSlots.Length} slots but GameConfig allows {config.MaxWaitingCalls} calls.", config);
-            callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, callerSlots, PortraitOf, cordBridge.ColorOf);
+            callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, Session.Penalties, callerSlots, PortraitOf,
+                cordBridge.ColorOf, CardStyleOf);
             loopRunner.Bind(Session);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             // Added at runtime so no scene or prefab references a type that release builds leave out.
@@ -63,6 +64,8 @@ namespace Switchboard.Game
         }
 
         private Sprite PortraitOf(IPerson person) => person is PersonRecord record ? config.Portrait(record.Portrait) : null;
+
+        private CallCardStyle CardStyleOf(ICallerType type) => type != null ? config.CardStyleOf(type.Id) : default;
 
         private static List<string> BoardJacks(Scene level)
         {

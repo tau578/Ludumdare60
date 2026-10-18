@@ -8,6 +8,7 @@ namespace Switchboard.Domain
     {
         private readonly List<Call> live = new List<Call>();
         private readonly List<Call> expired = new List<Call>();
+        private readonly List<Call> missed = new List<Call>();
         private int lastId;
 
         public event Action<CallAddedArgs> CallAdded;
@@ -25,6 +26,14 @@ namespace Switchboard.Domain
             foreach (Call call in live)
                 if (call.Id == id) return call;
             return null;
+        }
+
+        public int CountLive(ICallerType type)
+        {
+            int count = 0;
+            for (int i = 0; i < live.Count; i++)
+                if (live[i].Request.Type == type) count++;
+            return count;
         }
 
         public bool IsInLiveCall(IPerson person)
@@ -114,14 +123,27 @@ namespace Switchboard.Domain
             if (!(dt > 0)) return;
             foreach (Call call in live)
             {
-                if (call.State != CallState.Connected) continue;
-                call.SecondsLeft = Math.Max(0, call.SecondsLeft - dt);
-                if (call.SecondsLeft <= 0) expired.Add(call);
+                if (call.State == CallState.Connected)
+                {
+                    call.SecondsLeft = Math.Max(0, call.SecondsLeft - dt);
+                    if (call.SecondsLeft <= 0) expired.Add(call);
+                }
+                else if (call.HasResponseTime && IsAwaitingConnection(call.State))
+                {
+                    call.ResponseSecondsLeft = Math.Max(0, call.ResponseSecondsLeft - dt);
+                    if (call.ResponseSecondsLeft <= 0) missed.Add(call);
+                }
             }
             // Ending raises events, so calls end only after the walk over the live list.
             foreach (Call call in expired) End(call, CallEndReason.Finished);
+            foreach (Call call in missed) End(call, CallEndReason.Missed);
             expired.Clear();
+            missed.Clear();
         }
+
+        // The response timer runs until a correct connection (D09) and never restarts after hold.
+        private static bool IsAwaitingConnection(CallState state) =>
+            state == CallState.Incoming || state == CallState.Taken || state == CallState.Connecting;
 
         private void End(Call call, CallEndReason reason)
         {

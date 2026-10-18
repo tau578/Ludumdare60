@@ -11,9 +11,15 @@ namespace Switchboard.Domain.Tests
         private const string GameConfigPath = "Assets/Content/GameConfig.asset";
 
         private static readonly ICallerType Regular = new FakeCallerType(new FloatRange(3, 8), new FloatRange(15, 30));
+        private static readonly ICallerType Emergency = FakeCallerType.Emergency();
 
         private static string Contact(string name, string socket, string portrait = "caller-01", string type = "type.regular") =>
             $"{{ 'name': '{name}', 'socket': '{socket}', 'portrait': '{portrait}', 'type': '{type}', 'rate': 0, 'fee': 0 }}";
+
+        private static string Service(string name, string socket) =>
+            $"{{ 'name': '{name}', 'socket': '{socket}', 'tags': ['emergency-service'] }}";
+
+        private static List<string> WithServices(params string[] contacts) => Validate(new[] { Regular, Emergency }, 6, contacts);
 
         private static List<string> Validate(int perPage, params string[] contacts) =>
             Validate(new[] { Regular }, perPage, contacts);
@@ -85,6 +91,70 @@ namespace Switchboard.Domain.Tests
 
         [Test]
         public void ReportsATypeWithNobodyToCall() => AssertSingleError(Validate(6, Contact("Ada Moss", "A1")), "nobody to call");
+
+        [Test]
+        public void ServicesAtTheTopPassWithoutPortraitsOrTypes() =>
+            Assert.That(WithServices(Service("Police", "B6"), Service("Fire Brigade", "C2"),
+                Contact("Ada Moss", "A1"), Contact("Basil Thorne", "B2")), Is.Empty);
+
+        [Test]
+        public void ReportsAServiceBelowThePeople()
+        {
+            List<string> errors = WithServices(Service("Police", "B6"), Contact("Ada Moss", "A1"),
+                Contact("Basil Thorne", "B2"), Service("Fire Brigade", "C2"));
+
+            AssertSingleError(errors, "Contact 4 \"Fire Brigade\": emergency services must be listed at the top of the file");
+        }
+
+        [Test]
+        public void ServiceNamesDoNotCountAsSurnames() =>
+            Assert.That(WithServices(Service("Police", "B6"), Service("Doctor", "D4"),
+                Contact("Ada Moss", "A1"), Contact("Basil Thorne", "B2")), Is.Empty);
+
+        [Test]
+        public void ReportsAPersonOutOfOrderBelowTheServices() =>
+            AssertSingleError(WithServices(Service("Police", "B6"), Contact("Basil Thorne", "B2"), Contact("Ada Moss", "A1")),
+                "\"Ada Moss\" is listed after \"Basil Thorne\"");
+
+        [Test]
+        public void ReportsARecipientTagThatNoContactHas() =>
+            AssertSingleError(WithServices(Contact("Ada Moss", "A1"), Contact("Basil Thorne", "B2")),
+                "no contact has that tag");
+
+        [Test]
+        public void ReportsANegativeFine()
+        {
+            FakeCallerType broken = FakeCallerType.Emergency();
+            broken.FineMissedCents = -5;
+
+            List<string> errors = Validate(new ICallerType[] { Regular, broken }, 6, Service("Police", "B6"),
+                Contact("Ada Moss", "A1"), Contact("Basil Thorne", "B2"));
+
+            AssertSingleError(errors, "missed fine is -5");
+        }
+
+        [Test]
+        public void ReportsNegativeLimitsAndTimes()
+        {
+            FakeCallerType broken = FakeCallerType.Emergency();
+            broken.ResponseTimeSeconds = -1;
+            broken.MaxSimultaneous = -1;
+            broken.FineEarlyDisconnectCents = -1;
+
+            List<string> errors = Validate(new ICallerType[] { Regular, broken }, 6, Service("Police", "B6"),
+                Contact("Ada Moss", "A1"), Contact("Basil Thorne", "B2"));
+
+            Assert.That(errors.Count, Is.EqualTo(3), string.Join("\n", errors));
+        }
+
+        [Test]
+        public void ReportsWhenNoTypeCanRing()
+        {
+            var silent = new FakeCallerType(new FloatRange(3, 8), new FloatRange(15, 30)) { SpawnWeight = 0 };
+
+            AssertSingleError(Validate(new[] { silent }, 6, Contact("Ada Moss", "A1"), Contact("Basil Thorne", "B2")),
+                "No caller type has a spawn weight above 0");
+        }
 
         [Test]
         public void ReportsBadTypeRanges()
