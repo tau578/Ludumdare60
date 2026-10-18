@@ -74,28 +74,25 @@ namespace Switchboard.UI
 
         public void ConfigureTabs(PhoneBookTab[] letterTabs) => tabs = letterTabs;
 
-        public bool HasLetter(char letter) => FirstContactWithSurname(letter) >= 0;
+        public bool HasLetter(char letter) => FirstContactWithName(letter) >= 0;
 
-        /// <summary>Opens the spread with the first surname starting with the letter; the contacts are sorted by surname.</summary>
+        /// <summary>Opens the spread with the first given name starting with the letter, after the pinned services.</summary>
         public bool ShowLetter(char letter)
         {
-            int index = FirstContactWithSurname(letter);
+            int index = FirstContactWithName(letter);
             if (index < 0) return false;
             CurrentSpreadIndex = index / ContactsPerSpread;
             RefreshPages();
             return true;
         }
 
-        private int FirstContactWithSurname(char letter)
+        private int FirstContactWithName(char letter)
         {
             letter = char.ToUpperInvariant(letter);
             for (int i = 0; i < directory.contacts.Length; i++)
             {
                 var contact = directory.contacts[i];
-                string name = contact.name;
-                bool service = contact.tags != null && System.Array.IndexOf(contact.tags, "emergency-service") >= 0;
-                int initial = service || name.IndexOf(',') >= 0 ? 0 : name.LastIndexOf(' ') + 1;
-                if (char.ToUpperInvariant(name[initial]) == letter) return i;
+                if (!contact.IsEmergencyService && char.ToUpperInvariant(contact.name[0]) == letter) return i;
             }
             return -1;
         }
@@ -142,7 +139,7 @@ namespace Switchboard.UI
             foreach (var tab in tabs)
             {
                 if (tab == null) continue;
-                int index = FirstContactWithSurname(tab.Letter);
+                int index = FirstContactWithName(tab.Letter);
                 tab.Show(index >= 0, index >= 0 && index / ContactsPerSpread == CurrentSpreadIndex);
             }
         }

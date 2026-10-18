@@ -38,10 +38,7 @@ namespace Switchboard.Game
             silhouetteHalo.raycastTarget = false;
             silhouetteMaterial = new Material(Resources.Load<Shader>("GuideSilhouette")) { hideFlags = HideFlags.HideAndDontSave };
             silhouetteHalo.material = silhouetteMaterial;
-            var edge = child.AddComponent<Outline>();
-            edge.effectDistance = new Vector2(6, -6);
-            edge.effectColor = Color.white;
-            edge.useGraphicAlpha = true;
+            child.AddComponent<SoftGuideOutline>();
             child.SetActive(IsShowing);
             if (outline != null) outline.enabled = false;
         }

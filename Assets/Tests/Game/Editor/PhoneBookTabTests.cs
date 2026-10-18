@@ -1,4 +1,5 @@
 using System.Text;
+using System.Linq;
 using NUnit.Framework;
 using Switchboard.UI;
 using UnityEngine;
@@ -34,10 +35,10 @@ namespace Switchboard.Game.Tests
             return view;
         }
 
-        private static string[] Surnames(int count, char letter, int from = 0)
+        private static string[] FirstNames(int count, char letter, int from = 0)
         {
             var names = new string[count];
-            for (int i = 0; i < count; i++) names[i] = $"Ann {letter}{(char)('a' + (from + i) / 26)}{(char)('a' + (from + i) % 26)}";
+            for (int i = 0; i < count; i++) names[i] = $"{letter}{(char)('a' + (from + i) / 26)}{(char)('a' + (from + i) % 26)} Smith";
             return names;
         }
 
@@ -52,10 +53,27 @@ namespace Switchboard.Game.Tests
         }
 
         [Test]
-        public void JumpsToTheSpreadWithTheFirstMatchingSurname()
+        public void ServicesStayFirstAndPeopleSortByGivenNameWithoutLosingSockets()
+        {
+            var config = PhoneBookConfig.Parse(@"{ 'contacts': [
+                { 'name': 'Abbott, Zoe', 'socket': 'A1' },
+                { 'name': 'Police', 'socket': 'B1', 'tags': ['emergency-service'] },
+                { 'name': 'Moss, Ada', 'socket': 'C1' },
+                { 'name': 'Ambulance', 'socket': 'D1', 'tags': ['emergency-service'] },
+                { 'name': 'ada Brown', 'socket': 'E1' },
+                { 'name': 'Fire Brigade', 'socket': 'F1', 'tags': ['emergency-service'] }
+            ] }".Replace('\'', '"'));
+            Assert.That(config.contacts.Select(c => c.name), Is.EqualTo(new[]
+                { "Police", "Ambulance", "Fire Brigade", "ada Brown", "Ada Moss", "Zoe Abbott" }));
+            Assert.That(config.contacts.Select(c => c.socket), Is.EqualTo(new[]
+                { "B1", "D1", "F1", "E1", "C1", "A1" }));
+        }
+
+        [Test]
+        public void JumpsToTheSpreadWithTheFirstMatchingFirstName()
         {
             // A x10, M x5 (spreads 0 and 1), T x15 (spreads 1 and 2), Z x6 (spread 2).
-            var view = Book(Concat(Surnames(10, 'A'), Surnames(5, 'M'), Surnames(15, 'T'), Surnames(6, 'Z')));
+            var view = Book(Concat(FirstNames(10, 'A'), FirstNames(5, 'M'), FirstNames(15, 'T'), FirstNames(6, 'Z')));
 
             Assert.That(view.ShowLetter('M'), Is.True);
             Assert.That(view.CurrentSpreadIndex, Is.EqualTo(0));
@@ -68,7 +86,7 @@ namespace Switchboard.Game.Tests
         [Test]
         public void WorksOnTheFirstAndLastSpread()
         {
-            var view = Book(Concat(Surnames(30, 'B'), Surnames(1, 'Y')));
+            var view = Book(Concat(FirstNames(30, 'B'), FirstNames(1, 'Y')));
 
             Assert.That(view.ShowLetter('Y'), Is.True);
             Assert.That(view.CurrentSpreadIndex, Is.EqualTo(2));
@@ -79,9 +97,9 @@ namespace Switchboard.Game.Tests
         }
 
         [Test]
-        public void IgnoresLettersWithNoSurname()
+        public void IgnoresLettersWithNoFirstName()
         {
-            var view = Book(Concat(Surnames(13, 'C'), Surnames(2, 'D')));
+            var view = Book(Concat(FirstNames(13, 'C'), FirstNames(2, 'D')));
             view.NextSpread();
 
             Assert.That(view.HasLetter('Q'), Is.False);
@@ -91,21 +109,21 @@ namespace Switchboard.Game.Tests
         }
 
         [Test]
-        public void SurnameFirstNamesUseTheSurnameInsteadOfTheGivenName()
+        public void LegacyCommaNamesUseTheGivenName()
         {
-            var view = Book(Concat(Surnames(12, 'A'), new[] { "Smith, Mary Ann" }));
-            Assert.That(view.HasLetter('M'), Is.False);
-            Assert.That(view.ShowLetter('S'), Is.True);
+            var view = Book(Concat(FirstNames(12, 'A'), new[] { "Smith, Mary Ann" }));
+            Assert.That(view.HasLetter('S'), Is.False);
+            Assert.That(view.ShowLetter('M'), Is.True);
             Assert.That(view.CurrentSpreadIndex, Is.EqualTo(1));
         }
 
         [Test]
-        public void UsesTheLastWordOfTheNameAsTheSurname()
+        public void CompoundGivenNamesUseTheirFirstLetter()
         {
-            var view = Book(Concat(Surnames(12, 'A'), new[] { "Mary Ann Smith" }));
+            var view = Book(Concat(FirstNames(12, 'A'), new[] { "Mary Ann Smith" }));
 
-            Assert.That(view.HasLetter('M'), Is.False);
-            Assert.That(view.ShowLetter('S'), Is.True);
+            Assert.That(view.HasLetter('S'), Is.False);
+            Assert.That(view.ShowLetter('M'), Is.True);
             Assert.That(view.CurrentSpreadIndex, Is.EqualTo(1));
         }
     }
