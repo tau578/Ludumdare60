@@ -61,5 +61,28 @@ namespace Switchboard.Game.Tests
             Assert.IsFalse(reveal.IsTyping);
             Assert.AreEqual(0, reveal.Advance(1f, 40));
         }
+
+        [Test]
+        public void AFinishedLineStaysFinishedWhenItGrows()
+        {
+            var reveal = new TypingReveal();
+            reveal.Restart(20);
+            reveal.Advance(5f, 40);
+            reveal.Resize(25);
+            Assert.AreEqual(25, reveal.Visible);
+            Assert.IsFalse(reveal.IsTyping);
+        }
+
+        [Test]
+        public void ALineStillTypingGoesOnFromWhereItWas()
+        {
+            var reveal = new TypingReveal();
+            reveal.Restart(30);
+            reveal.Advance(0.1f, 40);
+            reveal.Resize(36);
+            Assert.AreEqual(5, reveal.Visible);
+            Assert.AreEqual(36, reveal.Total);
+            Assert.AreEqual(9, reveal.Advance(0.1f, 40));
+        }
     }
 }

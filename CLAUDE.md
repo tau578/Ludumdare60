@@ -16,7 +16,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), team coordination (§8) and the step briefs (§9).
 3. `Docs/Design.md`: the source of truth for game rules, architecture, ownership and decisions D01–D44. If the code or a brief disagrees with it, stop and ask; don't improvise.
 
-**Next step:** see the first row in `Docs/Progress.md` that isn't "done". As of 2026-10-18, Step 5 is split (D39–D44): **5a** (the designer's `Economy.json`, Sergei's shop panel wired with real texts, income upgrades, the secret goal with a savings fill) is done; 5b (extra wires, Notepad) and 5c (calls and pacing into `Economy.json`) are outlines to brief next.
+**Next step:** see the first row in `Docs/Progress.md` that isn't "done". As of 2026-10-18, Step 5 is split (D39–D44): **5a** (the designer's `Economy.json`, Sergei's shop panel, income upgrades, the secret goal) and **5b** (extra wires up to 6 cords, the Notepad) are built; 5c (calls and pacing into `Economy.json`) is an outline to brief next.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).
@@ -76,7 +76,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 - The `UpgradeShopPanel` prefab and `UpgradeShopPanelBuilder` constants (Step 1c: the `HeaderSlot` money plaque).
 - Step 3 (D34, A–Z tabs in the phone book): `PhoneBookView.cs`, `PhoneBookPageView.cs`, `PhoneBookContactRow.cs`, a new tab component in `Assets/Scripts/UI/`, `PhoneBookBuilder.cs`, `PhoneBook.prefab`, and a test in `Assets/Tests/Editor/` for the tab jump. Used: `PhoneBookView.cs`, the new `PhoneBookTab.cs`, `PhoneBookBuilder.cs` (new menu `Tools/Switchboard/Update Phone Book Tabs`) and `PhoneBook.prefab`. The test went to our `Assets/Tests/Game/Editor/` instead.
 - Step 5a (D41): `UpgradeSlotView.cs` (new, `Assets/Scripts/UI/`), `UpgradeShopPanelBuilder.cs` (menu `Update Upgrade Shop Buttons`), `UpgradePlaceholderButton.prefab`, `UpgradeShopPanel.prefab`: texts, price and savings fill inside his shop buttons.
-- Step 5b (approved in principle, files to list in its brief): runtime cords in his cord input and tray; a tapped-entry event in his book.
+- Step 5b (lead, 2026-10-18): `CableInputController.cs` (`AddCable`, tray re-spacing), `PhoneBookView.cs`, `PhoneBookPageView.cs`, `PhoneBookContactRow.cs`, `PhoneBook.prefab`, `PhoneBookBuilder.cs` (row hit area and `ContactTapped`; no menu run).
 
 ## Architecture in brief (details in Design.md §4–§7)
 - **Scene flow (D38).** `MainMenu` → `Final`. Sergei's menu loads the next build index. `Final.unity` (formerly `Level.unity`, same GUID) is the one game scene: Sergei's board plus our `Game.prefab` and `GameUI.prefab` instances. Sergei's first merge attempt (`1c20569`, prefab-less copies) was reverted in `cdc5876`.
@@ -127,6 +127,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 
 ## Pending coordination with Sergei (Plan §8)
 - **Step 5 (D44):** Sergei has none of the hooks, so our agents build them as coordinated changes: shop button texts (5a), runtime cords and the book's tapped-entry event (5b). Tell him before and after.
+- **Tell Sergei (Step 5b, built):** `CableInputController.AddCable(Color)`, `MaxCables` = 6 and public tray-spacing statics (usable width 830 px as a constant); keep the tray slot's child named `Preview`. His book has `ContactTapped(name, socket)` and `ContactTapsEnabled`; each `ContactTemplate` has a transparent tap `Image`, which `PhoneBookBuilder` now builds too.
 - **Tell Sergei (Step 5a, built):** his shop button now has `UpgradeSlotView` (texts, savings fill, highlight frame) and is 204 px wide; new menu `Tools/Switchboard/Update Upgrade Shop Buttons` (Plan §8).
 - **Step 7 (D42):** board growth from 3×3. His book shows only people on open jacks, and closed jacks are dimmed. Both touch his book and board.
 - **Step 6:** touch input in `CableInputController` (`Pointer.current`).

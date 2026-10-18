@@ -17,13 +17,14 @@ namespace Switchboard.Content
         private static readonly TypeInfo[] Types =
         {
             new TypeInfo("extra_income", UpgradeKind.ExtraIncome, null),
-            new TypeInfo("extra_wires", UpgradeKind.ExtraWires, "Step 5b"),
-            new TypeInfo("notepad", UpgradeKind.Notepad, "Step 5b"),
+            new TypeInfo("extra_wires", UpgradeKind.ExtraWires, null),
+            new TypeInfo("notepad", UpgradeKind.Notepad, null),
             new TypeInfo("extra_clients", UpgradeKind.ExtraClients, "Step 7"),
             new TypeInfo("secret", UpgradeKind.Secret, null)
         };
 
-        public static EconomyCatalog Load(string json)
+        /// <param name="startingCords">The cords a new game starts with; every wires total must be above it.</param>
+        public static EconomyCatalog Load(string json, int startingCords = StatSheet.DefaultStartingCords)
         {
             var errors = new List<string>();
             var upgrades = new List<IUpgrade>();
@@ -32,15 +33,15 @@ namespace Switchboard.Content
             {
                 var ids = new Dictionary<string, int>(StringComparer.Ordinal);
                 var lastInChain = new Dictionary<UpgradeKind, UpgradeRecord>();
-                int secretAt = -1;
+                var rules = new ChainRules(startingCords);
                 for (int i = 0; i < data.upgrades.Length; i++)
                 {
-                    UpgradeRecord record = Check(i, data.upgrades[i], ids, lastInChain, ref secretAt, errors);
+                    UpgradeRecord record = Check(i, data.upgrades[i], ids, lastInChain, rules, errors);
                     if (record == null) continue;
                     upgrades.Add(record);
                     lastInChain[record.Kind] = record;
                 }
-                if (secretAt < 0)
+                if (rules.SecretAt < 0)
                     errors.Add("There is no secret upgrade. Add exactly one entry with \"type\": \"secret\": " +
                         "the most expensive one, which the player saves for.");
             }
@@ -82,7 +83,7 @@ namespace Switchboard.Content
         }
 
         private static UpgradeRecord Check(int index, UpgradeEntry entry, Dictionary<string, int> ids,
-            Dictionary<UpgradeKind, UpgradeRecord> lastInChain, ref int secretAt, List<string> errors)
+            Dictionary<UpgradeKind, UpgradeRecord> lastInChain, ChainRules rules, List<string> errors)
         {
             string id = entry?.id?.Trim() ?? string.Empty;
             string where = id.Length == 0 ? $"Upgrade {index + 1}" : $"Upgrade {index + 1} \"{id}\"";
@@ -131,15 +132,34 @@ namespace Switchboard.Content
                     errors.Add($"{where}: incomeMultiplier {Number(multiplier)} is not higher than {previous.Id}'s " +
                         $"{Number(previous.IncomeMultiplier)}. Values in a chain must grow.");
             }
+            int wires = 0;
+            if (type.Kind == UpgradeKind.ExtraWires)
+            {
+                wires = entry.wires;
+                lastInChain.TryGetValue(type.Kind, out UpgradeRecord previous);
+                if (wires <= rules.StartingCords)
+                    errors.Add($"{where}: wires {wires} is not above the {rules.StartingCords} cords the game starts with. " +
+                        $"wires is the total number of cords, so use {rules.StartingCords + 1} or more.");
+                else if (wires > StatSheet.MaxCords)
+                    errors.Add($"{where}: wires {wires} is more than the tray holds. Use {StatSheet.MaxCords} or less.");
+                else if (previous != null && wires <= previous.Wires)
+                    errors.Add($"{where}: wires {wires} is not higher than {previous.Id}'s {previous.Wires}. Values in a chain must grow.");
+            }
             if (type.Kind == UpgradeKind.Secret && errors.Count == errorsBefore)
             {
-                if (secretAt >= 0)
-                    errors.Add($"{where}: there is already a secret upgrade (upgrade {secretAt + 1}). Keep exactly one secret entry.");
-                else secretAt = index;
+                if (rules.SecretAt >= 0)
+                    errors.Add($"{where}: there is already a secret upgrade (upgrade {rules.SecretAt + 1}). Keep exactly one secret entry.");
+                else rules.SecretAt = index;
+            }
+            if (type.Kind == UpgradeKind.Notepad && errors.Count == errorsBefore)
+            {
+                if (rules.NotepadAt >= 0)
+                    errors.Add($"{where}: there is already a notepad (upgrade {rules.NotepadAt + 1}). Keep at most one notepad entry.");
+                else rules.NotepadAt = index;
             }
             if (errors.Count > errorsBefore) return null;
             return new UpgradeRecord(id, type.Kind, entry.name.Trim(), entry.description?.Trim() ?? string.Empty,
-                entry.costCents, multiplier);
+                entry.costCents, multiplier, wires);
         }
 
         private static TypeInfo FindType(string name)
@@ -166,6 +186,17 @@ namespace Switchboard.Content
         }
 
         private static string Number(double value) => value.ToString("0.###", Invariant);
+
+        // What the checks remember from one entry to the next.
+        private sealed class ChainRules
+        {
+            public ChainRules(int startingCords) =>
+                StartingCords = startingCords > 0 ? startingCords : StatSheet.DefaultStartingCords;
+
+            public int StartingCords { get; }
+            public int SecretAt { get; set; } = -1;
+            public int NotepadAt { get; set; } = -1;
+        }
 
         private sealed class TypeInfo
         {

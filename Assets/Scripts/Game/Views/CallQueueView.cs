@@ -27,6 +27,7 @@ namespace Switchboard.Game
         private OperatorDesk desk;
         private EarningsService earnings;
         private PenaltyService penalties;
+        private Notepad notepad;
         private Func<IPerson, Sprite> portraitOf;
         private Func<ICallerType, CallCardStyle> styleOf;
         private Func<CordId, Color> cordColorOf;
@@ -51,13 +52,14 @@ namespace Switchboard.Game
 
         public void Bind(CallService callService, OperatorDesk operatorDesk, EarningsService earningsService,
             PenaltyService penaltyService, RectTransform[] callerSlots, Func<IPerson, Sprite> portraits,
-            Func<CordId, Color> cordColors, Func<ICallerType, CallCardStyle> cardStyles)
+            Func<CordId, Color> cordColors, Func<ICallerType, CallCardStyle> cardStyles, Notepad notes = null)
         {
             Unsubscribe();
             calls = callService;
             desk = operatorDesk;
             earnings = earningsService;
             penalties = penaltyService;
+            notepad = notes;
             portraitOf = portraits;
             styleOf = cardStyles;
             cordColorOf = cordColors;
@@ -70,6 +72,7 @@ namespace Switchboard.Game
             calls.CallStateChanged += OnCallStateChanged;
             earnings.ConnectionFeePaid += OnConnectionFeePaid;
             if (penalties != null) penalties.FineApplied += OnFineApplied;
+            if (notepad != null) notepad.Noted += OnNoted;
             foreach (CallCardView card in pool)
             {
                 card.Clicked += OnCardClicked;
@@ -90,6 +93,7 @@ namespace Switchboard.Game
             }
             if (earnings != null) earnings.ConnectionFeePaid -= OnConnectionFeePaid;
             if (penalties != null) penalties.FineApplied -= OnFineApplied;
+            if (notepad != null) notepad.Noted -= OnNoted;
             foreach (CallCardView card in pool)
             {
                 if (card == null) continue;
@@ -99,6 +103,7 @@ namespace Switchboard.Game
             calls = null;
             earnings = null;
             penalties = null;
+            notepad = null;
         }
 
         private void BuildPool(int size)
@@ -136,6 +141,11 @@ namespace Switchboard.Game
 
         // "Missed -$2.00" names the amount actually taken, which is known only once the fine lands.
         private void OnFineApplied(FineAppliedArgs e) => CardOf(e.Call)?.RefreshStamp();
+
+        private void OnNoted(CallId id)
+        {
+            if (calls != null) CardOf(calls.Find(id))?.ShowNotes();
+        }
 
         private void OnCardClicked(CallCardView clicked)
         {

@@ -18,6 +18,7 @@ Level art pass (2026-10-18, lead requested): `BackgroundPanel.prefab` groups `ma
 | 4 | Done (2026-10-18) | Emergencies and fines (D36, D37): `type.emergency` (30 s response ring, $2 miss or wrong-patch fine, $1 cut-off fine, 20–40¢ + 5–10¢/s for 10–20 s, at most one at a time, spawn weight 1 against Regular 5, `everyoneCalls`, `recipientTag` `emergency-service`). Police B6, Fire Brigade C2 and Doctor D4 head `PhoneBook.json`. `PenaltyService` with `FineApplied`, the "Missed -$X" stamp and a red fine popup under the money counter. `IdleGuard` (60 s, `PacingProfile.idleTimeoutSeconds`) blocks fined types and their callbacks. A presentation-only `CallCardStyle` per type (badge, accent). Dev panel "Emergency now". Accepted deviations: the countdown ring is cream on a dark track, turning orange-red in the last 10 s (a red ring was invisible on the red halo); the type badge hides once connected; a `type` given on a service is ignored. |
 | Scene merge | Done (2026-10-18) | One `Final.unity` built from prefabs (D38): our `Game.prefab` and `GameUI.prefab` next to Sergei's board; build list `MainMenu` (0), `Final` (1); `Game.unity` removed; `GameInstaller` finds the views by type in its own scene. |
 | 5a | Done (2026-10-18) | The designer's `Assets/Configs/Economy.json` (`upgrades` only) and `Docs/EconomyFile.md`. Domain `UpgradeService` (with `PurchaseCheck`), `StatSheet`, `ShopShelf`, `GoalProgress`, `Wallet.TrySpend`; the live income multiplier on fee and pay. `EconomyFileLoader` with plain-English checks, shown by `Validate Content`. Sergei's 4 shop buttons (coordinated, D44) carry `UpgradeSlotView` (title, description, price, savings fill, gold frame) and are 204 px wide; menu `Tools/Switchboard/Update Upgrade Shop Buttons`. Our `ShopView`, a neutral "-$X" spend popup and the "To be continued..." dialog (`GoalPanelView`). Dev panel "+ $100" and "Reset upgrades" (no refund). Accepted deviations: see 5.9 and 4.3. |
+| 5b | Done (2026-10-18) | `extra_wires` and `notepad` in `Economy.json` (D23, D40, D43). `StatSheet.Cords` (from `GameConfig.startingCords` = 3), `HasNotepad` and `Changed`; Domain `Notepad` (notes on the `Call`: `CallerNote`, `RecipientNote`). Coordinated changes to Sergei's code (D44): `CableInputController.AddCable(Color)` and `MaxCables` = 6, with tray re-spacing; `PhoneBookView.ContactTapped(name, socket)` and `ContactTapsEnabled`, with a transparent row tap area in `PhoneBook.prefab`. `CordBridge.EnsureCords` adds green, violet and ivory cords (`GameConfig.extraCordColors`); `NotepadBookLink` routes book taps; the bubble shows noted jacks. Accepted deviations: see 5.9. |
 
 What Step 1 built:
 - **Operator desk.** A right pair connects the call. A wrong pair ends it as "Wrong number!". Patching with no call in hand is refused. Pulling a plug cut the call off (replaced by hold in Step 2b).
@@ -106,6 +107,8 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 - `CableController`:
   - `Phase`, `FirstSocket`, `SecondSocket`, `IsInTray`, `CableColor`
   - `TryRemove(SocketView)`, `PlayBlockedFeedback()`
+- `CableInputController` (5b, coordinated): `AddCable(Color)`, `MaxCables`.
+- `PhoneBookView` (5b, coordinated): `ContactTapped(name, socket)`, `ContactTapsEnabled`.
 - `CablePhase` values: `Ready` (in the tray), `Held` (picked up, nothing plugged in), `OneEndConnected`, `Connected`.
 - `SocketView`: `Address` (e.g. `"C4"`), `Row`, `Column`, `PlugAnchor`, `IsOccupied`.
 - The cord input model: click a cord in the tray to pick it up, then click a jack to plug in. Clicking a plugged jack pulls that plug out. If the player pulls one plug of a connected cord and then clicks empty space, the plug snaps back to its jack ("restore", `ReconnectSocket`).
@@ -197,7 +200,8 @@ public void Tick(double dt)
 - **Commands from the domain:**
   - `ReturnToTray(cord)`: call `TryRemove` on each plugged socket.
   - `Refuse(cord)`: `PlayBlockedFeedback()`, then return the cord to the tray.
-- **Anything more is a coordinated change.** Examples: adding cords at runtime (Step 5), or touch input in the cord controller (before Step 6).
+- **Adding cords (5b).** `EnsureCords(total)` calls Sergei's `CableInputController.AddCable(color)` until the count is reached. It appends the new cable to its list, and records the cable's current state so the next `LateUpdate` reports nothing for it. New cords continue the index order (3, 4, 5). The spawner reads `CordCount` live.
+- **Anything more is a coordinated change.** Example: touch input in the cord controller (before Step 6).
 
 ## 5. Systems
 The step that introduces each part is shown in brackets.
@@ -401,6 +405,11 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
 - **Shop buttons as built (5a, accepted deviations from D41):**
   - Empty and too-expensive buttons stay clickable but do nothing; disabling Unity's `Button` would tint Sergei's "+" look. Too-expensive offers are dimmed instead (grey button image, faded text).
   - The owned secret shows its name and "Owned", with a full fill, no price, no frame, and does nothing on click.
+- **Wires and Notepad as built (5b, accepted deviations):**
+  - New cords are copies of the last cord and its tray slot, made while the game runs. The tray slot keeps its height and only narrows. With 6 cords, the previews are about half today's size.
+  - Dev "Reset upgrades" keeps the added cords (a cord can't be removed safely mid-call). The shop then offers the first wire entry again, and buying it adds nothing.
+  - A book row takes taps only while the Notepad is owned. A row tap keeps the book open; without the Notepad, a tap falls through and closes the book as before.
+  - Validator rules: `wires` must be above `startingCords`, at most 6, and growing; there can be at most one `notepad`.
 - **Checks.** The economy file's checks live in `EconomyFileLoader` (as the people-file checks live in `PeopleFileLoader`); `ContentValidator.ValidateEconomy` passes them on with the prefix "Economy file: ". There is no separate `EconomyValidator`.
 
 ### 5.10 Progression and the goal [5a]

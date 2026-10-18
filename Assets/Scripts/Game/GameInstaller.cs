@@ -16,6 +16,8 @@ namespace Switchboard.Game
         [SerializeField] private CordBridge cordBridge;
         [SerializeField] private GameLoopRunner loopRunner;
 
+        private NotepadBookLink bookLink;
+
         public GameSession Session { get; private set; }
 
         private void Start()
@@ -40,16 +42,22 @@ namespace Switchboard.Game
             EconomyCatalog economy = config.LoadEconomy();
             foreach (string error in economy.Errors) Debug.LogError($"Economy file: {error}", config);
 
-            cordBridge.Attach(scene);
+            cordBridge.Attach(scene, config.ExtraCordColors);
+            if (cordBridge.CordCount != config.StartingCords)
+                Debug.LogWarning($"The scene has {cordBridge.CordCount} cords but GameConfig starts with {config.StartingCords}.", config);
             int seed = randomSeed != 0 ? randomSeed : Random.Range(1, int.MaxValue);
             Session = new GameSession(new GameContent(config, people, economy), new SeededRandom(seed), cordBridge);
             cordBridge.Bind(Session.Desk);
+            cordBridge.EnsureCords(Session.Stats.Cords);
+            Session.Stats.Changed += OnStatsChanged;
             moneyCounter.Bind(Session.Wallet, LevelScene.FindShopHeader(scene), Session.Penalties, Session.Upgrades);
             RectTransform[] callerSlots = LevelScene.FindCallerSlots(scene);
             if (callerSlots.Length < config.MaxWaitingCalls)
                 Debug.LogWarning($"The caller panel has {callerSlots.Length} slots but GameConfig allows {config.MaxWaitingCalls} calls.", config);
             callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, Session.Penalties, callerSlots, PortraitOf,
-                cordBridge.ColorOf, CardStyleOf);
+                cordBridge.ColorOf, CardStyleOf, Session.Notepad);
+            PhoneBookView book = FindSingle<PhoneBookView>(scene);
+            if (book != null) bookLink = new NotepadBookLink(book, Session.Stats, Session.Notepad);
             shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene));
             goalPanel.Bind(Session.Goal);
             loopRunner.Bind(Session);
@@ -58,6 +66,16 @@ namespace Switchboard.Game
             gameObject.AddComponent<DevPanel>().Bind(Session, callQueue);
 #endif
         }
+
+        private void OnDestroy()
+        {
+            if (Session != null) Session.Stats.Changed -= OnStatsChanged;
+            bookLink?.Dispose();
+            bookLink = null;
+        }
+
+        // Cords are only ever added: one can't be taken away safely mid-call.
+        private void OnStatsChanged() => cordBridge.EnsureCords(Session.Stats.Cords);
 
         private Sprite PortraitOf(IPerson person) => person is PersonRecord record ? config.Portrait(record.Portrait) : null;
 

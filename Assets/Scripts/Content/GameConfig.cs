@@ -12,6 +12,15 @@ namespace Switchboard.Content
         [SerializeField] private long startingCents;
         [SerializeField, Min(1), Tooltip("Live calls never outnumber the caller panel's slots (D17).")]
         private int maxWaitingCalls = 6;
+        [SerializeField, Min(1), Tooltip("The cords a new game starts with; extra_wires upgrades set more (5b).")]
+        private int startingCords = StatSheet.DefaultStartingCords;
+        [SerializeField, Tooltip("Colours for the cords that extra_wires upgrades add, in order (5b).")]
+        private Color[] extraCordColors =
+        {
+            new Color32(92, 184, 92, 255),
+            new Color32(156, 104, 214, 255),
+            new Color32(240, 232, 206, 255)
+        };
         [SerializeField] private PacingProfile pacing;
         [SerializeField] private CallerTypeDefinition[] callerTypes = new CallerTypeDefinition[0];
         [SerializeField, Tooltip("Assets/Configs/PhoneBook.json, shared with the team's phone book (D31).")]
@@ -22,6 +31,8 @@ namespace Switchboard.Content
 
         public long StartingCents => startingCents;
         public int MaxWaitingCalls => maxWaitingCalls;
+        public int StartingCords => startingCords;
+        public IReadOnlyList<Color> ExtraCordColors => extraCordColors ?? new Color[0];
         public IPacingProfile Pacing => pacing != null ? pacing : null;
         public IReadOnlyList<ICallerType> CallerTypes => callerTypes ?? new CallerTypeDefinition[0];
 
@@ -32,12 +43,12 @@ namespace Switchboard.Content
         public PeopleCatalog LoadPeople(IEnumerable<string> boardJacks) =>
             PeopleFileLoader.Load(PeopleFileText, CallerTypes, HasPortrait, boardJacks);
 
-        public EconomyCatalog LoadEconomy() => EconomyFileLoader.Load(EconomyFileText);
+        public EconomyCatalog LoadEconomy() => EconomyFileLoader.Load(EconomyFileText, startingCords);
 
         public List<string> Validate()
         {
             List<string> errors = ContentValidator.Validate(PeopleFileText, CallerTypes, HasPortrait, ContentValidator.BoardJacks());
-            foreach (string error in ContentValidator.ValidateEconomy(EconomyFileText)) errors.Add("Economy file: " + error);
+            foreach (string error in ContentValidator.ValidateEconomy(EconomyFileText, startingCords)) errors.Add("Economy file: " + error);
             return errors;
         }
 

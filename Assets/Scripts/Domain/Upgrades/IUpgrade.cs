@@ -11,5 +11,8 @@ namespace Switchboard.Domain
 
         /// <summary>The earnings multiplier an extra_income entry sets; 0 for other kinds.</summary>
         double IncomeMultiplier { get; }
+
+        /// <summary>The total number of cords an extra_wires entry sets; 0 for other kinds.</summary>
+        int Wires { get; }
     }
 }

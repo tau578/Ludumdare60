@@ -8,7 +8,7 @@ Keep it readable: one entry per line, in the order you want the player to meet t
 
 | Section | What it holds | Ready? |
 |---|---|---|
-| `upgrades` | Everything the shop sells. | Yes (Step 5a) |
+| `upgrades` | Everything the shop sells. | Yes (Steps 5a and 5b) |
 | `calls` | Each call type's money: fee, rate and duration ranges, fines, response time, how often it rings. | Coming in Step 5c |
 | `pacing` | How fast calls arrive, and the idle timeout. | Coming in Step 5c |
 | `startingCents` | The money a new game starts with. | Coming in Step 5c |
@@ -41,11 +41,34 @@ Every upgrade is bought **once**. An entry looks like this:
 |---|---|---|---|
 | `extra_income` | `incomeMultiplier` | **Sets** how much every call pays: 1.5 means half as much again. It applies at once, even to calls already connected. Fines are never multiplied. | Yes (5a) |
 | `secret` | none | The mystery upgrade, the goal the player saves for. Its shop button fills up as money is saved. There must be **exactly one**. For now, buying it shows "To be continued...". | Yes (5a) |
-| `extra_wires` | `wires` | **Sets** the total number of cords. | Coming in Step 5b |
-| `notepad` | none | Tapping a name in the phone book notes its jack on the call in hand. Delete the entry to drop the feature. | Coming in Step 5b |
+| `extra_wires` | `wires` | **Sets** the total number of cords. The new cord appears in the tray at once, in a new colour. | Yes (5b) |
+| `notepad` | none | While owned, tapping a name in the open phone book notes that person's jack on the call in hand, if they are the caller or the person wanted: "Ada Moss (C3)". There is **at most one**. Delete the entry to drop the feature. | Yes (5b) |
 | `extra_clients` | `boardSize`, `clientSlots` | **Sets** how much of the board is open, and the caller slots. | Coming in Step 7 |
 
 A type that isn't ready yet is reported by the validator and left out of the game, so add those entries when their step arrives.
+
+### Extra cords: `wires`
+
+`wires` is the **total** number of cords after buying, not the number added. The game starts with 3 cords, so:
+
+```json
+{ "id": "wires_1", "type": "extra_wires", "name": "Extra cord", "description": "4 cords", "costCents": 500, "wires": 4 },
+{ "id": "wires_2", "type": "extra_wires", "name": "Extra cord", "description": "5 cords", "costCents": 800, "wires": 5 },
+{ "id": "wires_3", "type": "extra_wires", "name": "Extra cord", "description": "6 cords", "costCents": 1300, "wires": 6 },
+```
+
+- Each `wires` must be **above 3**, the cords the game starts with.
+- It can be **at most 6**: that's all the tray holds.
+- Along the chain it must **grow**: 4, then 5, then 6.
+
+### The Notepad
+
+```json
+{ "id": "notepad", "type": "notepad", "name": "Notepad", "description": "Tap a name: note its jack", "costCents": 300 },
+```
+
+- Keep at most one `notepad` entry; it has no extra fields.
+- Without it, a tap on a name closes the book, as before. Deleting the entry removes the feature; nothing else needs to change.
 
 ### Chains
 
@@ -80,6 +103,17 @@ The validator reports:
 - an empty name
 - a `costCents` of 0 or less
 - an `incomeMultiplier` of 1 or less, or one that doesn't grow along its chain
+- a `wires` that isn't above the starting 3 cords, is more than 6, or doesn't grow along its chain
+- more than one `notepad`
 - no `secret`, or more than one
+
+More example messages:
+
+```
+Economy file: Upgrade 5 "wires_2": wires 4 is not higher than wires_1's 4. Values in a chain must grow.
+Economy file: Upgrade 4 "wires_1": wires 3 is not above the 3 cords the game starts with. wires is the total number of cords, so use 4 or more.
+Economy file: Upgrade 6 "wires_3": wires 7 is more than the tray holds. Use 6 or less.
+Economy file: Upgrade 8 "notepad_2": there is already a notepad (upgrade 7). Keep at most one notepad entry.
+```
 
 An entry with a problem is left out, and the game still starts with the others. The same check runs in the automated tests, so a broken file is noticed before a build.

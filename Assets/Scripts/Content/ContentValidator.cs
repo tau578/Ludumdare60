@@ -40,7 +40,8 @@ namespace Switchboard.Content
         }
 
         /// <summary>Checks Economy.json (Design 6.4). Every rule lives in the loader, which the game uses too.</summary>
-        public static IReadOnlyList<string> ValidateEconomy(string economyJson) => EconomyFileLoader.Load(economyJson).Errors;
+        public static IReadOnlyList<string> ValidateEconomy(string economyJson, int startingCords = StatSheet.DefaultStartingCords) =>
+            EconomyFileLoader.Load(economyJson, startingCords).Errors;
 
         private static void CheckTypes(IReadOnlyList<ICallerType> types, List<string> errors)
         {

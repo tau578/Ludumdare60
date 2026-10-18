@@ -6,6 +6,9 @@ namespace Switchboard.Domain
     {
         long StartingCents { get; }
         int MaxWaitingCalls { get; }
+
+        /// <summary>The cords a new game starts with, before any extra_wires upgrade (5b).</summary>
+        int StartingCords { get; }
         IPacingProfile Pacing { get; }
         IReadOnlyList<ICallerType> CallerTypes { get; }
         IReadOnlyList<IPerson> People { get; }

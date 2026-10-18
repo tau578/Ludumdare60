@@ -1969,6 +1969,8 @@ GameObject:
   m_Component:
   - component: {fileID: 7062149251680710953}
   - component: {fileID: 6691283936835594517}
+  - component: {fileID: 4683907256427542387}
+  - component: {fileID: 1292336237585564231}
   m_Layer: 5
   m_Name: ContactTemplate
   m_TagString: Untagged
@@ -2011,6 +2013,45 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.PhoneBookContactRow
   contactName: {fileID: 1889710781023667587}
   socketAddress: {fileID: 8613706225660886939}
+  tapArea: {fileID: 1292336237585564231}
+--- !u!222 &4683907256427542387
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2649282866955131836}
+  m_CullTransparentMesh: 1
+--- !u!114 &1292336237585564231
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2649282866955131836}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0, g: 0, b: 0, a: 0}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &2654098343073984612
 GameObject:
   m_ObjectHideFlags: 0
@@ -2100,6 +2141,8 @@ GameObject:
   m_Component:
   - component: {fileID: 2650399302453121463}
   - component: {fileID: 6794884070895480120}
+  - component: {fileID: 5099368742139226142}
+  - component: {fileID: 2167096367680167445}
   m_Layer: 5
   m_Name: ContactTemplate
   m_TagString: Untagged
@@ -2142,6 +2185,45 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.PhoneBookContactRow
   contactName: {fileID: 3363572477916630067}
   socketAddress: {fileID: 358661111331560835}
+  tapArea: {fileID: 2167096367680167445}
+--- !u!222 &5099368742139226142
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2679503753654530981}
+  m_CullTransparentMesh: 1
+--- !u!114 &2167096367680167445
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2679503753654530981}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0, g: 0, b: 0, a: 0}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &2813871448004205329
 GameObject:
   m_ObjectHideFlags: 0

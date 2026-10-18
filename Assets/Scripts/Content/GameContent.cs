@@ -10,6 +10,7 @@ namespace Switchboard.Content
         {
             StartingCents = config.StartingCents;
             MaxWaitingCalls = config.MaxWaitingCalls;
+            StartingCords = config.StartingCords;
             Pacing = config.Pacing;
             CallerTypes = config.CallerTypes;
             People = people.People;
@@ -20,6 +21,7 @@ namespace Switchboard.Content
 
         public long StartingCents { get; }
         public int MaxWaitingCalls { get; }
+        public int StartingCords { get; }
         public IPacingProfile Pacing { get; }
         public IReadOnlyList<ICallerType> CallerTypes { get; }
         public IReadOnlyList<IPerson> People { get; }

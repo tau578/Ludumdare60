@@ -29,6 +29,8 @@ namespace Switchboard.Game
         [SerializeField] private TMP_Text speechLabel;
         [SerializeField, Min(1), Tooltip("How fast the bubble's text types out.")]
         private float charactersPerSecond = 40f;
+        [SerializeField, Range(50, 100), Tooltip("Size of a jack the Notepad noted, in percent of the name's size.")]
+        private int jackTextSize = 85;
         [SerializeField] private FloatingTextView feePopup;
         [SerializeField, Tooltip("A ring around the portrait in the colour of the call's cord.")]
         private Graphic cordRing;
@@ -136,7 +138,7 @@ namespace Switchboard.Game
             if (inHand || onCord)
                 Say(onHold ? "On hold"
                     : onCord ? "On the line"
-                    : $"{Listed(Call.Request.CallerPerson)}\n<size=80%>wants</size>\n{Listed(Call.Request.Recipient)}");
+                    : InHandText());
             else typedText = null;
 
             stamp.SetActive(state == CallState.Ended);
@@ -155,6 +157,20 @@ namespace Switchboard.Game
             if (Call == null || Call.State != CallState.Ended) return;
             stampLabel.text = StampText(Call);
             stampLabel.color = stampOutline.effectColor = Ink(Call.EndReason);
+        }
+
+        /// <summary>A new Notepad note: the jack joins the bubble at once, without typing the bubble again.</summary>
+        public void ShowNotes()
+        {
+            if (Call == null || !speechBubble.activeSelf) return;
+            if (Call.State != CallState.Taken && Call.State != CallState.Connecting) return;
+            string text = InHandText();
+            if (text == typedText) return;
+            typedText = text;
+            speechLabel.text = text;
+            speechLabel.ForceMeshUpdate();
+            typing.Resize(speechLabel.textInfo.characterCount);
+            speechLabel.maxVisibleCharacters = typing.Visible;
         }
 
         public void ShowConnectionFee(double cents) => feePopup.Show("+" + MoneyFormat.Cents(cents));
@@ -338,6 +354,12 @@ namespace Switchboard.Game
         }
 
         private Color Faded(Color color, bool onHold) => onHold ? new Color(color.r, color.g, color.b, color.a * onHoldAlpha) : color;
+
+        private string InHandText() =>
+            $"{Listed(Call.Request.CallerPerson)}{Noted(Call.CallerNote)}\n<size=80%>wants</size>\n" +
+            $"{Listed(Call.Request.Recipient)}{Noted(Call.RecipientNote)}";
+
+        private string Noted(JackId? jack) => jack.HasValue ? $" <size={jackTextSize}%>({jack.Value.Label})</size>" : string.Empty;
 
         // The book is sorted by surname, so the surname stands out.
         private static string Listed(IPerson person) =>

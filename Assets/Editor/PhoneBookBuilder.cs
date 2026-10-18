@@ -217,8 +217,11 @@ namespace Switchboard.Editor
             addressLabel.rectTransform.anchorMin = new Vector2(.76f, 0);
             addressLabel.rectTransform.anchorMax = Vector2.one;
             addressLabel.rectTransform.offsetMin = addressLabel.rectTransform.offsetMax = Vector2.zero;
+            var tapArea = template.gameObject.AddComponent<Image>();
+            tapArea.color = Color.clear;
+            tapArea.raycastTarget = false;
             var row = template.gameObject.AddComponent<PhoneBookContactRow>();
-            row.Configure(nameLabel, addressLabel);
+            row.Configure(nameLabel, addressLabel, tapArea);
             template.gameObject.SetActive(false);
             var number = Label("PageNumber", root, "", new Vector2(0, -223), new Vector2(80, 26), 18, FontStyle.Normal, TextAnchor.MiddleCenter);
             var empty = Label("EmptyMessage", root, "No contacts", new Vector2(0, 50), new Vector2(300, 50), 22, FontStyle.Italic, TextAnchor.MiddleCenter);

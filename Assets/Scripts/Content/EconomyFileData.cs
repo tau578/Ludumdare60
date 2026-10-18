@@ -2,7 +2,7 @@ using System;
 
 namespace Switchboard.Content
 {
-    /// <summary>The designer's Assets/Configs/Economy.json (D39). Step 5a reads only its upgrades.</summary>
+    /// <summary>The designer's Assets/Configs/Economy.json (D39). Steps 5a and 5b read only its upgrades.</summary>
     [Serializable]
     public sealed class EconomyFileData
     {
@@ -19,5 +19,6 @@ namespace Switchboard.Content
         public string description;
         public long costCents;
         public float incomeMultiplier;
+        public int wires;
     }
 }

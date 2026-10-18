@@ -110,6 +110,7 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Format-only re-saves (4) | Test runs and Play Mode can re-save `ProjectSettings/TimeManager.asset` (as well as `SampleScene.unity`) with only format changes. Discard them with `git checkout -- <file>` and mention it in the report. |
 | Layout in prefab editing (5a) | Unity's layout groups don't run while a prefab is edited from code, so an editor menu that resizes children must set their `sizeDelta` directly (as `Update Upgrade Shop Buttons` does). |
 | Disabled buttons (5a) | Setting `Button.interactable = false` applies the button's grey, half-transparent disabled tint and changes Sergei's look. To make a button inert, ignore the click in our view and dim it ourselves. |
+| Book row clicks (5b) | Row taps only reach `PhoneBookContactRow` while `ContactTapsEnabled` is on (Notepad owned); otherwise the open book's button gets the click and closes. Simulate them with EventSystem raycasts inside a `Canvas.willRenderCanvases` handler. |
 | Buying in Play Mode (5a) | Connect a call through `OperatorDesk.OnCircuitClosed` to check fees and pay without plugging cords; the dev panel's "+ $100" and "Reset upgrades" call `GameSession` methods directly. |
 
 ## 5. Definition of done (every step)
@@ -152,8 +153,8 @@ Follow-ups: <ideas, debts, questions>
 |---|---|---|
 | Before Step 1 | `Game.unity` will load `Level.unity` additively. We rely on the public members listed in Design §3 and on the name `CallerQueuePanel`. Please say before renaming any of them. | Sergei |
 | Before Step 2 | Done (2026-10-17): the lead confirmed D07. Pulling a plug puts the call on hold, using the new restore feature. | Lead (and Sergei) |
-| Step 5b (D44) | A way to add cords at runtime: a cable plus a tray slot, registered with `CableInputController` and the tray. Sergei hasn't built it, so our 5b agent does it as a coordinated change (lead, 2026-10-18). Tell Sergei before and after. | Sergei |
-| Step 5b (D44) | Notepad upgrade (D23): Sergei's phone book reports when an entry is tapped (a public event with the contact's name and socket). Built by our 5b agent as a coordinated change (lead, 2026-10-18). Tell Sergei. | Sergei |
+| Step 5b (D44), built 2026-10-18 | A way to add cords at runtime: `CableInputController.AddCable(Color)` copies a cable and its tray slot and re-spaces the tray (up to 6). Built by our 5b agent as a coordinated change; the lead approved `CableInputController.cs` (2026-10-18). Tell Sergei: also keep the tray slot's child name `Preview`; the 830 px usable tray width is a constant in his file. | Sergei |
+| Step 5b (D44), built 2026-10-18 | Notepad upgrade (D23): `PhoneBookView.ContactTapped(name, socket)` and `ContactTapsEnabled`; rows get a hit area that is a raycast target only while taps are on. Approved files (lead, 2026-10-18): `PhoneBookView.cs`, `PhoneBookPageView.cs`, `PhoneBookContactRow.cs`, `PhoneBook.prefab`, `PhoneBookBuilder.cs`. Tell Sergei. | Sergei |
 | Step 5a (D41, D44) | Built (2026-10-18). Tell Sergei: his `UpgradePlaceholderButton` now carries `UpgradeSlotView` (title, description, price, savings fill, gold highlight frame) and is 204 px wide (was 144); `UpgradeShopPanelBuilder` builds these parts and has a new menu `Tools/Switchboard/Update Upgrade Shop Buttons` that updates both shop prefabs in place. Keep the names `UpgradeShopPanel`, `HeaderSlot` and the 4 buttons. | Sergei |
 | Before Step 7 (D42) | Board growth: the book shows only people on open jacks; closed jacks are dimmed and can't be clicked. Both touch his book and board. Agree on how, or approve another coordinated change. | Sergei, Mia |
 | Feedback (Step 3 playtest) | Holding a cord and clicking a button (the book, a tab, a caller card) drops the cord back in the tray, because any click off a jack counts as "empty space". The lead would find it easier if clicks on buttons kept the cord in hand. His call; we didn't change it. | Sergei |
@@ -181,7 +182,7 @@ Follow-ups: <ideas, debts, questions>
 | 9 | Mobile and Web polish | Good on phones and desktop browsers |
 | 10 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–5a are fully specified. Steps 5b–10 are outlines. The orchestrator turns each one into a full brief before launching it.
+Steps 1–5b are fully specified. Steps 5c–10 are outlines. The orchestrator turns each one into a full brief before launching it.
 
 ---
 
@@ -880,27 +881,165 @@ Steps 1–5a are fully specified. Steps 5b–10 are outlines. The orchestrator t
 - a real secret effect (D15)
 - re-showing the A–Z tabs
 
-### Step 5b: Extra wires and the Notepad (outline; D23, D40, D43, D44)
-- **`extra_wires`** in `Economy.json` (`wires` = the total, values growing): 4, 5 and 6 cords for $5, $8 and $13. The base of 3 lives in `GameConfig`.
-  - `StatSheet.Cords`, and `CordBridge` attaches new cords as they appear.
-  - The spawner's cord count follows.
-- **Coordinated change to Sergei's cord code** (files to list in the brief):
-  - A runtime way to add a cord: a cable instance plus a tray slot, registered with `CableInputController` (today `Configure(tray, cables, cursor)` replaces the whole array; `Owns` and `Usable` gate input).
-  - The tray re-spaced so up to 6 slots fit (today 3 slots, 270 px apart).
-  - New cord colours.
-- **`notepad`** (one entry, $3). Coordinated change to his book:
-  - `PhoneBookView` raises a "contact tapped" event (name and socket), and each `PhoneBookContactRow` becomes clickable without breaking page turns.
-  - While owned, tapping an entry notes its jack on the call in hand, e.g. "Ada Moss (C3) / wants Basil Thorne (A5)".
-  - Deleting the entry from the file removes the feature.
-  - Known issue: a click on a row while holding a cord drops the cord. That's Sergei's call; mention it.
-- **Tests:**
-  - the cord stat by chain
-  - the spawner's cord count updating
-  - Notepad notes only while owned and only for people in the call in hand
-  - validator rules for the new types
-- **Playtest:**
-  - buy a cord and see a 4th cord in the tray that works
-  - buy the Notepad and tap names in the book to see their jacks in the bubble
+### Step 5b: Extra wires and the Notepad (D23, D40, D43, D44)
+
+**Goal.** Two new upgrade types from `Economy.json`, sold on Sergei's shop buttons: `extra_wires` adds cords to his tray while the game runs, and `notepad` lets a tap on a phone book entry note that person's jack on the call in hand. Both need small coordinated changes to Sergei's cord input and book. **Recommended effort:** high.
+
+**Playable result.**
+- The shop shows "Better rates" on top, "Extra cord / 4 cords / $5.00" in the second button and "Notepad / ... / $3.00" in the third. The secret is still at the bottom.
+- Buying "Extra cord" puts a 4th cord, in a new colour, in the tray at once. The tray re-spaces so every cord fits. The new cord works like the others: patch, hold, restore, and back to the tray. The button then offers 5 cords ($8), then 6 ($13), then goes back to "+".
+- After buying the Notepad, its button shows the next chain, or "+". From then on, tapping a name in the open book while a call is in hand shows that person's jack in the bubble, if they are the caller or the person wanted: "Ada Moss (C3) / wants Basil Thorne (A5)". The book stays open for the second tap.
+- A tap on someone not on the call in hand, or with no call in hand, does nothing, and the book stays open.
+- Without the Notepad, the book behaves exactly as today: a tap on a row closes the book.
+
+**Decisions for this step** (lead, 2026-10-18; D23, D40, D43, D44, Design 5.9):
+- **Prices (D43):** 4, 5 and 6 cords for $5, $8 and $13. The Notepad costs $3. The game starts with 3 cords, set by a new `GameConfig` field `startingCords` = 3.
+- **`wires` sets the total** (D40). Values in the chain must grow, be above `startingCords`, and be at most 6, which is all the tray holds.
+- **New cords are added while the game runs** by copying an existing cord and its tray slot. `Final.unity` and `CableTray.prefab` don't change.
+- **The three new cord colours** are presentation, so they live in our `GameConfig` (`extraCordColors`) and are passed to Sergei's `AddCable`. Use green, violet and ivory, clearly different from his red, blue and yellow and from the emergency red. Check them in a screenshot.
+- **Notepad scope** (lead, 2026-10-18):
+  - It notes only the caller or the person wanted on the **call in hand**.
+  - A tap on anyone else, or with no call in hand, does nothing: no message, no sound, and the book stays open.
+  - Notes belong to the call. They stay if the player swaps to another card and back, and go when the call ends.
+- **Rows are tappable only while the Notepad is owned** (lead, 2026-10-18). Without it, a row tap falls through to the open book and closes it, as today.
+- **Deleting the `notepad` entry from the file removes the feature.** Nothing in code names its id.
+- **Dev "Reset upgrades"** keeps cords already added (a cord can't be removed safely mid-call) and turns row taps back off. Say so in the report.
+
+**Approved coordinated changes** (Sergei's files, D44; the lead approved exactly these on 2026-10-18):
+- **`Assets/Scripts/UI/CableInputController.cs`:**
+  - New `public CableController AddCable(Color color)`, plus a constant `MaxCables = 6`. It:
+    - copies the last cable in its list under the same parent, named `Cable_NN`
+    - copies that cable's tray slot (`StoredCableView`) under the tray, named `StoredCable_NN`
+    - links them with `SetTrayCableView`, sets the colour with `SetCableColor`, and adds the cable to its list
+    - re-spaces all tray slots and returns the new cable, or null when the tray is full or nothing can be copied
+  - The new cord must start in the tray whatever state the copied cord is in (held, half-patched, connected or highlighted), with no hover outline copied across.
+  - **Tray layout:**
+    - Slots are spaced evenly along today's row (y −140), with spacing = min(270, usable width ÷ count). Pick the usable width from the green felt, about 830 px.
+    - The cord preview scales down with the spacing, and the hit area is narrowed so neighbours don't overlap.
+    - **With 3 cords the positions and sizes must equal today's** (−270, 0, 270; 252×94.5; preview scale 0.45).
+    - Put the spacing maths in a small public static method so an EditMode test can check it.
+  - Nothing else in the file changes. Keep his style.
+- **`Assets/Scripts/UI/PhoneBookContactRow.cs`:**
+  - A full-row hit area (a transparent `Image` on the row root, assigned in `Configure`, with `raycastTarget` off by default).
+  - `SetTappable(bool)`, which turns that raycast on or off.
+  - `IPointerClickHandler`, raising `event Action<PhoneBookContact> Tapped` with the contact shown.
+  - With taps off, it must not swallow clicks, so they reach the open book as now.
+- **`Assets/Scripts/UI/PhoneBookPageView.cs`:** subscribes the rows it creates and forwards their taps (`event Action<PhoneBookContact> ContactTapped`); applies the tappable flag to new and existing rows.
+- **`Assets/Scripts/UI/PhoneBookView.cs`:**
+  - `public event Action<string, string> ContactTapped` (name, socket)
+  - `public bool ContactTapsEnabled { get; set; }`, off by default and passed to both pages
+  - Page turns (corners, arrow keys, tabs) stay unchanged.
+- **`Assets/Prefabs/UI/PhoneBook.prefab`:** both `ContactTemplate` rows get the transparent `Image` (`raycastTarget` off), assigned to the row. Edit the prefab directly (`manage_prefabs` or `PrefabUtility.LoadPrefabContents` from `execute_code`). **Don't run `Update Phone Book Tabs` or any phone book menu.** `OpenBook/LetterTabs` must stay inactive; check this in the diff.
+- **`Assets/Editor/PhoneBookBuilder.cs`:** `DirectoryPage` builds the same hit area on `ContactTemplate`, so a future rebuild by Sergei keeps it. Change nothing else, and don't run the menu.
+- Don't touch any other file of his: `CableController`, `StoredCableView`, `CableBuilder`, `CableTrayBuilder`, `CableTray.prefab`, `Final.unity`'s loose objects or `MainMenu.unity`. If one of them turns out to be unavoidable, stop and report the exact change.
+
+**Build**
+1. **`Assets/Configs/Economy.json`:** add these entries after `income_3`, one per line, keeping the secret last:
+   ```json
+   { "id": "wires_1", "type": "extra_wires", "name": "Extra cord", "description": "4 cords", "costCents": 500, "wires": 4 },
+   { "id": "wires_2", "type": "extra_wires", "name": "Extra cord", "description": "5 cords", "costCents": 800, "wires": 5 },
+   { "id": "wires_3", "type": "extra_wires", "name": "Extra cord", "description": "6 cords", "costCents": 1300, "wires": 6 },
+   { "id": "notepad", "type": "notepad", "name": "Notepad", "description": "Tap a name: note its jack", "costCents": 300 },
+   ```
+   Check that the texts fit the button at 1280×720. Shorten the description if needed, but keep the ids.
+2. **`Docs/EconomyFile.md`:**
+   - Mark `extra_wires` and `notepad` as ready (5b) and describe their fields.
+   - Explain `wires`: it is the total, must grow, must be above the starting 3, and can be at most 6.
+   - Explain that there is at most one `notepad`, and that deleting it removes the feature.
+   - Give an example validator message for each new rule.
+   - `extra_clients` stays "Coming in Step 7".
+3. **Content:**
+   - `UpgradeEntry.wires` (int); `IUpgrade.Wires`.
+   - `EconomyFileLoader` loads `ExtraWires` and `Notepad`. `extra_clients` still reports "arrives in Step 7".
+   - `GameConfig.startingCords` (default 3, `Min(1)`) and `extraCordColors` (3 colours).
+   - `IGameContent.StartingCords`; update the fakes.
+4. **Domain:**
+   - **`StatSheet`:**
+     - `Cords`: the `wires` of the last bought `extra_wires` entry, or `StartingCords`.
+     - `HasNotepad`: true while any `notepad` entry is owned.
+     - Raises `Changed` after every recompute, including `ResetUpgrades`.
+   - **`Notepad`** (new, `Assets/Scripts/Domain/Upgrades/`):
+     - `bool Note(JackId jack)` notes the jack on the call in hand only when `HasNotepad`, a call is in hand, and the jack belongs to its caller or its recipient, found through `PhoneDirectory`. Otherwise it changes nothing and returns false.
+     - Notes live on the call: for example `Call.CallerNoted` and `Call.RecipientNoted`, or a per-call record. The agent may choose, but no per-tick allocation.
+     - Raises `Noted(CallId)` once per new note. Tapping the same person again changes nothing.
+   - The spawner already reads `ISwitchboard.CordCount` live. Check it, and don't change it unless a test shows a gap.
+   - Build `Notepad` in `GameSession`.
+5. **Game:**
+   - **`CordBridge`:**
+     - Finds the one `CableInputController` by type in its scene (log a clear error otherwise).
+     - `EnsureCords(int total)` calls `AddCable` with the next colour from `extraCordColors` until the count is reached or `AddCable` returns null.
+     - Appends each new cable to `cables` and `observed` with its current state, so the next `LateUpdate` reports nothing spurious.
+     - New cord ids continue the index order (3, 4, 5).
+   - **`GameInstaller`:**
+     - Calls `EnsureCords(Stats.Cords)` at start and on `Stats.Changed`.
+     - Warns if the scene's cord count differs from `startingCords`.
+     - Finds the one `PhoneBookView` by type.
+     - Sets `ContactTapsEnabled = Stats.HasNotepad` at start and on `Stats.Changed`.
+     - Routes `ContactTapped` to `Session.Notepad.Note(new JackId(socket))`.
+     - Unsubscribes on destroy. Keep the installer thin; a small plain class for the book wiring is fine. No new root objects.
+   - **`CallCardView`:**
+     - The in-hand bubble adds " (C3)" after a noted name, keeping the bold surname style.
+     - A new note updates the bubble text at once, without re-typing the whole bubble.
+     - Check that the longest names with jacks still fit the bubble, and shrink the jack text slightly if needed.
+6. **Dev panel:** no new buttons. "Reset upgrades" behaves as described in the decisions.
+
+**Tests** (`Switchboard.Domain.Tests`, plus Content tests where they live; Sergei-type tests in `Assets/Tests/Game/Editor/`)
+- **`StatSheet`:**
+  - `Cords` is `StartingCords` with nothing bought.
+  - It is the last bought value, set and not stacked (4 then 5 gives 5).
+  - `HasNotepad` is false, then true after buying.
+  - `Changed` is raised on purchase and on reset.
+- **Spawner:** with waiting calls, the interval stretches less once the switchboard's cord count grows (a fake switchboard whose count changes mid-session).
+- **`Notepad`:**
+  - It does nothing without the upgrade.
+  - It notes the caller's jack and the recipient's jack, each once, and raises `Noted`.
+  - It ignores a jack not on the call in hand, and does nothing with no call in hand.
+  - Notes stay on a call after swapping away and back, and don't leak to another call.
+  - It works for an emergency's service recipient.
+- **Loader and validator:**
+  - The real file loads 8 entries with no problems.
+  - `wires` not growing; `wires` ≤ `startingCords`; `wires` > 6; a second `notepad`.
+  - `extra_clients` still reports Step 7. Replace the 5a test that used `extra_wires` as the "not ready" example.
+  - Each message names the entry and the fix.
+- **Shelf with the real file:** `income_1`, `wires_1`, `notepad`. After the notepad is bought, slot 3 goes empty and slots 1 and 2 don't move.
+- **Sergei-type tests** (`Assets/Tests/Game/Editor/`):
+  - Tray spacing: 3 slots give today's positions, and 4–6 slots fit the usable width with no overlap.
+  - `PhoneBookView` raises `ContactTapped` with the row's name and socket when a row is clicked with taps on.
+  - With taps off, the row's hit area isn't a raycast target.
+
+**Play Mode checks** (stepped frames; see the Plan §4 cheat sheet):
+- Buy all three wire upgrades (dev "+ $100"): 6 cords in the tray, each picked up and patched with `ProcessPointer`.
+- A 4th cord connects a real call and pays.
+- Buy a wire while all 3 original cords are connected: the new cord appears in the tray, and the connected calls aren't disturbed.
+- Notepad: with a call in hand, a raycast click on the caller's row and the recipient's row shows both jacks in the bubble. A click on another row changes nothing and the book stays open. Before buying, a row click closes the book.
+
+**Done when** Plan §5 is met and every test above passes. Screenshots in `Temp/Captures/`:
+- `step-05b.png`: the shop at the start, with income, Extra cord, Notepad and the secret
+- `step-05b-cords.png`: 6 cords in the tray, with one of the new ones connected on the board
+- `step-05b-notepad.png`: the book open with the bubble showing both noted jacks
+- `step-05b-720.png`: the tray with 6 cords and the shop at 1280×720
+
+**Playtest script (you)**
+1. Play `Final.unity`. The shop shows Better rates ($8), Extra cord / 4 cords ($5), Notepad ($3) and the secret.
+2. Earn $5 (or F1, then "+ $10") and buy Extra cord. A 4th cord in a new colour appears in the tray, the cords move closer together, and the button now offers 5 cords for $8.
+3. Pick up the new cord and connect a call with it. It pays, can be put on hold and restored, and goes back to the tray like the others.
+4. Buy 5 and 6 cords. All 6 fit in the tray and each one works. The button goes back to "+".
+5. Before buying the Notepad: open the book and tap a name. The book closes, as before.
+6. Buy the Notepad. Take a call, open the book and tap the caller's name: their jack appears in the bubble, e.g. "Ada Moss (C3)". Tap the wanted person: their jack appears too. The book stays open.
+7. Tap someone else: nothing happens. Swap to another call and back: the notes are still there.
+8. Known issue (Sergei's code, not changed): tapping a book row while holding a cord drops the cord back in the tray.
+9. Open `Economy.json`, set `wires_2`'s `wires` to 4, and run `Tools/Switchboard/Validate Content`. You get a plain message about the chain. Undo the change.
+
+**Out of scope:**
+- removing cords
+- more than 6 cords
+- notes for people not on the call in hand
+- re-showing the A–Z tabs
+- keeping a held cord when a button or row is clicked (Sergei's call)
+- moving calls and pacing into the file (5c)
+- saving purchases (6)
+- board growth (7)
+- shop sounds (8)
 
 ### Step 5c: Calls, pacing and starting money into `Economy.json` (outline; D39)
 - Move these into `Economy.json` sections, removing them from the assets:

@@ -14,6 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Switchboard.Content::Switchboard.Content.GameConfig
   startingCents: 0
   maxWaitingCalls: 6
+  startingCords: 3
+  extraCordColors:
+  - {r: 0.36078432, g: 0.72156864, b: 0.36078432, a: 1}
+  - {r: 0.6117647, g: 0.40784314, b: 0.8392157, a: 1}
+  - {r: 0.9411765, g: 0.9098039, b: 0.80784315, a: 1}
   pacing: {fileID: 11400000, guid: dd81c1612abd847569593a27c48b3706, type: 2}
   callerTypes:
   - {fileID: 11400000, guid: 4bef3ba27d35f481cb8d2a5c7c95dc32, type: 2}
