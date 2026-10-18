@@ -28,6 +28,14 @@ A step moves through these statuses: not started → building → verifying → 
 ## Log
 <!-- Agents append their reports below, newest last. The orchestrator adds verification and playtest notes under each report. -->
 
+### Level artwork: background and lamps (2026-10-18)
+- Requested directly by the lead: add `main_background_0` to a Canvas container, hide replaced placeholder visuals, add lamp sprite states, and save a prefab.
+- `BackgroundPanel.prefab` contains the background and the existing switchboard as a nested prefab. The Level scene uses the new prefab instance. Socket positions and all 36 socket identities are preserved.
+- Twelve row/column lamps use `bulb-01` (lit), `bulb-02` (unlit), and the matching glyph pairs. Hovering or occupying a socket lights its row and column. Shared rows/columns stay lit until the last relevant plug is removed. F retains a text label because the artwork only supplies A–E.
+- Disabled caller panel decoration, old row/column badges and their strips as instance overrides; original source prefabs remain available. Six caller slot anchors are retained; aligning them to the five painted portrait windows is a separate layout task.
+- Verified prefab reload and internal socket references, on/off artwork, hover, occupancy, multiple plugs and release, and raycast passthrough. Render previews: `Temp/Background-off.png` and `Temp/Background-on.png`.
+- Play Mode smoke check passed: picked up a real cable, inserted it into B3, observed B and 3 lit, then removed it and observed both unlit. All three cables and 36 sockets remain available. Exited Play Mode; temporary verification script removed.
+
 ### Step 1 prep (orchestrator, 2026-10-17)
 - **Decisions:** the lead confirmed D07 (hold). It is built in Step 2; Step 1 keeps the temporary immediate cut-off.
 - **Coordination:** the lead was asked to tell Sergei about `Game.unity`, which loads `Level.unity`, and about the public members we rely on.
@@ -915,3 +923,11 @@ Follow-ups:
 
 #### Step 3 final playtest (lead, 2026-10-18)
 - Looks good with the tabs hidden. The lead asked to commit, and to push if upstream has no new commits.
+
+#### Merge with upstream (orchestrator, 2026-10-18)
+- Merged 4 upstream commits: Mia's bulb sprites, the `caller-01` portrait, `tray.png` and F bulb letters, plus Sergei's level art pass.
+- Mia's commit deleted `caller-01.png.meta`, which `GameConfig.asset` and `GameUI.prefab` reference. The old meta was kept in the merge, so the GUID `f1165ce5…` and the portrait links survive. The lead sent Mia a note to commit `.meta` files with her images.
+- After the merge: EditMode tests 211/211, a clean compile, and a Play Mode check with no errors. `CallerQueuePanel` and `HeaderSlot` are still found, and the cards and the money counter show.
+- **Follow-up:** Sergei's new background paints 5 portrait windows, but there are still 6 caller slot anchors, so our cards no longer line up with the painted windows. He lists this as a pending layout task.
+- Unity created `.meta` files for Mia's `F01.png` and `F02.png` locally. They were left uncommitted, per the team rule.
+
