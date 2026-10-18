@@ -13,7 +13,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 ## Read first, every session
 1. `Docs/Progress.md`: status table (what's done, what's next), step reports, and verification and playtest notes.
 2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), team coordination (§8) and the step briefs (§9).
-3. `Docs/Design.md`: the source of truth for game rules, architecture, ownership and decisions D01–D33. If the code or a brief disagrees with it, stop and ask; don't improvise.
+3. `Docs/Design.md`: the source of truth for game rules, architecture, ownership and decisions D01–D35. If the code or a brief disagrees with it, stop and ask; don't improvise.
 
 **Next step:** see the first "not started" row in `Docs/Progress.md`. As of 2026-10-18 that is **Step 3: phone book and cards**.
 
@@ -69,7 +69,9 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 
 **Division of work (D30):** Sergei builds the UI components; we build the rules and data and wire his components to them. Before building any UI, check whether Sergei already has one.
 
-**Approved changes to his files so far:** the `UpgradeShopPanel` prefab and `UpgradeShopPanelBuilder` constants (Step 1c: the `HeaderSlot` money plaque).
+**Approved changes to his files so far:**
+- The `UpgradeShopPanel` prefab and `UpgradeShopPanelBuilder` constants (Step 1c: the `HeaderSlot` money plaque).
+- Step 3 (D34, A–Z tabs in the phone book): `PhoneBookView.cs`, `PhoneBookPageView.cs`, `PhoneBookContactRow.cs`, a new tab component in `Assets/Scripts/UI/`, `PhoneBookBuilder.cs`, `PhoneBook.prefab`, and a test in `Assets/Tests/Editor/` for the tab jump.
 
 ## Architecture in brief (details in Design.md §4–§7)
 - **Scene flow (D33).** `MainMenu` → `Game` → `Level`. Sergei's menu loads the next build index. Our `Game.unity` loads his `Level.unity` additively.

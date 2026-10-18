@@ -162,7 +162,7 @@ Follow-ups: <ideas, debts, questions>
 | 1b | Connection fee, Sergei's book, layout | Fee on connect; the real phone book shows our people; no overlaps |
 | 2a | Queue, callbacks, dev panel | Several callers, swapping, callbacks, a dev panel |
 | 2b | Hold and resume | Pulled plugs put calls on hold; restore resumes |
-| 3 | The phone book and real cards | Look people up in the book with tabs; readable cards in every state |
+| 3 | Phone book tabs, 36 people, real cards | Find anyone fast with A–Z tabs; the whole board in use; readable cards in every state |
 | 4 | Emergencies and fines | Timed emergency calls and fair fines |
 | 5 | Upgrades, shop and the mystery goal | Buy cords and multipliers; save up toward the mystery |
 | 6 | Saves, Boot scene, first Web build | Plays in a browser, and progress survives a reload |
@@ -171,7 +171,7 @@ Follow-ups: <ideas, debts, questions>
 | 9 | Mobile and Web polish | Good on phones and desktop browsers |
 | 10 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator turns each one into a full brief before launching it.
+Steps 1–3 are fully specified. Steps 4–10 are outlines. The orchestrator turns each one into a full brief before launching it.
 
 ---
 
@@ -440,23 +440,53 @@ Steps 1 and 2 are fully specified. Steps 3–10 are outlines. The orchestrator t
 
 ---
 
-### Step 3: Real cards (outline). The book itself was wired in Step 1b; this step polishes it with Sergei.
-- **Book:** `DirectoryBookView` (Design §5.7). The book on the desk opens an overlay with:
-  - pages
-  - A–Z tabs
-  - pooled rows
-  - flipping by tap, swipe or keys
+### Step 3: Phone book tabs, 36 people, real cards
 
-  D23 is decided (2026-10-18) as the Notepad upgrade in Step 5; Step 3 doesn't build it.
-- **People:** the directory grows to 36 people, one per jack. Portraits are reused, or silhouettes are used. Names follow Design §6.3.
-- **Cards:** every state from Design §5.4, in TextMeshPro, styled to match the caller panel, with a ringing animation.
-- **`ContentValidator`:** an editor menu item plus an EditMode test (Design §6.3).
-- **Notes from 2b:**
-  - Card states now in code: waiting (halo + rate badge), in hand (bubble with names), connected and on hold (cord ring + earnings badge; bubble "On the line" / "On hold"), ended (stamp). Step 3 restyles these; keep the halo's nested canvas (order 9) so badges stay readable.
-  - The dev panel's "Clear calls" can leave the cord input briefly holding a returned cord (stale `heldCable` from Step 1); it lets go on the next update. Dev-only, harmless.
-- **Playtest:**
-  - Anyone can be found in under 10 s using the tabs.
-  - Cards are readable at 1280×720 and in a phone-sized Game view.
+**Goal.** Finding anyone in the book is quick, the whole 6×6 board is in use, and every card state is readable. **Recommended effort:** high.
+
+**Playable result.**
+- The book has A–Z tabs. Tapping a letter jumps to the spread with the first surname starting with that letter. Letters with no surname are greyed out and do nothing.
+- 36 people, one on every jack A1–F6, all listed in the book and all able to call.
+- Cards are restyled and readable in every state, at 1280×720 and in a phone-sized Game view.
+- `Tools/Switchboard/Validate Content` reports problems in `PhoneBook.json`; the same checks run as an EditMode test.
+
+**Build**
+- **Book tabs (D34, coordinated change to Sergei's book, approved by the lead 2026-10-18).**
+  - Approved files: `Assets/Scripts/UI/PhoneBookView.cs`, `PhoneBookPageView.cs` and `PhoneBookContactRow.cs` if needed, a new tab component in `Assets/Scripts/UI/` if needed, `Assets/Editor/PhoneBookBuilder.cs`, and `Assets/Prefabs/UI/PhoneBook.prefab`. Nothing else of his.
+  - Match his style exactly (namespace `Switchboard.UI`, uGUI `Text` like his rows, his builder pattern). Keep his public API working: `IsOpen`, `CurrentSpreadIndex`, `NextSpread`, `PreviousSpread`, `Toggle`, `SetOpen`, `ReloadContacts`.
+  - Add a public `ShowLetter(char)` (or similar) and keep the tabs as a thin view over it, so it can be tested and reused.
+  - Tabs sit on the open book's edge, inside his book canvas, so nothing of ours overlaps the book (both are at sorting order 10).
+  - Add the tabs in the prefab through his builder's own code path, or by editing the prefab directly. **Don't run `Update Phone Book Directory`**: it points at a missing `Assets/Settings/PhoneBook.json`. Don't run anything that marks `Level.unity` dirty, and never save it.
+  - Keyboard arrows and swipe flipping: only if they're small, using `Pointer.current` / `Keyboard.current`; otherwise list them as follow-ups.
+- **36 people (D35).**
+  - Add 24 people to `Assets/Configs/PhoneBook.json` so every jack A1–F6 is used exactly once. Keep Sergei's format, `contactsPerPage` (6) and the surname sort order. Names follow Design §6.3: 1920s–40s English names, unique surnames, no famous people. Spread surnames across the alphabet so most tabs are live.
+  - Portraits: reuse `caller-01`…`caller-12`, each three times, until Mia draws more. All 36 use `type.regular` with no overrides.
+  - Check that the book shows 3 spreads and the spawner uses the larger pool.
+- **Cards (ours: `CallCardView`, `GameUI.prefab`).**
+  - Restyle every state from Design §5.4 to match the caller panel: waiting (halo, rate and fee badge, "Calling again"), in hand (bubble with names), connected and on hold (cord ring, earnings, "On the line" / "On hold"), ended (stamps "Paid $X", "Wrong number!", "Cut off").
+  - Use TextMeshPro and only glyphs in the static atlas. Keep the halo's nested canvas at sorting order 9 (Step 2b), so badges stay readable. Don't add raycast targets except the card portrait.
+  - Check readability with screenshots at 1920×1080, 1280×720 and a phone-sized landscape view (e.g. 844×390).
+- **`ContentValidator` (Design §6.3, adapted to D31).**
+  - Content assembly code plus an editor menu item `Tools/Switchboard/Validate Content` (in `Assets/Scripts/Game/Editor/` or another folder of ours; `Assets/Editor/` is Sergei's).
+  - It checks `PhoneBook.json` and the caller types: unique names and surnames, unique person ids, every socket a real jack (A–F × 1–6) used once, every portrait sprite exists, every type id exists, rate and fee ≥ 0, ranges min ≤ max, and each type has enough possible recipients.
+  - Reuse the error collection that `PeopleFileLoader` already does instead of duplicating it.
+
+**Tests**
+- `ShowLetter`: jumps to the right spread, ignores letters with no surname, and works on the first and last spread. If it lives in Sergei's assembly, put the test next to his `CableConnectionTests` in `Assets/Tests/Editor/` (approved as part of this change); otherwise in ours.
+- The validator: the real file passes, and broken samples (duplicate socket, unknown jack, missing portrait, unknown type, duplicate surname) are each reported.
+- The spawner and busy rule still behave with 36 people (one test is enough).
+
+**Playtest script (you)**
+1. Play from `Game.unity`. Open the book: there are A–Z tabs, and letters with no names are greyed out.
+2. Take a card, find both people with the tabs in under 10 s each, and connect them.
+3. Flip through all three spreads: 36 names, sorted by surname, each with its jack.
+4. Callers come from all over the board, not only the first 12 jacks.
+5. Look at cards in every state (ringing, in hand, connected, on hold, each stamp). Everything is readable. Switch the Game view to 1280×720 and to a phone-sized landscape size and check again.
+6. Run `Tools/Switchboard/Validate Content`: it reports no problems.
+
+**Out of scope:** the Notepad upgrade (D23, Step 5), board sections and locked lines (Step 7), emergencies, sounds.
+
+---
 
 ### Step 4: Emergencies and fines (outline)
 - **Caller types:** the fields that Design §6.1 marks [4].
