@@ -10,7 +10,9 @@
 | 3. Phone book and cards | done | ✅ 2026-10-18 (16 min + 8 min fix + 3 min fix) | ✅ 211/211 tests, scope clean | ✅ | |
 | 4. Emergencies and fines | done | ✅ 2026-10-18 (26 min) | ✅ 255/255 tests, scope clean | ✅ | 14fd59c |
 | Scene merge: `Final` (D38) | done | ✅ 2026-10-18 (11 min) | ✅ 255/255 tests, scope clean | ✅ | 3002ea8 |
-| 5. Upgrades, shop, goal | not started | | | | |
+| 5a. Economy file, shop, income, secret | not started | | | | |
+| 5b. Extra wires and Notepad | not started | | | | |
+| 5c. Calls and pacing into Economy.json | not started | | | | |
 | 6. Saves, Boot, Web build | not started | | | | |
 | 7. Board growth and pacing | not started | | | | |
 | 8. Sound and feel | not started | | | | |
@@ -1242,3 +1244,22 @@ Follow-ups:
 - **Seen, not changed:** `Assets/Sprites/board/caller.png` (Mia, 229×190) still slices `caller_0` at 190×191, so Unity logs "rect lies outside of texture" for it. Nothing references it yet; tell Mia or the lead before it gets used.
 
 - Orchestrator check: an independent EditMode run passed 255/255. Seven one-line slice edits plus `CallerPortraitSliceCheck`. Pushed at the lead's request. Mia's `board/caller.png` (229×190, slice 190×191) is unused for now; flagged to the lead.
+
+#### Step 5 prep (orchestrator and lead, 2026-10-18)
+- **Pre-flight:** nothing new upstream (`main` = `origin/main` at `6487687`), Unity idle in `Final.unity`, console empty, EditMode 255/255.
+- **Sergei:** no commits since his reverted "edited sfx" (`9eed19b`), so the call sounds and music haven't been redone on `Final.unity` yet, and there's no sign he has pulled the new layout. Nothing to stop for.
+- **Step 5 coordination items: neither exists on his side.**
+  - His cord code has no runtime add: `CableBuilder.CableCount` is a constant 3, and the tray has 3 fixed slots 270 px apart.
+  - His book raises no event for a tapped entry; the rows are plain labels.
+  - His `UpgradeShopPanel` is still the placeholder: the money plaque plus 4 blank "+" buttons, with no script or text.
+- **The designer's upgrade config** replaced the planned `UpgradeDefinition` levels and cost formula. The lead's answers are recorded as D39–D44 in Design §10:
+  - one hand-edited `Assets/Configs/Economy.json` with sections
+  - one-time entries in chains
+  - values set the result, and costs are in cents
+  - Notepad as a removable entry
+  - board growth by open jacks, starting at 3×3 (Step 7)
+  - a pinned secret button with the savings fill and 3 rotating buttons
+  - Sergei's missing hooks built by us as coordinated changes, including the text inside his shop buttons
+- **Split:** 5a (file, shop, income, secret), 5b (wires and Notepad), 5c (calls, pacing and starting money into the file). Plan §9 has the full 5a brief.
+- **Docs updated:** Design 1, 3, 5.9, 5.10, 5.11, 5.12, 6.1–6.4, 9 and 10 (D14, D21, D23, D27, D35; new D39–D44). Plan §8, §9, Steps 5a/5b/5c/6/7/10. CLAUDE.md.
+

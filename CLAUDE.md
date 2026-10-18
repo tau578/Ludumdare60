@@ -6,16 +6,17 @@ A casual telephone switchboard-operator game:
 - Connected calls pay a one-off connection fee plus a per-second rate.
 - Wrong connections make the caller hang up and call back later.
 - Emergency calls bring fines (later step), but money never drops below 0 and there is no lose condition.
-- The player buys upgrades and saves for a final "mystery upgrade" whose effect is still undecided.
+- The player buys upgrades and saves for a final "mystery upgrade" (the `secret` entry) whose effect is still undecided.
+- The economy is driven by the designer's hand-edited `Assets/Configs/Economy.json` (D39, D40): one-time upgrade entries in chains, values that set the result, costs in cents.
 
 Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile browsers, mouse and touch through the new Input System. Team repo: `github.com/tau578/Ludumdare60`, branch `main`. Teammates push often.
 
 ## Read first, every session
 1. `Docs/Progress.md`: status table (what's done, what's next), step reports, and verification and playtest notes.
 2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), team coordination (§8) and the step briefs (§9).
-3. `Docs/Design.md`: the source of truth for game rules, architecture, ownership and decisions D01–D38. If the code or a brief disagrees with it, stop and ask; don't improvise.
+3. `Docs/Design.md`: the source of truth for game rules, architecture, ownership and decisions D01–D44. If the code or a brief disagrees with it, stop and ask; don't improvise.
 
-**Next step:** see the first "not started" row in `Docs/Progress.md`. As of 2026-10-18, Step 4 and the scene merge into `Final.unity` (D38) are done, and the next is **Step 5: upgrades, shop and the mystery goal**. It needs the Step 5 coordination items with Sergei first (runtime cords, and the book reporting a tapped entry for the Notepad), and the orchestrator turns its outline in Plan.md into a full brief.
+**Next step:** see the first "not started" row in `Docs/Progress.md`. As of 2026-10-18, Step 5 is split (D39–D44): **5a** (the designer's `Economy.json`, Sergei's shop panel wired with real texts, income upgrades, the secret goal with a savings fill) is fully briefed in Plan.md; 5b (extra wires, Notepad) and 5c (calls and pacing into `Economy.json`) are outlines.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).
@@ -66,13 +67,16 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 | Sergei | Phone book (`PhoneBookView`), `UpgradeShopPanel`, main menu, `Assets/Tools/rodrigo_menu_tools`, volume panel | Same. |
 | Mia (art) | `Assets/Sprites/`, `Assets/Fonts/` | Read-only. |
 | Ours | `Assets/Scripts/Domain/`, `Assets/Scripts/Content/`, `Assets/Scripts/Game/`, `Assets/Tests/Domain/`, `Assets/Tests/Game/`, `Assets/Content/`, `Assets/Prefabs/Game/`, `Docs/`, `CLAUDE.md` | Agents change these. |
+| Ours (designer edits) | `Assets/Configs/Economy.json` | The economy file (D39). One entry per line; the format guide is `Docs/EconomyFile.md`. |
 | Shared | `Assets/Configs/PhoneBook.json` | The single people file (D31). Sergei's book reads `name` and `socket`; our game reads every field. Keep his format, `contactsPerPage`, and the surname sort order. |
 
 **Division of work (D30):** Sergei builds the UI components; we build the rules and data and wire his components to them. Before building any UI, check whether Sergei already has one.
 
-**Approved changes to his files so far:**
+**Approved changes to his files so far** (from Step 5 on, D44: our agents build his missing hooks as coordinated changes, each brief listing the files):
 - The `UpgradeShopPanel` prefab and `UpgradeShopPanelBuilder` constants (Step 1c: the `HeaderSlot` money plaque).
 - Step 3 (D34, A–Z tabs in the phone book): `PhoneBookView.cs`, `PhoneBookPageView.cs`, `PhoneBookContactRow.cs`, a new tab component in `Assets/Scripts/UI/`, `PhoneBookBuilder.cs`, `PhoneBook.prefab`, and a test in `Assets/Tests/Editor/` for the tab jump. Used: `PhoneBookView.cs`, the new `PhoneBookTab.cs`, `PhoneBookBuilder.cs` (new menu `Tools/Switchboard/Update Phone Book Tabs`) and `PhoneBook.prefab`. The test went to our `Assets/Tests/Game/Editor/` instead.
+- Step 5a (D41): `UpgradeSlotView.cs` (new, `Assets/Scripts/UI/`), `UpgradeShopPanelBuilder.cs` (menu `Update Upgrade Shop Buttons`), `UpgradePlaceholderButton.prefab`, `UpgradeShopPanel.prefab`: texts, price and savings fill inside his shop buttons.
+- Step 5b (approved in principle, files to list in its brief): runtime cords in his cord input and tray; a tapped-entry event in his book.
 
 ## Architecture in brief (details in Design.md §4–§7)
 - **Scene flow (D38).** `MainMenu` → `Final`. Sergei's menu loads the next build index. `Final.unity` (formerly `Level.unity`, same GUID) is the one game scene: Sergei's board plus our `Game.prefab` and `GameUI.prefab` instances. Sergei's first merge attempt (`1c20569`, prefab-less copies) was reverted in `cdc5876`.
@@ -122,7 +126,8 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 - **Leave the editor clean:** idle, not in Play Mode, compiled, `Final.unity` saved as the active scene, console clean, and no temporary callbacks or editor state left behind.
 
 ## Pending coordination with Sergei (Plan §8)
-- **Step 5:** a way to add cords at runtime, and the phone book reporting a tapped entry (Notepad upgrade, D23).
+- **Step 5 (D44):** Sergei has none of the hooks, so our agents build them as coordinated changes: shop button texts (5a), runtime cords and the book's tapped-entry event (5b). Tell him before and after.
+- **Step 7 (D42):** board growth from 3×3. His book shows only people on open jacks, and closed jacks are dimmed. Both touch his book and board.
 - **Step 6:** touch input in `CableInputController` (`Pointer.current`).
 - **Tell Sergei (scene merge):** `Level.unity` is now `Final.unity`; his `LevelBackgroundBuilder` and `GamePresentationBuilder` menus still name the old path; "scene shared, prefabs owned"; suggest making `SwitchboardCanvas` and `EventSystem` prefabs.
 - **Ongoing:** keep the names `CallerQueuePanel`, `UpgradeShopPanel` and `HeaderSlot`, and keep the extra fields in `PhoneBook.json`.
@@ -136,6 +141,6 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 - D26: hosting target.
 - D27: currency scale and target playtime.
 
-**Designer:** edits `Assets/Configs/PhoneBook.json` by hand. Keep it human-readable and keep validator messages plain.
+**Designer:** edits `Assets/Configs/PhoneBook.json` and `Assets/Configs/Economy.json` by hand. Keep it human-readable and keep validator messages plain.
 
 Don't assume answers to these; ask the lead when a step needs them.
