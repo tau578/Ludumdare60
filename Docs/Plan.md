@@ -149,13 +149,14 @@ Follow-ups: <ideas, debts, questions>
 |---|---|---|
 | Before Step 1 | `Game.unity` will load `Level.unity` additively. We rely on the public members listed in Design §3 and on the name `CallerQueuePanel`. Please say before renaming any of them. | Sergei |
 | Before Step 2 | Done (2026-10-17): the lead confirmed D07. Pulling a plug puts the call on hold, using the new restore feature. | Lead (and Sergei) |
-| Before Step 5 | A way to add cords at runtime: a cable prefab plus a tray slot, and a way to register them with `CableInputController` and the tray. | Sergei |
-| Before Step 5 | Notepad upgrade (D23): Sergei's phone book reports when an entry is tapped (e.g. a public event with the contact's name and socket), so we can note the jack on the call in hand. | Sergei |
+| Step 5b (D44) | A way to add cords at runtime: a cable plus a tray slot, registered with `CableInputController` and the tray. Sergei hasn't built it, so our 5b agent does it as a coordinated change (lead, 2026-10-18). Tell Sergei before and after. | Sergei |
+| Step 5b (D44) | Notepad upgrade (D23): Sergei's phone book reports when an entry is tapped (a public event with the contact's name and socket). Built by our 5b agent as a coordinated change (lead, 2026-10-18). Tell Sergei. | Sergei |
+| Step 5a (D41, D44) | His shop buttons get a small `UpgradeSlotView` (title, description, price, savings fill) and a builder menu `Update Upgrade Shop Buttons`, built by our 5a agent as a coordinated change. His panel's names `UpgradeShopPanel`, `HeaderSlot` and the 4 buttons stay. Tell Sergei. | Sergei |
+| Before Step 7 (D42) | Board growth: the book shows only people on open jacks; closed jacks are dimmed and can't be clicked. Both touch his book and board. Agree on how, or approve another coordinated change. | Sergei, Mia |
 | Feedback (Step 3 playtest) | Holding a cord and clicking a button (the book, a tab, a caller card) drops the cord back in the tray, because any click off a jack counts as "empty space". The lead would find it easier if clicks on buttons kept the cord in hand. His call; we didn't change it. | Sergei |
 | Before Step 6 | Touch input in the cord code: use `Pointer.current` instead of `Mouse.current` in `CableInputController.Update`, and hide the hand cursor on touch. | Sergei |
 | Done (2026-10-18, D38) | One `Final.unity` from prefabs. Tell Sergei: `Level.unity` is now `Final.unity` (same GUID); his `LevelBackgroundBuilder` and `GamePresentationBuilder` menus still name `Assets/Scenes/Level.unity`; the rule is "scene shared, prefabs owned" (announce root-level changes); suggestion: make `SwitchboardCanvas` and `EventSystem` prefabs. | Sergei |
 | Done in Step 1c (lead approved) | The upgrade panel's top header is now a 96 px `HeaderSlot` plaque holding our money counter. Sergei keeps the names `UpgradeShopPanel` and `HeaderSlot`. | Sergei |
-| Before Step 7 | Decide how locked board sections look: cover plates in our overlay, or a change to the board prefab. | Sergei, Mia |
 | Before Step 8 | Sound effects (ring, alarm, coins, paid, fine, hang-up): find them or generate them. | Mia, team |
 
 ## 9. Steps
@@ -168,14 +169,16 @@ Follow-ups: <ideas, debts, questions>
 | 2b | Hold and resume | Pulled plugs put calls on hold; restore resumes |
 | 3 | Phone book tabs, 36 people, real cards | Find anyone fast with A–Z tabs; the whole board in use; readable cards in every state |
 | 4 | Emergencies and fines | Timed emergency calls and fair fines |
-| 5 | Upgrades, shop and the mystery goal | Buy cords and multipliers; save up toward the mystery |
+| 5a | Economy file, shop, income, secret goal | `Economy.json` drives Sergei's shop; income upgrades; the secret fills as a savings bar |
+| 5b | Extra wires and the Notepad | Buy cords and the Notepad (coordinated changes to Sergei's cords and book) |
+| 5c | Calls and pacing into `Economy.json` | The designer tunes the whole economy in one file |
 | 6 | Saves, Boot scene, first Web build | Plays in a browser, and progress survives a reload |
 | 7 | Board growth and pacing | The board and the difficulty grow over a session |
 | 8 | Sound and feel | Rings, alarms, coins and animations |
 | 9 | Mobile and Web polish | Good on phones and desktop browsers |
 | 10 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–4 are fully specified. Steps 5–10 are outlines. The orchestrator turns each one into a full brief before launching it.
+Steps 1–5a are fully specified. Steps 5b–10 are outlines. The orchestrator turns each one into a full brief before launching it.
 
 ---
 
@@ -696,28 +699,215 @@ Steps 1–4 are fully specified. Steps 5–10 are outlines. The orchestrator tur
 
 ---
 
-### Step 5: Upgrades, shop and the mystery goal (outline). Wire Sergei's `UpgradeShopPanel` to our `UpgradeService` instead of building our own `ShopView` (D30).
-- **Stats and upgrades:**
-  - `StatSheet`, `UpgradeService`, `UpgradeDefinition`, `StatModifier` and `UpgradeEffect` (Design §5.9).
-  - Assets: Extra Cord, Earnings Multiplier, Notepad (D23: while owned, tapping a book entry notes its jack on the call in hand), and Mystery (`isGoal`, with `MysteryPlaceholderEffect`).
-- **Shop:**
-  - `ShopView`: the store tab on the right (`Sprites/store/store.png`) opens a list showing cost, level and a buy button.
-  - The savings bar (D14).
-  - Buying the goal shows "to be continued".
-- **Extra cords at runtime** depend on the Step 5 coordination item (§8).
+### Step 5a: Economy file, shop, income upgrades and the secret goal
+
+**Goal.** The designer's `Economy.json` drives a working shop on Sergei's upgrade panel. Income upgrades raise earnings, and the secret upgrade's button fills as a savings bar; buying it shows "To be continued". **Recommended effort:** high.
+
+**Playable result.**
+- The right-hand panel's 4 buttons now show real offers, with a name, a one-line description and a price.
+  - The top button sells "Better rates" (×1.5, $8.00).
+  - The next 2 buttons keep Sergei's "+" placeholder look and can't be clicked. Wires and Notepad fill them in 5b.
+  - The bottom button is the secret ("???", $250.00). It fills from the bottom as money is saved.
+- An offer you can't afford is dimmed and can't be clicked.
+- Buying deducts the price; "-$8.00" pops up by the money counter in a neutral ink (not the fine red). The button then shows the next entry in the chain (×2.0 for $20, then ×3.0 for $50). Once the chain is bought out, the button goes back to the placeholder look.
+- With ×1.5 bought, a call's fee popup and its earnings are 1.5 times bigger, including on calls already connected.
+- With $250 saved, the secret button is full and stands out. Buying it shows a "To be continued..." panel with a "Keep playing" button, and the secret button then reads "Owned".
+
+**Decisions for this step** (lead, 2026-10-18; Design D14, D39–D44, Design 5.9, 5.10 and 6.4):
+- **D39 and D40:** one hand-edited file, `Assets/Configs/Economy.json`. 5a builds only its `upgrades` section and the types `extra_income` and `secret`. Values set the result, chains follow file order, there's no skipping, and costs are in cents.
+- **D41:** a pinned secret button at the bottom, with 3 rotating buttons above it driven by `ShopShelf`.
+- **D43:** the placeholder prices listed below.
+- **D44:** the button texts and the savings fill live inside Sergei's button prefab, as a coordinated change. The files are listed below.
+- The old plan of `UpgradeDefinition`, levels, `StatModifier` and `UpgradeEffect` is dropped. Don't build it.
+- D15 stays open. The secret's only effect is the "To be continued" panel.
+
+**Approved coordinated changes** (Sergei's files, D44). Only these, and only for the button texts and the fill:
+- `Assets/Scripts/UI/UpgradeSlotView.cs`: new, in his folder and his style (sealed, `[SerializeField] private`, no comments beyond the why).
+- `Assets/Editor/UpgradeShopPanelBuilder.cs`:
+  - Its button-creation code builds the new parts.
+  - A new menu `Tools/Switchboard/Update Upgrade Shop Buttons` upgrades the existing prefabs in place, like Step 3's `Update Phone Book Tabs`.
+- `Assets/Prefabs/UI/UpgradePlaceholderButton.prefab`. Keep its name; it is nested 4 times in the panel.
+- `Assets/Prefabs/UI/UpgradeShopPanel.prefab`.
+- Keep `HeaderSlot` and its position exactly as they are; our money counter lives there.
+- Don't touch any other file of his, `Final.unity`'s loose objects, or `MainMenu.unity`.
+
+**Build**
+1. **`Assets/Configs/Economy.json`** (new; the designer's file). Use one entry per line, readable, in this order:
+   ```json
+   {
+     "upgrades": [
+       { "id": "income_1", "type": "extra_income", "name": "Better rates", "description": "Earn x1.5", "costCents": 800, "incomeMultiplier": 1.5 },
+       { "id": "income_2", "type": "extra_income", "name": "Good rates", "description": "Earn x2", "costCents": 2000, "incomeMultiplier": 2.0 },
+       { "id": "income_3", "type": "extra_income", "name": "Top rates", "description": "Earn x3", "costCents": 5000, "incomeMultiplier": 3.0 },
+       { "id": "secret", "type": "secret", "name": "???", "description": "Something big", "costCents": 25000 }
+     ]
+   }
+   ```
+   Keep the names short enough for the button. Check them on screen and shorten if needed, but keep the ids. Reference the file from `GameConfig` through a new `economyFile` `TextAsset`, as with `peopleFile`.
+2. **`Docs/EconomyFile.md`** (new): a short guide for the designer, in plain English.
+   - Cover the sections, the common fields, each type's fields and whether it is built yet, the chain rule, "values set", and cents.
+   - Explain that ids are never renamed once released.
+   - Show how to run `Tools/Switchboard/Validate Content`, with an example message.
+   - Mark `extra_wires`/`notepad` (5b), `extra_clients` (7), and `calls`/`pacing` (5c) as coming.
+3. **Content: loader** (`Switchboard.Content`).
+   - `EconomyFileData` / `UpgradeEntry` are `[Serializable]` classes for `JsonUtility`. `costCents` is a `long`, and `incomeMultiplier` a `float`.
+   - `EconomyFileLoader` turns them into Domain `IUpgrade` records and collects errors the way `PeopleFileLoader` does. An entry with an error is left out, and the game still starts.
+   - `IGameContent.Upgrades` (`IReadOnlyList<IUpgrade>`) is filled by `GameContent`. Update the test fakes.
+4. **Domain** (`Assets/Scripts/Domain/Upgrades/`, no `UnityEngine`):
+   - `UpgradeKind` enum with explicit values: `ExtraIncome = 1, ExtraWires = 2, Notepad = 3, ExtraClients = 4, Secret = 5`. Only `ExtraIncome` and `Secret` are loaded in 5a. The others are reserved, and the loader reports them as "not built yet".
+   - `IUpgrade`: `Id`, `Kind`, `Name`, `Description`, `CostCents`, `IncomeMultiplier`.
+   - `Wallet.TrySpend(long cents)`: returns false and changes nothing if cents ≤ 0 or the balance is short. It never touches the fraction.
+   - `UpgradeService`:
+     - Holds the bought ids, `IsOwned(id)`, and the chains (entries grouped by kind, in file order).
+     - `NextInChain(kind)`; the secret is its own one-entry chain.
+     - `CanBuy(id)` returns a reason enum (`Ok`, `Unknown`, `Owned`, `NotNext`, `TooExpensive`). `TryBuy(id)` spends and raises `UpgradeBought` (a readonly struct).
+     - A `Restore(ids)` method for Step 6 is **not** in scope.
+   - `StatSheet`: `IncomeMultiplier` is the `incomeMultiplier` of the last bought `extra_income` entry, or 1. It is recomputed from scratch on `UpgradeBought`.
+   - `EarningsService` reads `() => stats.IncomeMultiplier`. Fines stay unmultiplied.
+   - `ShopShelf` (Design 5.9, D41):
+     - 3 slots, each holding a chain or empty, filled in order of each kind's first appearance in the file. The secret is never on the shelf.
+     - When a slot's chain is bought out, that slot (only that one) takes the next chain not on the shelf, or goes empty. The other slots never move.
+     - It raises `Changed`.
+   - `GoalProgress`:
+     - `Goal`: the single secret entry.
+     - `Progress = clamp01(balance ÷ cost)`, polled.
+     - `GoalAffordable` is raised the first time progress reaches 1, checked in `Tick`.
+     - `GoalPurchased` is raised on buying the secret. Afterwards `Progress` reads 1.
+   - Build all of these in `GameSession` and add them to the tick order where needed, keeping Design 4.4's order (goal check last). No allocations or LINQ per tick.
+5. **Sergei's button: `UpgradeSlotView`** (coordinated, his folder).
+   - Inside each `UpgradeButton_NN`:
+     - a title label, a description label and a price label (TextMeshPro with LiberationSans SDF, like our money plaque; `raycastTarget` off)
+     - a vertical fill `Image` behind the content, hidden unless set (`raycastTarget` off)
+     - the existing "+" `PlaceholderIcon`, shown only in the empty state
+   - Public API, small and in his naming style:
+     - `Show(title, description, price, bool affordable)`
+     - `ShowEmpty()`
+     - `SetFill(float)` (0 hides the fill)
+     - `SetHighlight(bool)`
+     - `event Action Clicked`, wired to his `Button`
+   - The button stays a raycast target. Nothing new may block it, and nothing outside the button's rect becomes a raycast target.
+   - Layout:
+     - Keep 4 buttons inside the 236×860 panel, below the untouched `HeaderSlot`.
+     - The buttons may grow up to the plaque's width (204) and be re-spaced, as long as everything fits the panel.
+     - Text must be readable at a 1280×720 Game view; check with a screenshot.
+   - Colours: match his panel (greens and greys). The price may use the money counter's gold.
+6. **Our `ShopView`** (`Assets/Scripts/Game/Views/`, on `GameUI.prefab`):
+   - `GameInstaller` finds it with `FindSingle`. `ShopView` finds the `UpgradeSlotView`s by type in the scene: expect exactly 4, ordered top to bottom. Log a clear error otherwise.
+   - Binding: slots 1–3 follow `ShopShelf`, and slot 4 is the secret.
+   - States:
+     - **Affordable:** normal, and a click calls `UpgradeService.TryBuy`.
+     - **Too expensive:** dimmed, and a click does nothing beyond Sergei's button feel. Don't add a fine-style sound.
+     - **Empty:** the placeholder look.
+     - **Secret:** `SetFill(progress)`, polled in `LateUpdate` with a change check. Highlighted when affordable; "Owned" after purchase.
+   - Affordability changes as money changes: poll the balance with a change check, and allocate nothing per frame.
+   - Prices use `MoneyFormat.Dollars`. Glyphs come only from the static LiberationSans SDF atlas, so use "..." rather than "…" unless "…" is confirmed in it.
+7. **Spending popup:** on `UpgradeBought`, show "-$8.00" with `FloatingTextView` by the money counter, in a neutral ink (not the fine red), the way the fine popup is placed. Check it doesn't overlap a fee or fine popup landing at the same time.
+8. **"To be continued" panel:**
+   - In `GameUI.prefab`: a centred panel saying "To be continued...", the secret's name, and a "Keep playing" button that closes it. It is shown on `GoalPurchased`.
+   - It blocks clicks behind it while open (a deliberate modal), and is inactive otherwise.
+   - It must not overlap the open book's sorting badly. Check a screenshot with the book open, too.
+   - The game keeps running underneath (D20).
+9. **Validator** (`ContentValidator` or a sibling `EconomyValidator` called from the same menu and test; Design 6.4):
+   - Messages are plain, name the entry, and say the fix. For example: `Upgrade 2 "income_2": incomeMultiplier 1.2 is not higher than income_1's 1.5. Values in a chain must grow.`
+   - Report each of:
+     - the file is missing or unreadable
+     - an id that is empty, uses characters other than a–z, 0–9 and `_`, or is a duplicate
+     - an unknown type (list the known ones) or a type not built yet ("`extra_wires` arrives in Step 5b")
+     - a missing name
+     - `costCents` ≤ 0
+     - `incomeMultiplier` ≤ 1 or not growing along the chain
+     - not exactly one `secret`
+10. **Dev panel:** add "+$100" (next to "+$10") and "Reset upgrades" (clears the bought ids, recomputes the stats, rebuilds the shelf, and resets the goal's affordable flag). Editor and development builds only, as now.
+
+**Tests** (`Switchboard.Domain.Tests`, plus the Content tests where they live)
+- **`Wallet.TrySpend`:** succeeds and deducts when enough; refuses with no change when short or ≤ 0; keeps the fraction.
+- **`UpgradeService`:**
+  - buys the next entry in a chain
+  - refuses out of order, already owned, unknown, and too expensive, each with nothing changed
+  - raises `UpgradeBought` once per purchase
+  - the secret can be bought regardless of the other chains
+- **`StatSheet`:**
+  - the multiplier is 1 with nothing bought
+  - it equals the last bought value, which is set and not stacked (1.5 then 2.0 gives 2.0)
+  - recomputing twice gives the same result
+- **Earnings:**
+  - a multiplier bought mid-call applies to the rest of that call
+  - the fee of a call connected after the purchase is multiplied
+  - fines aren't multiplied
+- **`ShopShelf`:**
+  - chains are placed in file order
+  - a bought-out slot takes the next chain while the other slots don't move
+  - slots go empty when nothing is left
+  - the secret is never shelved
+- **`GoalProgress`:**
+  - progress is the clamped ratio
+  - `GoalAffordable` fires once
+  - `GoalPurchased` fires on buying the secret, and progress stays 1 afterwards
+- **Loader and validator:**
+  - the real `Economy.json` loads 4 entries and has no problems
+  - each problem listed in Build 9 is reported
+  - a broken entry is left out while the others load
+- **Session:** a `GameSession` built with the fakes still ticks with no upgrades in the content: multiplier 1, an empty shelf, and no goal (the goal check is skipped and logs nothing).
+
+**Done when** Plan §5 is met and every test above passes. Screenshots in `Temp/Captures/`:
+- `step-05a.png`: the shop at the start, with income in slot 1, slots 2–3 as placeholders and the secret part-filled
+- `step-05a-bought.png`: after buying ×1.5, with slot 1 showing ×2.0 and the "-$8.00" popup
+- `step-05a-goal.png`: the secret affordable (full fill, highlighted)
+- `step-05a-continued.png`: the "To be continued..." panel
+- `step-05a-720.png`: the shop at 1280×720, readable
+
+**Playtest script (you)**
+1. Play `Final.unity` (or MainMenu → Start). The right panel shows "Better rates / Earn x1.5 / $8.00" on top, two "+" placeholders, and "??? / $250.00" at the bottom with an empty fill.
+2. Below $8 the top offer is dimmed and clicking it does nothing. Earn $8 (or press F1, then "+$10"). It lights up.
+3. Buy it. "-$8.00" pops up, the money drops by $8, and the button now offers "Good rates / Earn x2 / $20.00".
+4. Connect a call: the fee popup and the money rise about 1.5 times faster than before. A call already connected also speeds up.
+5. Buy ×2 and ×3. After ×3 the top button returns to the "+" placeholder.
+6. Watch the bottom button fill as money grows (use "+$100" to speed up). At $250 it's full and highlighted.
+7. Buy it. "To be continued..." appears; click "Keep playing". The game goes on, and the bottom button reads "Owned".
+8. Fines still take the plain amount ($2/$1), not multiplied.
+9. Open `Assets/Configs/Economy.json`, change `income_2`'s `incomeMultiplier` to 1.2 and run `Tools/Switchboard/Validate Content`. You get a plain message about the chain. Undo the change.
+10. Press F1, then "Reset upgrades": the shop is back to the start.
+
+**Out of scope:**
+- extra wires and the Notepad (5b)
+- moving calls, pacing and starting money into `Economy.json` (5c)
+- board growth (7)
+- saving purchases (6)
+- shop sounds (8)
+- a real secret effect (D15)
+- re-showing the A–Z tabs
+
+### Step 5b: Extra wires and the Notepad (outline; D23, D40, D43, D44)
+- **`extra_wires`** in `Economy.json` (`wires` = the total, values growing): 4, 5 and 6 cords for $5, $8 and $13. The base of 3 lives in `GameConfig`.
+  - `StatSheet.Cords`, and `CordBridge` attaches new cords as they appear.
+  - The spawner's cord count follows.
+- **Coordinated change to Sergei's cord code** (files to list in the brief):
+  - A runtime way to add a cord: a cable instance plus a tray slot, registered with `CableInputController` (today `Configure(tray, cables, cursor)` replaces the whole array; `Owns` and `Usable` gate input).
+  - The tray re-spaced so up to 6 slots fit (today 3 slots, 270 px apart).
+  - New cord colours.
+- **`notepad`** (one entry, $3). Coordinated change to his book:
+  - `PhoneBookView` raises a "contact tapped" event (name and socket), and each `PhoneBookContactRow` becomes clickable without breaking page turns.
+  - While owned, tapping an entry notes its jack on the call in hand, e.g. "Ada Moss (C3) / wants Basil Thorne (A5)".
+  - Deleting the entry from the file removes the feature.
+  - Known issue: a click on a row while holding a cord drops the cord. That's Sergei's call; mention it.
 - **Tests:**
-  - The cost curve.
-  - Max level.
-  - Purchase validation.
-  - Stat recompute gives the same result when repeated.
-  - Goal progress and the affordable event.
-  - Effect hooks: `Apply` on load versus `OnPurchased` once.
+  - the cord stat by chain
+  - the spawner's cord count updating
+  - Notepad notes only while owned and only for people in the call in hand
+  - validator rules for the new types
 - **Playtest:**
-  - Buy a cord and see it in the tray.
-  - Buy the Notepad, then tap names in the book and see their jacks on the call in hand.
-  - Buy the multiplier and see income rise.
-  - Watch the savings bar fill.
-  - Buy the mystery and see "to be continued".
+  - buy a cord and see a 4th cord in the tray that works
+  - buy the Notepad and tap names in the book to see their jacks in the bubble
+
+### Step 5c: Calls, pacing and starting money into `Economy.json` (outline; D39)
+- Move these into `Economy.json` sections, removing them from the assets:
+  - **`calls`:** each caller type's money fields (fee, rate and duration ranges, callback delay, response time, fines, callback flags, `maxSimultaneous`, `spawnWeight`, `everyoneCalls`, `recipientTag`)
+  - **`pacing`:** first-call delay, base interval, jitter, load factor, idle timeout
+  - **`startingCents`**
+- Card styles (badge, accent) stay in the `CallerTypeDefinition` assets, keyed by type id.
+- Domain is unchanged; it already reads through `ICallerType`, `IPacingProfile` and `IGameContent`. The Content loaders, the validator and the tests change.
+- Keep the current values exactly (D37 and the `Default.asset` pacing), so the game plays the same.
+- Update `Docs/EconomyFile.md`.
 
 ### Step 6: Saves and first Web build (outline). Sergei's `MainMenu` is the start screen: it replaces our planned `Boot.unity` and doubles as the tap-to-start audio unlock (D30, D33).
 - **Saving:**
@@ -733,16 +923,16 @@ Steps 1–4 are fully specified. Steps 5–10 are outlines. The orchestrator tur
   - Unknown ids are ignored.
   - A corrupt main save falls back to the backup.
 - **Playtest (browser):**
-  - Earn and buy, then reload: progress is restored.
+  - Earn and buy, then reload: progress (the balance and the bought upgrade ids) is restored.
   - Close and reopen the tab: progress is restored.
   - On a phone, tap to patch.
 
 ### Step 7: Board growth and pacing (outline)
-- **Board growth:**
-  - Sections in `BoardLayoutDefinition`: rows A–B at the start, then C–D, then E–F.
-  - Cover plates over locked jacks in our overlay (D21).
-  - A Bigger Board upgrade.
-  - The directory lists only unlocked people.
+- **Board growth (D42):**
+  - Start on a 3×3 board (rows A–C, columns 1–3). `extra_clients` entries in `Economy.json` set `boardSize {cols, rows}` and `clientSlots`.
+  - Exactly the people on open jacks are in the game, and Sergei's book lists only them (coordinated change). The designer chooses the starting group by placing people on A1–C3. The services move off A–C 1–3 (Fire Brigade is on C2 today), so emergencies come later.
+  - Closed jacks dimmed and not clickable, with their row and column labels dimmed (coordinated change to his board).
+  - Check the 6-slot caller panel against `clientSlots`.
 - **Pacing:**
   - `PacingProfile` curves driven by progress (D19).
   - Caller type weights, with emergencies appearing later.
@@ -782,5 +972,5 @@ Steps 1–4 are fully specified. Steps 5–10 are outlines. The orchestrator tur
   - Its skill (lookup time, error rate) is configurable.
   - It runs hours of game time in seconds.
   - It reports the time to reach the mystery, the income curve and the fines.
-- **Tuning:** adjust prices, rates and pacing toward the target in D27.
+- **Tuning:** adjust prices, rates and pacing in `Economy.json` toward the target in D27, with the designer.
 - **Playtest:** a full run from a new save feels right.
