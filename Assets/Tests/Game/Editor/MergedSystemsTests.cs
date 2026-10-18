@@ -60,11 +60,10 @@ namespace Switchboard.Game.Tests
         private CallCardView AcceptOrder()
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>("Assets/Content/GameConfig.asset");
-            var people = config.LoadPeople(config.LoadEconomy(), null);
-            // The game starts on a small board (D42): the order is between two people on open jacks.
-            var caller = people.Callers.First(c => !c.Type.EveryoneCalls && session.Board.IsInGame(c.Person));
-            var recipient = people.People.First(p => p != caller.Person && session.Board.IsInGame(p));
-            var call = session.Calls.Add(new CallRequest(caller, recipient, 10, 30, 100));
+            // The game starts on a small board (D42): the order is the start pool's first call, on open jacks.
+            CallScript first = config.LoadEconomy().StartPool[0];
+            var script = new CallScript("test_order", first.Name, first.Icon, first.Message, first.From, first.To, 30, 100, 10);
+            var call = session.Calls.Add(new CallRequest(script));
             var card = All<CallCardView>().Single(c => c.Call == call);
             Invoke(queue, "OnCardClicked", card);
             return card;
@@ -82,7 +81,7 @@ namespace Switchboard.Game.Tests
             Assert.That(sockets.Count(s => s.GetComponent<SocketGraphic>().enabled), Is.EqualTo(9));
             Assert.That(sockets.Where(s => !s.IsOpen).All(s => !s.GetComponent<SocketGraphic>().raycastTarget), Is.True);
             var callerSlots = Field<RectTransform[]>(queue, "slots");
-            Assert.That(callerSlots.Count(s => s.GetComponent<CanvasGroup>().alpha > 0), Is.EqualTo(3));
+            Assert.That(callerSlots.Count(s => s.GetComponent<CanvasGroup>().alpha > 0), Is.EqualTo(2), "D52: two slots at the start");
             var shop = All<ShopView>().Single();
             session.Wallet.Earn(10000);
             Invoke(shop, "LateUpdate");
@@ -94,13 +93,15 @@ namespace Switchboard.Game.Tests
             Field<Button>(slots[1], "button").onClick.Invoke();
             Assert.That(session.Wallet.Cents, Is.EqualTo(before - 1000));
             Assert.That(sockets.Count(s => s.GetComponent<SocketGraphic>().enabled), Is.EqualTo(16));
-            Assert.That(callerSlots.Count(s => s.GetComponent<CanvasGroup>().alpha > 0), Is.EqualTo(4));
+            Assert.That(callerSlots.Count(s => s.GetComponent<CanvasGroup>().alpha > 0), Is.EqualTo(3));
             Field<Button>(slots[0], "button").onClick.Invoke();
             Assert.That(bridge.CordCount, Is.EqualTo(4));
             var card = AcceptOrder();
-            var text = Field<TMPro.TMP_Text>(card, "speechLabel").text;
-            Assert.That(text, Does.Contain("<b>" + card.Call.Request.CallerPerson.LastName + "</b>"), "D50: the book is sorted by surname");
-            Assert.That(text, Does.Not.Contain("<b>" + card.Call.Request.CallerPerson.FirstName + "</b>"));
+            Assert.That(Field<TMPro.TMP_Text>(card, "speechLabel").text, Is.EqualTo(card.Call.Request.Script.Message),
+                "D51: the bubble says the call's own message");
+            var name = Field<TMPro.TMP_Text>(card, "nameLabel");
+            Assert.That(name.text, Is.EqualTo(card.Call.Request.Script.Name), "the caller's name under the portrait");
+            Assert.That(name.raycastTarget, Is.False);
             Assert.That(session.Upgrades.TryBuy("wires_2") && session.Upgrades.TryBuy("wires_3"), Is.True);
             Assert.That(All<CableController>().Where(c => c.gameObject.activeInHierarchy)
                 .Select(c => c.CableColor).Distinct().Count(), Is.EqualTo(6), "Buying the removed third cord restores its colour before the extra colours");
@@ -110,7 +111,9 @@ namespace Switchboard.Game.Tests
         public void FreshSessionFirstPortraitHasVisibleHaloUntilClicked()
         {
             session.Tick(3);
-            var card = All<CallCardView>().Single(c => c.Call != null);
+            Assert.That(All<CallCardView>().Count(c => c.Call != null), Is.EqualTo(2), "both start slots fill at once");
+            var card = All<CallCardView>().Single(c => c.Call == session.Calls.Live[0]);
+            Assert.That(card.Call.Request.Script.Id, Is.EqualTo("call_001"));
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Portrait));
             var pulse = card.PortraitRect.GetComponent<SlowGuidePulse>();
             Assert.That(pulse.IsShowing, Is.True);
@@ -186,18 +189,13 @@ namespace Switchboard.Game.Tests
         }
 
         [Test]
-        public void NotepadAndNewCordKeepConnectionHighlightsCoinsAndAudio()
+        public void NewCordKeepsConnectionHighlightsCoinsAndAudio()
         {
             var card = AcceptOrder();
             session.Wallet.Earn(10000);
-            Assert.That(session.Upgrades.TryBuy("notepad"), Is.True);
-            Assert.That(book.ContactTapsEnabled, Is.True);
             var call = card.Call;
-            var first = session.Directory.JackOf(call.Request.CallerPerson);
-            var second = session.Directory.JackOf(call.Request.Recipient);
-            Assert.That(session.Notepad.Note(first), Is.True);
-            Assert.That(call.CallerNote, Is.EqualTo(first));
-            Assert.That(Field<TMPro.TMP_Text>(card, "speechLabel").text, Does.Contain(first.Label));
+            var first = call.Request.From;
+            var second = call.Request.To;
             Assert.That(session.Upgrades.TryBuy("wires_1"), Is.True);
             var cable = All<CableController>().Single(c => c.name == "Cable_04");
             var a = All<SocketView>().Single(s => new JackId(s.Address) == first);

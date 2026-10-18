@@ -7,14 +7,13 @@ namespace Switchboard.Content
     public sealed class EconomyCatalog
     {
         public EconomyCatalog(long startingCents, int startingCords, BoardSize startingBoard, int startingClientSlots,
-            IPacingProfile pacing, IReadOnlyList<ICallerType> callTypes, IReadOnlyList<IUpgrade> upgrades, IReadOnlyList<string> errors)
+            IReadOnlyList<CallScript> startPool, IReadOnlyList<IUpgrade> upgrades, IReadOnlyList<string> errors)
         {
             StartingCents = startingCents;
             StartingCords = startingCords;
             StartingBoard = startingBoard;
             StartingClientSlots = startingClientSlots;
-            Pacing = pacing;
-            CallTypes = callTypes;
+            StartPool = startPool;
             Upgrades = upgrades;
             Errors = errors;
         }
@@ -23,6 +22,9 @@ namespace Switchboard.Content
         public int StartingCords { get; }
         public BoardSize StartingBoard { get; }
         public int StartingClientSlots { get; }
+
+        /// <summary>The queue of a new game (D52), with unknown calls and calls off the starting board left out.</summary>
+        public IReadOnlyList<CallScript> StartPool { get; }
 
         /// <summary>The most caller slots the file can ever open: the start or any extra_clients entry.</summary>
         public int MostClientSlots
@@ -35,16 +37,7 @@ namespace Switchboard.Content
                 return most;
             }
         }
-        public IPacingProfile Pacing { get; }
-        public IReadOnlyList<ICallerType> CallTypes { get; }
         public IReadOnlyList<IUpgrade> Upgrades { get; }
         public IReadOnlyList<string> Errors { get; }
-
-        public bool HasCallType(string id)
-        {
-            foreach (ICallerType type in CallTypes)
-                if (type.Id == id) return true;
-            return false;
-        }
     }
 }

@@ -6,10 +6,10 @@ using UnityEngine;
 namespace Switchboard.Content
 {
     /// <summary>
-    /// Checks the people file against the economy file's call types (Design 6.3). Per-contact checks come from
-    /// <see cref="PeopleFileLoader"/>; this adds what needs the whole file or the type catalog. The call types'
-    /// own rules live in <see cref="EconomyFileLoader"/>.
-    /// Messages are for the designer who edits the file by hand: each names the contact and the fix.
+    /// Checks the people file as a whole (Design 6.3), and the calls against it. Per-contact checks come from
+    /// <see cref="PeopleFileLoader"/>, per-call checks from <see cref="CallsFileLoader"/> and the economy file's
+    /// rules from <see cref="EconomyFileLoader"/>.
+    /// Messages are for the designer who edits the files by hand: each names the entry and the fix.
     /// </summary>
     public static class ContentValidator
     {
@@ -26,70 +26,46 @@ namespace Switchboard.Content
             return jacks;
         }
 
-        /// <summary>
-        /// A new game only has the people on the starting board (D42). A caller can't call themselves, so fewer
-        /// than two people without tags there means no call could ever ring.
-        /// </summary>
-        public static List<string> ValidateStartingBoard(IReadOnlyList<IDirectoryEntry> directory, BoardSize startingBoard)
-        {
-            var errors = new List<string>();
-            if (directory == null || !startingBoard.IsValid) return errors;
-            int people = 0;
-            foreach (IDirectoryEntry entry in directory)
-                if (entry?.Person != null && entry.Person.Tags.Count == 0 && startingBoard.Contains(entry.JackLabel)) people++;
-            if (people >= 2) return errors;
-            string who = people == 0 ? "Nobody without tags sits" : "Only 1 person without tags sits";
-            errors.Add($"{who} on the starting board ({startingBoard}: rows A to {startingBoard.LastRow}, columns 1 to " +
-                $"{startingBoard.Cols}), so no call could ever ring. Put at least two people on those jacks, or make " +
-                "startingBoard in Economy.json bigger.");
-            return errors;
-        }
-
-        public static List<string> Validate(string peopleJson, IReadOnlyList<ICallerType> callerTypes,
-            Func<string, bool> hasPortrait, IEnumerable<string> boardJacks)
+        public static List<string> Validate(string peopleJson, IEnumerable<string> boardJacks)
         {
             var errors = new List<string>();
             PeopleFileData data = TryParse(peopleJson);
             CheckPageSize(data, errors);
             CheckServicesFirst(data, errors);
-            PeopleCatalog catalog = PeopleFileLoader.Load(peopleJson, callerTypes, hasPortrait, boardJacks);
+            PeopleCatalog catalog = PeopleFileLoader.Load(peopleJson, boardJacks);
             errors.AddRange(catalog.Errors);
             CheckSurnames(catalog.Directory, errors);
-            CheckRecipients(callerTypes, catalog, errors);
             return errors;
         }
 
-        /// <summary>Checks Economy.json (Design 6.4). Every rule lives in the loader, which the game uses too.</summary>
-        public static IReadOnlyList<string> ValidateEconomy(string economyJson) => EconomyFileLoader.Load(economyJson).Errors;
-
         /// <summary>
-        /// Checks GameConfig's card styles against the economy file's call types. A call type with no style gets
-        /// plain cards, so only styles that match no call type are reported.
+        /// The player finds a call's jacks in the book, so every jack a call uses needs someone listed on it. Until
+        /// Step 8 the book is PhoneBook.json.
         /// </summary>
-        /// <param name="styleIds">The id of each style asset in GameConfig's list; null for an empty slot.</param>
-        public static List<string> ValidateCardStyles(IReadOnlyList<string> styleIds, IReadOnlyList<ICallerType> callTypes)
+        public static List<string> ValidateCallJacks(IReadOnlyList<CallScript> calls, IReadOnlyList<IDirectoryEntry> book)
         {
             var errors = new List<string>();
-            if (styleIds == null) return errors;
-            for (int i = 0; i < styleIds.Count; i++)
+            if (calls == null) return errors;
+            var listed = new HashSet<string>(StringComparer.Ordinal);
+            if (book != null)
+                foreach (IDirectoryEntry entry in book)
+                    if (entry != null && !string.IsNullOrEmpty(entry.JackLabel)) listed.Add(entry.JackLabel);
+            foreach (CallScript call in calls)
             {
-                string id = styleIds[i];
-                if (id == null)
-                    errors.Add($"GameConfig's card style {i + 1} is empty. Pick a card style asset or remove the slot.");
-                else if (!HasType(callTypes, id))
-                    errors.Add($"GameConfig's card style {i + 1} is for \"{id}\", but Economy.json has no call type with that id. " +
-                        "Add the call type to the file's calls, or correct the style asset's id.");
+                if (call == null) continue;
+                if (!listed.Contains(call.From.Label)) errors.Add(Unlisted(call, call.From));
+                if (call.To != call.From && !listed.Contains(call.To.Label)) errors.Add(Unlisted(call, call.To));
             }
             return errors;
         }
 
-        private static bool HasType(IReadOnlyList<ICallerType> types, string id)
-        {
-            if (types == null) return false;
-            foreach (ICallerType type in types)
-                if (type != null && string.Equals(type.Id, id, StringComparison.Ordinal)) return true;
-            return false;
-        }
+        private static string Unlisted(CallScript call, JackId jack) =>
+            $"{call.Id} uses {jack}, but nobody is listed on {jack} in PhoneBook.json, so the player can't look it up. " +
+            "Put someone on that jack in the book, or give the call another jack.";
+
+        /// <summary>Checks Economy.json (Design 6.4). Every rule lives in the loader, which the game uses too.</summary>
+        public static IReadOnlyList<string> ValidateEconomy(string economyJson, CallsCatalog calls = null) =>
+            EconomyFileLoader.Load(economyJson, calls).Errors;
 
         private static PeopleFileData TryParse(string json)
         {
@@ -149,34 +125,6 @@ namespace Switchboard.Content
                         $"{previous.LastName}. Move the line up; sort the file by surname.");
                 previous = person;
             }
-        }
-
-        private static void CheckRecipients(IReadOnlyList<ICallerType> types, PeopleCatalog catalog, List<string> errors)
-        {
-            if (types == null) return;
-            foreach (ICallerType type in types)
-            {
-                if (type == null) continue;
-                int recipients = 0;
-                foreach (IDirectoryEntry entry in catalog.Directory)
-                    if (type.Accepts(entry.Person)) recipients++;
-                if (!string.IsNullOrEmpty(type.RecipientTag))
-                {
-                    if (recipients == 0)
-                        errors.Add($"Call type '{type.Id}' sends its calls to contacts tagged \"{type.RecipientTag}\", but no contact " +
-                            "has that tag. Add the tag to a contact, or clear the type's recipientTag in Economy.json.");
-                }
-                // A caller can't call themselves, so people calling people need at least two.
-                else if (HasCaller(catalog.Callers, type) && recipients < 2)
-                    errors.Add($"Call type '{type.Id}' has nobody to call. Add at least two people without tags.");
-            }
-        }
-
-        private static bool HasCaller(IReadOnlyList<ICaller> callers, ICallerType type)
-        {
-            foreach (ICaller caller in callers)
-                if (caller.Type == type) return true;
-            return false;
         }
     }
 }

@@ -14,7 +14,7 @@ namespace Switchboard.Domain.Tests
         public void SetUp()
         {
             world = new TestWorld(); calls = new CallService(); board = new FakeSwitchboard();
-            desk = new OperatorDesk(calls, new ConnectionRule(world.Directory), board);
+            desk = new OperatorDesk(calls, new ConnectionRule(), board);
         }
         private Call Add() => calls.Add(world.AdaWantsBasil(connectionFeeCents: 10));
 
@@ -75,7 +75,7 @@ namespace Switchboard.Domain.Tests
         public void OlderAcceptedOrderConnectsEvenAfterAnotherWasOpened()
         {
             Call older = Add(); desk.TryTake(older.Id);
-            Call newer = calls.Add(new CallRequest(world.Callers[2], world.Basil, 5, 20)); desk.TryTake(newer.Id);
+            Call newer = calls.Add(TestWorld.Request(TestWorld.C3, TestWorld.B2, 5, 20)); desk.TryTake(newer.Id);
             desk.OnCircuitClosed(Wire, TestWorld.A1, TestWorld.B2);
             Assert.That(older.State, Is.EqualTo(CallState.Connected));
             Assert.That(newer.State, Is.EqualTo(CallState.Taken));
@@ -96,7 +96,7 @@ namespace Switchboard.Domain.Tests
         public void WrongPatchTargetsTheAnchoredSubscribersOrderRatherThanLastOpened()
         {
             Call ada = Add(); desk.TryTake(ada.Id);
-            Call clara = calls.Add(new CallRequest(world.Callers[2], world.Basil, 5, 20)); desk.TryTake(clara.Id);
+            Call clara = calls.Add(TestWorld.Request(TestWorld.C3, TestWorld.B2, 5, 20)); desk.TryTake(clara.Id);
             desk.OnPlugInserted(Wire, TestWorld.A1);
             desk.OnCircuitClosed(Wire, TestWorld.A1, TestWorld.C3, TestWorld.A1);
             Assert.That(ada.EndReason, Is.EqualTo(CallEndReason.WrongConnection));
@@ -107,7 +107,7 @@ namespace Switchboard.Domain.Tests
         public void CorrectPairWinsOverAnotherOrdersSharedRecipient()
         {
             Call ada = Add(); desk.TryTake(ada.Id);
-            Call clara = calls.Add(new CallRequest(world.Callers[2], world.Basil, 5, 20)); desk.TryTake(clara.Id);
+            Call clara = calls.Add(TestWorld.Request(TestWorld.C3, TestWorld.B2, 5, 20)); desk.TryTake(clara.Id);
             desk.OnPlugInserted(Wire, TestWorld.B2);
             desk.OnCircuitClosed(Wire, TestWorld.B2, TestWorld.C3);
             Assert.That(clara.State, Is.EqualTo(CallState.Connected));
@@ -204,7 +204,7 @@ namespace Switchboard.Domain.Tests
         {
             Call older = Add(); desk.TryTake(older.Id);
             desk.OnPlugInserted(Wire, TestWorld.A1);
-            Call newer = calls.Add(new CallRequest(world.Callers[2], world.Basil, 5, 20)); desk.TryTake(newer.Id);
+            Call newer = calls.Add(TestWorld.Request(TestWorld.C3, TestWorld.B2, 5, 20)); desk.TryTake(newer.Id);
             desk.OnCircuitClosed(Wire, TestWorld.A1, TestWorld.C3, TestWorld.A1);
             Assert.That(older.EndReason, Is.EqualTo(CallEndReason.WrongConnection));
             Assert.That(newer.State, Is.EqualTo(CallState.Taken));
@@ -214,7 +214,7 @@ namespace Switchboard.Domain.Tests
         public void SuccessWinsEvenWhenAnchorAlsoBelongsToAnotherOrder()
         {
             Call older = Add(); desk.TryTake(older.Id);
-            Call other = calls.Add(new CallRequest(world.Callers[2], world.Basil, 5, 20)); desk.TryTake(other.Id);
+            Call other = calls.Add(TestWorld.Request(TestWorld.C3, TestWorld.B2, 5, 20)); desk.TryTake(other.Id);
             desk.OnCircuitClosed(Wire, TestWorld.B2, TestWorld.C3, TestWorld.B2);
             Assert.That(older.State, Is.EqualTo(CallState.Taken));
             Assert.That(other.State, Is.EqualTo(CallState.Connected));
@@ -248,7 +248,7 @@ namespace Switchboard.Domain.Tests
             Call expired = Add(); desk.TryTake(expired.Id);
             desk.OnPlugInserted(Wire, TestWorld.A1);
             calls.End(expired.Id, CallEndReason.Missed);
-            Call newer = calls.Add(new CallRequest(world.Callers[2], world.Basil, 5, 20)); desk.TryTake(newer.Id);
+            Call newer = calls.Add(TestWorld.Request(TestWorld.C3, TestWorld.B2, 5, 20)); desk.TryTake(newer.Id);
             desk.OnCircuitClosed(Wire, TestWorld.A1, TestWorld.C3, TestWorld.A1);
             Assert.That(newer.State, Is.EqualTo(CallState.Taken));
             Assert.That(expired.EndReason, Is.EqualTo(CallEndReason.Missed));

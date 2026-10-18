@@ -10,25 +10,18 @@ namespace Switchboard.Domain.Tests
     {
         private const string GameConfigPath = "Assets/Content/GameConfig.asset";
 
-        private static readonly ICallerType Regular = new FakeCallerType(new FloatRange(3, 8), new FloatRange(15, 30));
-        private static readonly ICallerType Emergency = FakeCallerType.Emergency();
-
         private static string Contact(string name, string socket, string portrait = "caller-01", string type = "type.regular") =>
             $"{{ 'name': '{name}', 'socket': '{socket}', 'portrait': '{portrait}', 'type': '{type}', 'rate': 0, 'fee': 0 }}";
 
         private static string Service(string name, string socket) =>
             $"{{ 'name': '{name}', 'socket': '{socket}', 'tags': ['emergency-service'] }}";
 
-        private static List<string> WithServices(params string[] contacts) => Validate(new[] { Regular, Emergency }, 6, contacts);
+        private static List<string> WithServices(params string[] contacts) => Validate(6, contacts);
 
-        private static List<string> Validate(int perPage, params string[] contacts) =>
-            Validate(new[] { Regular }, perPage, contacts);
-
-        private static List<string> Validate(IReadOnlyList<ICallerType> types, int perPage, params string[] contacts)
+        private static List<string> Validate(int perPage, params string[] contacts)
         {
             string json = $"{{ 'contactsPerPage': {perPage}, 'contacts': [ {string.Join(", ", contacts)} ] }}";
-            return ContentValidator.Validate(json.Replace('\'', '"'), types,
-                name => name != null && name.StartsWith("caller-", StringComparison.Ordinal), ContentValidator.BoardJacks());
+            return ContentValidator.Validate(json.Replace('\'', '"'), ContentValidator.BoardJacks());
         }
 
         private static List<string> ValidPair(params string[] more)
@@ -73,10 +66,8 @@ namespace Switchboard.Domain.Tests
         public void ReportsAnUnknownJack() => AssertSingleError(ValidPair(Contact("Clara Whitlock", "G7")), "not on the board");
 
         [Test]
-        public void ReportsAMissingPortrait() => AssertSingleError(ValidPair(Contact("Clara Whitlock", "C3", "nobody")), "portrait");
-
-        [Test]
-        public void ReportsAnUnknownType() => AssertSingleError(ValidPair(Contact("Clara Whitlock", "C3", type: "type.vip")), "type.vip");
+        public void PortraitsTypesAndRatesInTheBookAreNoLongerRead() =>
+            Assert.That(ValidPair(Contact("Clara Whitlock", "C3", "nobody", "type.vip")), Is.Empty);
 
         [Test]
         public void ReportsADuplicateSurname() => AssertSingleError(ValidPair(Contact("Ivy Thorne", "C3")), "surname Thorne");
@@ -88,9 +79,6 @@ namespace Switchboard.Domain.Tests
         [Test]
         public void ReportsAPageSizeTheBookRejects() =>
             AssertSingleError(Validate(13, Contact("Ada Moss", "A1"), Contact("Basil Thorne", "B2")), "contactsPerPage");
-
-        [Test]
-        public void ReportsATypeWithNobodyToCall() => AssertSingleError(Validate(6, Contact("Ada Moss", "A1")), "nobody to call");
 
         [Test]
         public void ServicesAtTheTopPassWithoutPortraitsOrTypes() =>
@@ -117,8 +105,18 @@ namespace Switchboard.Domain.Tests
                 "\"Ada Moss\" is listed after \"Basil Thorne\"");
 
         [Test]
-        public void ReportsARecipientTagThatNoContactHas() =>
-            AssertSingleError(WithServices(Contact("Ada Moss", "A1"), Contact("Basil Thorne", "B2")),
-                "no contact has that tag");
+        public void EveryJackACallUsesNeedsSomeoneInTheBook()
+        {
+            var book = new IDirectoryEntry[]
+            {
+                new FakeDirectoryEntry(new FakePerson("Ada", "Moss"), "A1"),
+                new FakeDirectoryEntry(new FakePerson("Basil", "Thorne"), "B2")
+            };
+            var calls = new[] { Scripts.Call("call_001", "A1", "B2"), Scripts.Call("call_002", "B2", "E5") };
+
+            List<string> errors = ContentValidator.ValidateCallJacks(calls, book);
+
+            AssertSingleError(errors, "call_002 uses E5, but nobody is listed on E5 in PhoneBook.json");
+        }
     }
 }

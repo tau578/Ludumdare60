@@ -78,9 +78,9 @@ namespace Switchboard.Domain.Tests
         {
             var connected = new[]
             {
-                Connect(new CallRequest(world.AdaCaller, world.Basil, 3, 10)),
-                Connect(new CallRequest(world.AdaCaller, world.Clara, 5, 20)),
-                Connect(new CallRequest(world.AdaCaller, world.Basil, 7, 30))
+                Connect(TestWorld.Request(TestWorld.A1, TestWorld.B2, 3, 10)),
+                Connect(TestWorld.Request(TestWorld.A1, TestWorld.C3, 5, 20)),
+                Connect(TestWorld.Request(TestWorld.A1, TestWorld.B2, 7, 30))
             };
             Call waiting = calls.Add(world.AdaWantsBasil(centsPerSecond: 50));
 

@@ -3,7 +3,7 @@ using System;
 namespace Switchboard.Content
 {
     /// <summary>
-    /// The designer's Assets/Configs/Economy.json (D39, D47). JsonUtility gives 0, false or null for a field the
+    /// The designer's Assets/Configs/Economy.json (D39, D47, D52). JsonUtility gives 0, false or null for a field the
     /// file leaves out, so values that must not silently become 0 start as a marker the loader can tell apart.
     /// </summary>
     [Serializable]
@@ -15,52 +15,36 @@ namespace Switchboard.Content
         public int startingCords = Unset;
         public BoardSizeEntry startingBoard = new BoardSizeEntry();
         public int startingClientSlots = Unset;
-        public PacingEntry pacing = new PacingEntry();
-        public CallEntry[] calls;
+
+        /// <summary>Call ids from Calls.json for a new game (D52); null when the file leaves it out.</summary>
+        public string[] startPool;
+
         public UpgradeEntry[] upgrades = Array.Empty<UpgradeEntry>();
+
+        // Sections Step 7 removed (D51). Read only to tell the designer they are no longer used.
+        public RemovedPacingEntry pacing = new RemovedPacingEntry();
+        public RemovedCallTypeEntry[] calls;
     }
 
-    /// <summary>When new calls ring (Design 5.2). NaN marks a value the file leaves out.</summary>
+    /// <summary>The old pacing section; NaN everywhere means the file has none.</summary>
     [Serializable]
-    public sealed class PacingEntry
+    public sealed class RemovedPacingEntry
     {
         public float firstCallDelaySeconds = float.NaN;
         public float baseIntervalSeconds = float.NaN;
         public float intervalJitter = float.NaN;
         public float loadFactor = float.NaN;
         public float idleTimeoutSeconds = float.NaN;
+
+        public bool IsPresent => !float.IsNaN(firstCallDelaySeconds) || !float.IsNaN(baseIntervalSeconds) ||
+            !float.IsNaN(intervalJitter) || !float.IsNaN(loadFactor) || !float.IsNaN(idleTimeoutSeconds);
     }
 
-    /// <summary>One call type's money and timing. Fields left out mean "off", except the required ones.</summary>
+    /// <summary>An entry of the old calls section (call types).</summary>
     [Serializable]
-    public sealed class CallEntry
+    public sealed class RemovedCallTypeEntry
     {
         public string id;
-        public string name;
-        public float spawnWeight = float.NaN;
-        public RangeEntry rateCentsPerSecond = new RangeEntry();
-        public RangeEntry feeCents = new RangeEntry();
-        public RangeEntry durationSeconds = new RangeEntry();
-        public RangeEntry callbackDelaySeconds = new RangeEntry();
-        public float responseTimeSeconds;
-        public long fineMissedCents;
-        public long fineEarlyDisconnectCents;
-        public bool callbackAfterMiss;
-        public bool callbackAfterDisconnect;
-        public int maxSimultaneous;
-        public bool everyoneCalls;
-        public string recipientTag;
-    }
-
-    /// <summary>A range written as { "min": 3, "max": 8 }.</summary>
-    [Serializable]
-    public sealed class RangeEntry
-    {
-        public float min = float.NaN;
-        public float max = float.NaN;
-
-        public bool IsMissing => float.IsNaN(min) && float.IsNaN(max);
-        public bool IsPartial => float.IsNaN(min) != float.IsNaN(max);
     }
 
     /// <summary>One one-time upgrade (D40). Fields a type doesn't use stay at their defaults.</summary>
@@ -76,6 +60,9 @@ namespace Switchboard.Content
         public int wires;
         public BoardSizeEntry boardSize = new BoardSizeEntry();
         public int clientSlots = EconomyFileData.Unset;
+
+        /// <summary>An extra_clients entry's call queue (D52); null when the entry leaves it out.</summary>
+        public string[] stagePool;
     }
 
     /// <summary>The open part of the board, written as { "cols": 4, "rows": 4 } (D49).</summary>

@@ -21,71 +21,6 @@ namespace Switchboard.Domain.Tests
         public IReadOnlyList<string> Tags { get; }
     }
 
-    internal sealed class FakeCallerType : ICallerType
-    {
-        public FakeCallerType(FloatRange centsPerSecond, FloatRange durationSeconds, FloatRange connectionFeeCents = default,
-            FloatRange? callbackDelaySeconds = null)
-        {
-            CentsPerSecond = centsPerSecond;
-            DurationSeconds = durationSeconds;
-            ConnectionFeeCents = connectionFeeCents;
-            CallbackDelaySeconds = callbackDelaySeconds ?? new FloatRange(20, 40);
-        }
-
-        public string Id { get; set; } = "type.regular";
-        public string DisplayName { get; set; } = "Regular";
-        public FloatRange CentsPerSecond { get; }
-        public FloatRange ConnectionFeeCents { get; }
-        public FloatRange DurationSeconds { get; }
-        public FloatRange CallbackDelaySeconds { get; }
-        public double ResponseTimeSeconds { get; set; }
-        public long FineMissedCents { get; set; }
-        public long FineEarlyDisconnectCents { get; set; }
-        public bool CallbackAfterMiss { get; set; }
-        public bool CallbackAfterDisconnect { get; set; }
-        public string RecipientTag { get; set; } = string.Empty;
-        public int MaxSimultaneous { get; set; }
-        public double SpawnWeight { get; set; } = 1;
-        public bool EveryoneCalls { get; set; }
-
-        /// <summary>The Step 4 emergency numbers (D37): 30 s to connect, fines of 200¢ and 100¢, calls only to services.</summary>
-        public static FakeCallerType Emergency(double spawnWeight = 1) =>
-            new FakeCallerType(new FloatRange(5, 10), new FloatRange(10, 20), new FloatRange(20, 40), new FloatRange(20, 40))
-            {
-                Id = "type.emergency",
-                DisplayName = "Emergency",
-                ResponseTimeSeconds = 30,
-                FineMissedCents = 200,
-                FineEarlyDisconnectCents = 100,
-                RecipientTag = ServiceTag,
-                MaxSimultaneous = 1,
-                SpawnWeight = spawnWeight,
-                EveryoneCalls = true
-            };
-
-        public const string ServiceTag = "emergency-service";
-    }
-
-    internal sealed class FakeCaller : ICaller
-    {
-        public FakeCaller(IPerson person, ICallerType type, float weight = 1, float centsPerSecondOverride = 0,
-            float connectionFeeCentsOverride = 0)
-        {
-            Person = person;
-            Type = type;
-            Weight = weight;
-            CentsPerSecondOverride = centsPerSecondOverride;
-            ConnectionFeeCentsOverride = connectionFeeCentsOverride;
-        }
-
-        public string Id => "caller." + Person.Id;
-        public IPerson Person { get; }
-        public ICallerType Type { get; }
-        public float Weight { get; }
-        public float CentsPerSecondOverride { get; }
-        public float ConnectionFeeCentsOverride { get; }
-    }
-
     internal sealed class FakeDirectoryEntry : IDirectoryEntry
     {
         public FakeDirectoryEntry(IPerson person, string jackLabel)
@@ -98,24 +33,51 @@ namespace Switchboard.Domain.Tests
         public string JackLabel { get; }
     }
 
+    /// <summary>Hand-written calls for tests (D51).</summary>
+    internal static class Scripts
+    {
+        public static CallScript Call(string id, string from, string to, double centsPerSecond = 5, double durationSeconds = 20,
+            double connectCents = 0) =>
+            new CallScript(id, "Caller " + id, "caller-01", "Connect me, please.", new JackId(from), new JackId(to),
+                durationSeconds, connectCents, centsPerSecond);
+
+        /// <summary>The Step 4 emergency numbers (D37): 30 s to connect and a 200¢ fine for missing it.</summary>
+        public static CallScript Emergency(string id, string from, string to, double centsPerSecond = 7, double durationSeconds = 15,
+            double connectCents = 30, double responseTimeSeconds = 30, long penaltyCents = 200) =>
+            new CallScript(id, "Caller " + id, "caller-02", "Get me the Doctor!", new JackId(from), new JackId(to),
+                durationSeconds, connectCents, centsPerSecond, true, responseTimeSeconds, penaltyCents);
+
+        /// <summary>
+        /// Count different calls, each between two neighbouring jacks of the board's open part: call_1 joins the
+        /// first two open jacks, call_2 the second and third, and so on.
+        /// </summary>
+        public static CallScript[] Pool(int count, BoardSize board, string prefix = "call_")
+        {
+            var jacks = new List<string>();
+            for (int row = 0; row < board.Rows; row++)
+                for (int column = 1; column <= board.Cols; column++)
+                    jacks.Add($"{(char)('A' + row)}{column}");
+            var pool = new CallScript[count];
+            for (int i = 0; i < count; i++)
+                pool[i] = Call(prefix + (i + 1), jacks[i % jacks.Count], jacks[(i + 1) % jacks.Count], 5, 20, 10);
+            return pool;
+        }
+    }
+
     internal sealed class FakeContent : IGameContent
     {
         public long StartingCents { get; set; }
         public BoardSize StartingBoard { get; set; } = BoardSize.Full;
         public int StartingClientSlots { get; set; } = 6;
         public int StartingCords { get; set; } = 3;
-        public IPacingProfile Pacing { get; set; } = PacingSettings.Default;
-        public IReadOnlyList<ICallerType> CallerTypes { get; set; } = Array.Empty<ICallerType>();
-        public IReadOnlyList<IPerson> People { get; set; } = Array.Empty<IPerson>();
-        public IReadOnlyList<ICaller> Callers { get; set; } = Array.Empty<ICaller>();
-        public IReadOnlyList<IDirectoryEntry> Directory { get; set; } = Array.Empty<IDirectoryEntry>();
+        public IReadOnlyList<CallScript> StartPool { get; set; } = Array.Empty<CallScript>();
         public IReadOnlyList<IUpgrade> Upgrades { get; set; } = Array.Empty<IUpgrade>();
     }
 
     internal sealed class FakeUpgrade : IUpgrade
     {
         public FakeUpgrade(string id, UpgradeKind kind, long costCents, double incomeMultiplier = 0, int wires = 0,
-            BoardSize boardSize = default, int clientSlots = 0)
+            BoardSize boardSize = default, int clientSlots = 0, IReadOnlyList<CallScript> stagePool = null)
         {
             Id = id;
             Kind = kind;
@@ -124,6 +86,7 @@ namespace Switchboard.Domain.Tests
             Wires = wires;
             BoardSize = boardSize;
             ClientSlots = clientSlots;
+            StagePool = stagePool ?? Array.Empty<CallScript>();
         }
 
         public string Id { get; }
@@ -135,17 +98,18 @@ namespace Switchboard.Domain.Tests
         public int Wires { get; }
         public BoardSize BoardSize { get; }
         public int ClientSlots { get; }
+        public IReadOnlyList<CallScript> StagePool { get; }
 
         /// <summary>An extra_clients entry: a square board of the given side and as many caller slots (D49).</summary>
-        public static FakeUpgrade BoardUpgrade(string id, long costCents, int side) =>
-            new FakeUpgrade(id, UpgradeKind.ExtraClients, costCents, boardSize: new BoardSize(side, side), clientSlots: side);
+        public static FakeUpgrade BoardUpgrade(string id, long costCents, int side, IReadOnlyList<CallScript> stagePool = null,
+            int clientSlots = 0) =>
+            new FakeUpgrade(id, UpgradeKind.ExtraClients, costCents, boardSize: new BoardSize(side, side),
+                clientSlots: clientSlots > 0 ? clientSlots : side, stagePool: stagePool);
 
         public static FakeUpgrade WireUpgrade(string id, long costCents, int wires) =>
             new FakeUpgrade(id, UpgradeKind.ExtraWires, costCents, wires: wires);
 
-        public static FakeUpgrade NotepadUpgrade(long costCents = 300) => new FakeUpgrade("notepad", UpgradeKind.Notepad, costCents);
-
-        /// <summary>The 5b shop of D43: income, then 4, 5 and 6 cords for $5, $8 and $13, the $3 Notepad and the secret.</summary>
+        /// <summary>The 5b shop of D43 without the Notepad (D54): income, then 4, 5 and 6 cords, and the secret.</summary>
         public static IUpgrade[] FullShop() => new IUpgrade[]
         {
             Income("income_1", 800, 1.5),
@@ -154,7 +118,6 @@ namespace Switchboard.Domain.Tests
             WireUpgrade("wires_1", 500, 4),
             WireUpgrade("wires_2", 800, 5),
             WireUpgrade("wires_3", 1300, 6),
-            NotepadUpgrade(),
             new FakeUpgrade("secret", UpgradeKind.Secret, 25000)
         };
 
@@ -181,147 +144,56 @@ namespace Switchboard.Domain.Tests
         public void Refuse(CordId cord) => Refused.Add(cord);
     }
 
-    /// <summary>Three regular callers: Ada Moss on A1, Basil Thorne on B2 and Clara Whitlock on C3.</summary>
+    /// <summary>Three jacks the calls use: A1, B2 and C3. "Ada wants Basil" joins A1 and B2.</summary>
     internal sealed class TestWorld
     {
-        public TestWorld()
-        {
-            Regular = new FakeCallerType(new FloatRange(3, 8), new FloatRange(15, 30), new FloatRange(5, 15));
-            AdaCaller = new FakeCaller(Ada, Regular);
-            Callers = new ICaller[] { AdaCaller, new FakeCaller(Basil, Regular), new FakeCaller(Clara, Regular) };
-            Entries = new IDirectoryEntry[]
-            {
-                new FakeDirectoryEntry(Clara, "C3"),
-                new FakeDirectoryEntry(Ada, "A1"),
-                new FakeDirectoryEntry(Basil, "B2")
-            };
-            Directory = new PhoneDirectory(Entries);
-            Content = new FakeContent
-            {
-                CallerTypes = new ICallerType[] { Regular },
-                People = new IPerson[] { Ada, Basil, Clara },
-                Callers = Callers,
-                Directory = Entries
-            };
-        }
-
-        public FakePerson Ada { get; } = new FakePerson("Ada", "Moss");
-        public FakePerson Basil { get; } = new FakePerson("Basil", "Thorne");
-        public FakePerson Clara { get; } = new FakePerson("Clara", "Whitlock");
-        public FakeCallerType Regular { get; }
-        public ICaller AdaCaller { get; }
-        public IReadOnlyList<ICaller> Callers { get; }
-        public IReadOnlyList<IDirectoryEntry> Entries { get; }
-        public PhoneDirectory Directory { get; }
-        public FakeContent Content { get; }
-
         public static readonly JackId A1 = new JackId("A1");
         public static readonly JackId B2 = new JackId("B2");
         public static readonly JackId C3 = new JackId("C3");
 
+        private static int nextId;
+
+        public TestWorld()
+        {
+            AdaCallsBasil = Scripts.Call("ada_basil", "A1", "B2", 5, 20, 10);
+            Content = new FakeContent { StartPool = new[] { AdaCallsBasil } };
+        }
+
+        /// <summary>The one call in the start pool: A1 to B2, 10¢ + 5¢/s for 20 s.</summary>
+        public CallScript AdaCallsBasil { get; }
+        public FakeContent Content { get; }
+
         public CallRequest AdaWantsBasil(double centsPerSecond = 5, double durationSeconds = 20, double connectionFeeCents = 0) =>
-            new CallRequest(AdaCaller, Basil, centsPerSecond, durationSeconds, connectionFeeCents);
+            Request(A1, B2, centsPerSecond, durationSeconds, connectionFeeCents);
+
+        public static CallRequest Request(JackId from, JackId to, double centsPerSecond = 5, double durationSeconds = 20,
+            double connectionFeeCents = 0) =>
+            new CallRequest(new CallScript("test_" + (++nextId), "Caller", "caller-01", "Connect me, please.", from, to,
+                durationSeconds, connectionFeeCents, centsPerSecond));
+    }
+
+    /// <summary>
+    /// Emergencies (D51): people's calls from jacks A1 onwards (Grid.Jack) to Police on F6, Fire Brigade on F5 or
+    /// Doctor on F4, with 30 s to connect and a 200¢ fine for missing them.
+    /// </summary>
+    internal sealed class EmergencyWorld
+    {
+        private static int nextId;
+
+        public static JackId CallerJack(int person) => new JackId(Grid.Jack(person));
+
+        public static JackId ServiceJack(int service) => new JackId(Grid.Jack(35 - service));
+
+        public CallRequest EmergencyRequest(int caller, int service = 0) =>
+            new CallRequest(Scripts.Emergency("emergency_" + (++nextId), Grid.Jack(caller), Grid.Jack(35 - service)));
+
+        public CallRequest RegularRequest(int caller, int recipient, double centsPerSecond = 5, double durationSeconds = 20) =>
+            new CallRequest(Scripts.Call("regular_" + (++nextId), Grid.Jack(caller), Grid.Jack(recipient), centsPerSecond, durationSeconds));
     }
 
     internal static class Grid
     {
         /// <summary>The board's jacks row by row: 0 is A1, 5 is A6, 6 is B1, up to 35 for F6.</summary>
         public static string Jack(int index) => $"{(char)('A' + index / 6)}{index % 6 + 1}";
-    }
-
-    /// <summary>Any number of regular callers, up to 36: Person N1 on jack A1, Person N2 on A2, and so on (Grid.Jack).</summary>
-    internal sealed class Crowd
-    {
-        public Crowd(int count, FloatRange? callbackDelaySeconds = null)
-        {
-            Regular = new FakeCallerType(new FloatRange(3, 8), new FloatRange(15, 30), new FloatRange(5, 15), callbackDelaySeconds);
-            var people = new IPerson[count];
-            var callers = new ICaller[count];
-            var entries = new IDirectoryEntry[count];
-            for (int i = 0; i < count; i++)
-            {
-                people[i] = new FakePerson("Person", "N" + (i + 1));
-                callers[i] = new FakeCaller(people[i], Regular);
-                entries[i] = new FakeDirectoryEntry(people[i], Grid.Jack(i));
-            }
-            People = people;
-            Callers = callers;
-            Directory = new PhoneDirectory(entries);
-            Content = new FakeContent { CallerTypes = new ICallerType[] { Regular }, People = people, Callers = callers, Directory = entries };
-        }
-
-        public FakeCallerType Regular { get; }
-        public IReadOnlyList<IPerson> People { get; }
-        public IReadOnlyList<ICaller> Callers { get; }
-        public PhoneDirectory Directory { get; }
-        public FakeContent Content { get; }
-
-        public CallRequest Request(int caller, int recipient, double centsPerSecond = 5, double durationSeconds = 20) =>
-            new CallRequest(Callers[caller], People[recipient], centsPerSecond, durationSeconds);
-    }
-
-    /// <summary>
-    /// People N1..Nn on jacks A1 onwards (Grid.Jack), each with a regular and an emergency caller (as Content builds
-    /// them for everyoneCalls), plus Police on F6, Fire Brigade on F5 and Doctor on F4, who never call (D36, D37).
-    /// </summary>
-    internal sealed class EmergencyWorld
-    {
-        public EmergencyWorld(int count = 8, double regularWeight = 5, double emergencyWeight = 1)
-        {
-            Regular = new FakeCallerType(new FloatRange(3, 8), new FloatRange(15, 30), new FloatRange(5, 15)) { SpawnWeight = regularWeight };
-            Emergency = FakeCallerType.Emergency(emergencyWeight);
-            var people = new List<IPerson>();
-            var callers = new List<ICaller>();
-            var entries = new List<IDirectoryEntry>();
-            Services = new IPerson[]
-            {
-                new FakePerson("", "Police", FakeCallerType.ServiceTag),
-                new FakePerson("", "Fire Brigade", FakeCallerType.ServiceTag),
-                new FakePerson("", "Doctor", FakeCallerType.ServiceTag)
-            };
-            for (int i = 0; i < Services.Count; i++)
-            {
-                people.Add(Services[i]);
-                entries.Add(new FakeDirectoryEntry(Services[i], Grid.Jack(35 - i)));
-            }
-            var subscribers = new IPerson[count];
-            for (int i = 0; i < count; i++)
-            {
-                subscribers[i] = new FakePerson("Person", "N" + (i + 1));
-                people.Add(subscribers[i]);
-                entries.Add(new FakeDirectoryEntry(subscribers[i], Grid.Jack(i)));
-                callers.Add(new FakeCaller(subscribers[i], Regular));
-            }
-            foreach (IPerson person in subscribers) callers.Add(new FakeCaller(person, Emergency));
-            People = subscribers;
-            Callers = callers;
-            Directory = new PhoneDirectory(entries);
-            Content = new FakeContent
-            {
-                StartingCents = 10000,
-                CallerTypes = new ICallerType[] { Regular, Emergency },
-                People = people,
-                Callers = callers,
-                Directory = entries
-            };
-        }
-
-        public FakeCallerType Regular { get; }
-        public FakeCallerType Emergency { get; }
-        public IReadOnlyList<IPerson> People { get; }
-        public IReadOnlyList<IPerson> Services { get; }
-        public IReadOnlyList<ICaller> Callers { get; }
-        public PhoneDirectory Directory { get; }
-        public FakeContent Content { get; }
-
-        public ICaller EmergencyCallerOf(int person)
-        {
-            foreach (ICaller caller in Callers)
-                if (caller.Type == Emergency && caller.Person == People[person]) return caller;
-            return null;
-        }
-
-        public CallRequest EmergencyRequest(int caller, int service = 0) =>
-            new CallRequest(EmergencyCallerOf(caller), Services[service], 7, 15, 30);
     }
 }

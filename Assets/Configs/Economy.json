@@ -2,23 +2,18 @@
   "startingCents": 0,
   "startingCords": 2,
   "startingBoard": { "cols": 3, "rows": 3 },
-  "startingClientSlots": 3,
-  "pacing": { "firstCallDelaySeconds": 2, "baseIntervalSeconds": 8, "intervalJitter": 0.3, "loadFactor": 0.5, "idleTimeoutSeconds": 60 },
-  "calls": [
-    { "id": "type.regular", "name": "Regular", "spawnWeight": 5, "rateCentsPerSecond": { "min": 3, "max": 8 }, "feeCents": { "min": 5, "max": 15 }, "durationSeconds": { "min": 15, "max": 30 }, "callbackDelaySeconds": { "min": 20, "max": 40 }, "responseTimeSeconds": 0, "fineMissedCents": 0, "fineEarlyDisconnectCents": 0, "callbackAfterMiss": false, "callbackAfterDisconnect": false, "maxSimultaneous": 0, "everyoneCalls": false, "recipientTag": "" },
-    { "id": "type.emergency", "name": "Emergency", "spawnWeight": 1, "rateCentsPerSecond": { "min": 5, "max": 10 }, "feeCents": { "min": 20, "max": 40 }, "durationSeconds": { "min": 10, "max": 20 }, "callbackDelaySeconds": { "min": 20, "max": 40 }, "responseTimeSeconds": 30, "fineMissedCents": 200, "fineEarlyDisconnectCents": 100, "callbackAfterMiss": false, "callbackAfterDisconnect": false, "maxSimultaneous": 1, "everyoneCalls": true, "recipientTag": "emergency-service" }
-  ],
+  "startingClientSlots": 2,
+  "startPool": [ "call_001", "call_002", "call_003", "call_004", "call_005", "call_006", "call_007", "call_008" ],
   "upgrades": [
     { "id": "wires_1", "type": "extra_wires", "name": "Extra cord", "description": "4 cords", "costCents": 500, "wires": 4 },
     { "id": "wires_2", "type": "extra_wires", "name": "Extra cord", "description": "5 cords", "costCents": 800, "wires": 5 },
     { "id": "wires_3", "type": "extra_wires", "name": "Extra cord", "description": "6 cords", "costCents": 1300, "wires": 6 },
-    { "id": "board_1", "type": "extra_clients", "name": "Bigger board", "description": "4x4, 4 callers", "costCents": 1000, "boardSize": { "cols": 4, "rows": 4 }, "clientSlots": 4 },
-    { "id": "board_2", "type": "extra_clients", "name": "Bigger board", "description": "5x5, 5 callers", "costCents": 2500, "boardSize": { "cols": 5, "rows": 5 }, "clientSlots": 5 },
-    { "id": "board_3", "type": "extra_clients", "name": "Bigger board", "description": "6x6, 6 callers", "costCents": 6000, "boardSize": { "cols": 6, "rows": 6 }, "clientSlots": 6 },
+    { "id": "board_1", "type": "extra_clients", "name": "Bigger board", "description": "4x4, 3 callers", "costCents": 1000, "boardSize": { "cols": 4, "rows": 4 }, "clientSlots": 3, "stagePool": [ "call_101", "call_102", "call_103", "call_104", "call_105", "call_106", "call_107", "call_108", "call_109", "call_110" ] },
+    { "id": "board_2", "type": "extra_clients", "name": "Bigger board", "description": "5x5, 4 callers", "costCents": 2500, "boardSize": { "cols": 5, "rows": 5 }, "clientSlots": 4, "stagePool": [ "call_201", "call_202", "call_203", "call_204", "call_205", "call_206", "call_207", "call_208", "call_209", "call_210", "call_211", "call_212" ] },
+    { "id": "board_3", "type": "extra_clients", "name": "Bigger board", "description": "6x6, 5 callers", "costCents": 6000, "boardSize": { "cols": 6, "rows": 6 }, "clientSlots": 5, "stagePool": [ "call_301", "call_302", "call_303", "call_304", "call_305", "call_306", "call_307", "call_308", "call_309", "call_310", "call_311", "call_312", "call_313", "call_314" ] },
     { "id": "income_1", "type": "extra_income", "name": "Better rates", "description": "Earn x1.5", "costCents": 800, "incomeMultiplier": 1.5 },
     { "id": "income_2", "type": "extra_income", "name": "Good rates", "description": "Earn x2", "costCents": 2000, "incomeMultiplier": 2.0 },
     { "id": "income_3", "type": "extra_income", "name": "Top rates", "description": "Earn x3", "costCents": 5000, "incomeMultiplier": 3.0 },
-    { "id": "notepad", "type": "notepad", "name": "Notepad", "description": "Tap a name: note its jack", "costCents": 300 },
     { "id": "secret", "type": "secret", "name": "???", "description": "Something big", "costCents": 25000 }
   ]
 }

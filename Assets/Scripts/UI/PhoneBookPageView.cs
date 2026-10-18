@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,9 +11,6 @@ namespace Switchboard.UI
         [SerializeField] private Text pageNumber;
         [SerializeField] private Text emptyMessage;
         private readonly List<PhoneBookContactRow> rows = new List<PhoneBookContactRow>();
-        private bool tappable;
-
-        public event Action<PhoneBookContact> ContactTapped;
 
         public void Configure(RectTransform list, PhoneBookContactRow template, Text number, Text empty)
         {
@@ -32,8 +28,6 @@ namespace Switchboard.UI
             {
                 var row = Instantiate(rowTemplate, entries);
                 row.name = $"Contact_{rows.Count + 1:00}";
-                row.Tapped += OnRowTapped;
-                row.SetTappable(tappable);
                 rows.Add(row);
             }
             float spacing = entries.rect.height / config.contactsPerPage;
@@ -52,19 +46,6 @@ namespace Switchboard.UI
             pageNumber.text = (pageIndex + 1).ToString();
             emptyMessage.text = message ?? "No contacts";
             emptyMessage.gameObject.SetActive(pageIndex == 0 && config.contacts.Length == 0);
-        }
-
-        public void SetTappable(bool value)
-        {
-            tappable = value;
-            foreach (var row in rows) row.SetTappable(value);
-        }
-
-        private void OnRowTapped(PhoneBookContact contact) => ContactTapped?.Invoke(contact);
-
-        private void OnDestroy()
-        {
-            foreach (var row in rows) if (row != null) row.Tapped -= OnRowTapped;
         }
     }
 }

@@ -28,18 +28,12 @@ namespace Switchboard.Domain
             return null;
         }
 
-        public int CountLive(ICallerType type)
+        /// <summary>Whether a call that plays this script is still on a card (D52: no call shows twice).</summary>
+        public bool IsLive(CallScript script)
         {
-            int count = 0;
+            if (script == null) return false;
             for (int i = 0; i < live.Count; i++)
-                if (live[i].Request.Type == type) count++;
-            return count;
-        }
-
-        public bool IsInLiveCall(IPerson person)
-        {
-            for (int i = 0; i < live.Count; i++)
-                if (live[i].Request.Involves(person)) return true;
+                if (string.Equals(live[i].Request.Script.Id, script.Id, StringComparison.Ordinal)) return true;
             return false;
         }
 

@@ -5,7 +5,8 @@ namespace Switchboard.Domain
     {
         ExtraIncome = 1,
         ExtraWires = 2,
-        Notepad = 3,
+
+        // 3 was the Notepad, dropped by D54; never reuse it.
         ExtraClients = 4,
         Secret = 5
     }

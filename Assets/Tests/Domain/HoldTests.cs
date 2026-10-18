@@ -26,7 +26,7 @@ namespace Switchboard.Domain.Tests
             wallet = new Wallet();
             earnings = new EarningsService(calls, wallet);
             board = new FakeSwitchboard();
-            desk = new OperatorDesk(calls, new ConnectionRule(world.Directory), board);
+            desk = new OperatorDesk(calls, new ConnectionRule(), board);
             feesPaid = new List<ConnectionFeePaidArgs>();
             earnings.ConnectionFeePaid += e => feesPaid.Add(e);
             ended = new List<CallEndedArgs>();
@@ -53,9 +53,9 @@ namespace Switchboard.Domain.Tests
             return call;
         }
 
-        private Call TakeClaraCall(IPerson recipient)
+        private Call TakeClaraCall(JackId recipient)
         {
-            Call call = calls.Add(new CallRequest(world.Callers[2], recipient, 4, 30));
+            Call call = calls.Add(TestWorld.Request(TestWorld.C3, recipient, 4, 30));
             Assert.That(desk.TryTake(call.Id), Is.True);
             return call;
         }
@@ -163,7 +163,7 @@ namespace Switchboard.Domain.Tests
             Advance(3);
             desk.OnCircuitOpened(Cord, TestWorld.A1, TestWorld.B2);
             // Clara (C3) wants Ada (A1): the moved plug from B2 into C3 makes exactly that pair.
-            Call fresh = TakeClaraCall(world.Ada);
+            Call fresh = TakeClaraCall(TestWorld.A1);
             Assert.That(fresh.State, Is.EqualTo(CallState.Taken), "the on-hold cord isn't half-patched for the call in hand");
 
             desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3, TestWorld.A1);
@@ -182,7 +182,7 @@ namespace Switchboard.Domain.Tests
         {
             Call held = ConnectAdaToBasil();
             desk.OnCircuitOpened(Cord, TestWorld.A1, TestWorld.B2);
-            Call fresh = TakeClaraCall(world.Basil);
+            Call fresh = TakeClaraCall(TestWorld.B2);
 
             desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.C3, TestWorld.A1);
 
@@ -217,7 +217,7 @@ namespace Switchboard.Domain.Tests
             desk.OnCircuitOpened(Cord, TestWorld.A1, TestWorld.B2);
             desk.OnCordReturned(Cord);
 
-            Call next = TakeClaraCall(world.Ada);
+            Call next = TakeClaraCall(TestWorld.A1);
             desk.OnPlugInserted(Cord, TestWorld.A1);
             Assert.That(next.State, Is.EqualTo(CallState.Connecting));
             desk.OnCircuitClosed(Cord, TestWorld.A1, TestWorld.B2, TestWorld.A1);
@@ -228,7 +228,7 @@ namespace Switchboard.Domain.Tests
         public void SeveralCallsWithOneOnHold()
         {
             Call held = ConnectAdaToBasil();
-            Call other = calls.Add(new CallRequest(world.Callers[2], world.Ada, 4, 6));
+            Call other = calls.Add(TestWorld.Request(TestWorld.C3, TestWorld.A1, 4, 6));
             desk.TryTake(other.Id);
             desk.OnCircuitClosed(OtherCord, TestWorld.C3, TestWorld.A1);
             Advance(1);
@@ -243,26 +243,6 @@ namespace Switchboard.Domain.Tests
             Assert.That(held.CentsEarned, Is.EqualTo(heldEarned));
             Assert.That(board.Returned, Is.Empty);
             Assert.That(desk.CallOn(Cord), Is.SameAs(held));
-        }
-
-        [Test]
-        public void OnHoldCallUsesACordAndIsNotWaitingForTheSpawnerLoad()
-        {
-            var crowd = new Crowd(12);
-            var clock = new GameClock();
-            var random = new SeededRandom(5);
-            var crowdCalls = new CallService();
-            var callbacks = new CallbackScheduler(crowdCalls, clock, random, () => 6);
-            var spawner = new CallSpawner(crowdCalls, new CallFactory(random), crowd.Directory, crowd.Callers, random,
-                new BusyTracker(crowdCalls, callbacks), new PacingSettings(2, 8, 0, 0.5), () => 6, () => 1);
-            Call onHold = crowdCalls.Add(crowd.Request(0, 1));
-            crowdCalls.Take(onHold.Id);
-            crowdCalls.Connect(onHold.Id);
-            crowdCalls.Hold(onHold.Id);
-            crowdCalls.Add(crowd.Request(2, 3));
-
-            // One cord, held by the on-hold call: one waiting call and no free cord.
-            Assert.That(spawner.Load(), Is.EqualTo(1.5));
         }
     }
 }

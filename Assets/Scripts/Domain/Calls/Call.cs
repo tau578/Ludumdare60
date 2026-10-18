@@ -7,8 +7,8 @@ namespace Switchboard.Domain
             Id = id;
             Request = request;
             SecondsLeft = request.DurationSeconds;
-            // Every call, a callback included, starts with the type's full response time.
-            ResponseSecondsLeft = request.Type != null ? System.Math.Max(0, request.Type.ResponseTimeSeconds) : 0;
+            // Only emergencies are timed (D51); the timer starts with the call.
+            ResponseSecondsLeft = request.Script.ResponseTimeSeconds;
             HasResponseTime = ResponseSecondsLeft > 0;
         }
 
@@ -29,11 +29,5 @@ namespace Switchboard.Domain
 
         /// <summary>The fine actually taken when the call ended; 0 if none.</summary>
         public long FineCents { get; internal set; }
-
-        /// <summary>The caller's jack once the Notepad has noted it (D23); null until then.</summary>
-        public JackId? CallerNote { get; internal set; }
-
-        /// <summary>The wanted person's jack once the Notepad has noted it (D23); null until then.</summary>
-        public JackId? RecipientNote { get; internal set; }
     }
 }

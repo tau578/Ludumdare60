@@ -12,11 +12,9 @@ namespace Switchboard.Game
     public sealed class GameInstaller : MonoBehaviour
     {
         [SerializeField] private GameConfig config;
-        [SerializeField, Tooltip("0 picks a new seed every session.")] private int randomSeed;
         [SerializeField] private CordBridge cordBridge;
         [SerializeField] private GameLoopRunner loopRunner;
 
-        private NotepadBookLink bookLink;
         private OpenBoardLink boardLink;
 
         public GameSession Session { get; private set; }
@@ -39,21 +37,22 @@ namespace Switchboard.Game
             GoalPanelView goalPanel = FindSingle<GoalPanelView>(scene);
             if (moneyCounter == null || callQueue == null || shop == null || goalPanel == null) return;
 
-            // People reference the economy file's call types by id, so the economy file loads first.
-            EconomyCatalog economy = config.LoadEconomy();
+            // The economy file's pools refer to Calls.json, so the calls load first.
+            CallsCatalog calls = config.LoadCalls();
+            foreach (string error in calls.Errors) Debug.LogError($"Calls file: {error}", config);
+            EconomyCatalog economy = config.LoadEconomy(calls);
             foreach (string error in economy.Errors) Debug.LogError($"Economy file: {error}", config);
             List<SocketView> sockets = LevelScene.FindAll<SocketView>(scene);
-            PeopleCatalog people = config.LoadPeople(economy, BoardJacks(sockets));
+            PeopleCatalog people = config.LoadPeople(BoardJacks(sockets));
             foreach (string error in people.Errors) Debug.LogError($"People file: {error}", config);
-            foreach (string error in ContentValidator.ValidateStartingBoard(people.Directory, economy.StartingBoard))
-                Debug.LogError($"People file: {error}", config);
+            foreach (string error in ContentValidator.ValidateCallJacks(calls.Calls, people.Directory))
+                Debug.LogError($"Calls file: {error}", config);
 
             // Trim unused prefab cords before binding; missing starting cords are added below.
             cordBridge.Attach(scene, config.ExtraCordColors, economy.StartingCords);
             if (cordBridge.CordCount > economy.StartingCords)
                 Debug.LogWarning($"The scene has {cordBridge.CordCount} cords but Economy.json starts with {economy.StartingCords}.", config);
-            int seed = randomSeed != 0 ? randomSeed : Random.Range(1, int.MaxValue);
-            Session = new GameSession(new GameContent(people, economy), new SeededRandom(seed), cordBridge);
+            Session = new GameSession(new GameContent(economy), cordBridge);
             cordBridge.Bind(Session.Desk, Session.Calls);
             cordBridge.EnsureCords(Session.Stats.Cords);
             Session.Stats.Changed += OnStatsChanged;
@@ -63,10 +62,8 @@ namespace Switchboard.Game
                 Debug.LogWarning($"The caller panel has {callerSlots.Length} slots, but Economy.json can open {economy.MostClientSlots} " +
                     "(startingClientSlots or an extra_clients clientSlots). Lower the file's values or add slots to the panel.", config);
             callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, Session.Penalties, callerSlots, PortraitOf,
-                cordBridge.ColorOf, CardStyleOf, notes: Session.Notepad,
-                syncBoard: cordBridge.Synchronize, counter: moneyCounter);
+                cordBridge.ColorOf, config.CardStyleFor, syncBoard: cordBridge.Synchronize, counter: moneyCounter);
             PhoneBookView book = FindSingle<PhoneBookView>(scene);
-            if (book != null) bookLink = new NotepadBookLink(book, Session.Stats, Session.Notepad);
             boardLink = new OpenBoardLink(sockets, book, callQueue, Session.Stats, Session.Board);
             shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene));
             goalPanel.Bind(Session.Goal);
@@ -85,8 +82,6 @@ namespace Switchboard.Game
         private void OnDestroy()
         {
             if (Session != null) Session.Stats.Changed -= OnStatsChanged;
-            bookLink?.Dispose();
-            bookLink = null;
             boardLink?.Dispose();
             boardLink = null;
         }
@@ -94,9 +89,7 @@ namespace Switchboard.Game
         // Cords are only ever added: one can't be taken away safely mid-call.
         private void OnStatsChanged() => cordBridge.EnsureCords(Session.Stats.Cords);
 
-        private Sprite PortraitOf(IPerson person) => person is PersonRecord record ? config.Portrait(record.Portrait) : null;
-
-        private CallCardStyle CardStyleOf(ICallerType type) => type != null ? config.CardStyleOf(type.Id) : default;
+        private Sprite PortraitOf(CallScript call) => call != null ? config.Portrait(call.Icon) : null;
 
         private T FindSingle<T>(Scene scene) where T : Component
         {

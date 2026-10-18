@@ -1,140 +1,128 @@
-# The economy file: a guide for the designer
+# The economy and calls files: a guide for the designer
 
-`Assets/Configs/Economy.json` is your file. You edit it by hand, and the game reads it every time it starts. Nothing in Unity needs to change when you edit it.
+Two files are yours. You edit them by hand, and the game reads them every time it starts. Nothing in Unity needs to change when you edit them.
 
-Keep it readable: one entry per line, in the order you want the player to meet them.
+- `Assets/Configs/Calls.json`: every call in the game, written out one by one.
+- `Assets/Configs/Economy.json`: the starting money and cords, the board, **which calls play in which order** (the call queues), and everything the shop sells.
 
-## Sections
+Keep both readable: one entry per line, in the order you want the player to meet them.
 
-| Section | What it holds | Ready? |
+**Cents and seconds.** Every money value is in **cents**: 500 is $5.00, 25 is 25¢. Every time value is in **seconds**. The field names say which: `...Cents`, `...Seconds`, `centsPerSecond`.
+
+**Text.** Write names and messages in English with straight quotes and apostrophes only (`'` and `"`). Curly quotes, arrows and other special signs may be missing from the game's font. To put a `"` inside a message, write `\"`; it's easier to use `'` instead: `"It's about the cricket."`.
+
+What stays in Unity: how cards look (the EMERGENCY badge and its red), the portraits and the cord colours. You never need to touch those to tune the game.
+
+## Calls.json
+
+Every call is one line in `calls`:
+
+```json
+{
+  "calls": [
+    { "id": "call_001", "icon": "caller-01", "name": "Ada Moss", "message": "Connect me with Mabel Dunmore, please.", "from": "C3", "to": "A2", "durationSeconds": 20, "connectCents": 10, "centsPerSecond": 5 },
+    { "id": "call_103", "icon": "caller-02", "name": "Herbert Marlow", "message": "Get me the Doctor! My wife has taken a fall!", "from": "D3", "to": "D4", "durationSeconds": 15, "connectCents": 30, "centsPerSecond": 7, "emergency": true, "responseTimeSeconds": 30, "penaltyCents": 200 }
+  ]
+}
+```
+
+| Field | Meaning | Allowed |
 |---|---|---|
-| `startingCents`, `startingCords` | The money and the cords a new game starts with. | Yes (5c) |
-| `startingBoard`, `startingClientSlots` | How much of the board, and how many caller slots, a new game opens. | Yes (7a) |
-| `pacing` | How fast calls arrive, and the idle timeout. | Yes (5c) |
-| `calls` | Each call type's money and timing: fee, rate and duration ranges, fines, response time, how often it rings. | Yes (5c) |
-| `upgrades` | Everything the shop sells. | Yes (Steps 5a and 5b) |
+| `id` | The call's permanent name, such as `call_001`. The queues in `Economy.json` list calls by id. Every id must be different. | required |
+| `icon` | The caller's portrait: `caller-01` to `caller-12`. | a portrait name from GameConfig's list |
+| `name` | The caller's name, shown under the portrait, such as "Ada Moss". | required |
+| `message` | What the caller says when the player takes the card, in the speech bubble. Usually who they want, so the player can look them up. | required |
+| `from` | The caller's jack, such as `"C3"`. | a jack label (see below) |
+| `to` | The jack of the person or service they want. | a jack label, not the same as `from` |
+| `durationSeconds` | How long the call lasts once connected. | above 0 |
+| `connectCents` | The one-off fee paid when the call connects. | 0 or more, whole cents |
+| `centsPerSecond` | What the call pays every second while connected. Decimals are fine: 2.5 pays 2½¢ a second, and nothing is lost to rounding. | 0 or more |
+| `emergency` | `true` makes it an emergency: a red EMERGENCY badge and a countdown ring. | leave it out for a regular call |
+| `responseTimeSeconds` | Emergencies only: the seconds the player has to connect it. | above 0 |
+| `penaltyCents` | Emergencies only: the fine when the time runs out. | 0 or more, whole cents |
 
-The whole file looks like this (the calls and upgrades are shortened here):
+**Jack labels** are written as on the board and in the book: a row letter **A to F**, then a column number **1 to 6**, such as `"C3"` (row C, column 3). The game starts on a 3x3 corner (rows A to C, columns 1 to 3) and grows from there.
+
+**What a call pays.** A correct connection pays `connectCents` at once, then `centsPerSecond` every second for `durationSeconds`: the shipped first call pays 10¢ + 20 × 5¢ = $1.10. Income upgrades multiply both. The card shows "10¢ + 5¢/s"; the duration stays hidden.
+
+**What can go wrong for the player:**
+- A wrong patch ends the call with "Wrong number!". There is **no fine**, and the next call in the queue takes the slot. The same call comes back when the queue comes round to it.
+- An emergency that isn't connected within `responseTimeSeconds` ends as "Missed" and takes `penaltyCents` (never multiplied; money never drops below $0.00). A wrong patch or a cut-off emergency is **not** fined.
+
+**The phone book is only for looking things up.** The calls carry their own jacks; the book (`PhoneBook.json`, and from Step 8 `Book.json`) just has to list someone on every jack a call uses, or the player can't find it. The validator checks that.
+
+## Economy.json
+
+| Section | What it holds |
+|---|---|
+| `startingCents`, `startingCords` | The money and the cords a new game starts with. |
+| `startingBoard`, `startingClientSlots` | How much of the board, and how many caller slots, a new game opens. |
+| `startPool` | The call queue of a new game. |
+| `upgrades` | Everything the shop sells. Each `extra_clients` entry has its own `stagePool`. |
+
+The whole file looks like this (the pools and upgrades are shortened here):
 
 ```json
 {
   "startingCents": 0,
-  "startingCords": 3,
+  "startingCords": 2,
   "startingBoard": { "cols": 3, "rows": 3 },
-  "startingClientSlots": 3,
-  "pacing": { "firstCallDelaySeconds": 2, "baseIntervalSeconds": 8, "intervalJitter": 0.3, "loadFactor": 0.5, "idleTimeoutSeconds": 60 },
-  "calls": [
-    { "id": "type.regular", "name": "Regular", ... },
-    { "id": "type.emergency", "name": "Emergency", ... }
-  ],
+  "startingClientSlots": 2,
+  "startPool": [ "call_001", "call_002", "call_003", ... ],
   "upgrades": [
+    { "id": "board_1", "type": "extra_clients", ..., "stagePool": [ "call_101", "call_102", ... ] },
     { "id": "income_1", ... }
   ]
 }
 ```
 
-**Cents and seconds.** Every money value is in **cents**: 500 is $5.00, 25 is 25¢. Every time value is in **seconds**. The field names say which: `...Cents`, `...Seconds`, `...CentsPerSecond`.
+The old `pacing` and `calls` sections and the `notepad` upgrade are gone. If an old file still has them, the validator says they're no longer used.
 
-What stays in Unity: how cards look (the EMERGENCY badge and its red), the portraits and the cord colours. You never need to touch those to tune the economy.
+## Call queues
+
+Calls don't ring at random any more: they come from a queue, the list of call ids you write.
+
+```json
+"startPool": [ "call_001", "call_002", "call_003", "call_004", "call_005", "call_006", "call_007", "call_008" ],
+```
+
+- **Slots.** Each open caller slot holds one call. Whenever a slot is free, the next call in the queue appears in it **at once**: at the start, when a call ends, and when an upgrade opens a slot. There is no timer. (A finished card keeps its slot while its "Paid" or "Wrong number!" stamp shows, about two seconds.)
+- **Order.** Calls play in the order you list them and loop back to the first. Success or a wrong number doesn't change the order.
+- **No call shows twice.** A call that is still on a card is skipped when the queue comes round to it. If every call in the queue is on a card, a free slot stays empty until one ends. So give a queue at least as many calls as it has slots, and preferably more.
+- **Busy lines.** A call whose jack is already in use waits on its card until the player can connect it.
+- **Bigger boards.** Each `extra_clients` upgrade has its own `stagePool`. Buying it **replaces** the queue, starting at its first call. Calls already on cards finish normally. The queue is always the last bought board's `stagePool`, or `startPool` before any.
+- **Every call must fit its stage.** A call in `startPool` must use jacks on `startingBoard`; a call in a `stagePool` must use jacks on that entry's `boardSize`. A call outside is left out of the queue, because the player could never connect it. A `stagePool` may reuse calls from earlier stages.
+- A new game (and, until saves arrive in Step 9, every restart) begins at `startPool`'s first call. Make that one simple: the first-call guide walks the player through it.
+
+The designer's draft wrote `start_pool` and `stage_pool`; the file uses `startPool` and `stagePool`, like its other names.
 
 ## Starting money and cords
 
 ```json
 "startingCents": 0,
-"startingCords": 3,
+"startingCords": 2,
 ```
 
 | Field | Meaning | If left out |
 |---|---|---|
 | `startingCents` | The money a new game starts with, in cents. 500 starts the counter at $5.00. 0 or more. | 0 |
-| `startingCords` | The cords in the tray when a game starts: **3 to 6**. | 3 |
+| `startingCords` | The cords in the tray when a game starts: **2 to 6**. | 2 |
 
-- The tray is built with 3 cords, and cords can't be taken away, so `startingCords` can't go below 3. The tray holds at most 6.
-- Above 3, the extra cords are in the tray from the start, in the same colours as bought cords.
 - The `extra_wires` upgrades must start above `startingCords`. With `"startingCords": 4`, a `wires` of 4 is reported, and the first cord the shop offers is the one with `"wires": 5`.
 
 ## Starting board and caller slots
 
 ```json
 "startingBoard": { "cols": 3, "rows": 3 },
-"startingClientSlots": 3,
+"startingClientSlots": 2,
 ```
 
 | Field | Meaning | If left out or wrong |
 |---|---|---|
 | `startingBoard` | The part of the board a new game opens. `cols` are the columns 1 to 6, `rows` the rows A to F; each is **1 to 6**. The open part is always the top-left corner: `{ "cols": 3, "rows": 3 }` opens rows A to C and columns 1 to 3 (9 jacks). | The full 6x6 board, with a message |
-| `startingClientSlots` | How many caller slots, from the top, take calls in a new game: **1 to 6**. The others look closed. Live calls never outnumber the open slots. | All 6, with a message |
+| `startingClientSlots` | How many caller slots, from the top, take calls in a new game: **1 to 6**. The others are hidden. | All 6, with a message |
 
-- **Who is in the game** follows from `PhoneBook.json`: exactly the people whose jack is on the open part call, are called, and are listed in the book. To change the starting group, move people onto or off those jacks.
-- The starting board needs **at least two people without tags**, or no call could ever ring; the validator says so.
-- An emergency service (Police, Fire Brigade, Doctor) only takes calls once the board opens over its jack. With the shipped files, the Doctor (D4) joins at 4x4, the Fire Brigade (E5) at 5x5 and the Police (B6) at 6x6, so emergencies start once the board is 4x4.
-- The board in Unity has 6 by 6 jacks and 6 caller slots; those are the only fixed limits.
-
-## Pacing
-
-How often new calls ring. One line:
-
-```json
-"pacing": { "firstCallDelaySeconds": 2, "baseIntervalSeconds": 8, "intervalJitter": 0.3, "loadFactor": 0.5, "idleTimeoutSeconds": 60 },
-```
-
-| Field | What it does | Allowed |
-|---|---|---|
-| `firstCallDelaySeconds` | Seconds before the first call of a game rings. | 0 or more |
-| `baseIntervalSeconds` | The usual gap between two new calls, in seconds, while the player keeps up. Smaller means busier: 3 is hectic, 8 is calm. | 0.1 or more |
-| `intervalJitter` | How much each gap varies. 0.3 means each gap is rolled between 30 % shorter and 30 % longer than the base (8 s becomes 5.6 to 10.4 s). 0 makes every gap the same. | 0 to 0.95 |
-| `loadFactor` | Each waiting call beyond the free cords stretches the gap by this share. With 0.5, two calls more than the free cords make the gap twice as long (1 + 2 × 0.5), so a swamped player gets a breather. 0 turns this off. | 0 or more |
-| `idleTimeoutSeconds` | After this many seconds with no input, calls that carry fines (emergencies) stop ringing, so a player who walks away isn't fined. 0 turns this off. | 0 or more |
-
-A missing or wrong pacing value is reported, and the game uses the default for it (the values in the line above).
-
-## Calls
-
-Each call type is one line in `calls`. A new call goes like this: the game picks a **type** (by `spawnWeight`), then a caller of that type, then the person they want.
-
-```json
-{ "id": "type.regular", "name": "Regular", "spawnWeight": 5, "rateCentsPerSecond": { "min": 3, "max": 8 }, "feeCents": { "min": 5, "max": 15 }, "durationSeconds": { "min": 15, "max": 30 }, "callbackDelaySeconds": { "min": 20, "max": 40 }, "responseTimeSeconds": 0, "fineMissedCents": 0, "fineEarlyDisconnectCents": 0, "callbackAfterMiss": false, "callbackAfterDisconnect": false, "maxSimultaneous": 0, "everyoneCalls": false, "recipientTag": "" },
-{ "id": "type.emergency", "name": "Emergency", "spawnWeight": 1, "rateCentsPerSecond": { "min": 5, "max": 10 }, "feeCents": { "min": 20, "max": 40 }, "durationSeconds": { "min": 10, "max": 20 }, "callbackDelaySeconds": { "min": 20, "max": 40 }, "responseTimeSeconds": 30, "fineMissedCents": 200, "fineEarlyDisconnectCents": 100, "callbackAfterMiss": false, "callbackAfterDisconnect": false, "maxSimultaneous": 1, "everyoneCalls": true, "recipientTag": "emergency-service" }
-```
-
-**Ranges** are written `{ "min": 3, "max": 8 }`. Each call rolls its own value between the two, in whole cents where it can. To fix a value, give both the same number: `{ "min": 5, "max": 5 }`.
-
-### Fields every call type needs
-
-| Field | Meaning |
-|---|---|
-| `id` | The type's permanent name, such as `type.regular`. Every id must be different. `PhoneBook.json` uses it in each person's `"type"`, so **don't rename an id** without changing the people file too. |
-| `name` | A short name, such as "Regular". The dev panel shows it ("Emergency now"). |
-| `spawnWeight` | How often this type rings **compared with the others**. 5 against 1 means five regular calls for each emergency. 0 means it never rings on its own. At least one type needs a weight above 0. |
-| `rateCentsPerSecond` | What a connected call pays every second, in cents (a range). |
-| `feeCents` | The one-off fee paid when the call connects correctly, in cents (a range). |
-| `durationSeconds` | How long a connected call lasts, in seconds (a range above 0). |
-
-### Fields you may leave out
-
-Left out, each one means "off".
-
-| Field | Meaning | If left out |
-|---|---|---|
-| `callbackDelaySeconds` | After a wrong connection, how many seconds until the caller rings again (a range). | 20 to 40 |
-| `responseTimeSeconds` | Seconds the player has to connect the call before it counts as missed. | 0: waits as long as it takes |
-| `fineMissedCents` | Cents taken for a missed call and for a wrong connection. | 0: no fine |
-| `fineEarlyDisconnectCents` | Cents taken for pulling a cord before the call has finished. | 0: no fine |
-| `callbackAfterMiss` | `true`: a missed caller rings again later. | `false` |
-| `callbackAfterDisconnect` | `true`: a caller who was cut off rings again later. | `false` |
-| `maxSimultaneous` | At most this many calls of the type at once, counting callers waiting to ring back. | 0: no limit |
-| `everyoneCalls` | `true`: every person without tags can place this kind of call, besides their own type. | `false` |
-| `recipientTag` | Only people with this tag receive the calls, such as `"emergency-service"` for the Police, Fire Brigade and Doctor. | `""`: any person without tags |
-
-Money never drops below $0.00, however big the fines.
-
-### Per-person prices
-
-In `PhoneBook.json`, a person's `rate` and `fee` (when above 0) **override** the range of their own `type` for that person's calls. 0 means "use the type's range". So a rich caller can pay more than other Regular callers without a new type. Calls they place through `everyoneCalls` (emergencies) always use that type's ranges.
-
-### A new call type
-
-Add a line to `calls` with a new id, then give people that `"type"` in `PhoneBook.json`. No Unity work is needed: a type without a card style in Unity gets plain cards. (A card badge, like EMERGENCY, is set in a `CallerTypes` asset in Unity, matched by the id.) New *behaviour* beyond these fields still needs code.
+- Closed jacks are dimmed and can't take a plug. The board in Unity has 6 by 6 jacks and 6 caller slots; those are the only fixed limits.
 
 ## Upgrades
 
@@ -154,21 +142,20 @@ Every upgrade is bought **once**. An entry looks like this:
 | `description` | One short line under the title, such as "Earn x1.5". |
 | `costCents` | The price in **cents**: 800 is $8.00, 25000 is $250.00. Must be above 0. |
 
-**Never rename an id once players have played.** Saves remember bought upgrades by id (from Step 6), so a renamed id counts as never bought. You can change the name, description and price at any time.
+**Never rename an id once players have played.** Saves remember bought upgrades by id (from Step 9), so a renamed id counts as never bought. You can change the name, description and price at any time.
 
 ### Types
 
-| `type` | Extra fields | What it does | Ready? |
-|---|---|---|---|
-| `extra_income` | `incomeMultiplier` | **Sets** how much every call pays: 1.5 means half as much again. It applies at once, even to calls already connected. Fines are never multiplied. | Yes (5a) |
-| `secret` | none | The mystery upgrade, the goal the player saves for. Its shop button fills up as money is saved. There must be **exactly one**. For now, buying it shows "To be continued...". | Yes (5a) |
-| `extra_wires` | `wires` | **Sets** the total number of cords. The new cord appears in the tray at once, in a new colour. | Yes (5b) |
-| `notepad` | none | While owned, tapping a name in the open phone book notes that person's jack on the call in hand, if they are the caller or the person wanted: "Ada Moss (C3)". There is **at most one**. Delete the entry to drop the feature. | Yes (5b) |
-| `extra_clients` | `boardSize`, `clientSlots` | **Sets** how much of the board is open, and the caller slots. The new jacks, their people and the slots open at once. | Yes (7a) |
+| `type` | Extra fields | What it does |
+|---|---|---|
+| `extra_income` | `incomeMultiplier` | **Sets** how much every call pays: 1.5 means half as much again. It applies at once, even to calls already connected. Fines are never multiplied. |
+| `extra_wires` | `wires` | **Sets** the total number of cords. The new cord appears in the tray at once, in a new colour. |
+| `extra_clients` | `boardSize`, `clientSlots`, `stagePool` | **Sets** how much of the board is open, the caller slots and the call queue. The new jacks and slots open at once, and the queue switches to `stagePool`. |
+| `secret` | none | The mystery upgrade, the goal the player saves for. Its shop button fills up as money is saved. There must be **exactly one**. For now, buying it shows "To be continued...". |
 
 ### Extra cords: `wires`
 
-`wires` is the **total** number of cords after buying, not the number added. The game starts with `startingCords` cords (3 in the shipped file), so:
+`wires` is the **total** number of cords after buying, not the number added. The game starts with `startingCords` cords (2 in the shipped file), so:
 
 ```json
 { "id": "wires_1", "type": "extra_wires", "name": "Extra cord", "description": "4 cords", "costCents": 500, "wires": 4 },
@@ -176,41 +163,28 @@ Every upgrade is bought **once**. An entry looks like this:
 { "id": "wires_3", "type": "extra_wires", "name": "Extra cord", "description": "6 cords", "costCents": 1300, "wires": 6 },
 ```
 
-- Each `wires` must be **above `startingCords`**, the cords the game starts with.
-- It can be **at most 6**: that's all the tray holds.
-- Along the chain it must **grow**: 4, then 5, then 6.
+- Each `wires` must be **above `startingCords`**, at most 6 (all the tray holds), and **grow** along the chain.
 
-### Bigger board: `boardSize` and `clientSlots`
+### Bigger board: `boardSize`, `clientSlots` and `stagePool`
 
 ```json
-{ "id": "board_1", "type": "extra_clients", "name": "Bigger board", "description": "4x4, 4 callers", "costCents": 1000, "boardSize": { "cols": 4, "rows": 4 }, "clientSlots": 4 },
-{ "id": "board_2", "type": "extra_clients", "name": "Bigger board", "description": "5x5, 5 callers", "costCents": 2500, "boardSize": { "cols": 5, "rows": 5 }, "clientSlots": 5 },
-{ "id": "board_3", "type": "extra_clients", "name": "Bigger board", "description": "6x6, 6 callers", "costCents": 6000, "boardSize": { "cols": 6, "rows": 6 }, "clientSlots": 6 },
+{ "id": "board_1", "type": "extra_clients", "name": "Bigger board", "description": "4x4, 3 callers", "costCents": 1000, "boardSize": { "cols": 4, "rows": 4 }, "clientSlots": 3, "stagePool": [ "call_101", "call_102", "call_103" ] },
+{ "id": "board_2", "type": "extra_clients", "name": "Bigger board", "description": "5x5, 4 callers", "costCents": 2500, "boardSize": { "cols": 5, "rows": 5 }, "clientSlots": 4, "stagePool": [ "call_201", "call_202", "call_203" ] },
+{ "id": "board_3", "type": "extra_clients", "name": "Bigger board", "description": "6x6, 5 callers", "costCents": 6000, "boardSize": { "cols": 6, "rows": 6 }, "clientSlots": 5, "stagePool": [ "call_301", "call_302", "call_303" ] },
 ```
 
-- `boardSize` is the **whole** open part after buying, written like `startingBoard` (`cols` and `rows`, each 1 to 6), not the jacks added.
-- `clientSlots` is the **total** number of open caller slots after buying, 1 to 6.
-- Along the chain, starting from `startingBoard`, the board must **grow**: neither `cols` nor `rows` may go down, and at least one must go up. So the first entry must be bigger than `startingBoard`.
-- `clientSlots` may stay the same but never goes down, starting from `startingClientSlots`.
-- Add or remove lines to have more or fewer board steps; a non-square step such as `{ "cols": 4, "rows": 3 }` is fine.
+(The shipped pools are longer: 10, 12 and 14 calls.)
+
+- `boardSize` is the **whole** open part after buying, written like `startingBoard`, not the jacks added.
+- `clientSlots` is the **total** number of open caller slots after buying, 1 to 6. It may stay the same but never goes down, starting from `startingClientSlots`.
+- Along the chain, starting from `startingBoard`, the board must **grow**: neither `cols` nor `rows` may go down, and at least one must go up.
+- `stagePool` is the queue once this board is bought; see "Call queues". If it's missing or empty, the board can still be bought and the queue stays as it was, with a message.
+- Each new ring of the shipped board brings one emergency service: the Doctor (D4) at 4x4, the Fire Brigade (E5) at 5x5 and the Police (B6) at 6x6. Their emergency calls are in that board's `stagePool`.
 - Write "x", not "×", in the description: the game's font has no "×".
-
-
-```json
-{ "id": "notepad", "type": "notepad", "name": "Notepad", "description": "Tap a name: note its jack", "costCents": 300 },
-```
-
-- Keep at most one `notepad` entry; it has no extra fields.
-- Without it, a tap on a name closes the book, as before. Deleting the entry removes the feature; nothing else needs to change.
 
 ### Chains
 
-Entries of the same type form a **chain**, in the order they appear in the file. The player can only buy the next one in a chain; there's no skipping. In the example below, "Good rates" can only be bought after "Better rates".
-
-```json
-{ "id": "income_1", "type": "extra_income", "name": "Better rates", "description": "Earn x1.5", "costCents": 800, "incomeMultiplier": 1.5 },
-{ "id": "income_2", "type": "extra_income", "name": "Good rates", "description": "Earn x2", "costCents": 2000, "incomeMultiplier": 2.0 },
-```
+Entries of the same type form a **chain**, in the order they appear in the file. The player can only buy the next one in a chain; there's no skipping.
 
 **Values set the result; they don't add up.** `incomeMultiplier` 2.0 means "earn ×2 from now on", not "×1.5 and then another ×2". So values in a chain must **grow**: 1.5, then 2.0, then 3.0.
 
@@ -221,56 +195,60 @@ Entries of the same type form a **chain**, in the order they appear in the file.
 - When a chain is bought out, its button takes the next chain that isn't shown yet, or goes back to the "+" look. The other buttons don't move.
 - To add a new upgrade of a type that already exists, just add a line. No code is needed.
 
-## Checking the file
+## Checking the files
 
-In Unity, choose **Tools > Switchboard > Validate Content**. The Console then shows either "Validate Content: no problems found." or one plain message per problem, naming the entry and the fix. For example:
+In Unity, choose **Tools > Switchboard > Validate Content**. The Console then shows either "Validate Content: no problems found." or one plain message per problem, naming the file, the entry and the fix. For example:
 
 ```
-Economy file: Upgrade 2 "income_2": incomeMultiplier 1.2 is not higher than income_1's 1.5. Values in a chain must grow.
+Economy file: startPool: call_014 uses E5, but the startingBoard opens only 3x3. The player could never connect it, so it is left out. Move it to the pool of a bigger board, or give it jacks on this one.
 ```
 
-The validator reports:
-- a missing file, or one that isn't valid JSON (usually a missing comma, quote or bracket)
-- a negative `startingCents`, or a `startingCords` outside 3 to 6 (the game then starts with 3)
+**Calls.json** messages report:
+- a missing or empty file, one that isn't valid JSON (usually a missing comma, quote or bracket), or one with no calls (the game still starts, with no calls)
+- an empty or duplicate id
+- an empty `name`, `icon` or `message`, or an icon that isn't a known portrait
+- a missing `durationSeconds`, `connectCents` or `centsPerSecond` (missing numbers never silently become 0)
+- a `durationSeconds` of 0 or less; a negative `connectCents`, `centsPerSecond` or `penaltyCents`; fees and fines that aren't whole cents
+- an empty `from` or `to`, a jack that isn't on the 6x6 board, or `from` and `to` the same
+- an emergency without a `responseTimeSeconds` above 0, or without `penaltyCents`
+- a note when a regular call has `responseTimeSeconds` or `penaltyCents` (only used for emergencies; the call still plays)
+- a jack a call uses that nobody is listed on in the phone book
+
+A call with a problem is left out; the others still play.
+
+**Economy.json** messages report:
+- a missing file, or one that isn't valid JSON
+- a negative `startingCents`, or a `startingCords` outside 2 to 6 (the game then starts with 2)
 - a missing `startingBoard` or `startingClientSlots`, a `startingBoard` without both `cols` and `rows` or outside 1 to 6, or a `startingClientSlots` outside 1 to 6 (the game then opens the full board and all 6 slots)
-- fewer than two people without tags on the starting board
-- a missing `pacing` section or value, or one out of its range (the game then uses the default for it)
-- a missing or empty `calls` section (then no calls ring)
-- a call type with an empty or duplicate id, an empty name, or a missing `spawnWeight`, `rateCentsPerSecond`, `feeCents` or `durationSeconds`
-- a range with only a min or only a max, a min above its max, a negative min, or a `durationSeconds` min of 0
-- a negative `spawnWeight`, `responseTimeSeconds`, fine or `maxSimultaneous`
-- no call type with a `spawnWeight` above 0
-- a person in `PhoneBook.json` whose `type` isn't a call type in this file
-- a card style asset in Unity whose id isn't a call type in this file
+- a missing or empty `startPool`; an `extra_clients` entry without a `stagePool`, or with an empty one
+- a pool id that isn't in `Calls.json`, or a call that has a problem there
+- a call that doesn't fit its stage's board (it is left out of that queue)
+- a note when a pool has fewer different calls than its stage's slots (some slots would stay empty)
+- the old `pacing` and `calls` sections and the `notepad` upgrade: no longer used
 - an empty id, an id with other characters than `a-z`, `0-9` and `_`, or an id used twice
 - an unknown type (the message lists the known ones)
-- an empty name
-- a `costCents` of 0 or less
+- an empty name, or a `costCents` of 0 or less
 - an `incomeMultiplier` of 1 or less, or one that doesn't grow along its chain
 - a `wires` that isn't above `startingCords`, is more than 6, or doesn't grow along its chain
-- more than one `notepad`
 - an `extra_clients` entry with a missing `boardSize` or `clientSlots`, a size outside 1 to 6, a board that doesn't grow (or shrinks on one side) along its chain, or `clientSlots` that go down
 - no `secret`, or more than one
 
 More example messages:
 
 ```
-Economy file: Call type 2 "type.emergency": feeCents min 40 is above its max 20. Swap them.
-Economy file: Call type 1 "type.regular": spawnWeight is missing. Add how often this type rings compared with the others, such as "spawnWeight": 1.
-Economy file: Call type 1 "type.regular": durationSeconds is missing. Add it as "durationSeconds": { "min": 15, "max": 30 }.
-Economy file: Call type 2 "type.emergency": fineMissedCents -5 is negative. Use 0 or more; 0 means off.
-Economy file: No call type has a spawnWeight above 0, so no calls would ever ring. Give one a weight, such as 1.
-Economy file: pacing: intervalJitter 1.2 is outside 0 to 0.95. Use a value such as 0.3. The game uses 0.3 for now.
-Economy file: startingCords 7 is more than the tray holds. Use 3 to 6. The game starts with 3 for now.
-People file: Contact 4 "Clara Whitlock": call type 'type.vip' is unknown. Use one of: type.regular, type.emergency.
-Economy file: Upgrade 5 "wires_2": wires 4 is not higher than wires_1's 4. Values in a chain must grow.
-Economy file: Upgrade 4 "wires_1": wires 3 is not above the 3 cords the game starts with. wires is the total number of cords, so use 4 or more.
-Economy file: Upgrade 6 "wires_3": wires 7 is more than the tray holds. Use 6 or less.
-Economy file: Upgrade 8 "notepad_2": there is already a notepad (upgrade 7). Keep at most one notepad entry.
-Economy file: Upgrade 9 "board_2": boardSize 4x4 is the same as board_1's 4x4. The board must grow: raise cols, rows or both.
-Economy file: Upgrade 10 "board_3": clientSlots 4 is fewer than board_2's 5. Caller slots can only grow along the chain.
+Calls file: Call 3 "call_003": durationSeconds is missing. Add how many seconds the call lasts once connected, such as "durationSeconds": 20.
+Calls file: Call 7 "call_007": to "G2" is not a jack on the board. Use a row letter A to F, then a column 1 to 6, such as "C3".
+Calls file: Call 9 "call_103": an emergency needs responseTimeSeconds, the seconds the player has to connect it, such as "responseTimeSeconds": 30.
+Calls file: Call 2 "call_002": responseTimeSeconds and penaltyCents are only used for emergencies. Add "emergency": true, or remove them.
+Calls file: call_201 uses A5, but nobody is listed on A5 in PhoneBook.json, so the player can't look it up. Put someone on that jack in the book, or give the call another jack.
+Economy file: startPool: call_099 is not in Calls.json. Check the spelling, or add the call to Calls.json.
+Economy file: Upgrade "board_1": stagePool: call_014 uses E5, but board_1 opens only 4x4. The player could never connect it, so it is left out. Move it to the pool of a bigger board, or give it jacks on this one.
+Economy file: Upgrade "board_2": stagePool has 3 different calls for 4 caller slots (board_2's clientSlots), so 1 slot would stay empty. A note only: add more calls if you want every slot busy.
+Economy file: The pacing section is no longer used: calls now come from the queues (startPool and each extra_clients's stagePool). Remove the section.
+Economy file: Upgrade 7 "notepad": the notepad upgrade is no longer used, so this entry is left out. Remove it from the file.
+Economy file: Upgrade 2 "income_2": incomeMultiplier 1.2 is not higher than income_1's 1.5. Values in a chain must grow.
+Economy file: Upgrade 5 "board_2": boardSize 4x4 is the same as board_1's 4x4. The board must grow: raise cols, rows or both.
 Economy file: startingBoard is missing. Add the part of the board a new game opens, such as "startingBoard": { "cols": 3, "rows": 3 }. The game starts on the full 6x6 board for now.
-People file: Only 1 person without tags sits on the starting board (3x3: rows A to C, columns 1 to 3), so no call could ever ring. Put at least two people on those jacks, or make startingBoard in Economy.json bigger.
 ```
 
-An upgrade or call type with a problem is left out, and the game still starts with the others. A wrong starting or pacing value falls back to its default. The same check runs in the automated tests, so a broken file is noticed before a build.
+An upgrade with a problem is left out, and the game still starts with the others. A wrong starting value falls back to its default. The same checks run in the automated tests, so a broken file is noticed before a build.

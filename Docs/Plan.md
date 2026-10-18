@@ -114,6 +114,7 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Art merges (6) | Re-exported images can keep a slice bigger than the new texture, and Unity then drops the sprite with no console message. Compare PNG sizes (`sips -g pixelWidth -g pixelHeight`) with the `.meta` rects, or load the path with `AssetDatabase.LoadAssetAtPath<Sprite>` and check it isn't null. |
 | Dynamic TMP fonts (merge) | Test and Play runs fill glyphs into Sergei's dynamic font assets (`Boecklins Universe SDF.asset`, `Della Respira SDF.asset`): thousands of changed lines. Discard them with `git checkout -- <file>` like `TimeManager.asset`, and mention it. |
 | Simulated hover vs. the real mouse (merge) | While Unity has focus, `CableInputController` reads the real mouse every frame and overrides a simulated hover. Disable the controller for the one captured frame. |
+| Deleting files (7) | Delete through MCP (`delete_script`, `manage_asset` `delete`) or a plain `rm` followed by `refresh_unity`. Never use `git rm`: it stages the deletion. |
 | Missing JSON fields (5c) | `JsonUtility.FromJson` keeps field initializers for fields the file leaves out, also inside nested objects in arrays. Use a marker initializer (NaN, or a named `Unset` constant) to tell "missing" from 0. |
 
 ## 5. Definition of done (every step)
@@ -157,14 +158,16 @@ Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs 
 | Item | Notes | Planned |
 |---|---|---|
 | Touch input in the cord code | Use `Pointer.current` instead of `Mouse.current` in `CableInputController.Update`, and hide the hand cursor on touch (D28). | Step 9 |
-| A held cord drops on button and book-row clicks | Any click off a jack counts as "empty space" and returns the held cord. A call-card click already keeps it (`2fc3810`). The lead prefers that buttons and book rows keep it too. | any step; Step 12 at the latest |
+| A held cord drops on button clicks | Any click off a jack counts as "empty space" and returns the held cord. A call-card click already keeps it (`2fc3810`). The lead prefers that buttons keep it too. Book rows no longer take clicks since Step 7 (D54). | any step; Step 12 at the latest |
 | `CableInputController` references `Switchboard.Game.CallCardView` | The UI code depends on the Game layer. A small interface or marker component on the card would keep the layers apart. | cleanup, any step |
 | Stale paths in editor menus | `LevelBackgroundBuilder` and `GamePresentationBuilder` still name `Assets/Scenes/Level.unity` (now `Final.unity`, same GUID). `PhoneBookBuilder` points at a missing `Assets/Settings/PhoneBook.json` (the file is `Assets/Configs/PhoneBook.json`). | cleanup, any step |
 | A–Z tabs are hidden | `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab` (lead, 2026-10-18); the code, objects and tests stay. `Tools/Switchboard/Update Phone Book Tabs` rebuilds them active, so untick them again after running it. | |
 | Loose scene objects | `SwitchboardCanvas` and `EventSystem` are loose in `Final.unity`; making them prefabs would keep scene merges small. | optional |
 | Sound effects | Ring, alarm, coins, paid, fine, hang-up: find them or generate them. | before Step 11 |
 | Art imports | Mia has no Unity, so her re-exports keep the old slices: `caller-04`/`05` (5b) and `caller-06`/`07`/`08` (6) came back at 190×190 with 191×191 slices, and Unity dropped them silently (all fixed to 190×190 in the `.meta`). After every art merge, compare each changed PNG's size with its `.meta` sprite rect. `Assets/Sprites/board/caller.png` (229×190, slice 190×191) has no sprite for the same reason; nothing uses it yet. | check after art merges |
-| Closed caller-slot covers (6) | Closed slots get plain dark discs made at runtime; the 6th slot sits over the printer art, so its disc overlaps it. A cover-plate drawing from Mia would replace them. | when art exists |
+| Closed caller-slot covers (6) | Closed slots are hidden since Sergei's `041fb90` (Step 6's dark discs are gone). A cover-plate drawing from Mia could show them as closed. | when art exists |
+| Unused random helpers (7) | `IRandom`, `SeededRandom`, `RandomExtensions` and `FloatRange` in `Domain/Common` have no users since the spawner went. Delete them, or keep `IRandom` if a later step needs randomness. | cleanup, any step |
+| "New order!" stamp over the emergency badge (7) | While a call rings, the stamp hides half the EMERGENCY badge and most of the countdown ring. This predates Step 7. | Step 11 or 12 |
 | `SlowGuidePulse` material in EditMode tests | The guide's hidden book-glow material is freed only in `OnDestroy`, which EditMode tests don't run, so each test run leaves 2 materials in editor memory. Free it in `OnDisable` too, or in the test teardown. | cleanup, any step |
 
 Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `UpgradeShopPanel/HeaderSlot`, or update `GameInstaller` with the rename. `PhoneBook.json` keeps the book's format, `contactsPerPage` and the surname order.
@@ -191,7 +194,7 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 12 | Mobile and Web polish | Good on phones and desktop browsers |
 | 13 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–6 are built. Steps 7 and 8 are fully specified and come next. Steps 9–13 are outlines; the orchestrator turns each one into a full brief before launching it.
+Steps 1–7 are built (Step 7 awaits the playtest). Step 8 is fully specified and comes next. Steps 9–13 are outlines; the orchestrator turns each one into a full brief before launching it.
 
 > **Renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7, 7d → 8, 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11, 9 → 12, 10 → 13. The briefs of done steps, commit messages and older reports keep the numbers they were written with.
 
@@ -1447,19 +1450,20 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 
 **How it fits together:**
 - `PhoneBookView`/`PhoneBookConfig` read `Book.json`. The domain doesn't read the book at all: calls carry their own jacks since Step 7.
-- Remove `PhoneBook.json` and whatever is left of the people model (`PeopleFileLoader`, `PeopleCatalog`, `PersonRecord`, `PhoneDirectory`, `IPerson`), plus Step 6's people checks.
+- Remove `PhoneBook.json` and whatever is left of the people model: `PeopleFileLoader`, `PeopleFileData`, `PeopleCatalog`, `PersonRecord`, `DirectoryRecord`, `IPerson`, `PersonExtensions` and `IDirectoryEntry`. Check that nothing else uses each one first. Step 7 already deleted `PhoneDirectory` and Step 6's people checks, and the people loader no longer reads `portrait`, `type`, `rate` or `fee`.
 - `GameConfig` references `Book.json` instead.
 - **Layout:**
   - Show four columns, Name, Profession, Address, Jack, readable at 1920×1080 and at 1280×720 (Plan §4, Game view size).
   - If four don't fit on Sergei's page, put profession and address on a smaller second line under the name, and keep the jack as the last column.
   - Keep page turning, the hand cursor and the guide's book glow working.
+  - Drop the rows' unused tap image (`PhoneBookContactRow.tapArea` in `PhoneBook.prefab`), left over from the Notepad (D54).
   - Include screenshots of both sizes.
 - **Validator** (plain messages):
   - the file is missing or empty
   - a missing `name` or `jack`
   - a jack that isn't on the 6×6 board
   - duplicate names
-  - every call's `from` and `to` jack in `Calls.json` has at least one book entry (moved here from Step 7's interim check)
+  - every call's `from` and `to` jack in `Calls.json` has at least one book entry (moved here from Step 7's interim check, `ContentValidator.ValidateCallJacks`)
   - `profession` and `address` may be empty
 - **Shipped `Book.json`:** convert today's 36 contacts with their jacks. Write names as "SURNAME, First" and keep the three services. Professions and addresses are English placeholders in period style, families sharing an address now and then. The designer replaces them.
 - **Docs:** a "Book.json" section in `Docs/EconomyFile.md` (or a sibling `Docs/BookFile.md` linked from it). The orchestrator updates the CLAUDE.md lines that name `PhoneBook.json`.

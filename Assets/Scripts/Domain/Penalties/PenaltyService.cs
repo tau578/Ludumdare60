@@ -2,7 +2,7 @@ using System;
 
 namespace Switchboard.Domain
 {
-    /// <summary>Fines calls that end badly, by their type's fines (Design 5.5). Money never goes below zero.</summary>
+    /// <summary>Fines a missed emergency its penaltyCents (D51), and nothing else. Money never goes below zero.</summary>
     public sealed class PenaltyService
     {
         private readonly Wallet wallet;
@@ -16,10 +16,10 @@ namespace Switchboard.Domain
 
         public event Action<FineAppliedArgs> FineApplied;
 
-        // Fines are not multiplied by the earnings multiplier (D37).
+        // Fines are not multiplied by the earnings multiplier (D37). A wrong patch or a cut-off is never fined (D51).
         private void OnCallEnded(CallEndedArgs e)
         {
-            long requested = e.Call.Request.Type.FineFor(e.Reason);
+            long requested = e.Reason == CallEndReason.Missed ? e.Call.Request.Script.PenaltyCents : 0;
             if (requested <= 0) return;
             long taken = wallet.ApplyFine(requested);
             e.Call.FineCents = taken;
