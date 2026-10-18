@@ -13,28 +13,6 @@ MonoBehaviour:
   m_Name: Emergency
   m_EditorClassIdentifier: Switchboard.Content::Switchboard.Content.CallerTypeDefinition
   id: type.emergency
-  displayName: Emergency
-  centsPerSecond:
-    min: 5
-    max: 10
-  durationSeconds:
-    min: 10
-    max: 20
-  connectionFeeCents:
-    min: 20
-    max: 40
-  callbackDelaySeconds:
-    min: 20
-    max: 40
-  responseTimeSeconds: 30
-  fineMissedCents: 200
-  fineEarlyDisconnectCents: 100
-  callbackAfterMiss: 0
-  callbackAfterDisconnect: 0
-  recipientTag: emergency-service
-  everyoneCalls: 1
-  maxSimultaneous: 1
-  spawnWeight: 1
   cardStyle:
     badgeText: EMERGENCY
     accent: {r: 0.78, g: 0.13, b: 0.13, a: 1}

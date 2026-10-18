@@ -37,14 +37,16 @@ namespace Switchboard.Game
             GoalPanelView goalPanel = FindSingle<GoalPanelView>(scene);
             if (moneyCounter == null || callQueue == null || shop == null || goalPanel == null) return;
 
-            PeopleCatalog people = config.LoadPeople(BoardJacks(scene));
-            foreach (string error in people.Errors) Debug.LogError($"People file: {error}", config);
+            // People reference the economy file's call types by id, so the economy file loads first.
             EconomyCatalog economy = config.LoadEconomy();
             foreach (string error in economy.Errors) Debug.LogError($"Economy file: {error}", config);
+            PeopleCatalog people = config.LoadPeople(economy, BoardJacks(scene));
+            foreach (string error in people.Errors) Debug.LogError($"People file: {error}", config);
 
+            // Fewer cords than startingCords are added below like bought ones; more can't be taken away.
             cordBridge.Attach(scene, config.ExtraCordColors);
-            if (cordBridge.CordCount != config.StartingCords)
-                Debug.LogWarning($"The scene has {cordBridge.CordCount} cords but GameConfig starts with {config.StartingCords}.", config);
+            if (cordBridge.CordCount > economy.StartingCords)
+                Debug.LogWarning($"The scene has {cordBridge.CordCount} cords but Economy.json starts with {economy.StartingCords}.", config);
             int seed = randomSeed != 0 ? randomSeed : Random.Range(1, int.MaxValue);
             Session = new GameSession(new GameContent(config, people, economy), new SeededRandom(seed), cordBridge);
             cordBridge.Bind(Session.Desk);

@@ -19,6 +19,7 @@ Level art pass (2026-10-18, lead requested): `BackgroundPanel.prefab` groups `ma
 | Scene merge | Done (2026-10-18) | One `Final.unity` built from prefabs (D38): our `Game.prefab` and `GameUI.prefab` next to Sergei's board; build list `MainMenu` (0), `Final` (1); `Game.unity` removed; `GameInstaller` finds the views by type in its own scene. |
 | 5a | Done (2026-10-18) | The designer's `Assets/Configs/Economy.json` (`upgrades` only) and `Docs/EconomyFile.md`. Domain `UpgradeService` (with `PurchaseCheck`), `StatSheet`, `ShopShelf`, `GoalProgress`, `Wallet.TrySpend`; the live income multiplier on fee and pay. `EconomyFileLoader` with plain-English checks, shown by `Validate Content`. Sergei's 4 shop buttons (coordinated, D44) carry `UpgradeSlotView` (title, description, price, savings fill, gold frame) and are 204 px wide; menu `Tools/Switchboard/Update Upgrade Shop Buttons`. Our `ShopView`, a neutral "-$X" spend popup and the "To be continued..." dialog (`GoalPanelView`). Dev panel "+ $100" and "Reset upgrades" (no refund). Accepted deviations: see 5.9 and 4.3. |
 | 5b | Done (2026-10-18) | `extra_wires` and `notepad` in `Economy.json` (D23, D40, D43). `StatSheet.Cords` (from `GameConfig.startingCords` = 3), `HasNotepad` and `Changed`; Domain `Notepad` (notes on the `Call`: `CallerNote`, `RecipientNote`). Coordinated changes to Sergei's code (D44): `CableInputController.AddCable(Color)` and `MaxCables` = 6, with tray re-spacing; `PhoneBookView.ContactTapped(name, socket)` and `ContactTapsEnabled`, with a transparent row tap area in `PhoneBook.prefab`. `CordBridge.EnsureCords` adds green, violet and ivory cords (`GameConfig.extraCordColors`); `NotepadBookLink` routes book taps; the bubble shows noted jacks. Accepted deviations: see 5.9. |
+| 5c | Done (2026-10-18) | `Economy.json` holds `startingCents`, `startingCords`, `pacing` and `calls` (D47), read by `EconomyFileLoader` into `CallTypeRecord`s and `PacingSettings`; the domain is unchanged. `CallerTypeDefinition` is card look only; `PacingProfile` and `Default.asset` are gone. Values unchanged (a real-file test pins them). Accepted deviations: a negative `startingCents` and half-written ranges are also reported; `startingCords` above 6 falls back to 3; `Validate Content` prefixes people messages with "People file: ". |
 | Upstream merge | Done (2026-10-18, `a173e75`) | Sergei's `2fc3810`: persistent wiring (D45) in `OperatorDesk`/`CallService` with `PersistentWiringTests`; "New order!" stamp and `StampExitAnimation`; bubble only on the last-clicked card; `CallAudio` and `BackgroundMusic`; board gold light; `CordBridge.Synchronize` and insertion anchors. His `CableInputController` keeps a held cord when a call card is clicked (it now references our `CallCardView`). Mia: new art, including `caller-04`/`caller-05` (slices fixed to 190×190, lead-approved). |
 
 What Step 1 built:
@@ -284,7 +285,7 @@ In the diagram, HungUp means `Ended` with reason `WrongConnection`, and Finished
   - `CallSpawner`
   - `CallFactory`: resolves rate and duration. It uses the caller's override if set, otherwise a roll within the type's range. A roll is a whole number whenever the range contains one, so cards show readable rates and a finished call pays whole cents. Otherwise the roll is continuous.
   - `BusyTracker`
-  - `PacingProfile` (content)
+  - `IPacingProfile`, from `Economy.json`'s `pacing` (5c; was the `PacingProfile` asset)
   - `IRandom`, seeded so runs are reproducible
 - **When** (built in 2a):
   - Each interval is `base × U(1 − jitter, 1 + jitter)`, at least 0.1 s. The first call comes after `firstCallDelaySeconds`.
@@ -300,9 +301,9 @@ In the diagram, HungUp means `Ended` with reason `WrongConnection`, and Finished
   - The caller is a weighted pick among callers on unlocked lines who aren't busy.
   - The recipient comes from the type's recipient rule: any subscriber, or people with a tag. They must be unlocked, not busy, and not the caller.
 - **Busy (D18).** Anyone in a waiting, in-hand, connected or on-hold call can't be picked. Both the caller and the recipient of a pending callback can't be picked either.
-- **Progress** = lifetime earnings ÷ the goal's price (D19). `PacingProfile` curves turn it into the spawn interval and the type weights.
+- **Progress** = lifetime earnings ÷ the goal's price (D19). Pacing curves (in `Economy.json`, Step 7) turn it into the spawn interval and the type weights.
 - **Opening calls.** The first few calls of a new game are scripted and double as the tutorial [7].
-- **Idle guard (D16).** After 60 s without player input, types that carry fines stop spawning [4] Their due callbacks wait too. The timeout is `idleTimeoutSeconds` on `PacingProfile`.
+- **Idle guard (D16).** After 60 s without player input, types that carry fines stop spawning [4] Their due callbacks wait too. The timeout is `pacing.idleTimeoutSeconds` in `Economy.json` (5c).
 
 ### 5.3 Callbacks [2]
 `CallbackScheduler` listens for `CallEnded`:
@@ -466,12 +467,12 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
 
 | Asset | Fields, with the step that adds them | Notes |
 |---|---|---|
-| `GameConfig` | catalogs of all definitions; `startingCents` [1]; `maxWaitingCalls` = 6 [2]; the `Economy.json` reference [5a]; base stats: cords, board size [5b, 7] | The one asset `GameInstaller` references. `startingCents` and the call economy move into `Economy.json` in Step 5c. |
-| `CallerTypeDefinition` | `id`, `displayName`, `centsPerSecond` (range), `durationSeconds` (range) [1]; `callbackDelaySeconds` (range) [2]; `responseTimeSeconds` (0 = none), `fineMissedCents`, `fineEarlyDisconnectCents`, `callbackAfterMiss`, `callbackAfterDisconnect`, `recipientTag`, `maxSimultaneous`, `spawnWeight` (temporary, D37), `everyoneCalls`, card style [4]; `weightByProgress` [7] | Regular [1], Emergency [4]. VIP and long distance later. |
+| `GameConfig` | `maxWaitingCalls` = 6 [2]; card-style list `cardStyles` [4, renamed 5c]; the `PhoneBook.json` and `Economy.json` references [1b, 5a]; `extraCordColors` [5b]; portraits | The one asset `GameInstaller` references. Since 5c (D47) `startingCents`, `startingCords` and pacing live in `Economy.json`; only presentation and the caller panel slot count stay here. |
+| `CallerTypeDefinition` | `id`, `cardStyle` (badge, accent) [4; trimmed 5c] | Card look only (D47): matched by id to a call type in `Economy.json`'s `calls`. Regular, Emergency. A type without one gets plain cards. The money and timing fields moved to the file. |
 | `CallerDefinition` | `id`, `person`, `type`, `weight`, optional `centsPerSecondOverride` [1]; optional favourite recipients [7] | The "caller config". This is how some callers become worth much more. |
 | ~~`PersonDefinition`~~, ~~`CallerDefinition`~~, ~~`PhoneDirectoryDefinition`~~ | Replaced in Step 1b by `Assets/Configs/PhoneBook.json` (D31). | Loaded and validated at startup. Errors are logged clearly, and a test runs the same check. |
 | `PhoneDirectoryDefinition` | entries `{ person, jackLabel }` | Jack labels are the `SocketView.Address` values, A1–F6. |
-| `PacingProfile` | base interval, jitter, load factor, first-call delay [2]; curves by progress, opening calls, idle timeout [7] | `Assets/Content/Pacing/Default.asset`: 2 s first call, 8 s base, ±30 % jitter, load factor 0.5. Referenced by `GameConfig`. |
+| ~~`PacingProfile`~~ | Replaced in 5c by the `pacing` section of `Economy.json` (D47), read into the domain's `PacingSettings`. | Progress curves and opening calls [7] will extend that section. |
 | `BoardLayoutDefinition` | sections: which jack labels each unlocks [7] | |
 | ~~`UpgradeDefinition`~~, ~~`UpgradeEffect`~~ | Replaced by the `upgrades` section of `Assets/Configs/Economy.json` (D39, D40). | See 6.4. |
 | `AudioCueLibrary` | event → cue [8] | Game layer only. |
@@ -515,9 +516,9 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
 `Assets/Configs/Economy.json` belongs to the designer, who edits it by hand. Keep it readable, with one entry per line. The format is documented for him in `Docs/EconomyFile.md`.
 - **Sections:**
   - `upgrades` [5a]: see 5.9.
-  - `calls` [5c]: the money fields of each caller type (fee, rate and duration ranges, fines, response time, spawn weight).
-  - `pacing` [5c]: the spawn timing and the idle timeout.
-  - `startingCents` [5c].
+  - `startingCents`, `startingCords` (3–6) [5c].
+  - `pacing` [5c]: first-call delay, base interval, jitter, load factor and idle timeout.
+  - `calls` [5c]: one entry per call type: `id`, `name`, `spawnWeight`, ranges `{min, max}` for rate, fee, duration and callback delay, response time, fines, callback flags, `maxSimultaneous`, `everyoneCalls`, `recipientTag`. Missing required fields are reported, never silently 0.
 
   Presentation stays in Unity assets, for example the emergency card's badge and colour.
 - **Upgrade ids** follow the designer's style: lowercase letters, digits and `_`, such as `income_1`. This is an accepted exception to the `type.regular` id style.
@@ -555,7 +556,7 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
   3. Create a `CallerDefinition`.
 
   The validator checks it. No code.
-- **New caller type (VIP, long distance):** create a `CallerTypeDefinition`. Only new behaviour needs code: a `ConnectionRule`, or a small behaviour hook that `CallService` calls. Code never checks which type a call is.
+- **New caller type (VIP, long distance):** add a line to `calls` in `Economy.json` (5c), and optionally a `CallerTypeDefinition` asset for its card badge and colour. Only new behaviour needs code: a `ConnectionRule`, or a small behaviour hook that `CallService` calls. Code never checks which type a call is.
 - **New upgrade:** add an entry to `Economy.json`. Only a new `type` needs code:
   - the type name and its fields in the loader and validator
   - the stat in `StatSheet`, with a base value
@@ -617,6 +618,7 @@ Statuses:
 | D44 | Sergei's missing hooks are built by our agents as coordinated changes (lead, 2026-10-18), each brief listing the approved files: the shop button texts and savings fill [5a]; adding cords at runtime to his cord input and tray [5b]; a tapped-entry event in his phone book [5b]. | decided (lead, 2026-10-18) | 5a |
 | D45 | Persistent wiring (Sergei's `2fc3810`, adopted by the lead 2026-10-18). Several calls can be accepted at once; taking a card no longer swaps. Cords stay plugged when calls end. A closed circuit connects any accepted call it is correct for; taking a card connects it at once if its circuit is already plugged. A wrong number needs a manual insertion against an anchored end that belongs to an accepted call. The bubble shows only on the card last clicked. Supersedes D03; see 5.1 and 5.6. | decided (lead, 2026-10-18) | 5b merge |
 | D46 | Notepad under D45: a tapped book entry notes that person's jack on every accepted call still waiting to connect (Taken or Connecting) where they are the caller or the recipient, including duplicates. Ringing, connected, on-hold and ended calls are never noted. | decided (lead, 2026-10-18) | 5b fix |
+| D47 | Step 5c details: `startingCents`, `startingCords` (3–6), `pacing` and `calls` live in `Economy.json`; the old asset fields are deleted, not kept as a fallback (`CallerTypeDefinition` keeps only `id` and the card style; `PacingProfile` and `Default.asset` go). Ranges are `{ "min", "max" }` objects. Call type ids keep the `type.` style because `PhoneBook.json` references them; the type's display `name` moves into the file. `maxWaitingCalls` and the cord colours stay in `GameConfig`. | decided (lead, 2026-10-18) | 5c |
 | D29 | Merge into one scene. The `Game.unity` + `Level.unity` split is temporary; it keeps Sergei's actively edited scene conflict-free. Once his cord work settles, and with his agreement, move the `Game` object and the `GameUI` prefab into one scene, then remove `Game.unity` and the additive loading. Do it at the latest before the first Web build. **Done as D38 (2026-10-18).** | done | 6 |
 
 ## 11. Glossary

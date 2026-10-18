@@ -112,6 +112,7 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Disabled buttons (5a) | Setting `Button.interactable = false` applies the button's grey, half-transparent disabled tint and changes Sergei's look. To make a button inert, ignore the click in our view and dim it ourselves. |
 | Book row clicks (5b) | Row taps only reach `PhoneBookContactRow` while `ContactTapsEnabled` is on (Notepad owned); otherwise the open book's button gets the click and closes. Simulate them with EventSystem raycasts inside a `Canvas.willRenderCanvases` handler. |
 | Buying in Play Mode (5a) | Connect a call through `OperatorDesk.OnCircuitClosed` to check fees and pay without plugging cords; the dev panel's "+ $100" and "Reset upgrades" call `GameSession` methods directly. |
+| Missing JSON fields (5c) | `JsonUtility.FromJson` keeps field initializers for fields the file leaves out, also inside nested objects in arrays. Use a marker initializer (NaN, or a named `Unset` constant) to tell "missing" from 0. |
 
 ## 5. Definition of done (every step)
 - [ ] The project compiles. The console has no errors and no new warnings from our code.
@@ -183,7 +184,7 @@ Follow-ups: <ideas, debts, questions>
 | 9 | Mobile and Web polish | Good on phones and desktop browsers |
 | 10 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–5b are fully specified. Steps 5c–10 are outlines. The orchestrator turns each one into a full brief before launching it.
+Steps 1–5c are fully specified. Steps 6–10 are outlines. The orchestrator turns each one into a full brief before launching it.
 
 ---
 
@@ -1042,22 +1043,99 @@ Steps 1–5b are fully specified. Steps 5c–10 are outlines. The orchestrator t
 - board growth (7)
 - shop sounds (8)
 
-### Step 5c: Calls, pacing and starting money into `Economy.json` (outline; D39)
-- Move these into `Economy.json` sections, removing them from the assets:
-  - **`calls`:** each caller type's money fields (fee, rate and duration ranges, callback delay, response time, fines, callback flags, `maxSimultaneous`, `spawnWeight`, `everyoneCalls`, `recipientTag`)
-  - **`pacing`:** first-call delay, base interval, jitter, load factor, idle timeout
-  - **`startingCents`**
-- Card styles (badge, accent) stay in the `CallerTypeDefinition` assets, keyed by type id.
-- Domain is unchanged; it already reads through `ICallerType`, `IPacingProfile` and `IGameContent`. The Content loaders, the validator and the tests change.
-- Keep the current values exactly (D37 and the `Default.asset` pacing), so the game plays the same.
-- Update `Docs/EconomyFile.md`.
-- **Notes for the brief** (orchestrator, 2026-10-18):
-  - Before removing the asset fields, record the current values (or add a test that compares the file with them), so the game provably plays the same.
-  - Check that Sergei's persistent wiring (D45, `OperatorDesk` and `CallService`) reads none of the moving values.
-  - Questions for the lead, if the code doesn't settle them:
-    - Does `startingCords` (5b, `GameConfig`) move into the file too?
-    - Are the ScriptableObject fields deleted, or kept as a fallback?
-    - How are ranges written: min/max pairs, or objects?
+### Step 5c: Calls, pacing and starting money into `Economy.json` (D39, D47)
+
+**Goal.** The designer tunes the whole economy in one file. Each call type's money and timing values, the pacing, the starting money and the starting cords move from Unity assets into `Assets/Configs/Economy.json`. The game plays **exactly** as before. Only presentation (card badge and accent) stays in Unity. **Recommended effort:** high.
+
+**Playable result.**
+- Press Play: nothing looks or plays differently. Regular calls ring about every 8 s (the first after 2 s), pay 5–15¢ on connect plus 3–8¢/s for 15–30 s. Emergencies (red badge) still have the 30 s ring, the $2 and $1 fines, and at most one at a time.
+- Edit a value in `Economy.json` (for example Regular's `spawnWeight`, or `startingCents` 500), press Play again: the change is live, with no Unity asset touched.
+- Break a value (for example a `min` above its `max`) and run `Tools/Switchboard/Validate Content`: one plain message names the call type, the field and the fix.
+
+**Decisions for this step** (lead, 2026-10-18; D47):
+- **`startingCords` moves into the file** too, next to `startingCents`. The cord colours (`extraCordColors`) stay in `GameConfig` (presentation). `maxWaitingCalls` stays in `GameConfig` too: it is the caller panel's slot count, which Step 7's `clientSlots` will replace.
+- **The old asset fields are deleted, not kept as a fallback.** The file is the only source:
+  - `CallerTypeDefinition` keeps only `id` and `cardStyle`. It is no longer an `ICallerType`. Keep its class name, script file and the two assets (`Regular.asset`, `Emergency.asset`), because `GameConfig` references them by GUID. Update its summary: "How cards of one call type look."
+  - `GameConfig` loses `startingCents`, `startingCords` and `pacing`. Its `callerTypes` list becomes the card-style list (`[FormerlySerializedAs("callerTypes")]` if renamed, so the two references survive).
+  - `PacingProfile.cs`, `Assets/Content/Pacing/Default.asset` and the `Pacing` folder are deleted. The file's pacing uses the domain's existing `PacingSettings`.
+- **Ranges are objects:** `"rateCentsPerSecond": { "min": 3, "max": 8 }`.
+- **Type ids stay `type.regular` and `type.emergency`.** `PhoneBook.json` references them in each contact's `type`, and that shared file doesn't change. (Upgrade ids keep their `a-z0-9_` rule; call ids keep the `type.` style, an accepted difference.)
+- **The display name moves into the file as `name`**, so a designer can add a new call type without any Unity asset. A type with no matching card-style asset gets plain cards, with no message. A card-style asset whose id isn't in the file gets a validator message.
+- **Per-contact `rate` and `fee` overrides stay in `PhoneBook.json`**, unchanged.
+
+**The file after this step** (one entry per line; key order as shown; values are today's, from `Regular.asset`, `Emergency.asset`, `Default.asset` and `GameConfig.asset`):
+```json
+{
+  "startingCents": 0,
+  "startingCords": 3,
+  "pacing": { "firstCallDelaySeconds": 2, "baseIntervalSeconds": 8, "intervalJitter": 0.3, "loadFactor": 0.5, "idleTimeoutSeconds": 60 },
+  "calls": [
+    { "id": "type.regular", "name": "Regular", "spawnWeight": 5, "rateCentsPerSecond": { "min": 3, "max": 8 }, "feeCents": { "min": 5, "max": 15 }, "durationSeconds": { "min": 15, "max": 30 }, "callbackDelaySeconds": { "min": 20, "max": 40 }, "responseTimeSeconds": 0, "fineMissedCents": 0, "fineEarlyDisconnectCents": 0, "callbackAfterMiss": false, "callbackAfterDisconnect": false, "maxSimultaneous": 0, "everyoneCalls": false, "recipientTag": "" },
+    { "id": "type.emergency", "name": "Emergency", "spawnWeight": 1, "rateCentsPerSecond": { "min": 5, "max": 10 }, "feeCents": { "min": 20, "max": 40 }, "durationSeconds": { "min": 10, "max": 20 }, "callbackDelaySeconds": { "min": 20, "max": 40 }, "responseTimeSeconds": 30, "fineMissedCents": 200, "fineEarlyDisconnectCents": 100, "callbackAfterMiss": false, "callbackAfterDisconnect": false, "maxSimultaneous": 1, "everyoneCalls": true, "recipientTag": "emergency-service" }
+  ],
+  "upgrades": [ ...unchanged... ]
+}
+```
+The field names are a proposal. Rename one only if it reads clearly better to a designer, and say so in the report.
+
+**How it fits together:**
+- **Domain unchanged.** It already reads through `ICallerType`, `IPacingProfile` and `IGameContent`. If a domain change looks necessary, stop and report.
+- **Content:**
+  - `EconomyFileData` gains the new fields; `EconomyFileLoader` builds `CallTypeRecord`s (new, `ICallerType`), the `PacingSettings`, `StartingCents` and `StartingCords`, and `EconomyCatalog` exposes them.
+  - Load the economy file first. `LoadPeople` then takes the file's call types, because people reference type ids.
+  - `GameContent` takes these values from the economy catalog, not from `GameConfig`.
+  - `GameConfig.CardStyleOf(typeId)` keeps working from the style assets.
+- **The wires checks** use the file's `startingCords`.
+- **`startingCords` may be 3 to 6.** Sergei's tray has 3 built-in cords, and removing cords isn't supported, so below 3 gets a message and falls back to 3. Above 3, the extra cords should appear at start the same way bought cords do. Check how `CordBridge`/`GameInstaller` sync cords to `StatSheet` (the installer's "scene has N cords" warning must not fire for 4–6). If that doesn't come for free, keep 3–6 valid in the validator, stop short of new wiring, and report.
+- **Missing values must not silently become 0.** `JsonUtility` gives 0/false/null for a missing field (check whether field initializers survive `FromJson`, with a test).
+  - Required in each call entry, with a plain message if missing: `id`, `name`, `spawnWeight`, `rateCentsPerSecond`, `feeCents`, `durationSeconds`. A call entry with a problem is left out, like an upgrade.
+  - The rest may be left out and mean "off": no response time, no fines, no callbacks, no limit, no tag, and `callbackDelaySeconds` 20–40. `EconomyFile.md` says so.
+  - Missing `pacing` (or one of its fields): use `PacingSettings.Default`'s value with a message. Missing `startingCents`: 0, no message. Missing `startingCords`: 3, no message.
+- **Validator messages** follow the upgrades' style: `Call type 2 "type.emergency": feeCents min 40 is above its max 20. Swap them.` Move the current `ContentValidator.CheckTypes` and `CheckRange` rules into the economy loader:
+  - unique ids
+  - min ≤ max and no negatives
+  - duration above 0
+  - no negative response time, fines, `maxSimultaneous` or `spawnWeight`
+  - at least one type with `spawnWeight` above 0
+  - `intervalJitter` from 0 to 0.95
+  - `baseIntervalSeconds` at least 0.1, and the other pacing values not negative (as the old asset's `Min`/`Range` attributes did)
+  
+  The people checks (unknown `type` in `PhoneBook.json`, enough recipients per type) stay in `ContentValidator`, fed the file's types. A message that used to say "GameConfig's caller types" now points at the file.
+- **Sergei's persistent wiring (D45)** in `OperatorDesk`/`CallService` reads call types only through `ICallerType`. The orchestrator checked: `OperatorDesk` touches none of the moving fields. Confirm it for `CallService` and note it in the report.
+- **Dev panel** "<type> now" labels use `DisplayName`, which now comes from the file's `name`.
+
+**Prove it plays the same** (the 5c notes):
+- A test `EconomyFileCallsMatchStep5bValues` (any name) reads the real `Assets/Configs/Economy.json` and asserts every value listed above for both types, plus pacing, `startingCents` 0 and `startingCords` 3. Write it **before** deleting the asset fields, and run it against the file you wrote.
+- The real-file test also checks that `Validate Content` finds no problems on the shipped files (extend the existing real-file tests).
+- Loader tests: the full sample parses; each required field missing gives its message; min > max; a negative fine; a duplicate id; no type with weight; jitter out of range; `startingCords` 2 and 7; a card-style id not in the file; a `PhoneBook.json` type not in the file; a file with no `calls` section (one message, and no calls ring). The wires checks use the file's `startingCords`: with `startingCords` 4, `wires_1` = 4 is reported.
+- `Fakes.cs` keeps working (its fakes implement the domain interfaces), so existing domain tests shouldn't change.
+
+**Files this step may change** (all ours):
+- `Assets/Scripts/Content/*`: `EconomyFileData`, `EconomyFileLoader`, `EconomyCatalog`, `GameConfig`, `GameContent`, `CallerTypeDefinition`, `ContentValidator`, `PeopleFileLoader` (only if its signature needs it), plus a new `CallTypeRecord`. Delete `PacingProfile.cs`.
+- `Assets/Scripts/Game/` (`GameInstaller`, `DevPanel`, the validator menu) only as needed.
+- `Assets/Content/` assets, as described above.
+- `Assets/Configs/Economy.json` (keep the upgrades exactly as they are).
+- Tests in `Assets/Tests/Domain/`.
+- `Docs/EconomyFile.md`: a new "Calls", "Pacing" and "Starting money and cords" section each, written for the designer, with examples and the validator's messages. Mark the sections "Yes (5c)" and drop "Until Step 5c...". Explain cents vs. seconds, what each pacing value does in plain words (for example, `loadFactor`: "each waiting call beyond the free cords stretches the gap by this share"), that `spawnWeight` is relative (5 vs 1 means five regular calls for each emergency), and that the per-person `rate`/`fee` in `PhoneBook.json` still override a type's.
+
+No team-owned file changes. `Final.unity` and the prefabs shouldn't need to change: say so if they do.
+
+**Playtest script:**
+1. Press Play in `Final.unity` (and once from `MainMenu`). Calls ring and pay as before; an emergency appears now and then, with its badge, 30 s ring and fines.
+2. Stop. In `Economy.json`, set `startingCents` to 500. Play: the counter starts at $5.00. Undo it.
+3. Set Regular's `spawnWeight` to 0. Play: only emergencies ring (about one every 8 s, never two at once). Undo it.
+4. Set `pacing.baseIntervalSeconds` to 3. Play: calls arrive much faster. Undo it.
+5. Set `startingCords` to 4. Play: 4 cords in the tray from the start, and the shop's first cord offer is "5 cords". Undo it. (If the agent reported that this isn't wired, skip it.)
+6. Set Emergency's `feeCents` to `{ "min": 40, "max": 20 }` and run `Tools/Switchboard/Validate Content`. A plain message names Emergency's fee. Undo it and validate again: "no problems found".
+7. Open `Regular.asset` in the Inspector: only the id and the card look are left. `Default.asset` (pacing) is gone.
+
+**Out of scope:**
+- progress-driven pacing curves and weights (7)
+- `extra_clients` and board growth (7)
+- saves (6)
+- balancing the values (10): keep them exactly
+- moving card styles or portraits into a file
+- changing `PhoneBook.json`
 
 ### Step 6: Saves and first Web build (outline). Sergei's `MainMenu` is the start screen: it replaces our planned `Boot.unity` and doubles as the tap-to-start audio unlock (D30, D33).
 - **Saving:**

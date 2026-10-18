@@ -21,8 +21,17 @@ namespace Switchboard.Domain.Tests
         private static string Wires(string id, long cost, int wires) =>
             $"{{ 'id': '{id}', 'type': 'extra_wires', 'name': 'Extra cord', 'description': '{wires} cords', 'costCents': {cost}, 'wires': {wires} }}";
 
-        private static string Json(params string[] entries) =>
-            $"{{ 'upgrades': [ {string.Join(", ", entries)} ] }}".Replace('\'', '"');
+        // A valid start, pacing and calls section, so each test sees only its upgrades' messages.
+        private const string Head =
+            "'startingCords': {0}, " +
+            "'pacing': { 'firstCallDelaySeconds': 2, 'baseIntervalSeconds': 8, 'intervalJitter': 0.3, 'loadFactor': 0.5, 'idleTimeoutSeconds': 60 }, " +
+            "'calls': [ { 'id': 'type.regular', 'name': 'Regular', 'spawnWeight': 1, 'rateCentsPerSecond': { 'min': 3, 'max': 8 }, " +
+            "'feeCents': { 'min': 5, 'max': 15 }, 'durationSeconds': { 'min': 15, 'max': 30 } } ], ";
+
+        private static string Json(params string[] entries) => JsonStartingWith(StatSheet.DefaultStartingCords, entries);
+
+        private static string JsonStartingWith(int startingCords, params string[] entries) =>
+            ("{ " + Head.Replace("{0}", startingCords.ToString()) + $"'upgrades': [ {string.Join(", ", entries)} ] }}").Replace('\'', '"');
 
         private static EconomyCatalog Load(params string[] entries) => EconomyFileLoader.Load(Json(entries));
 
@@ -65,7 +74,7 @@ namespace Switchboard.Domain.Tests
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
             Assert.That(config.LoadEconomy().Upgrades.Count, Is.EqualTo(8));
-            Assert.That(config.StartingCords, Is.EqualTo(3));
+            Assert.That(config.LoadEconomy().StartingCords, Is.EqualTo(3));
             Assert.That(config.ExtraCordColors.Count, Is.EqualTo(3));
             Assert.That(config.Validate(), Is.Empty);
         }
@@ -139,7 +148,7 @@ namespace Switchboard.Domain.Tests
         {
             AssertSingleError(Load(Wires("wires_1", 500, 3), Secret),
                 "Upgrade 1 \"wires_1\"", "wires 3 is not above the 3 cords the game starts with", "4 or more");
-            AssertSingleError(EconomyFileLoader.Load(Json(Wires("wires_1", 500, 4), Secret), 4), "wires 4", "5 or more");
+            AssertSingleError(EconomyFileLoader.Load(JsonStartingWith(4, Wires("wires_1", 500, 4), Secret)), "wires 4", "5 or more");
         }
 
         [Test]

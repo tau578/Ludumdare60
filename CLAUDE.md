@@ -16,7 +16,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), team coordination (§8) and the step briefs (§9).
 3. `Docs/Design.md`: the source of truth for game rules, architecture, ownership and decisions D01–D44. If the code or a brief disagrees with it, stop and ask; don't improvise.
 
-**Next step:** see the first row in `Docs/Progress.md` that isn't "done". As of 2026-10-18, Step 5 is split (D39–D44): **5a** (the designer's `Economy.json`, Sergei's shop panel, income upgrades, the secret goal) and **5b** (extra wires up to 6 cords, the Notepad) are built; 5c (calls and pacing into `Economy.json`) is an outline to brief next.
+**Next step:** see the first row in `Docs/Progress.md` that isn't "done". As of 2026-10-18, Step 5 is split (D39–D44): **5a** (the designer's `Economy.json`, Sergei's shop panel, income upgrades, the secret goal), **5b** (extra wires up to 6 cords, the Notepad) and **5c** (calls, pacing, starting money and cords in `Economy.json`, D47) are done; Step 6 (saves, Web build) is an outline to brief next.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).

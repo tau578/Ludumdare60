@@ -12,7 +12,7 @@
 | Scene merge: `Final` (D38) | done | ✅ 2026-10-18 (11 min) | ✅ 255/255 tests, scope clean | ✅ | 3002ea8 |
 | 5a. Economy file, shop, income, secret | done | ✅ 2026-10-18 (23 min) | ✅ 304/304 tests, scope clean | ✅ | e115c59 |
 | 5b. Extra wires and Notepad | done | ✅ 2026-10-18 (22 min) | ✅ 333/333 tests, scope clean | ✅ | 667adda |
-| 5c. Calls and pacing into Economy.json | not started | | | | |
+| 5c. Calls and pacing into Economy.json | done | ✅ 2026-10-18 (17 min) | ✅ 388/388 tests, scope clean | ✅ | |
 | 6. Saves, Boot, Web build | not started | | | | |
 | 7. Board growth and pacing | not started | | | | |
 | 8. Sound and feel | not started | | | | |
@@ -1687,3 +1687,91 @@ Follow-ups:
   - `step-05b-fix-notepad.png` shows "Doris Cobbold (D1) / wants / Rose Ellery (A4)" with two accepted cards and two "New order!" cards.
 - **Docs:** Design (D45, D46, core loop, 5.1, 5.6, 5.9, §3, status table), CLAUDE.md (notes for Sergei), Plan §8 (tell Mia).
 
+
+### Step 5c prep (orchestrator, 2026-10-18)
+- **Pre-flight:** `git fetch`: up to date. Unity idle on `Final.unity`, not in Play Mode, console cleared. EditMode tests 361/361 green; no format-only re-saves.
+- **Decisions (lead, D47):** `startingCords` moves into the file too; the old asset fields are deleted (no fallback); ranges are `{min, max}` objects.
+- **Checked:** `OperatorDesk` (Sergei's D45 wiring) reads none of the moving fields; everything goes through `ICallerType`/`IPacingProfile`. Current values recorded in the Plan's 5c brief.
+
+## Step 5c report: 2026-10-18
+Result: done
+
+Playable now: the game plays as before, but every money and timing value now comes from `Assets/Configs/Economy.json`: the starting money and cords, the pacing, and both call types. Unity only keeps how cards look. If you edit the file and press Play, the change is live.
+
+How to test: follow the Plan's 5c playtest script. Step 5 (`startingCords` 4) is wired: 4 cords sit in the tray from the start, and the shop's first cord offer is "5 cords". The console also shows the expected message that `wires_1` (4) is no longer above the 4 starting cords.
+
+Created:
+- `Assets/Scripts/Content/CallTypeRecord.cs`: a call type read from the file (`ICallerType`).
+- `Assets/Tests/Domain/EconomyCallsTests.cs`.
+
+Changed:
+- **Economy loading:**
+  - `EconomyFileData`: new `startingCents`, `startingCords`, `pacing` (`PacingEntry`) and `calls` (`CallEntry`, `RangeEntry`). A missing value starts as a marker: NaN, or `Unset` for `startingCords`.
+  - `EconomyFileLoader`: new checks for the starting values, pacing and calls. `Load(json)` no longer takes `startingCords`; the wires checks use the file's own value.
+  - `EconomyCatalog`: now also exposes `StartingCents`, `StartingCords`, `Pacing` and `CallTypes`.
+- **Game content and validation:**
+  - `GameContent`: money, cords, pacing and types now come from the economy catalog. Only `MaxWaitingCalls` still comes from `GameConfig`.
+  - `GameConfig`: `startingCents`, `startingCords` and `pacing` are deleted. `callerTypes` is renamed to `cardStyles` with `[FormerlySerializedAs("callerTypes")]`. `LoadPeople(economy, jacks)` replaces the old overload. `Validate()` adds a "People file: " prefix to people messages and checks card styles.
+  - `CallerTypeDefinition`: now only `id` and `cardStyle`, and it is no longer an `ICallerType`.
+  - `ContentValidator`: `CheckTypes`/`CheckRange` moved into the loader. New `ValidateCardStyles(styleIds, callTypes)`. The recipient messages now say "Call type" and point at Economy.json.
+  - `PeopleFileLoader`: the "no types" text now points at Economy.json.
+- **Game layer:** `GameInstaller` loads the economy file first, then the people. The cord warning now fires only if the scene has more cords than `startingCords`, so it stays quiet for 4–6.
+- **Shipped data:** `Assets/Configs/Economy.json` gains `startingCents`, `startingCords`, `pacing` and `calls`, with today's values. The upgrades are unchanged.
+- **Assets:** `Assets/Content/GameConfig.asset`, `CallerTypes/Regular.asset` and `CallerTypes/Emergency.asset` were re-serialized to drop the dead fields. Both card-style references survive under `cardStyles`.
+- **Deleted through Unity, metas included:** `PacingProfile.cs`, `Assets/Content/Pacing/Default.asset` and the `Pacing` folder.
+- **Tests:**
+  - `EconomyFileTests`: its helper now writes a valid start, pacing and calls section, and the starting-cords test uses `startingCords` in the file.
+  - `ContentValidatorTests`: the 5 type-rule tests moved to `EconomyCallsTests`.
+  - `PeopleFileTests` and `FullBoardTests` use the new `LoadPeople`.
+- **Docs:** `Docs/EconomyFile.md` has new sections: "Starting money and cords", "Pacing" and "Calls". It also has a full-file outline, a cents and seconds note, per-person overrides, new validator messages, and the sections table set to "Yes (5c)".
+
+Scene and prefab changes: none. `Final.unity` and all prefabs are untouched.
+
+Tests: 388/388 EditMode, up from 361. New tests are in `EconomyCallsTests`:
+- **Values:** `EconomyFileCallsMatchStep5bValues` checks every value of both types, plus pacing, `startingCents` 0 and `startingCords` 3. Before the asset fields were deleted, a temporary `TheRealFileMatchesTheOldAssets` compared the file field by field with `Regular.asset`, `Emergency.asset`, `Default.asset` and `GameConfig`. All 389 tests passed then, and that test was removed with the fields.
+- **Parsing:** `JsonUtilityKeepsTheMarkersForFieldsTheFileLeavesOut` proves that field initializers survive `FromJson`, including in nested objects inside arrays. `TheFullSampleParses`.
+- **Missing values:** `EachRequiredFieldMissingGivesItsMessage` ×6, `ReportsARangeWithOnlyAMin`, `OptionalFieldsLeftOutMeanOff`.
+- **Bad call values:** min above max (exact brief message), a negative range, a duration of 0, a negative fine, negative limits and times, a negative weight, a duplicate id, no type with a weight.
+- **Pacing:** jitter out of range, an interval below 0.1, a negative load factor, a missing section (one message, defaults used), a missing value named.
+- **Starting values:**
+  - Left out, they give 0¢ and 3 cords with no message; 500¢ and 6 cords load.
+  - `startingCords` 2 or 7 gets a message and falls back to 3. A negative `startingCents` gets a message.
+  - With `startingCords` 4, `wires_1` = 4 is reported.
+- **Other checks:**
+  - No `calls` section: one message, no callers, and a 120 s session rings nothing.
+  - A card style with an unknown id, or an empty slot, gets a message; a type with no style gets none.
+  - A `PhoneBook.json` type that isn't in the file gets a message.
+- The existing real-file tests (`RealContentHasNoProblems`, `GameConfigReferencesTheRealFile`) still require `config.Validate()` to be empty.
+
+Console: clean. Two engine "Ignoring depth surface … memoryless" lines appear only around screenshots.
+
+Screenshot: `Temp/Captures/step-05c.png` (calls ringing with the EMERGENCY badge, 3 cords, the shop). There is also `Temp/Captures/step-05c-four-cords.png`, taken with a temporary `startingCords` of 4.
+
+Smoke test:
+- **Final directly:** the spawner types are `CallTypeRecord`: Regular w=5, and Emergency w=1 with a 30 s response time. The first call rang at about 2 s.
+- **Dev panel:** its timed label is "Emergency now", taken from the file's `name`. Its spawn rang an emergency with a 35¢ fee at 5¢/s.
+- **Validate Content:** "no problems found".
+- **MainMenu path:** loading build index 0, then 1, gives a working session in `Final` with no errors.
+- **`startingCords` 4 (temporary edit, restored):** `Stats.Cords` = 4, the bridge has 4 cords and the tray shows 4. The first cord offer is `wires_2` "5 cords", and there is no cord-count warning.
+- **Editor left clean:** not in Play Mode, `timeScale` 1, `Final.unity` active and not dirty, no callbacks or SessionState keys. Format-only re-saves: none, so nothing was discarded.
+
+`CallService` check (D45): `CallService` reads only `Request.Type` by reference (for `CountLive`) and `Call.HasResponseTime`. It reads none of the moved fields directly; everything goes through `ICallerType`, as in `OperatorDesk`.
+
+Deviations from Design/Plan:
+- **Field names:** as proposed, no renames in the file. `GameConfig`'s list is now called `cardStyles` (was `callerTypes`), as the brief allowed.
+- **Small rules added:** a negative `startingCents` is reported and falls back to 0. A range with only a min or only a max is reported. Both follow the brief's "no silent 0" rule.
+- **`startingCords` above 6** also falls back to 3, not 6. That keeps the wires chain valid; the message says "Use 3 to 6".
+- **Validate Content** now prefixes people messages with "People file: ", as the game already does at runtime.
+- **Missing economy file:** if `Economy.json` is missing or unreadable, no call types exist, so no calls ring. Its error is logged. Before 5c, call types came from the assets.
+
+Follow-ups:
+- **Design.md (orchestrator):** the §6.1 rows for `GameConfig`, `CallerTypeDefinition` and `PacingProfile` and the §6.4 sections list are now out of date. So is §9 "New caller type": it is now a line in `Economy.json`, plus an optional card-style asset.
+- **Step 7:** `maxWaitingCalls` and the cord colours remain in `GameConfig`, per D47.
+
+### Step 5c verification (orchestrator, 2026-10-18)
+- EditMode tests re-run: 388/388 green. Console: no errors or warnings.
+- `git status`: only our files (Content scripts, Game installer, Content assets, `Economy.json`, Domain tests, docs). No team-owned file, scene or prefab changed; no format-only re-saves.
+- `GameConfig.asset` keeps both card-style references under `cardStyles`; `Emergency.asset` keeps its badge and accent.
+- Screenshots: `step-05c.png` (calls ringing, emergency badge, 3 cords) and `step-05c-four-cords.png` (`startingCords` 4: four cords, shop offers "5 cords").
+- Design.md updated: implementation row, §6.1 (`GameConfig`, `CallerTypeDefinition`, `PacingProfile`), §6.4 sections, §9 "New caller type", and the pacing mentions in §5.
+- **Playtest (lead, 2026-10-18):** all looks good.

@@ -15,9 +15,10 @@ namespace Switchboard.Domain.Tests
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
             Assert.That(config, Is.Not.Null, GameConfigPath);
-            PeopleCatalog people = config.LoadPeople(ContentValidator.BoardJacks());
+            EconomyCatalog economy = config.LoadEconomy();
+            PeopleCatalog people = config.LoadPeople(economy, ContentValidator.BoardJacks());
             var board = new FakeSwitchboard { CordCount = 6 };
-            var session = new GameSession(new GameContent(config, people, config.LoadEconomy()), new SeededRandom(36), board);
+            var session = new GameSession(new GameContent(config, people, economy), new SeededRandom(36), board);
             var callers = new HashSet<string>();
             var inCalls = new HashSet<string>();
             int emergencies = 0;
