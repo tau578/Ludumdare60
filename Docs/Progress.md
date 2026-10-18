@@ -13,8 +13,9 @@
 | 5a. Economy file, shop, income, secret | done | ✅ 2026-10-18 (23 min) | ✅ 304/304 tests, scope clean | ✅ | e115c59 |
 | 5b. Extra wires and Notepad | done | ✅ 2026-10-18 (22 min) | ✅ 333/333 tests, scope clean | ✅ | 667adda |
 | 5c. Calls and pacing into Economy.json | done | ✅ 2026-10-18 (17 min) | ✅ 388/388 tests, scope clean | ✅ | f70b7df |
+| 7a. Board growth | not started | | | | |
 | 6. Saves, Boot, Web build | not started | | | | |
-| 7. Board growth and pacing | not started | | | | |
+| 7b. Pacing and tutorial | not started | | | | |
 | 8. Sound and feel | not started | | | | |
 | 9. Mobile and Web polish | not started | | | | |
 | 10. Balance | not started | | | | |
