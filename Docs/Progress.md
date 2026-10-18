@@ -1232,3 +1232,13 @@ Follow-ups:
 - **Check:** after the re-import, `caller-02_0` loads as 190×190 with the fileID and GUID that `GameConfig.asset` references, so the `caller-02` portrait is back.
 - **EditMode:** 255/255 pass (the 3 failures are fixed). Console clean. No format-only re-saves to discard.
 - Orchestrator check: an independent EditMode run passed 255/255. Lead playtest of `Final` from MainMenu: all good. The lead asked to push.
+
+#### Caller portrait slices (2026-10-18)
+- **Why:** Mia re-exported the portraits at 190 or 191 px, but each `.meta` kept its old single-sprite slice. `caller-03` (now 190×190, slice 190×191) was dropped by Unity, so its portrait was missing.
+- **Change (lead approved, Mia's files):** the `caller-NN_0` rect width/height now equals the image size, x 0 and y 0, in `caller-02` (190×191), `caller-03` (190×190) and `caller-06`…`caller-10` (191×191). Sprite names, internalIDs, spriteMode and every other import setting are unchanged. 01, 04, 05, 11 and 12 already matched.
+- **Check:** after a forced re-import, all 12 `caller-NN_0` sprites load, each rect equals its texture size, and each fileID/GUID is the one `GameConfig.asset` references.
+- **Safety net:** `Assets/Scripts/Game/Editor/CallerPortraitSliceCheck.cs`, an `AssetPostprocessor` for `Assets/Sprites/callers/` only. When a single-sprite slice is bigger than the imported image, it logs a warning naming the file ("re-slice it in the Sprite Editor or ask the orchestrator"). It only warns and changes nothing. Tested on a temporary copy with an oversized slice (warning shown; the copy was deleted).
+- **EditMode:** 255/255 pass. Console clean. No format-only re-saves to discard.
+- **Seen, not changed:** `Assets/Sprites/board/caller.png` (Mia, 229×190) still slices `caller_0` at 190×191, so Unity logs "rect lies outside of texture" for it. Nothing references it yet; tell Mia or the lead before it gets used.
+
+- Orchestrator check: an independent EditMode run passed 255/255. Seven one-line slice edits plus `CallerPortraitSliceCheck`. Pushed at the lead's request. Mia's `board/caller.png` (229×190, slice 190×191) is unused for now; flagged to the lead.
