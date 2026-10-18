@@ -13,10 +13,10 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 
 ## Read first, every session
 1. `Docs/Progress.md`: status table (what's done, what's next), step reports, and verification and playtest notes.
-2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), team coordination (§8) and the step briefs (§9).
-3. `Docs/Design.md`: the source of truth for game rules, architecture, ownership and decisions D01–D44. If the code or a brief disagrees with it, stop and ask; don't improvise.
+2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), open items (§8) and the step briefs (§9).
+3. `Docs/Design.md`: the source of truth for game rules, architecture and decisions D01–D48. If the code or a brief disagrees with it, stop and ask; don't improvise.
 
-**Next step:** see the first row in `Docs/Progress.md` that isn't "done". As of 2026-10-18, Step 5 is split (D39–D44): **5a** (the designer's `Economy.json`, Sergei's shop panel, income upgrades, the secret goal), **5b** (extra wires up to 6 cords, the Notepad) and **5c** (calls, pacing, starting money and cords in `Economy.json`, D47) are done; Step 6 (saves, Web build) is an outline to brief next.
+**Next step:** see the first row in `Docs/Progress.md` that isn't "done". As of 2026-10-18, Step 5 is split (D39–D44): **5a** (the designer's `Economy.json`, the shop panel, income upgrades, the secret goal), **5b** (extra wires up to 6 cords, the Notepad) and **5c** (calls, pacing, starting money and cords in `Economy.json`, D47) are done; Step 6 (saves, Web build) is an outline to brief next.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).
@@ -28,11 +28,11 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
      - Unity connected, idle and not in Play Mode.
      - Console cleared.
      - EditMode tests green.
-     - The step's decisions and coordination items settled.
+     - The step's decisions settled; check Plan §8 for open items it could pick up.
   2. **Launch:** use the prompt template in `Docs/Plan.md` §6. Add orchestrator notes on anything that changed since the brief was written (teammate merges, new decisions, playtest feedback). Mark the step "building" in `Progress.md`.
   3. **Verify when the agent reports:**
      - Re-run the EditMode tests through MCP and read the console.
-     - Check `git status`. No team-owned file may be changed unless approved.
+     - Check `git status`: every changed file is one the step needed, and the report lists it.
      - Look at the agent's screenshots in `Temp/Captures/`.
      - Skim the key code.
   4. **Update docs:**
@@ -58,46 +58,34 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
   - Duplicate imports, for example TextMeshPro. Compare GUIDs, then keep theirs.
 - **Unity can re-save scenes:** the test runner can re-save an open scene in a newer format with no real changes, as happened with `SampleScene.unity`. Discard such format-only changes instead of committing them.
 
-## Team ownership
-| Owner | Area | Rule |
-|---|---|---|
-| Sergei | `Assets/Scripts/UI/`, `Assets/Scripts/Cables/`, `Assets/Editor/`, `Assets/Tests/Editor/` | Read-only unless the lead approves a specific change, which is then a "coordinated change". |
-| Sergei | `Assets/Scenes/MainMenu.unity`, the prefabs in `Assets/Prefabs/` and `Assets/Prefabs/UI/`, the loose `SwitchboardCanvas` and `EventSystem` in `Final.unity` | Same. Never save `MainMenu.unity` when opening it to inspect. |
-| Shared | `Assets/Scenes/Final.unity` (D38) | Scene shared, prefabs owned. Our part is the `Game` and `GameUI` prefab instances; we change our prefabs, not the scene. Adding or removing a root object needs the lead's OK and a heads-up to the team. |
-| Sergei | Phone book (`PhoneBookView`), `UpgradeShopPanel`, main menu, `Assets/Tools/rodrigo_menu_tools`, volume panel | Same. |
-| Mia (art) | `Assets/Sprites/`, `Assets/Fonts/` | Read-only. |
-| Ours | `Assets/Scripts/Domain/`, `Assets/Scripts/Content/`, `Assets/Scripts/Game/`, `Assets/Tests/Domain/`, `Assets/Tests/Game/`, `Assets/Content/`, `Assets/Prefabs/Game/`, `Docs/`, `CLAUDE.md` | Agents change these. |
-| Ours (designer edits) | `Assets/Configs/Economy.json` | The economy file (D39). One entry per line; the format guide is `Docs/EconomyFile.md`. |
-| Shared | `Assets/Configs/PhoneBook.json` | The single people file (D31). Sergei's book reads `name` and `socket`; our game reads every field. Keep his format, `contactsPerPage`, and the surname sort order. |
+## Team
+**No ownership split (D48, lead 2026-10-18).** The whole team works on the whole project together. There are no owners, read-only folders, coordinated changes or approval lists, and nothing needs to be asked about or reported to a teammate before changing it. Any step may change any file it needs (cord, board, book, shop, menu, scenes, prefabs), as long as its brief names the files and its report lists them. Prefer extending an existing component over building a second one.
 
-**Division of work (D30):** Sergei builds the UI components; we build the rules and data and wire his components to them. Before building any UI, check whether Sergei already has one.
+Teammates still push to `main`, so pre-flight always merges first (see the git rules).
 
-**Approved changes to his files so far** (from Step 5 on, D44: our agents build his missing hooks as coordinated changes, each brief listing the files):
-- The `UpgradeShopPanel` prefab and `UpgradeShopPanelBuilder` constants (Step 1c: the `HeaderSlot` money plaque).
-- Step 3 (D34, A–Z tabs in the phone book): `PhoneBookView.cs`, `PhoneBookPageView.cs`, `PhoneBookContactRow.cs`, a new tab component in `Assets/Scripts/UI/`, `PhoneBookBuilder.cs`, `PhoneBook.prefab`, and a test in `Assets/Tests/Editor/` for the tab jump. Used: `PhoneBookView.cs`, the new `PhoneBookTab.cs`, `PhoneBookBuilder.cs` (new menu `Tools/Switchboard/Update Phone Book Tabs`) and `PhoneBook.prefab`. The test went to our `Assets/Tests/Game/Editor/` instead.
-- Step 5a (D41): `UpgradeSlotView.cs` (new, `Assets/Scripts/UI/`), `UpgradeShopPanelBuilder.cs` (menu `Update Upgrade Shop Buttons`), `UpgradePlaceholderButton.prefab`, `UpgradeShopPanel.prefab`: texts, price and savings fill inside his shop buttons.
-- Step 5b (lead, 2026-10-18): `CableInputController.cs` (`AddCable`, tray re-spacing), `PhoneBookView.cs`, `PhoneBookPageView.cs`, `PhoneBookContactRow.cs`, `PhoneBook.prefab`, `PhoneBookBuilder.cs` (row hit area and `ContactTapped`; no menu run).
+- **The designer** edits `Assets/Configs/Economy.json` (D39; one entry per line, guide in `Docs/EconomyFile.md`) and `Assets/Configs/PhoneBook.json` (D31) by hand. Keep both human-readable, keep validator messages plain, and keep the book's format, `contactsPerPage` and the surname sort order.
+- **Mia** makes the art (`Assets/Sprites/`, `Assets/Fonts/`).
 
 ## Architecture in brief (details in Design.md §4–§7)
-- **Scene flow (D38).** `MainMenu` → `Final`. Sergei's menu loads the next build index. `Final.unity` (formerly `Level.unity`, same GUID) is the one game scene: Sergei's board plus our `Game.prefab` and `GameUI.prefab` instances. Sergei's first merge attempt (`1c20569`, prefab-less copies) was reverted in `cdc5876`.
+- **Scene flow (D38).** `MainMenu` → `Final`. The menu loads the next build index. `Final.unity` (formerly `Level.unity`, same GUID) is the one game scene: the board prefabs plus `Game.prefab` and `GameUI.prefab` instances.
 - **Assemblies:**
   - `Switchboard.Domain` (`noEngineReferences`): all rules, plain C#, ticked by `GameSession.Tick(dt)` in a fixed order. Time only comes from ticks, randomness only from a seeded `IRandom`, and money is a `long` of cents plus a carried fraction.
   - `Switchboard.Content`: ScriptableObjects (`GameConfig`, `CallerTypeDefinition`) plus the `PhoneBook.json` loader and validator.
-  - The Game layer (`Assets/Scripts/Game/`) is in **Assembly-CSharp on purpose**: asmdefs can't reference Assembly-CSharp, where Sergei's code lives.
+  - The Game layer (`Assets/Scripts/Game/`) is in **Assembly-CSharp on purpose**: asmdefs can't reference Assembly-CSharp, where the cord, board and UI code lives.
   - Tests: `Switchboard.Domain.Tests` (EditMode).
-- **Integration with Sergei's code:**
+- **Integration with the cord code:**
   - **`CordBridge`** observes his `CableController`s every `LateUpdate`, reading only public members (Design §3). It reports plugs and circuits to `OperatorDesk`, and returns cords to the tray with his `TryRemove`.
-  - `GameInstaller` finds the views and Sergei's objects in its own scene **by component type**. The only name lookups are `CallerQueuePanel` (the caller slots) and `UpgradeShopPanel/HeaderSlot` (the money plaque).
+  - `GameInstaller` finds the views and the board's objects in its own scene **by component type**. The only name lookups are `CallerQueuePanel` (the caller slots) and `UpgradeShopPanel/HeaderSlot` (the money plaque).
 - **Composition root:** `GameInstaller`. No singletons, statics with state, service locators, or `FindObjectOfType`.
 - **Communication:** views call verbs (`OperatorDesk.TryTake`), services raise C# events, and values that change every frame are polled in `LateUpdate`.
 - **UI:**
-  - Our `GameUI.prefab` is a Screen Space Overlay canvas (sorting order 10, 1920×1080 Expand), laid over Sergei's canvas.
+  - Our `GameUI.prefab` is a Screen Space Overlay canvas (sorting order 10, 1920×1080 Expand), laid over the board's `SwitchboardCanvas`.
   - Anything not meant to be clicked has `raycastTarget` off, because his cord input takes the topmost hit. His book is also at sorting order 10, so nothing of ours may overlap it.
   - The money counter fills `HeaderSlot`. The call in hand shows as a speech bubble left of the caller column. Cards sit over the caller slots.
 - **Data:** people, jacks and per-caller overrides live in `PhoneBook.json`; call types (rate, fee and duration ranges) live in ScriptableObjects. Rates and fees are rolled as whole cents when the range allows. Names are English.
 
 ## Code conventions
-- Match Sergei's style:
+- Match the existing style:
   - `sealed` classes by default
   - `[SerializeField] private` fields
   - small focused types
@@ -125,19 +113,8 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 - **Screenshots:** `manage_camera screenshot` with `output_folder: "Temp/Captures"` (git-ignored). Never save under `Assets/`. Take them while Play Mode is paused or being stepped.
 - **Leave the editor clean:** idle, not in Play Mode, compiled, `Final.unity` saved as the active scene, console clean, and no temporary callbacks or editor state left behind.
 
-## Pending coordination with Sergei (Plan §8)
-- **Step 5 (D44):** Sergei has none of the hooks, so our agents build them as coordinated changes: shop button texts (5a), runtime cords and the book's tapped-entry event (5b). Tell him before and after.
-- **Tell Sergei (Step 5b, built):** `CableInputController.AddCable(Color)`, `MaxCables` = 6 and public tray-spacing statics (usable width 830 px as a constant); keep the tray slot's child named `Preview`. His book has `ContactTapped(name, socket)` and `ContactTapsEnabled`; each `ContactTemplate` has a transparent tap `Image`, which `PhoneBookBuilder` now builds too.
-- **Tell Sergei (Step 5a, built):** his shop button now has `UpgradeSlotView` (texts, savings fill, highlight frame) and is 204 px wide; new menu `Tools/Switchboard/Update Upgrade Shop Buttons` (Plan §8).
-- **Step 7 (D42):** board growth from 3×3. His book shows only people on open jacks, and closed jacks are dimmed. Both touch his book and board.
-- **Step 6:** touch input in `CableInputController` (`Pointer.current`).
-- **Tell Sergei (scene merge):** `Level.unity` is now `Final.unity`; his `LevelBackgroundBuilder` and `GamePresentationBuilder` menus still name the old path; "scene shared, prefabs owned"; suggest making `SwitchboardCanvas` and `EventSystem` prefabs.
-- **Ongoing:** keep the names `CallerQueuePanel`, `UpgradeShopPanel` and `HeaderSlot`, and keep the extra fields in `PhoneBook.json`.
-- **His `PhoneBookBuilder`** points at a missing `Assets/Settings/PhoneBook.json`.
-- **A–Z tabs are hidden** (lead, 2026-10-18): `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab`; the code, objects and tests stay. His `Update Phone Book Tabs` menu rebuilds them active, so untick them again afterwards.
-- **Feedback for Sergei (Step 3 playtest):** a click on a button or card while holding a cord drops the cord; the lead would prefer it kept in hand. Since `2fc3810` his input keeps the cord on a call-card click; buttons and book rows still drop it.
-- **Talk to Sergei (merge `a173e75`):** his `2fc3810` changed our domain (`OperatorDesk`, `CallService`, tests) and Game layer. The lead adopted the rules as D45, but ask him to agree changes to our folders first next time. His `CableInputController` now references our `Switchboard.Game.CallCardView` (UI depending on Game); a small interface or tag on the card would keep the layers apart.
-- **Tell Sergei (Step 3):** his book has A–Z tabs now, built by the new `Tools/Switchboard/Update Phone Book Tabs` menu, which `CreatePrefab` also calls. The tabs for the spread on show are highlighted and nudged out (`PhoneBookTab.SetRest`). Our card click sound uses his `AudioChannelSource` (Sfx) unchanged.
+## Open items (Plan §8)
+Known issues and to-dos, such as touch input in the cord code, held cords dropping on button clicks, stale editor-menu paths and the hidden A–Z tabs, are listed in `Docs/Plan.md` §8. A step that fixes one removes it there.
 
 ## Open decisions (Design §10)
 - D15: what the mystery upgrade does.

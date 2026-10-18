@@ -9,13 +9,13 @@ Design: [Design.md](Design.md) · Progress: [Progress.md](Progress.md)
 1. **Prep (orchestrator: the main Claude session).**
    - Pull teammates' changes.
    - Check that Unity is connected, idle, and has a clean console.
-   - Make sure the step's decisions (Design §10) and coordination items (§8) are settled.
+   - Make sure the step's decisions (Design §10) are settled, and check the open items (§8) the step could pick up.
    - Refine the step's brief with anything learned so far.
 2. **Build (one implementer agent).** The agent gets the brief, works only through Unity MCP, and returns a report (§7).
 3. **Verify (orchestrator).**
    - Re-run all EditMode tests and read the console.
    - Run a Play Mode smoke test and take a screenshot.
-   - Review the diff for scope creep and for edits to team files.
+   - Review the diff for scope creep: files changed that the brief didn't name.
    - Send you the result and the playtest script.
 4. **Playtest (you).** Follow the step's script in Unity and say what's broken or feels off.
 5. **Fix (agent).** The agent gets the same brief plus your notes. Then go back to 3.
@@ -36,13 +36,12 @@ Ground rules:
 - [ ] Unity is open on this project with MCP for Unity connected. The orchestrator checks that `mcpforunity://instances` lists `Ludumdare60`. The editor is idle and not in Play Mode.
 - [ ] Your own work in Unity is saved, and the console shows no errors.
 - [ ] `git pull` is done, and there are no unexpected local changes.
-- [ ] The step's coordination items are agreed with teammates (§8).
 - [ ] The decisions the step needs are settled (Design §10).
 
 ## 3. Rules for implementing agents
 1. **Read first:** Design.md; sections §3–§7 of this plan and your own step; Progress.md.
 2. **Scope.** Build only your step. Put anything else you notice under "Follow-ups" in your report.
-3. **Team files are read-only** (Design §3). If your step can't be done without changing one, stop and report the exact change you'd need.
+3. **Any file may change** (D48, Design §3), including the cord, board, book, shop and menu code. Change what the step needs, prefer extending existing components over duplicating them, and list every changed file in your report. Don't rewrite unrelated code.
 4. **Placement.** Put code in the folders and assemblies of Design §4.1. Use the namespaces `Switchboard.Domain`, `Switchboard.Content`, `Switchboard.Game` and `Switchboard.Domain.Tests`.
 5. **Style: match the existing code in `Assets/Scripts/UI`.**
    - Classes are `sealed` by default.
@@ -105,11 +104,11 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Screenshot names (2a) | `manage_camera screenshot` adds "-1" to the name instead of overwriting an existing file. Delete the old file first if the name matters. |
 | Nested canvas sorting in a prefab (2b) | To give a child its own sorting order inside a prefab (e.g. the halo's order 9), set `m_OverrideSorting` through `SerializedObject`. `manage_prefabs` and the `overrideSorting` setter leave it off, because inside prefab contents the nested canvas counts as a root canvas. |
 | Game view size (3) | Set it with `PlayModeWindow.SetCustomRenderingResolution`, for example 1280×720 or 844×390, and set it back to 1920×1080 afterwards. Each new size stays in the Game view's size list as an editor preference, not a project file. |
-| Tests on Assembly-CSharp types (3) | `Assets/Tests/Editor/` (Sergei's asmdef) can't see Assembly-CSharp types such as `PhoneBookView`. Put such tests in our `Assets/Tests/Game/Editor/`, which has no asmdef and compiles into Assembly-CSharp-Editor. |
+| Tests on Assembly-CSharp types (3) | `Assets/Tests/Editor/` (the cable tests' asmdef) can't see Assembly-CSharp types such as `PhoneBookView`. Put such tests in our `Assets/Tests/Game/Editor/`, which has no asmdef and compiles into Assembly-CSharp-Editor. |
 | Dev panel (2a) | F1 or the "Dev" button in the top-right corner: + $10, Call now, Emergency now (4), Speed ×5/×1, Show/Hide times, Clear calls. Editor and development builds only. Its IMGUI clicks also reach the cord input as "empty space" clicks. |
 | Format-only re-saves (4) | Test runs and Play Mode can re-save `ProjectSettings/TimeManager.asset` (as well as `SampleScene.unity`) with only format changes. Discard them with `git checkout -- <file>` and mention it in the report. |
 | Layout in prefab editing (5a) | Unity's layout groups don't run while a prefab is edited from code, so an editor menu that resizes children must set their `sizeDelta` directly (as `Update Upgrade Shop Buttons` does). |
-| Disabled buttons (5a) | Setting `Button.interactable = false` applies the button's grey, half-transparent disabled tint and changes Sergei's look. To make a button inert, ignore the click in our view and dim it ourselves. |
+| Disabled buttons (5a) | Setting `Button.interactable = false` applies the button's grey, half-transparent disabled tint and changes the shop's look. To make a button inert, ignore the click in our view and dim it ourselves. |
 | Book row clicks (5b) | Row taps only reach `PhoneBookContactRow` while `ContactTapsEnabled` is on (Notepad owned); otherwise the open book's button gets the click and closes. Simulate them with EventSystem raycasts inside a `Canvas.willRenderCanvases` handler. |
 | Buying in Play Mode (5a) | Connect a call through `OperatorDesk.OnCircuitClosed` to check fees and pay without plugging cords; the dev panel's "+ $100" and "Reset upgrades" call `GameSession` methods directly. |
 | Missing JSON fields (5c) | `JsonUtility.FromJson` keeps field initializers for fields the file leaves out, also inside nested objects in arrays. Use a marker initializer (NaN, or a named `Unset` constant) to tell "missing" from 0. |
@@ -119,8 +118,8 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 - [ ] All EditMode tests pass: the team's existing tests plus new tests for every new rule.
 - [ ] A 10-second Play Mode smoke test in `Final.unity` shows no errors or exceptions. The screenshot is saved to `Temp/Captures/step-NN.png`.
 - [ ] Every changed scene and prefab is saved, with no missing references.
-- [ ] `Final.unity` plays directly and from `MainMenu` (Start), and nothing of Sergei's in `Final` changed beyond what the brief allows.
-- [ ] No team-owned file was changed, unless the brief lists it as a coordinated change.
+- [ ] `Final.unity` plays directly and from `MainMenu` (Start), and nothing in `Final` changed beyond what the brief needs.
+- [ ] Every changed file is listed in the report; nothing unrelated was rewritten.
 - [ ] The report is in `Docs/Progress.md`, including any deviations from Design.md.
 
 ## 6. Launch prompt (orchestrator → agent)
@@ -129,7 +128,7 @@ You are implementing Step N of the Switchboard Operator game in this Unity proje
 Read Docs/Design.md, Docs/Plan.md (sections 3–7 and "Step N") and Docs/Progress.md before changing anything.
 Implement only Step N, following the rules in Plan §3 and the definition of done in Plan §5.
 When you finish, append your report (Plan §7 format) to Docs/Progress.md and return it as your final message.
-Notes from the orchestrator: <confirmed decisions, coordination results, playtest feedback to address>
+Notes from the orchestrator: <confirmed decisions, teammates' recent merges, playtest feedback to address>
 ```
 
 ## 7. Report format
@@ -148,22 +147,22 @@ Deviations from Design/Plan: <none | list with reasons>
 Follow-ups: <ideas, debts, questions>
 ```
 
-## 8. Coordination with the team
+## 8. Open items
 
-| When | What | With |
+Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs anyone's approval. These are known issues and to-dos a step can pick up; the step that fixes one removes it.
+
+| Item | Notes | Planned |
 |---|---|---|
-| Before Step 1 | `Game.unity` will load `Level.unity` additively. We rely on the public members listed in Design §3 and on the name `CallerQueuePanel`. Please say before renaming any of them. | Sergei |
-| Before Step 2 | Done (2026-10-17): the lead confirmed D07. Pulling a plug puts the call on hold, using the new restore feature. | Lead (and Sergei) |
-| Step 5b (D44), built 2026-10-18 | A way to add cords at runtime: `CableInputController.AddCable(Color)` copies a cable and its tray slot and re-spaces the tray (up to 6). Built by our 5b agent as a coordinated change; the lead approved `CableInputController.cs` (2026-10-18). Tell Sergei: also keep the tray slot's child name `Preview`; the 830 px usable tray width is a constant in his file. | Sergei |
-| Step 5b (D44), built 2026-10-18 | Notepad upgrade (D23): `PhoneBookView.ContactTapped(name, socket)` and `ContactTapsEnabled`; rows get a hit area that is a raycast target only while taps are on. Approved files (lead, 2026-10-18): `PhoneBookView.cs`, `PhoneBookPageView.cs`, `PhoneBookContactRow.cs`, `PhoneBook.prefab`, `PhoneBookBuilder.cs`. Tell Sergei. | Sergei |
-| Step 5a (D41, D44) | Built (2026-10-18). Tell Sergei: his `UpgradePlaceholderButton` now carries `UpgradeSlotView` (title, description, price, savings fill, gold highlight frame) and is 204 px wide (was 144); `UpgradeShopPanelBuilder` builds these parts and has a new menu `Tools/Switchboard/Update Upgrade Shop Buttons` that updates both shop prefabs in place. Keep the names `UpgradeShopPanel`, `HeaderSlot` and the 4 buttons. | Sergei |
-| Before Step 7 (D42) | Board growth: the book shows only people on open jacks; closed jacks are dimmed and can't be clicked. Both touch his book and board. Agree on how, or approve another coordinated change. | Sergei, Mia |
-| Feedback (Step 3 playtest) | Holding a cord and clicking a button (the book, a tab, a caller card) drops the cord back in the tray, because any click off a jack counts as "empty space". The lead would find it easier if clicks on buttons kept the cord in hand. His call; we didn't change it. | Sergei |
-| Before Step 6 | Touch input in the cord code: use `Pointer.current` instead of `Mouse.current` in `CableInputController.Update`, and hide the hand cursor on touch. | Sergei |
-| Done (2026-10-18, D38) | One `Final.unity` from prefabs. Tell Sergei: `Level.unity` is now `Final.unity` (same GUID); his `LevelBackgroundBuilder` and `GamePresentationBuilder` menus still name `Assets/Scenes/Level.unity`; the rule is "scene shared, prefabs owned" (announce root-level changes); suggestion: make `SwitchboardCanvas` and `EventSystem` prefabs. | Sergei |
-| Done in Step 1c (lead approved) | The upgrade panel's top header is now a 96 px `HeaderSlot` plaque holding our money counter. Sergei keeps the names `UpgradeShopPanel` and `HeaderSlot`. | Sergei |
-| After the merge (2026-10-18) | `caller-04` and `caller-05` were re-exported at 190×190 while their slices stayed 191 tall, so Unity dropped them. We set the slices to 190 (lead-approved). Next time, re-slice in the Sprite Editor after resizing. | Mia |
-| Before Step 8 | Sound effects (ring, alarm, coins, paid, fine, hang-up): find them or generate them. | Mia, team |
+| Touch input in the cord code | Use `Pointer.current` instead of `Mouse.current` in `CableInputController.Update`, and hide the hand cursor on touch (D28). | Step 6 |
+| A held cord drops on button and book-row clicks | Any click off a jack counts as "empty space" and returns the held cord. A call-card click already keeps it (`2fc3810`). The lead prefers that buttons and book rows keep it too. | any step; Step 9 at the latest |
+| `CableInputController` references `Switchboard.Game.CallCardView` | The UI code depends on the Game layer. A small interface or marker component on the card would keep the layers apart. | cleanup, any step |
+| Stale paths in editor menus | `LevelBackgroundBuilder` and `GamePresentationBuilder` still name `Assets/Scenes/Level.unity` (now `Final.unity`, same GUID). `PhoneBookBuilder` points at a missing `Assets/Settings/PhoneBook.json` (the file is `Assets/Configs/PhoneBook.json`). | cleanup, any step |
+| A–Z tabs are hidden | `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab` (lead, 2026-10-18); the code, objects and tests stay. `Tools/Switchboard/Update Phone Book Tabs` rebuilds them active, so untick them again after running it. | |
+| Loose scene objects | `SwitchboardCanvas` and `EventSystem` are loose in `Final.unity`; making them prefabs would keep scene merges small. | optional |
+| Sound effects | Ring, alarm, coins, paid, fine, hang-up: find them or generate them. | before Step 8 |
+| Art imports | `caller-04` and `caller-05` were re-exported at 190×190 while their slices stayed 191 tall, so Unity dropped them (fixed). After resizing a sprite sheet, re-slice it in the Sprite Editor. | tip |
+
+Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `UpgradeShopPanel/HeaderSlot`, or update `GameInstaller` with the rename. `PhoneBook.json` keeps the book's format, `contactsPerPage` and the surname order.
 
 ## 9. Steps
 
@@ -176,7 +175,7 @@ Follow-ups: <ideas, debts, questions>
 | 3 | Phone book tabs, 36 people, real cards | Find anyone fast with A–Z tabs; the whole board in use; readable cards in every state |
 | 4 | Emergencies and fines | Timed emergency calls and fair fines |
 | 5a | Economy file, shop, income, secret goal | `Economy.json` drives Sergei's shop; income upgrades; the secret fills as a savings bar |
-| 5b | Extra wires and the Notepad | Buy cords and the Notepad (coordinated changes to Sergei's cords and book) |
+| 5b | Extra wires and the Notepad | Buy cords and the Notepad (changes to the cord input and the book) |
 | 5c | Calls and pacing into `Economy.json` | The designer tunes the whole economy in one file |
 | 6 | Saves, Boot scene, first Web build | Plays in a browser, and progress survives a reload |
 | 7 | Board growth and pacing | The board and the difficulty grow over a session |
@@ -1137,14 +1136,14 @@ No team-owned file changes. `Final.unity` and the prefabs shouldn't need to chan
 - moving card styles or portraits into a file
 - changing `PhoneBook.json`
 
-### Step 6: Saves and first Web build (outline). Sergei's `MainMenu` is the start screen: it replaces our planned `Boot.unity` and doubles as the tap-to-start audio unlock (D30, D33).
+### Step 6: Saves and first Web build (outline). The `MainMenu` is the start screen: it replaces our planned `Boot.unity` and doubles as the tap-to-start audio unlock (D30, D33).
 - **Saving:**
   - `SaveData` with a version number and migrations; `SaveService`.
   - `PlayerPrefsStorage` and `BrowserStorage` (a `.jslib` writing `localStorage`, plus a backup key).
   - Autosave as described in Design §5.12.
 - **`Boot.unity`:** tap to start, then load `Game`.
 - **Web build** through `manage_build`, to `Builds/Web/` (git-ignored).
-- **Depends on** D26 (hosting) and the touch coordination item (§8).
+- **Depends on** D26 (hosting). Includes the touch-input open item (§8).
 - **Tests:**
   - Saving and loading gives back the same data.
   - Migration from a v1 test file.
@@ -1158,8 +1157,8 @@ No team-owned file changes. `Final.unity` and the prefabs shouldn't need to chan
 ### Step 7: Board growth and pacing (outline)
 - **Board growth (D42):**
   - Start on a 3×3 board (rows A–C, columns 1–3). `extra_clients` entries in `Economy.json` set `boardSize {cols, rows}` and `clientSlots`.
-  - Exactly the people on open jacks are in the game, and Sergei's book lists only them (coordinated change). The designer chooses the starting group by placing people on A1–C3. The services move off A–C 1–3 (Fire Brigade is on C2 today), so emergencies come later.
-  - Closed jacks dimmed and not clickable, with their row and column labels dimmed (coordinated change to his board).
+  - Exactly the people on open jacks are in the game, and the book lists only them. The designer chooses the starting group by placing people on A1–C3. The services move off A–C 1–3 (Fire Brigade is on C2 today), so emergencies come later.
+  - Closed jacks dimmed and not clickable, with their row and column labels dimmed (a change to the board code).
   - Check the 6-slot caller panel against `clientSlots`.
 - **Pacing:**
   - `PacingProfile` curves driven by progress (D19).
@@ -1181,7 +1180,7 @@ No team-owned file changes. `Final.unity` and the prefabs shouldn't need to chan
   - Cards: a ringing wobble, sliding in and out, and stamps.
   - A rolling money counter.
   - Popups.
-- **Depends on** the Step 8 coordination item for audio assets (§8).
+- **Depends on** the sound-effects open item (§8).
 - **Playtest:** it sounds and feels good without getting noisy.
 
 ### Step 9: Mobile and Web polish (outline)
