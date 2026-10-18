@@ -242,12 +242,7 @@ namespace Switchboard.Editor
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = fold;
             button.navigation = new Navigation { mode = Navigation.Mode.None };
-            var colors = button.colors;
-            colors.normalColor = colors.selectedColor = Color.white;
-            colors.highlightedColor = new Color(1, .93f, .69f, 1);
-            colors.pressedColor = new Color(.78f, .73f, .56f, 1);
-            colors.fadeDuration = .08f;
-            button.colors = colors;
+            button.transition = Selectable.Transition.None;
             return button;
         }
 

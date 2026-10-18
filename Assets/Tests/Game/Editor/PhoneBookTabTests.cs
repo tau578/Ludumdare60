@@ -1,4 +1,5 @@
 using System.Text;
+using System.Linq;
 using NUnit.Framework;
 using Switchboard.UI;
 using UnityEngine;
@@ -26,7 +27,12 @@ namespace Switchboard.Game.Tests
             for (int i = 0; i < names.Length; i++)
                 json.Append(i > 0 ? "," : "").Append($"{{ \"name\": \"{names[i]}\", \"socket\": \"A{i + 1}\" }}");
             json.Append("] }");
-            file = new TextAsset(json.ToString());
+            return BookFrom(json.ToString());
+        }
+
+        private PhoneBookView BookFrom(string json)
+        {
+            file = new TextAsset(json);
             root = new GameObject("PhoneBook", typeof(RectTransform));
             var view = root.AddComponent<PhoneBookView>();
             view.ConfigureDirectory(file, null, null, null, null);
@@ -49,6 +55,40 @@ namespace Switchboard.Game.Tests
             int at = 0;
             foreach (var part in parts) { part.CopyTo(all, at); at += part.Length; }
             return all;
+        }
+
+        private const string MixedFile = @"{ 'contactsPerPage': 6, 'contacts': [
+                { 'name': 'Police', 'socket': 'B1', 'tags': ['emergency-service'] },
+                { 'name': 'Fire Brigade', 'socket': 'F1', 'tags': ['emergency-service'] },
+                { 'name': ' Abbott, Zoe ', 'socket': 'a1' },
+                { 'name': 'Brown, ada', 'socket': 'E1' },
+                { 'name': 'Moss, Ada', 'socket': 'C1' }
+            ] }";
+
+        // Legacy file names are displayed as given name + surname; services remain first.
+        [Test]
+        public void ParseSortsByGivenNameAndKeepsTheMatchingSockets()
+        {
+            var config = PhoneBookConfig.Parse(MixedFile.Replace('\'', '"'));
+            Assert.That(config.contacts.Select(c => c.name), Is.EqualTo(new[]
+                { "Police", "Fire Brigade", "ada Brown", "Ada Moss", "Zoe Abbott" }));
+            Assert.That(config.contacts.Select(c => c.socket), Is.EqualTo(new[]
+                { "B1", "F1", "E1", "C1", "A1" }));
+            Assert.That(config.contacts.Select(c => c.IsEmergencyService), Is.EqualTo(new[]
+                { true, true, false, false, false }));
+        }
+
+        [Test]
+        public void PeopleUseTheirGivenNameAndServicesStayOutsideLetterLookup()
+        {
+            var view = BookFrom(MixedFile.Replace('\'', '"'));
+
+            Assert.That(view.HasLetter('P'), Is.False, "Police remains in the leading service block");
+            Assert.That(view.HasLetter('F'), Is.False, "Fire Brigade remains in the leading service block");
+            Assert.That(view.HasLetter('A'), Is.True, "Ada");
+            Assert.That(view.HasLetter('B'), Is.False, "Brown is a surname");
+            Assert.That(view.HasLetter('M'), Is.False, "Moss is a surname");
+            Assert.That(view.HasLetter('Z'), Is.True, "Zoe");
         }
 
         [Test]

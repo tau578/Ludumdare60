@@ -107,8 +107,8 @@ namespace Switchboard.UI
             RefreshHighlight();
         }
 
-        private void RefreshHighlight() => Graphic.SetHighlighted(pointerHovered,
-            pointerCable != null && IsOccupied && occupyingCable != pointerCable);
+        private void RefreshHighlight() => Graphic.SetHighlighted(pointerHovered && pointerCable != null,
+            IsOccupied && occupyingCable != pointerCable);
 
         private void OnDisable()
         {

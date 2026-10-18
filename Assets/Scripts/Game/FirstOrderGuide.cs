@@ -111,9 +111,9 @@ namespace Switchboard.Game
             foreach (var pair in pulses)
                 if (pair.Value != null) pair.Value.SetShowing(false);
             if (Stage == FirstOrderGuideStage.Portrait && firstCard != null)
-                Show(firstCard.PortraitRect.GetComponent<Graphic>());
+                Show(firstCard.PortraitRect.GetComponent<Graphic>(), true);
             else if (Stage == FirstOrderGuideStage.Book && book != null)
-                Show(book.ClosedBookGraphic);
+                Show(book.ClosedBookGraphic, silhouette: true);
             else if (Stage == FirstOrderGuideStage.Cables)
                 foreach (var cable in cables)
                     if (cable != null && cable.IsInTray && cable.TrayView != null)
@@ -121,7 +121,7 @@ namespace Switchboard.Game
                             if (graphic is CableGraphic || graphic is PlugGraphic || graphic == cable.TrayView.Artwork) Show(graphic);
         }
 
-        private void Show(Graphic graphic)
+        private void Show(Graphic graphic, bool portrait = false, bool silhouette = false)
         {
             if (graphic == null) return;
             if (!pulses.TryGetValue(graphic, out var pulse) || pulse == null)
@@ -130,6 +130,8 @@ namespace Switchboard.Game
                 if (pulse == null) pulse = graphic.gameObject.AddComponent<SlowGuidePulse>();
                 pulses[graphic] = pulse;
             }
+            if (portrait) pulse.UsePortraitHalo();
+            if (silhouette) pulse.UseSilhouetteHalo();
             pulse.SetShowing(true);
         }
 

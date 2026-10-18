@@ -1,12 +1,14 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace Switchboard.UI
 {
     [DisallowMultipleComponent, RequireComponent(typeof(Canvas), typeof(GraphicRaycaster))]
-    public sealed class PhoneBookView : MonoBehaviour
+    public sealed class PhoneBookView : MonoBehaviour, IPointerDownHandler, IPointerClickHandler
     {
         [SerializeField] private Button closedBook;
         [SerializeField] private Button openBook;
@@ -22,11 +24,12 @@ namespace Switchboard.UI
         private Predicate<string> isVisibleSocket;
         private string configError;
         private bool contactTapsEnabled;
+        private readonly List<RaycastResult> pointerHits = new List<RaycastResult>();
 
         /// <summary>A tapped entry's name and socket, raised only while taps are on.</summary>
         public event Action<string, string> ContactTapped;
 
-        /// <summary>Off by default: a tap on an entry then falls through to the open book and closes it.</summary>
+        /// <summary>Off by default: entry taps fall through to page turning.</summary>
         public bool ContactTapsEnabled
         {
             get => contactTapsEnabled;
@@ -57,6 +60,7 @@ namespace Switchboard.UI
             rightPage = right;
             previousSpread = previous;
             nextSpread = next;
+            ConfigurePageInput();
             ListenToPages();
         }
 
@@ -95,7 +99,7 @@ namespace Switchboard.UI
                 directory = allContacts;
                 return;
             }
-            var visible = new System.Collections.Generic.List<PhoneBookContact>(allContacts.contacts.Length);
+            var visible = new List<PhoneBookContact>(allContacts.contacts.Length);
             foreach (PhoneBookContact contact in allContacts.contacts)
                 if (isVisibleSocket(contact.socket)) visible.Add(contact);
             directory = new PhoneBookConfig { contactsPerPage = allContacts.contactsPerPage, contacts = visible.ToArray() };
@@ -178,16 +182,53 @@ namespace Switchboard.UI
         {
             closedBook = closed;
             openBook = opened;
+            ConfigurePageInput();
             SetOpen(false);
+        }
+
+        private void ConfigurePageInput()
+        {
+            // Keep the artwork as the hit area; clicks bubble to this book instead of its old close button.
+            if (openBook != null)
+            {
+                openBook.transition = Selectable.Transition.None;
+                openBook.enabled = false;
+                openBook.targetGraphic.canvasRenderer.SetColor(Color.white);
+            }
+            foreach (var corner in new[] { previousSpread, nextSpread })
+            {
+                if (corner == null) continue;
+                corner.transition = Selectable.Transition.None;
+                corner.enabled = false;
+                corner.targetGraphic.raycastTarget = false;
+                corner.targetGraphic.canvasRenderer.SetColor(Color.white);
+            }
+        }
+
+        public int PageTurnDirectionAt(Vector2 position, Camera camera)
+        {
+            if (!IsOpen || openBook == null) return 0;
+            var rect = (RectTransform)openBook.transform;
+            if (!RectTransformUtility.RectangleContainsScreenPoint(rect, position, camera) ||
+                !RectTransformUtility.ScreenPointToLocalPointInRectangle(rect, position, camera, out var local)) return 0;
+            return local.x < rect.rect.center.x ? (CanGoBack ? -1 : 0) : (CanGoForward ? 1 : 0);
+        }
+
+        public void OnPointerDown(PointerEventData eventData) { }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            if (eventData.button != PointerEventData.InputButton.Left) return;
+            int direction = PageTurnDirectionAt(eventData.position, eventData.pressEventCamera);
+            if (direction < 0) PreviousSpread();
+            else if (direction > 0) NextSpread();
         }
 
         private void Awake()
         {
             SwitchboardUISorting.SetLayer(gameObject, SwitchboardUISorting.Book);
             closedBook.onClick.AddListener(Toggle);
-            openBook.onClick.AddListener(Toggle);
-            if (previousSpread != null) previousSpread.onClick.AddListener(PreviousSpread);
-            if (nextSpread != null) nextSpread.onClick.AddListener(NextSpread);
+            ConfigurePageInput();
             foreach (var tab in tabs) if (tab != null) tab.Bind(this);
             ListenToPages();
             ReloadContacts();
@@ -197,9 +238,6 @@ namespace Switchboard.UI
         private void OnDestroy()
         {
             if (closedBook != null) closedBook.onClick.RemoveListener(Toggle);
-            if (openBook != null) openBook.onClick.RemoveListener(Toggle);
-            if (previousSpread != null) previousSpread.onClick.RemoveListener(PreviousSpread);
-            if (nextSpread != null) nextSpread.onClick.RemoveListener(NextSpread);
             foreach (var tab in tabs) if (tab != null) tab.Unbind();
             if (leftPage != null) leftPage.ContactTapped -= OnContactTapped;
             if (rightPage != null) rightPage.ContactTapped -= OnContactTapped;
@@ -207,10 +245,20 @@ namespace Switchboard.UI
 
         private void Update()
         {
+            if (!IsOpen) return;
             var keyboard = Keyboard.current;
-            if (!IsOpen || keyboard == null) return;
-            if (keyboard.leftArrowKey.wasPressedThisFrame) PreviousSpread();
-            else if (keyboard.rightArrowKey.wasPressedThisFrame) NextSpread();
+            if (keyboard != null)
+            {
+                if (keyboard.escapeKey.wasPressedThisFrame) { SetOpen(false); return; }
+                if (keyboard.leftArrowKey.wasPressedThisFrame) PreviousSpread();
+                else if (keyboard.rightArrowKey.wasPressedThisFrame) NextSpread();
+            }
+            var pointer = Pointer.current;
+            if (pointer == null || !pointer.press.wasPressedThisFrame || EventSystem.current == null) return;
+            pointerHits.Clear();
+            EventSystem.current.RaycastAll(new PointerEventData(EventSystem.current)
+                { position = pointer.position.ReadValue() }, pointerHits);
+            if (pointerHits.Count == 0 || !pointerHits[0].gameObject.transform.IsChildOf(transform)) SetOpen(false);
         }
 
         public void Toggle() => SetOpen(!IsOpen);

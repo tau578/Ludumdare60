@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using System.Linq;
 using Switchboard.Domain;
 using Switchboard.UI;
 using UnityEditor;
@@ -55,6 +56,25 @@ namespace Switchboard.Game.Tests
         }
 
         private static System.Predicate<string> Open(int side) => socket => new BoardSize(side, side).Contains(socket);
+
+        // Display order is independent of the legacy source order; socket assignments remain intact.
+        [Test]
+        public void TheBookShowsGivenNamesWithServicesFirstAndKeepsAllSockets()
+        {
+            var file = AssetDatabase.LoadAssetAtPath<TextAsset>(PeopleFilePath);
+            Assert.That(file, Is.Not.Null, PeopleFilePath);
+            PhoneBookConfig raw = JsonUtility.FromJson<PhoneBookConfig>(file.text);
+            PhoneBookView book = Book();
+
+            Assert.That(book.ContactCount, Is.EqualTo(raw.contacts.Length));
+            var displayed = Enumerable.Range(0, book.ContactCount).Select(book.ContactAt).ToArray();
+            Assert.That(displayed.Select(c => c.socket), Is.EquivalentTo(raw.contacts.Select(c => c.socket)));
+            var services = raw.contacts.Where(c => c.IsEmergencyService).ToArray();
+            Assert.That(displayed.Take(services.Length).Select(c => c.name), Is.EqualTo(services.Select(c => c.name)));
+            var names = displayed.Skip(services.Length).Select(c => c.name).ToArray();
+            Assert.That(names.All(n => !n.Contains(",")), Is.True);
+            Assert.That(names, Is.EqualTo(names.OrderBy(n => n, System.StringComparer.OrdinalIgnoreCase)));
+        }
 
         [Test]
         public void AThreeByThreeBoardShowsTheStartingNineOnTwoPages()
