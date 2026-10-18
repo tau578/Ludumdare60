@@ -51,6 +51,7 @@ namespace Switchboard.Game
             if (callerSlots.Length < config.MaxWaitingCalls)
                 Debug.LogWarning($"The caller panel has {callerSlots.Length} slots but GameConfig allows {config.MaxWaitingCalls} calls.", config);
             callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, callerSlots, PortraitOf, cordBridge.ColorOf);
+            if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls);
             loopRunner.Bind(Session);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             // Added at runtime so no scene or prefab references a type that release builds leave out.
