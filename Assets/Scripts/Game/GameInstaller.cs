@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using Switchboard.Content;
 using Switchboard.Domain;
@@ -13,35 +12,32 @@ namespace Switchboard.Game
     public sealed class GameInstaller : MonoBehaviour
     {
         [SerializeField] private GameConfig config;
-        [SerializeField] private string levelScene = "Level";
         [SerializeField, Tooltip("0 picks a new seed every session.")] private int randomSeed;
         [SerializeField] private CordBridge cordBridge;
         [SerializeField] private GameLoopRunner loopRunner;
-        [SerializeField] private MoneyCounterView moneyCounter;
-        [SerializeField] private CallQueueView callQueue;
 
         public GameSession Session { get; private set; }
 
-        private IEnumerator Start()
+        private void Start()
         {
             if (config == null)
             {
                 Debug.LogError("GameInstaller needs a GameConfig.", this);
-                yield break;
+                return;
             }
 
-            Scene level = SceneManager.GetSceneByName(levelScene);
-            if (!level.isLoaded)
+            // The board, UI and composition root now share one standalone scene.
+            Scene level = gameObject.scene;
+            List<MoneyCounterView> counters = LevelScene.FindAll<MoneyCounterView>(level);
+            List<CallQueueView> queues = LevelScene.FindAll<CallQueueView>(level);
+            if (counters.Count != 1 || queues.Count != 1)
             {
-                AsyncOperation loading = SceneManager.LoadSceneAsync(levelScene, LoadSceneMode.Additive);
-                if (loading != null) yield return loading;
-                level = SceneManager.GetSceneByName(levelScene);
+                Debug.LogError($"Scene '{level.name}' needs exactly one MoneyCounterView and CallQueueView " +
+                    $"(found {counters.Count} and {queues.Count}).", this);
+                return;
             }
-            if (!level.isLoaded)
-            {
-                Debug.LogError($"GameInstaller could not load the scene '{levelScene}'. Is it in the build list?", this);
-                yield break;
-            }
+            MoneyCounterView moneyCounter = counters[0];
+            CallQueueView callQueue = queues[0];
 
             PeopleCatalog people = config.LoadPeople(BoardJacks(level));
             foreach (string error in people.Errors) Debug.LogError($"People file: {error}", config);
