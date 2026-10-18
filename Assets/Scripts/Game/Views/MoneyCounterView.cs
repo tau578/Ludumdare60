@@ -25,10 +25,16 @@ namespace Switchboard.Game
         private TMP_Text[] reels;
         private TMP_Text decimalPoint;
         private const int ReelCount = 6;
+        private const float InsufficientFundsDuration = .5f;
+        private float insufficientFundsTime;
+        private RectTransform shakeTarget;
+        private Vector3 shakeOffset;
+        private Color restingColor;
 
         /// <param name="headerSlot">The shop panel's header plaque to sit in; null keeps the prefab position.</param>
         public void Bind(Wallet source, RectTransform headerSlot, PenaltyService fines, UpgradeService shop)
         {
+            ResetInsufficientFunds();
             Unsubscribe();
             wallet = source;
             penalties = fines;
@@ -119,6 +125,7 @@ namespace Switchboard.Game
 
         private void OnDisable()
         {
+            ResetInsufficientFunds();
             Unsubscribe();
             if (incomeCoins != null) incomeCoins.Clear();
         }
@@ -135,6 +142,49 @@ namespace Switchboard.Game
             if (!isActiveAndEnabled || portrait == null || label == null) return;
             if (incomeCoins == null) incomeCoins = IncomeCoinsView.Create(transform);
             incomeCoins.Fly(portrait, label.rectTransform);
+        }
+
+        public void ShowInsufficientFunds()
+        {
+            if (!isActiveAndEnabled || label == null) return;
+            ResetInsufficientFunds();
+            shakeTarget = plate != null ? plate : label.rectTransform;
+            restingColor = label.color;
+            insufficientFundsTime = InsufficientFundsDuration;
+            SetBalanceColor(new Color32(178, 62, 62, 255));
+        }
+
+        private void TickInsufficientFunds()
+        {
+            if (insufficientFundsTime <= 0) return;
+            insufficientFundsTime = Mathf.Max(0, insufficientFundsTime - Time.unscaledDeltaTime);
+            float progress = 1 - insufficientFundsTime / InsufficientFundsDuration;
+            shakeOffset = Vector3.up * (Mathf.Sin(progress * Mathf.PI * 10) * (1 - progress) * 8f);
+            if (shakeTarget != null) shakeTarget.localPosition += shakeOffset;
+            if (insufficientFundsTime <= 0) ResetInsufficientFunds();
+        }
+
+        private void ResetInsufficientFunds()
+        {
+            if (shakeTarget == null) return;
+            RemoveShakeOffset();
+            SetBalanceColor(restingColor);
+            shakeTarget = null;
+            insufficientFundsTime = 0;
+        }
+
+        private void SetBalanceColor(Color color)
+        {
+            if (label != null) label.color = color;
+            if (reels != null)
+                foreach (var reel in reels) if (reel != null) reel.color = color;
+            if (decimalPoint != null) decimalPoint.color = color;
+        }
+
+        private void RemoveShakeOffset()
+        {
+            if (shakeTarget != null) shakeTarget.localPosition -= shakeOffset;
+            shakeOffset = Vector3.zero;
         }
 
         private void Unsubscribe()
@@ -158,7 +208,9 @@ namespace Switchboard.Game
 
         private void LateUpdate()
         {
+            RemoveShakeOffset();
             FollowSlot();
+            TickInsufficientFunds();
             if (incomeCoins != null) incomeCoins.Tick(Time.unscaledDeltaTime);
             RefreshBalance();
         }

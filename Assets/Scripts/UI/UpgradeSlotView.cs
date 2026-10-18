@@ -2,10 +2,11 @@ using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 namespace Switchboard.UI
 {
-    public sealed class UpgradeSlotView : MonoBehaviour
+    public sealed class UpgradeSlotView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
         [SerializeField] private Button button;
         [SerializeField] private Image background;
@@ -21,12 +22,23 @@ namespace Switchboard.UI
 
         public event Action Clicked;
         private Image emblem;
+        private ColorBlock defaultColors;
+        private bool pointerInside;
+        private bool canAfford;
+        private Material hoverMaterial;
+        private Color baseMaterialColor;
         private Sprite blankEmblem, cableEmblem, incomeEmblem, secretEmblem, neutralButton, darkButton;
 
         public void ConfigureArtwork(Image image, Sprite blank, Sprite cable, Sprite income, Sprite secret, Sprite neutral, Sprite dark)
         {
             emblem = image; blankEmblem = blank; cableEmblem = cable; incomeEmblem = income; secretEmblem = secret;
             neutralButton = neutral; darkButton = dark;
+            if (hoverMaterial == null)
+            {
+                hoverMaterial = new Material(background.material);
+                baseMaterialColor = hoverMaterial.GetColor("_Color");
+                background.material = hoverMaterial;
+            }
         }
 
         public void SetArtwork(bool cable, bool income, bool secret = false)
@@ -39,6 +51,7 @@ namespace Switchboard.UI
         {
             if (button != null) button.onClick.RemoveListener(OnClick);
             button = slotButton;
+            defaultColors = button.colors;
             background = slotBackground;
             placeholderIcon = icon;
             details = texts;
@@ -50,12 +63,17 @@ namespace Switchboard.UI
             button.onClick.AddListener(OnClick);
         }
 
-        private void Awake() { button.onClick.RemoveListener(OnClick); button.onClick.AddListener(OnClick); }
+        private void Awake() { defaultColors = button.colors; button.onClick.RemoveListener(OnClick); button.onClick.AddListener(OnClick); }
 
-        private void OnDestroy() => button.onClick.RemoveListener(OnClick);
+        private void OnDestroy()
+        {
+            button.onClick.RemoveListener(OnClick);
+            if (hoverMaterial != null) Destroy(hoverMaterial);
+        }
 
         public void Show(string titleText, string descriptionText, string priceText, bool affordable)
         {
+            canAfford = affordable && !string.IsNullOrEmpty(priceText);
             placeholderIcon.SetActive(false);
             details.gameObject.SetActive(true);
             title.text = titleText;
@@ -66,11 +84,19 @@ namespace Switchboard.UI
                 details.alpha = 1;
                 background.color = Color.white;
                 background.sprite = affordable ? neutralButton : darkButton;
+                var sprites = button.spriteState;
+                sprites.highlightedSprite = affordable ? neutralButton : darkButton;
+                sprites.selectedSprite = affordable ? neutralButton : darkButton;
+                button.spriteState = sprites;
                 button.interactable = !string.IsNullOrEmpty(priceText);
+                RefreshHover();
                 if (string.IsNullOrEmpty(priceText)) price.text = "MAX";
                 return;
             }
             details.alpha = affordable ? 1 : dimmedTextAlpha;
+            var colors = defaultColors;
+            if (!affordable) colors.highlightedColor = colors.selectedColor = colors.normalColor;
+            button.colors = colors;
             background.color = affordable ? Color.white : dimmedTint;
         }
 
@@ -98,6 +124,32 @@ namespace Switchboard.UI
         }
 
         public void SetHighlight(bool on) => highlight.SetActive(on);
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            pointerInside = true;
+            RefreshHover();
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            pointerInside = false;
+            RefreshHover();
+        }
+
+        private void OnDisable()
+        {
+            pointerInside = false;
+            RefreshHover();
+        }
+
+        private void RefreshHover()
+        {
+            if (hoverMaterial == null) return;
+            float brightness = pointerInside && canAfford ? 1.12f : 1f;
+            hoverMaterial.SetColor("_Color", new Color(baseMaterialColor.r * brightness,
+                baseMaterialColor.g * brightness, baseMaterialColor.b * brightness, baseMaterialColor.a));
+        }
 
         private void OnClick() => Clicked?.Invoke();
     }
