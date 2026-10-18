@@ -28,6 +28,14 @@ A step moves through these statuses: not started → building → verifying → 
 ## Log
 <!-- Agents append their reports below, newest last. The orchestrator adds verification and playtest notes under each report. -->
 
+### Level artwork: background and lamps (2026-10-18)
+- Requested directly by the lead: add `main_background_0` to a Canvas container, hide replaced placeholder visuals, add lamp sprite states, and save a prefab.
+- `BackgroundPanel.prefab` contains the background and the existing switchboard as a nested prefab. The Level scene uses the new prefab instance. Socket positions and all 36 socket identities are preserved.
+- Twelve row/column lamps use `bulb-01` (lit), `bulb-02` (unlit), and the matching glyph pairs. Hovering or occupying a socket lights its row and column. Shared rows/columns stay lit until the last relevant plug is removed. F retains a text label because the artwork only supplies A–E.
+- Disabled caller panel decoration, old row/column badges and their strips as instance overrides; original source prefabs remain available. Six caller slot anchors are retained; aligning them to the five painted portrait windows is a separate layout task.
+- Verified prefab reload and internal socket references, on/off artwork, hover, occupancy, multiple plugs and release, and raycast passthrough. Render previews: `Temp/Background-off.png` and `Temp/Background-on.png`.
+- Play Mode smoke check passed: picked up a real cable, inserted it into B3, observed B and 3 lit, then removed it and observed both unlit. All three cables and 36 sockets remain available. Exited Play Mode; temporary verification script removed.
+
 ### Step 1 prep (orchestrator, 2026-10-17)
 - **Decisions:** the lead confirmed D07 (hold). It is built in Step 2; Step 1 keeps the temporary immediate cut-off.
 - **Coordination:** the lead was asked to tell Sergei about `Game.unity`, which loads `Level.unity`, and about the public members we rely on.

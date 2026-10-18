@@ -6,6 +6,8 @@ Last updated 2026-10-18 · Plan: [Plan.md](Plan.md) · Progress: [Progress.md](P
 
 ## Implementation status
 
+Level art pass (2026-10-18, lead requested): `BackgroundPanel.prefab` groups `main_background_0` with the existing 6×6 switchboard. Its twelve lamps indicate hovered/occupied rows and columns using supplied on/off sprites. This is presentation only; call rules and socket addresses are unchanged. Six caller anchors remain despite the five windows painted into the new background; their layout migration remains pending.
+
 | Step | State | What exists |
 |---|---|---|
 | 1 | Done (`e6f44e5`) | One call at a time, through Incoming → Taken → Connected → Ended. See below. |
