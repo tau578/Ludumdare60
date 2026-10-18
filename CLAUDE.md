@@ -135,7 +135,8 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 - **Ongoing:** keep the names `CallerQueuePanel`, `UpgradeShopPanel` and `HeaderSlot`, and keep the extra fields in `PhoneBook.json`.
 - **His `PhoneBookBuilder`** points at a missing `Assets/Settings/PhoneBook.json`.
 - **A–Z tabs are hidden** (lead, 2026-10-18): `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab`; the code, objects and tests stay. His `Update Phone Book Tabs` menu rebuilds them active, so untick them again afterwards.
-- **Feedback for Sergei (Step 3 playtest):** a click on a button or card while holding a cord drops the cord; the lead would prefer it kept in hand. Not changed by us.
+- **Feedback for Sergei (Step 3 playtest):** a click on a button or card while holding a cord drops the cord; the lead would prefer it kept in hand. Since `2fc3810` his input keeps the cord on a call-card click; buttons and book rows still drop it.
+- **Talk to Sergei (merge `a173e75`):** his `2fc3810` changed our domain (`OperatorDesk`, `CallService`, tests) and Game layer. The lead adopted the rules as D45, but ask him to agree changes to our folders first next time. His `CableInputController` now references our `Switchboard.Game.CallCardView` (UI depending on Game); a small interface or tag on the card would keep the layers apart.
 - **Tell Sergei (Step 3):** his book has A–Z tabs now, built by the new `Tools/Switchboard/Update Phone Book Tabs` menu, which `CreatePrefab` also calls. The tabs for the spread on show are highlighted and nudged out (`PhoneBookTab.SetRest`). Our card click sound uses his `AudioChannelSource` (Sfx) unchanged.
 
 ## Open decisions (Design §10)

@@ -1,11 +1,12 @@
 using System;
+using System.Collections.Generic;
 
 namespace Switchboard.Domain
 {
     /// <summary>
-    /// The Notepad upgrade (D23): while it is owned, a tapped book entry notes that person's jack on the call in
-    /// hand, if they are its caller or the person wanted. Anyone else, or no call in hand, changes nothing.
-    /// Notes live on the call, so they survive a swap and go when the call ends.
+    /// The Notepad upgrade (D23): while it is owned, a tapped book entry notes that person's jack on every accepted
+    /// call still waiting to connect (Taken or Connecting) where they are the caller or the person wanted.
+    /// Ringing, connected, held and ended calls are never noted. Notes live on the call until it ends.
     /// </summary>
     public sealed class Notepad
     {
@@ -20,27 +21,44 @@ namespace Switchboard.Domain
             this.stats = stats ?? throw new ArgumentNullException(nameof(stats));
         }
 
-        /// <summary>Raised once for every new note, with the call it was written on.</summary>
+        /// <summary>Raised once for every call that got a new note.</summary>
         public event Action<CallId> Noted;
 
+        /// <summary>Returns true if at least one call got a new note.</summary>
         public bool Note(JackId jack)
         {
-            Call call = calls.InHand;
-            if (!stats.HasNotepad || call == null) return false;
+            if (!stats.HasNotepad) return false;
+            bool any = false;
+            IReadOnlyList<Call> live = calls.Live;
+            for (int i = 0; i < live.Count; i++)
+            {
+                Call call = live[i];
+                if (!IsWaitingToConnect(call.State)) continue;
+                if (!NoteOn(call, jack)) continue;
+                any = true;
+                Noted?.Invoke(call.Id);
+            }
+            return any;
+        }
+
+        private bool NoteOn(Call call, JackId jack)
+        {
+            bool changed = false;
             if (call.CallerNote == null && Is(call.Request.CallerPerson, jack))
             {
                 call.CallerNote = jack;
-                Noted?.Invoke(call.Id);
-                return true;
+                changed = true;
             }
             if (call.RecipientNote == null && Is(call.Request.Recipient, jack))
             {
                 call.RecipientNote = jack;
-                Noted?.Invoke(call.Id);
-                return true;
+                changed = true;
             }
-            return false;
+            return changed;
         }
+
+        private static bool IsWaitingToConnect(CallState state) =>
+            state == CallState.Taken || state == CallState.Connecting;
 
         private bool Is(IPerson person, JackId jack) => directory.TryGetJack(person, out JackId listed) && listed == jack;
     }

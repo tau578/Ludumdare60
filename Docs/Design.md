@@ -19,6 +19,7 @@ Level art pass (2026-10-18, lead requested): `BackgroundPanel.prefab` groups `ma
 | Scene merge | Done (2026-10-18) | One `Final.unity` built from prefabs (D38): our `Game.prefab` and `GameUI.prefab` next to Sergei's board; build list `MainMenu` (0), `Final` (1); `Game.unity` removed; `GameInstaller` finds the views by type in its own scene. |
 | 5a | Done (2026-10-18) | The designer's `Assets/Configs/Economy.json` (`upgrades` only) and `Docs/EconomyFile.md`. Domain `UpgradeService` (with `PurchaseCheck`), `StatSheet`, `ShopShelf`, `GoalProgress`, `Wallet.TrySpend`; the live income multiplier on fee and pay. `EconomyFileLoader` with plain-English checks, shown by `Validate Content`. Sergei's 4 shop buttons (coordinated, D44) carry `UpgradeSlotView` (title, description, price, savings fill, gold frame) and are 204 px wide; menu `Tools/Switchboard/Update Upgrade Shop Buttons`. Our `ShopView`, a neutral "-$X" spend popup and the "To be continued..." dialog (`GoalPanelView`). Dev panel "+ $100" and "Reset upgrades" (no refund). Accepted deviations: see 5.9 and 4.3. |
 | 5b | Done (2026-10-18) | `extra_wires` and `notepad` in `Economy.json` (D23, D40, D43). `StatSheet.Cords` (from `GameConfig.startingCords` = 3), `HasNotepad` and `Changed`; Domain `Notepad` (notes on the `Call`: `CallerNote`, `RecipientNote`). Coordinated changes to Sergei's code (D44): `CableInputController.AddCable(Color)` and `MaxCables` = 6, with tray re-spacing; `PhoneBookView.ContactTapped(name, socket)` and `ContactTapsEnabled`, with a transparent row tap area in `PhoneBook.prefab`. `CordBridge.EnsureCords` adds green, violet and ivory cords (`GameConfig.extraCordColors`); `NotepadBookLink` routes book taps; the bubble shows noted jacks. Accepted deviations: see 5.9. |
+| Upstream merge | Done (2026-10-18, `a173e75`) | Sergei's `2fc3810`: persistent wiring (D45) in `OperatorDesk`/`CallService` with `PersistentWiringTests`; "New order!" stamp and `StampExitAnimation`; bubble only on the last-clicked card; `CallAudio` and `BackgroundMusic`; board gold light; `CordBridge.Synchronize` and insertion anchors. His `CableInputController` keeps a held cord when a call card is clicked (it now references our `CallCardView`). Mia: new art, including `caller-04`/`caller-05` (slices fixed to 190×190, lead-approved). |
 
 What Step 1 built:
 - **Operator desk.** A right pair connects the call. A wrong pair ends it as "Wrong number!". Patching with no call in hand is refused. Pulling a plug cut the call off (replaced by hold in Step 2b).
@@ -39,8 +40,8 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 2. The player takes the call. The caller says who they are and who they want.
 3. The player looks both people up in the **directory book** to find their jacks.
 4. The player connects the two jacks with a **cord**.
-5. **Right connection:** the caller pays **per second** while connected, and the money counter rises live. When the call ends, the cord is freed.
-6. **Wrong connection:** the caller hangs up at once and pays nothing. Later they **call back** wanting the same person. The cord is freed at once.
+5. **Right connection:** the caller pays **per second** while connected, and the money counter rises live. When the call ends, the cord stays plugged until the player moves it (D45).
+6. **Wrong connection:** the caller hangs up at once and pays nothing. Later they **call back** wanting the same person. The cord stays plugged (D45).
 7. The player can **disconnect** a call at any moment by unplugging it. Payment stops at that moment.
 8. The player spends money on upgrades and saves for the mystery upgrade.
 
@@ -68,7 +69,7 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 - **Upgrades**, bought with money. Every upgrade is a one-time entry in the designer's `Assets/Configs/Economy.json` (D39, D40). Entries of the same type form a chain, bought in file order:
   - Extra income: sets the earnings multiplier (e.g. ×1.5, then ×2, then ×3).
   - Extra wires: sets the number of cords [5b].
-  - Notepad: tapping a book entry notes its jack on the call in hand (D23) [5b].
+  - Notepad: tapping a book entry notes its jack on every accepted call that person is part of (D23, D46) [5b].
   - Extra clients: sets the board size, so more jacks and more people [7].
   - The secret (mystery) upgrade: one entry, the most expensive, with an effect still to be decided (D15).
 
@@ -107,6 +108,7 @@ A casual simulator. The player is a telephone switchboard operator in the era of
 - `CableController`:
   - `Phase`, `FirstSocket`, `SecondSocket`, `IsInTray`, `CableColor`
   - `TryRemove(SocketView)`, `PlayBlockedFeedback()`
+  - `InsertionRevision`, `LastInsertionAnchor`, `LastInsertionWasManual` (Sergei, `2fc3810`; read by `CordBridge` for the wrong-number anchor, D45)
 - `CableInputController` (5b, coordinated): `AddCable(Color)`, `MaxCables`.
 - `PhoneBookView` (5b, coordinated): `ContactTapped(name, socket)`, `ContactTapsEnabled`.
 - `CablePhase` values: `Ready` (in the tray), `Held` (picked up, nothing plugged in), `OneEndConnected`, `Connected`.
@@ -211,11 +213,11 @@ The step that introduces each part is shown in brackets.
   - `Call`: id, request, state, end reason, seconds left, cents earned, bound cord.
   - `CallRequest`: an immutable record of caller, recipient, type, cents per second, duration, and attempt number.
   - `CallState`, `CallEndReason`, `CallService`.
-- **`CallService`** owns the live calls in arrival order, the one call in hand, and the timers. It knows nothing about cords, money or UI.
+- **`CallService`** owns the live calls in arrival order and the timers. It knows nothing about cords, money or UI. Since D45, several calls can be accepted (Taken or Connecting) at once; `InHand` is only the most recently accepted one, kept for compatibility and never used to judge circuits.
 - **Events:** `CallAdded`, `CallStateChanged(call, from, to)`, `CallEnded(call, reason)`.
 - **Implementation:** an enum plus guarded methods (`Take`, `BeginConnecting`, `CancelConnecting`, `Connect`, `Hold`, `Resume`, `End(reason)`). Illegal transitions return `false`, and a table-driven test covers the whole matrix.
-  - `BeginConnecting` and `CancelConnecting` act only on the call in hand.
-  - `OperatorDesk` drives them from the half-patched cords it tracks: the call in hand is Connecting exactly while some cord has one plug in.
+  - `OperatorDesk` drives `BeginConnecting` and `CancelConnecting` for every accepted call: it is Connecting exactly while a free half-patched cord has its one plug in that call's caller's or recipient's jack (D45).
+  - The diagram below predates D45: the "swap" arrow from Taken back to Incoming no longer exists. Taking a card accepts it, and the other accepted calls stay as they are.
 - **Enums:**
   - `CallState { Incoming = 0, Taken = 1, Connecting = 2, Connected = 3, OnHold = 4, Ended = 5 }`
   - `CallEndReason { None = 0, Finished = 1, WrongConnection = 2, DisconnectedEarly = 3, Missed = 4, Cleared = 5 }`
@@ -341,12 +343,13 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
 `Wallet.ApplyFine` returns the amount actually taken (the balance floors at 0). Then `FineApplied(call, reason, requested, taken)` is raised for the popup.
 
 ### 5.6 Operator desk, switchboard port and connection rule [1]
-- **`OperatorDesk`** handles the player's verb `TryTake(callId)` and the cord observations reported by `CordBridge`. It is the only class that coordinates calls with cords:
-  - It moves the call in hand between Taken and Connecting.
-  - It judges closed circuits with `ConnectionRule`.
-  - It binds cords to calls.
-  - It returns cords when calls end.
-  - It refuses circuits closed while no call is in hand.
+- **`OperatorDesk`** handles the player's verb `TryTake(callId)` and the cord observations reported by `CordBridge`. It is the only class that coordinates calls with cords. Since D45 (persistent wiring, Sergei's `2fc3810`, adopted by the lead 2026-10-18):
+  - It remembers every closed circuit on the board, whether or not a call uses it.
+  - A closed circuit connects **any** accepted call it is correct for, whichever card the player last opened.
+  - Taking a card connects it at once if a matching circuit is already plugged in.
+  - A wrong number is judged only on a manual insertion: when the second plug goes in against an end that was already in place (the "anchor", from `CableController.LastInsertionAnchor`), and that anchor is a jack of an accepted call. Any other wiring is free.
+  - Cords are never sent back to the tray when a call ends; a wrong-number circuit also stays plugged. Only the dev panel's "Clear calls" returns all cords (`ReturnAllCords`).
+  - Hold and resume (D07) are unchanged.
 - **`ConnectionRule`.** The default is that the two jacks equal the caller's and the recipient's jacks, in either order. A caller type may supply another rule later, for example long distance routed through a trunk jack.
 - **`ISwitchboard`** (the port) has `CordCount`, `ReturnToTray(CordId)` and `Refuse(CordId)`. `CordBridge` implements it in the game, and a fake implements it in tests.
 
@@ -391,7 +394,7 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
   | `extra_income` | `incomeMultiplier` | **Sets** the earnings multiplier. | 5a |
   | `secret` | none | The goal. Exactly one. Its effect is code (D15); for now it shows "to be continued". | 5a |
   | `extra_wires` | `wires` | **Sets** the total number of cords. | 5b |
-  | `notepad` | none | While owned, a tapped book entry notes its jack on the call in hand (D23). | 5b |
+  | `notepad` | none | While owned, a tapped book entry notes its jack on every accepted call that person is part of (D23, D46). | 5b |
   | `extra_clients` | `boardSize {cols, rows}`, `clientSlots` | **Sets** the open part of the board and the number of caller slots (D42). | 7 |
 
 - **Chains.** Entries of the same type form a chain in file order. Only the next unbought entry of a chain can be bought; there's no skipping. Values in a chain must grow.
@@ -571,7 +574,7 @@ Statuses:
 |---|---|---|---|
 | D01 | Integrate with the cord code through `CordBridge`, with zero edits to team files. Our systems live in `Game.prefab` in the shared `Final.unity` (D38; until then, `Game.unity` loaded `Level.unity` additively). | default | 1 |
 | D02 | Assemblies as in 4.1: Domain and Content are asmdefs; the Game layer is in Assembly-CSharp. | default | 1 |
-| D03 | One call in hand at a time. Taking another card swaps; the old one goes back to the queue with its timers running. | default | 2 |
+| D03 | One call in hand at a time. Taking another card swaps; the old one goes back to the queue with its timers running. **Superseded by D45.** | superseded | 2 |
 | D04 | A circuit closed with no call in hand bounces back with the blocked sound. | default | 1 |
 | D05 | Plug order doesn't matter. | default | 1 |
 | D06 | A wrong connection ends the call at once and the cord bounces back. The callback comes after the type's delay. | decided (spec) | 1/2 |
@@ -591,7 +594,7 @@ Statuses:
 | D20 | The book and the shop never pause the game. | default | 3 |
 | D21 | Board growth uses pre-laid-out sections with cover plates. **Superseded by D42** (dimmed closed jacks; plates only if Mia draws them later). | superseded | 7 |
 | D22 | Jack assignments are fixed in data. | default | 1 |
-| D23 | Book QoL: tapping an entry in the phone book notes its jack on the call in hand (e.g. "Ada Moss (C3) / wants Basil Thorne (A5)"). Not built in from the start: it is sold in the shop as a cheap one-entry upgrade, `type` `notepad` in `Economy.json` (D40). The designer can drop it by deleting the entry. Sergei's book gets a tapped-entry event as a coordinated change by our agent (D44). | decided (lead, 2026-10-18) | 5b |
+| D23 | Book QoL: tapping an entry in the phone book notes its jack on the call in hand (since D46: on every accepted call that person is part of) (e.g. "Ada Moss (C3) / wants Basil Thorne (A5)"). Not built in from the start: it is sold in the shop as a cheap one-entry upgrade, `type` `notepad` in `Economy.json` (D40). The designer can drop it by deleting the entry. Sergei's book gets a tapped-entry event as a coordinated change by our agent (D44). | decided (lead, 2026-10-18) | 5b |
 | D24 | Portrait on phones shows a "rotate your device" screen. | default | 9 |
 | D25 | Save progression only; no in-flight calls and no offline earnings. | default | 6 |
 | D26 | Hosting target (itch.io, own site, …). It affects storage and compression settings. | open | 6 |
@@ -612,6 +615,8 @@ Statuses:
 | D42 | Board growth [7]. The game starts on a 3×3 part of the board (rows A–C, columns 1–3). Exactly the people whose jack is on the open part are in the game, and the book shows only them, so the designer picks the starting group by placing people on those jacks. `extra_clients` sets the open board size and the caller slots. Closed jacks are dimmed and can't be clicked (cover plates only if Mia draws them). The emergency services join when the board opens over their jacks, so emergencies come later in a session. Needs coordinated changes to Sergei's board and book. Supersedes D21. | decided (lead, 2026-10-18) | 7 |
 | D43 | Placeholder upgrade prices (until the designer's file; D27): income ×1.5 for $8, ×2.0 for $20, ×3.0 for $50; the secret $250. From 5b: wires 4, 5 and 6 for $5, $8 and $13 (start 3); Notepad $3. | default | 5a |
 | D44 | Sergei's missing hooks are built by our agents as coordinated changes (lead, 2026-10-18), each brief listing the approved files: the shop button texts and savings fill [5a]; adding cords at runtime to his cord input and tray [5b]; a tapped-entry event in his phone book [5b]. | decided (lead, 2026-10-18) | 5a |
+| D45 | Persistent wiring (Sergei's `2fc3810`, adopted by the lead 2026-10-18). Several calls can be accepted at once; taking a card no longer swaps. Cords stay plugged when calls end. A closed circuit connects any accepted call it is correct for; taking a card connects it at once if its circuit is already plugged. A wrong number needs a manual insertion against an anchored end that belongs to an accepted call. The bubble shows only on the card last clicked. Supersedes D03; see 5.1 and 5.6. | decided (lead, 2026-10-18) | 5b merge |
+| D46 | Notepad under D45: a tapped book entry notes that person's jack on every accepted call still waiting to connect (Taken or Connecting) where they are the caller or the recipient, including duplicates. Ringing, connected, on-hold and ended calls are never noted. | decided (lead, 2026-10-18) | 5b fix |
 | D29 | Merge into one scene. The `Game.unity` + `Level.unity` split is temporary; it keeps Sergei's actively edited scene conflict-free. Once his cord work settles, and with his agreement, move the `Game` object and the `GameUI` prefab into one scene, then remove `Game.unity` and the additive loading. Do it at the latest before the first Web build. **Done as D38 (2026-10-18).** | done | 6 |
 
 ## 11. Glossary

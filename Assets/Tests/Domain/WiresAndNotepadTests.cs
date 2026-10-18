@@ -116,19 +116,25 @@ namespace Switchboard.Domain.Tests
             session.Notepad.Noted += id => noted.Add(id);
         }
 
-        private Call TakeAdaWantsBasil()
+        private Call Take(CallRequest request)
         {
-            Call call = session.Calls.Add(world.AdaWantsBasil());
+            Call call = session.Calls.Add(request);
             session.Desk.TryTake(call.Id);
             return call;
         }
 
+        private Call TakeAdaWantsBasil() => Take(world.AdaWantsBasil());
+
+        private CallRequest ClaraWantsAda() => new CallRequest(world.Callers[2], world.Ada, 5, 20);
+
         [Test]
         public void DoesNothingWithoutTheUpgrade()
         {
-            Call call = TakeAdaWantsBasil();
+            Call first = TakeAdaWantsBasil();
+            Call second = Take(ClaraWantsAda());
             Assert.That(session.Notepad.Note(TestWorld.A1), Is.False);
-            Assert.That(call.CallerNote, Is.Null);
+            Assert.That(first.CallerNote, Is.Null);
+            Assert.That(second.RecipientNote, Is.Null);
             Assert.That(noted, Is.Empty);
         }
 
@@ -151,7 +157,7 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void IgnoresAJackNotOnTheCallInHand()
+        public void IgnoresAJackNotOnAnyAcceptedCall()
         {
             session.Upgrades.TryBuy("notepad");
             Call call = TakeAdaWantsBasil();
@@ -163,32 +169,99 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void DoesNothingWithNoCallInHand()
+        public void TwoAcceptedCallsSharingAPersonBothGetTheNote()
         {
             session.Upgrades.TryBuy("notepad");
-            Call call = session.Calls.Add(world.AdaWantsBasil());
+            Call first = TakeAdaWantsBasil();
+            Call second = Take(ClaraWantsAda());
+
+            Assert.That(session.Notepad.Note(TestWorld.A1), Is.True);
+            Assert.That(first.CallerNote, Is.EqualTo(TestWorld.A1));
+            Assert.That(second.RecipientNote, Is.EqualTo(TestWorld.A1));
+            Assert.That(first.RecipientNote, Is.Null);
+            Assert.That(second.CallerNote, Is.Null);
+            Assert.That(noted, Is.EqualTo(new[] { first.Id, second.Id }), "Noted is raised once per call");
+        }
+
+        [Test]
+        public void TappingTheSamePersonTwiceAddsNothingNew()
+        {
+            session.Upgrades.TryBuy("notepad");
+            TakeAdaWantsBasil();
+            Take(ClaraWantsAda());
+            session.Notepad.Note(TestWorld.A1);
+
             Assert.That(session.Notepad.Note(TestWorld.A1), Is.False);
-            Assert.That(call.CallerNote, Is.Null);
+            Assert.That(noted.Count, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void ARingingCallGetsNoNote()
+        {
+            session.Upgrades.TryBuy("notepad");
+            Call ringing = session.Calls.Add(world.AdaWantsBasil());
+            Assert.That(session.Notepad.Note(TestWorld.A1), Is.False, "nothing accepted yet");
+
+            Call accepted = Take(ClaraWantsAda());
+            Assert.That(session.Notepad.Note(TestWorld.A1), Is.True);
+            Assert.That(accepted.RecipientNote, Is.EqualTo(TestWorld.A1));
+            Assert.That(ringing.State, Is.EqualTo(CallState.Incoming));
+            Assert.That(ringing.CallerNote, Is.Null);
+            Assert.That(noted, Is.EqualTo(new[] { accepted.Id }));
+        }
+
+        [Test]
+        public void AConnectingCallGetsNotes()
+        {
+            session.Upgrades.TryBuy("notepad");
+            Call call = TakeAdaWantsBasil();
+            session.Desk.OnPlugInserted(new CordId(0), TestWorld.A1);
+            Assert.That(call.State, Is.EqualTo(CallState.Connecting));
+
+            Assert.That(session.Notepad.Note(TestWorld.B2), Is.True);
+            Assert.That(call.RecipientNote, Is.EqualTo(TestWorld.B2));
+        }
+
+        [Test]
+        public void ConnectedAndOnHoldCallsGetNoNote()
+        {
+            session.Upgrades.TryBuy("notepad");
+            Call connected = TakeAdaWantsBasil();
+            session.Desk.OnCircuitClosed(new CordId(0), TestWorld.A1, TestWorld.B2);
+            Call onHold = Take(ClaraWantsAda());
+            session.Desk.OnCircuitClosed(new CordId(1), TestWorld.C3, TestWorld.A1);
+            session.Desk.OnCircuitOpened(new CordId(1), TestWorld.C3, TestWorld.A1);
+            Assert.That(connected.State, Is.EqualTo(CallState.Connected));
+            Assert.That(onHold.State, Is.EqualTo(CallState.OnHold));
+
+            Assert.That(session.Notepad.Note(TestWorld.A1), Is.False);
+            Assert.That(session.Notepad.Note(TestWorld.B2), Is.False);
+            Assert.That(session.Notepad.Note(TestWorld.C3), Is.False);
+            Assert.That(connected.CallerNote, Is.Null);
+            Assert.That(connected.RecipientNote, Is.Null);
+            Assert.That(onHold.CallerNote, Is.Null);
+            Assert.That(onHold.RecipientNote, Is.Null);
             Assert.That(noted, Is.Empty);
         }
 
         [Test]
-        public void NotesStayOnTheirCallAfterASwapAndDoNotLeak()
+        public void NotesStayWhenAnotherCardIsAccepted()
         {
             session.Upgrades.TryBuy("notepad");
             Call first = TakeAdaWantsBasil();
             session.Notepad.Note(TestWorld.A1);
-            Call second = session.Calls.Add(new CallRequest(world.Callers[2], world.Ada, 5, 20));
-            session.Desk.TryTake(second.Id);
-            Assert.That(first.State, Is.EqualTo(CallState.Incoming));
-            Assert.That(second.CallerNote, Is.Null, "a note doesn't leak to another call");
-            Assert.That(session.Notepad.Note(TestWorld.A1), Is.True, "Ada is the person wanted on the second call");
-            Assert.That(second.RecipientNote, Is.EqualTo(TestWorld.A1));
+            session.Notepad.Note(TestWorld.B2);
 
-            session.Desk.TryTake(first.Id);
+            Call second = Take(new CallRequest(world.Callers[2], world.Basil, 5, 20));
+            Assert.That(first.State, Is.EqualTo(CallState.Taken), "accepting another card leaves the first accepted");
             Assert.That(first.CallerNote, Is.EqualTo(TestWorld.A1));
-            Assert.That(first.RecipientNote, Is.Null);
-            Assert.That(second.CallerNote, Is.Null);
+            Assert.That(first.RecipientNote, Is.EqualTo(TestWorld.B2));
+            Assert.That(second.CallerNote, Is.Null, "a note doesn't leak to a call accepted later");
+            Assert.That(second.RecipientNote, Is.Null);
+
+            Assert.That(session.Notepad.Note(TestWorld.B2), Is.True, "Basil is wanted on the second call too");
+            Assert.That(second.RecipientNote, Is.EqualTo(TestWorld.B2));
+            Assert.That(noted, Is.EqualTo(new[] { first.Id, first.Id, second.Id }));
         }
 
         [Test]

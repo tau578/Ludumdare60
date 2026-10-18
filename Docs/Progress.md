@@ -11,7 +11,7 @@
 | 4. Emergencies and fines | done | ✅ 2026-10-18 (26 min) | ✅ 255/255 tests, scope clean | ✅ | 14fd59c |
 | Scene merge: `Final` (D38) | done | ✅ 2026-10-18 (11 min) | ✅ 255/255 tests, scope clean | ✅ | 3002ea8 |
 | 5a. Economy file, shop, income, secret | done | ✅ 2026-10-18 (23 min) | ✅ 304/304 tests, scope clean | ✅ | e115c59 |
-| 5b. Extra wires and Notepad | done | ✅ 2026-10-18 (22 min) | ✅ 333/333 tests, scope clean | ✅ | |
+| 5b. Extra wires and Notepad | done | ✅ 2026-10-18 (22 min) | ✅ 333/333 tests, scope clean | ✅ | 667adda |
 | 5c. Calls and pacing into Economy.json | not started | | | | |
 | 6. Saves, Boot, Web build | not started | | | | |
 | 7. Board growth and pacing | not started | | | | |
@@ -1602,3 +1602,88 @@ Follow-ups:
 
 #### Step 5b playtest (lead, 2026-10-18)
 - All checks passed ("all good"). The lead asked to commit.
+
+### Step 5b fix report: 2026-10-18
+Result: done
+
+Playable now: after the team merge (a173e75), the Notepad follows the new "accept many calls" rules. A tapped book name notes that person's jack on every accepted call still waiting to connect (Taken or Connecting) where they are the caller or the person wanted. Each card's bubble shows its own notes when it is clicked. Callers 04 and 05 have their portraits again.
+
+How to test:
+1. Play `Final.unity`. F1, then "+ $10" a few times; buy the Notepad.
+2. Accept two cards, ideally two that share a person. Open the book and tap that person: both calls get the jack. Tap the other names on each call too.
+3. Click each accepted card. Each bubble shows its own jacks, e.g. "Doris Cobbold (D1) / wants / Rose Ellery (A4)", and nothing needs tapping again.
+4. Tap the name of someone on a ringing (not yet accepted) card, or on a connected or held call: nothing changes, and the book stays open.
+5. Buy Extra cord, connect a call with the new green cord: it pays, and the cord stays plugged after the call ends.
+
+Created: none.
+
+Changed:
+- `Assets/Scripts/Domain/Upgrades/Notepad.cs`:
+  - `Note(jack)` walks `CallService.Live` (on a tap, so no per-tick work) and notes the jack on every call in `Taken` or `Connecting` whose caller or recipient is listed at that jack.
+  - It no longer uses `CallService.InHand`.
+  - It returns true if at least one call got a new note, and raises `Noted(CallId)` once per call that got one. A person who is both caller and recipient on the same call is impossible, but would still raise once.
+  - Ringing, connected, on-hold and ended calls are never noted. Without the Notepad, or with no matching accepted call, nothing happens.
+- `Assets/Tests/Domain/WiresAndNotepadTests.cs` (`NotepadTests`):
+  - The swap test is gone.
+  - Two tests are renamed for the new rule: `IgnoresAJackNotOnAnyAcceptedCall`, and `DoesNothingWithoutTheUpgrade`, which now has two accepted calls.
+  - New: `TwoAcceptedCallsSharingAPersonBothGetTheNote` (Noted once per call), `TappingTheSamePersonTwiceAddsNothingNew`, `ARingingCallGetsNoNote` (it replaces "no call in hand"), `AConnectingCallGetsNotes`, `ConnectedAndOnHoldCallsGetNoNote` and `NotesStayWhenAnotherCardIsAccepted` (no leak to the later call; a shared person then notes both).
+  - Kept: the caller and recipient noted once each, a callback starts with no notes, an emergency's service recipient, and a reset turning it off.
+- **Mia's folder (the one approved coordinated change):** `Assets/Sprites/callers/caller-04.png.meta` and `caller-05.png.meta`. The slice rect height is now 190 instead of 191; the diff is one line in each. Sprite names (`caller-04_0`, `caller-05_0`), `spriteID` and `internalID` are unchanged. Both were force-reimported and each loads its sprite again. `CallerPortraitSliceCheck` logged nothing.
+
+Scene and prefab changes: none. `Final.unity`, `GameUI.prefab` and `Game.prefab` didn't need changes. The merged `CallCardView` works as it is: bubbles are built from `InHandText()` when a card's details turn visible, so notes written while another card's bubble is open show when that card is clicked. `ShowNotes()` updates an open bubble in place.
+
+Tests: 361/361 EditMode (357 after the merge, with 5 failing). All 5 now pass:
+- 4 from the portrait fix: `RealContentHasNoProblems`, `GameConfigReferencesTheRealFile`, `RealFileHasThirtyThreePeopleAndThreeServicesOnEveryJack` and `CallersComeFromTheWholeBoardAndNobodyIsInTwoCalls`.
+- The swap test was replaced.
+- Count: 2 removed (the swap test and `DoesNothingWithNoCallInHand`), 6 added. `NotepadTests` went from 8 to 12.
+
+Console: clean. The only messages during the work were:
+- the known MCP WebSocket line after a recompile
+- two URP "Ignoring depth surface load/store action as it is memoryless" lines in Play Mode (engine)
+
+Screenshots (`Temp/Captures/`):
+- `step-05b-fix-notepad.png`: book open; card 1's bubble reads "Doris Cobbold (D1) / wants / Rose Ellery (A4)".
+- `step-05b-fix-notepad-card2.png`: the same moment after clicking card 2; its bubble reads "Otis Bramble (F3) / wants / Doris Cobbold (D1)".
+- `step-05b-fix-cords.png`: the green 4th cord still plugged in D1–A4 after its call finished; 3 cords in the tray; Notepad slot at "+".
+
+Checked in Play Mode (stepped frames; clicks with EventSystem raycasts inside `Canvas.willRenderCanvases`):
+- **Setup:** bought `notepad` and `wires_1` (4 cords, row taps on). Added three calls with people on the open spread: Doris (D1) wants Rose (A4); Otis (F3) wants Doris; and a third, Stanley (B5) wants Doris, left ringing.
+- **Accepting:** clicked cards 1 and 2. The top hit was each card's `Portrait`, and both calls went to Taken.
+- **Tapping rows:** the top hits were the rows themselves.
+  - Doris noted D1 on both accepted calls: caller on call 1, recipient on call 2.
+  - Rose noted A4 on call 1, and Otis noted F3 on call 2.
+  - Ivy (C6, on no call) changed nothing.
+  - The ringing call 3 got no note, although Doris is on it.
+  - The book stayed open throughout.
+- **Bubbles:** clicking card 1, then card 2, showed each one's own jacks, fully typed: 41 of 41 and 42 of 42 characters. Only the clicked card shows a bubble.
+- **Cords:** picked up `Cable_04` from the tray with `ProcessPointer` and patched D1, then A4. The call connected on cord id 3 and paid its 50¢ fee. At timeScale 5 (reset to 1 afterwards) it finished: "Finished", 20¢ earned. `Cable_04` stayed Connected in D1/A4 afterwards, as the new rules want.
+- **Editor left clean:** not in Play Mode, `Final.unity` active and not dirty, `timeScale` 1, Game view 1920×1080, SessionState keys erased, no callbacks left, console cleared.
+- One leftover existed only for that Play session: a test subscription to `CallEnded`. It went when Play Mode stopped.
+
+Format-only re-saves: none. `TimeManager.asset` and `SampleScene.unity` are untouched, so nothing was discarded. Sergei's files: none changed. Mia's: only the two `.meta` files above.
+
+Deviations from Design/Plan: none from the lead's new Notepad rule. The 5b brief's "call in hand" wording (Plan, Design 5.9) is now out of date; the orchestrator is updating those docs.
+
+Follow-ups:
+- **Tell Mia:** `caller-04` and `caller-05` were re-exported at 190×190 while their slices stayed 190×191. We set the slice height to 190. Next time, re-slice in the Sprite Editor, or keep the image size.
+- **A person in two calls:** the spawner normally avoids putting one person in two live calls ("nobody is in two calls"), so a shared person mostly happens through callbacks or emergencies. The Notepad handles it either way.
+- **Stale hidden bubble text:** a pooled card that has never shown its bubble keeps an old label text while hidden (seen on a ringing card). It is never visible, because `Refresh` rewrites the text when the bubble opens. Cosmetic only; no action needed.
+
+#### Upstream merge and Step 5b fix verification (orchestrator, 2026-10-18)
+- **Merge `a173e75`:** brought in 7 upstream commits.
+  - Mia's art, and Sergei's `2fc3810` "added sfx, edit view, edit game balance".
+  - The 2 text conflicts (`GameInstaller.cs`, `CallQueueView.cs`) were one Bind argument each from both sides; both were kept.
+  - Unity asked to reload `Final.unity` (the lead clicked Reload).
+  - The merge compiled. EditMode was 352/357: 4 portrait failures and our Notepad swap test.
+- **Lead decisions:**
+  - Sergei's persistent wiring is adopted as the design (D45, replacing D03).
+  - The Notepad notes on every accepted call that person is part of, including duplicates (D46).
+  - Fixing the two portrait slices in Mia's folder is approved as a one-off.
+- **Portraits:** Mia's new `caller-04`/`caller-05` are 190×190, but their slices were 190×191, so Unity dropped both sprites. The fix pass set the height to 190 (one line per `.meta`; the ids are unchanged).
+- **Verification:**
+  - An independent EditMode run passed 361/361, and the console is clean.
+  - `git status`: only `Notepad.cs`, `WiresAndNotepadTests.cs`, the two `.meta` files and the docs changed.
+  - `Notepad.Note` loops over `Calls.Live` on a tap only and notes Taken/Connecting calls.
+  - `step-05b-fix-notepad.png` shows "Doris Cobbold (D1) / wants / Rose Ellery (A4)" with two accepted cards and two "New order!" cards.
+- **Docs:** Design (D45, D46, core loop, 5.1, 5.6, 5.9, §3, status table), CLAUDE.md (notes for Sergei), Plan §8 (tell Mia).
+

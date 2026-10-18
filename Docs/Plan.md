@@ -161,6 +161,7 @@ Follow-ups: <ideas, debts, questions>
 | Before Step 6 | Touch input in the cord code: use `Pointer.current` instead of `Mouse.current` in `CableInputController.Update`, and hide the hand cursor on touch. | Sergei |
 | Done (2026-10-18, D38) | One `Final.unity` from prefabs. Tell Sergei: `Level.unity` is now `Final.unity` (same GUID); his `LevelBackgroundBuilder` and `GamePresentationBuilder` menus still name `Assets/Scenes/Level.unity`; the rule is "scene shared, prefabs owned" (announce root-level changes); suggestion: make `SwitchboardCanvas` and `EventSystem` prefabs. | Sergei |
 | Done in Step 1c (lead approved) | The upgrade panel's top header is now a 96 px `HeaderSlot` plaque holding our money counter. Sergei keeps the names `UpgradeShopPanel` and `HeaderSlot`. | Sergei |
+| After the merge (2026-10-18) | `caller-04` and `caller-05` were re-exported at 190×190 while their slices stayed 191 tall, so Unity dropped them. We set the slices to 190 (lead-approved). Next time, re-slice in the Sprite Editor after resizing. | Mia |
 | Before Step 8 | Sound effects (ring, alarm, coins, paid, fine, hang-up): find them or generate them. | Mia, team |
 
 ## 9. Steps
@@ -897,7 +898,7 @@ Steps 1–5b are fully specified. Steps 5c–10 are outlines. The orchestrator t
 - **`wires` sets the total** (D40). Values in the chain must grow, be above `startingCords`, and be at most 6, which is all the tray holds.
 - **New cords are added while the game runs** by copying an existing cord and its tray slot. `Final.unity` and `CableTray.prefab` don't change.
 - **The three new cord colours** are presentation, so they live in our `GameConfig` (`extraCordColors`) and are passed to Sergei's `AddCable`. Use green, violet and ivory, clearly different from his red, blue and yellow and from the emergency red. Check them in a screenshot.
-- **Notepad scope** (lead, 2026-10-18):
+- **Notepad scope** (lead, 2026-10-18; **replaced after the merge by D46**: a tap notes the jack on every accepted call still waiting to connect that the person is part of, including duplicates):
   - It notes only the caller or the person wanted on the **call in hand**.
   - A tap on anyone else, or with no call in hand, does nothing: no message, no sound, and the book stays open.
   - Notes belong to the call. They stay if the player swaps to another card and back, and go when the call ends.
