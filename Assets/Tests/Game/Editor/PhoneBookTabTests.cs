@@ -1,4 +1,5 @@
 using System.Text;
+using System.Linq;
 using NUnit.Framework;
 using Switchboard.UI;
 using UnityEngine;
@@ -26,7 +27,12 @@ namespace Switchboard.Game.Tests
             for (int i = 0; i < names.Length; i++)
                 json.Append(i > 0 ? "," : "").Append($"{{ \"name\": \"{names[i]}\", \"socket\": \"A{i + 1}\" }}");
             json.Append("] }");
-            file = new TextAsset(json.ToString());
+            return BookFrom(json.ToString());
+        }
+
+        private PhoneBookView BookFrom(string json)
+        {
+            file = new TextAsset(json);
             root = new GameObject("PhoneBook", typeof(RectTransform));
             var view = root.AddComponent<PhoneBookView>();
             view.ConfigureDirectory(file, null, null, null, null);
@@ -49,6 +55,40 @@ namespace Switchboard.Game.Tests
             int at = 0;
             foreach (var part in parts) { part.CopyTo(all, at); at += part.Length; }
             return all;
+        }
+
+        private const string MixedFile = @"{ 'contactsPerPage': 6, 'contacts': [
+                { 'name': 'Police', 'socket': 'B1', 'tags': ['emergency-service'] },
+                { 'name': 'Fire Brigade', 'socket': 'F1', 'tags': ['emergency-service'] },
+                { 'name': ' Abbott, Zoe ', 'socket': 'a1' },
+                { 'name': 'Brown, ada', 'socket': 'E1' },
+                { 'name': 'Moss, Ada', 'socket': 'C1' }
+            ] }";
+
+        // D50: the book is a real directory, "Surname, First" in the file's surname order, services first.
+        [Test]
+        public void ParseKeepsTheFileNamesOrderAndSockets()
+        {
+            var config = PhoneBookConfig.Parse(MixedFile.Replace('\'', '"'));
+            Assert.That(config.contacts.Select(c => c.name), Is.EqualTo(new[]
+                { "Police", "Fire Brigade", "Abbott, Zoe", "Brown, ada", "Moss, Ada" }));
+            Assert.That(config.contacts.Select(c => c.socket), Is.EqualTo(new[]
+                { "B1", "F1", "A1", "E1", "C1" }));
+            Assert.That(config.contacts.Select(c => c.IsEmergencyService), Is.EqualTo(new[]
+                { true, true, false, false, false }));
+        }
+
+        [Test]
+        public void ServicesUseTheirWholeNameAndPeopleTheirSurname()
+        {
+            var view = BookFrom(MixedFile.Replace('\'', '"'));
+
+            Assert.That(view.HasLetter('P'), Is.True, "Police");
+            Assert.That(view.HasLetter('F'), Is.True, "Fire Brigade");
+            Assert.That(view.HasLetter('A'), Is.True, "Abbott");
+            Assert.That(view.HasLetter('B'), Is.True, "Brown");
+            Assert.That(view.HasLetter('M'), Is.True, "Moss");
+            Assert.That(view.HasLetter('Z'), Is.False, "Zoe is a given name");
         }
 
         [Test]

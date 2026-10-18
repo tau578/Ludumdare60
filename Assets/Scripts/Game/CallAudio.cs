@@ -11,22 +11,20 @@ namespace Switchboard.Game
         [SerializeField] private AudioClip incoming;
         [SerializeField] private AudioClip connected;
         [SerializeField] private AudioClip cashRegister;
+        [SerializeField, Range(0f, 2f)] private float cashRegisterGain = 2f;
         [SerializeField] private AudioClip hold;
         [SerializeField] private AudioClip finished;
         [SerializeField] private AudioClip wrongConnection;
         private CallService calls;
-        private EarningsService earnings;
         private float nextFeedback;
 
-        public void Bind(CallService service, EarningsService earningsService = null)
+        public void Bind(CallService service)
         {
             Unbind();
             calls = service;
             calls.CallAdded += OnAdded;
             calls.CallStateChanged += OnChanged;
             calls.CallEnded += OnEnded;
-            earnings = earningsService;
-            if (earnings != null) earnings.ConnectionFeePaid += OnFeePaid;
         }
 
         private void OnAdded(CallAddedArgs e)
@@ -38,17 +36,15 @@ namespace Switchboard.Game
             ringSource.PlayOneShot(incoming);
         }
 
-        private void OnFeePaid(ConnectionFeePaidArgs e)
-        {
-            // Independent of the relay's debounce: each actual connection fee gets its own cue.
-            if (feedbackSource != null && cashRegister != null) feedbackSource.PlayOneShot(cashRegister);
-        }
-
         private void OnChanged(CallStateChangedArgs e)
         {
             if (e.To == CallState.Connected)
             {
-                Play(connected);
+                // The register confirms the first successful connection, even with a zero fee.
+                // It already includes the relay click and must not be swallowed by feedback debounce.
+                if (e.From != CallState.OnHold && cashRegister != null && feedbackSource != null)
+                    feedbackSource.PlayOneShot(cashRegister, cashRegisterGain);
+                else Play(connected);
                 ConnectionSucceeded?.Invoke();
             }
             else if (e.To == CallState.OnHold) Play(hold);
@@ -70,8 +66,6 @@ namespace Switchboard.Game
         private void OnDisable() => Unbind();
         private void Unbind()
         {
-            if (earnings != null) earnings.ConnectionFeePaid -= OnFeePaid;
-            earnings = null;
             if (calls != null)
             {
                 calls.CallAdded -= OnAdded;

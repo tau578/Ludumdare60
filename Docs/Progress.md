@@ -1966,3 +1966,119 @@ Follow-ups:
 - Screenshots: `merge-sergei.png` (3×3 start, guide on the first card), `merge-sergei-connected.png` (A1–B2 green, coins flying), `merge-sergei-4x4.png`.
 - Design.md: a row for Sergei's branch, §3 hooks, §5.7 and D31 ("Surname, First"). Plan.md: 7b builds on `FirstOrderGuide`; Step 8 builds on the coins and cash-register sound.
 - **Playtest (lead, 2026-10-18):** OK.
+
+#### Mia's art after the merge (orchestrator, 2026-10-18)
+- Merged Mia's `bc0ca7d`, `1f38408`, `af83b02` (`b3da97f`): 13 coloured cable sprites, 3 store-button states and a new `store.png` (same size, slice still fits). She has no Unity, so our editor generated the 16 `.meta` files, committed in `c4870fa` (Sprite, 100 px per unit, every slice inside its image). 455/455 tests; pushed with the Sergei merge (`516548c`).
+- Note for whoever wires them in: the new `cable_stored_*` import as Multiple (one slice named `..._0`), while the original `cable_stored.png` is Single.
+
+### Merge of Sergei's 1c337e7 + 6226ead into main: report (2026-10-18)
+Result: done. The merge is resolved in the working tree but **not staged or committed**: `git status` still shows `UU` for the three conflict files until the orchestrator stages them. My test edits and `police.png.meta` are unstaged as well.
+
+**Needs a lead decision: book sort order.** Sergei's `PhoneBookConfig.Parse` now turns "Surname, First" into "First Surname" when it loads the file, then sorts people by **first name** (services stay first, in file order). The A–Z tabs, `HasLetter` and `ShowLetter` go by first name too, and he renamed his `PhoneBookTabTests` to match. This goes against Design §5.7, D31 and D36 ("sorted by surname") and CLAUDE.md ("keep … the surname sort order"). It doesn't clash with 7a, so I kept his version: `PhoneBook.json` is unchanged (still "Surname, First" in surname order, and `Validate Content` still checks that), and the open-board filter works on either order. To go back to surname order, remove the name flip and the `OrderBy` in `PhoneBookConfig.Parse` and the first-name rule in `FirstContactWithName`, then revert his tab-test renames and my `PhoneBookFilterTests` edit.
+
+Playable now: a 3×3 start, as after 7a, plus Sergei's new polish:
+- A soft yellow halo around an open jack when you hover it with a cord in hand. It turns red over a jack another cord is using, and green around both jacks of a connected call.
+- Click the left or right half of the open book to turn pages; the cursor becomes a pinching hand. Escape or a click outside closes the book.
+- Guide visuals: a bright ring on the first caller's portrait and a soft glow around the closed book.
+- The cash-register sound now plays on the first connection of a call.
+
+Conflicts resolved:
+- **`SocketGraphic.cs`:** Sergei moved the hover, blocked and green looks from the jack face to a separate halo (`SocketHaloGraphic`, a child made on demand). I kept his plain face and discs, kept 7a's `Tint` (the dimmed tint on the face and every disc) and added `ShowsHalo => !dimmed && (callConnected || highlighted)`. So a closed jack never shows a halo: no hover, no red and no green. `SetDimmed` now also refreshes the halo, so a plug left in a jack that closes (dev reset) loses its green, and gets it back if the jack reopens. The halo colour and intensity use `ShowsConnected`.
+- **`CableInputController.cs`:** both kept. A click on a closed jack plays the blocked sound and keeps the cord (7a). The "empty space" branch now also ignores clicks over the book (Sergei: `hoveredBook == null`), so a page click doesn't drop or return a held cord.
+- **`PhoneBookView.cs`:** kept `SetVisibleSockets`/`ApplyFilter` (7a; it now uses the existing `List` import) and Sergei's `FirstContactWithName` for `HasLetter`. `PageTurnDirectionAt`, `CanGoForward`/`CanGoBack` and the tabs all read the filtered `directory`, so page turns follow the open board.
+
+Auto-merged files checked (no edits needed):
+- **`SocketView`:** Sergei's hover rule (a highlight only with a cord in hand) sits next to our `open` checks: a closed socket clears hover and ignores enter and click events.
+- **`GameInstaller`:** `audio.Bind(Session.Calls)`. The cash register now plays on `Connected` (not from a hold), so `EarningsService` is no longer needed. Everything from 7a and the previous merge (`OpenBoardLink`, `GameContent(people, economy)`, `cordBridge.Bind(desk, calls)`) is intact.
+- Sergei's versions only, with nothing from 7a involved: `FirstOrderGuide`, `SlowGuidePulse`, `SoftGuideOutline`, `GuideSilhouette.shader`, `CallAudio`, `HandCursorGraphic`, `PhoneBookConfig`, `PhoneBookContactRow`, `PhoneBookBuilder`, `MergedSystemsTests`, `CallAudioTests`.
+
+Changed by me (beyond the conflicts):
+- **`Assets/Tests/Game/Editor/PhoneBookFilterTests.cs`** (7a's test): the expected 3×3 names are now in Sergei's form and order ("Ada Moss", "Arthur Hollis", …, "Reginald Underhill"). The letter probe is now 'E' (Eleanor Vickery C4 and Edgar Pennington B4 are closed at 3×3, open at 4×4) instead of 'V', because the tabs now go by first name. The count, pages, row visibility and services-first checks are unchanged.
+- **`Assets/Tests/Game/Editor/PhoneBookPageTurnTests.cs`:** new test `PageTurningFollowsTheOpenBoardFilter` on the real `PhoneBook.prefab`. At 3×3 (9 contacts, 1 spread), neither half turns and a click keeps the book open on spread 0. At 4×4 (16 contacts, 2 spreads), the right half turns to spread 1, then stops. Shrinking back to 3×3 returns to spread 0.
+- **`Assets/Tests/Game/Editor/SocketHoverTests.cs`:** new test `AClosedSocketNeverShowsAHalo`. A held cord over a closed jack: no halo and no highlight. A connected jack that closes: no green and no red halo. Reopening brings the green back.
+- None of Sergei's new tests failed because of 7a. His `MergedSystemsTests` already use the open-jack `AcceptOrder` from the last merge.
+
+Scene and prefab changes: none. `Final.unity` showed dirty once right after the first recompile. I saved a copy to `Temp/` and diffed it: it was byte-identical to disk, so nothing was lost. It was not dirty at the end, and it is the active scene.
+
+Tests: **472/472 EditMode** (455 before this merge; Sergei adds 15, I add 2). Before my test edits it was 468/470 (the two `PhoneBookFilterTests` order checks).
+
+Console: clean. The only lines are the engine's two "Ignoring depth surface … memoryless" lines around screenshots and the known MCP WebSocket and "TCS already completed" lines after recompiles. Cleared at the end. The guide shader compiles with no errors (`ShaderUtil.ShaderHasError` false, `isSupported` true).
+
+Format-only re-saves: `ProjectSettings/TimeManager.asset` (test run) was discarded with `git checkout`. `SampleScene.unity` was not touched.
+
+Play Mode smoke test (`Final.unity`, stepped frames, `ProcessPointer` and EventSystem clicks inside one-shot `Canvas.willRenderCanvases` handlers):
+- **Start:** board 3×3, 3 slots, 9 open jacks, 27 dimmed, 6 of 12 lamps dimmed, book 9 contacts on 2 pages, 3 discs over the closed slots. The guide was at `Portrait`, with the ring on the first card.
+- **Hover:** I picked up `Cable_02`. Hovering D4: no halo, no highlight. Clicking D4: empty, cord still held. Hovering A1: halo on, highlighted, and lamps A and 1 lit.
+- **Connect:** A3 to A2. The call is `Connected`, both jacks have the green halo (intensity 1.4), coins are flying and the wallet got 14¢.
+- **Book:** I clicked the closed book open. At 3×3 the right half shows the pointing hand (no page to turn), and a click keeps spread 0 and the book open. Then dev "Open board" (`TryGrantNext(ExtraClients)`): 4×4, 16 contacts, the Doctor first. The right half shows the `PageTurn` cursor, and a click turns to spread 1. Back and forward both worked, the book stayed open, and `HasLetter('M')` and `('E')` were true.
+- **MainMenu path:** build index 0 (MainMenu), then the next index, gave `Final` (index 1) with a fresh 3×3 session. In it, I took the first card without touching a cord. After the text typed out, the guide went to `Book`: the silhouette glow is on, using `Switchboard/UI/GuideSilhouette`. Opening the book moved it to `ReadingBook` and the glow went off. The book's first entry is "Ada Moss".
+- **Earlier session:** there the guide went to `Cancelled` when I took the card, because I had already picked up a cord. That is its intended out-of-order behaviour.
+- **Editor left clean:** not in Play Mode, `Final.unity` active and not dirty, `timeScale` 1, `captureDeltaTime` 0, Game view size never changed, SessionState keys erased, no callbacks or helper objects left, console cleared. I also destroyed leftover in-memory `GuideSilhouette` materials (see follow-ups).
+
+Screenshots (`Temp/Captures/`):
+- `merge-sergei2.png`: 3×3 start, three orders, the held cord over A1 with Sergei's yellow halo and lamps A/1 lit, D–F and 4–6 dimmed. For this one frame I disabled the input controller and set the hover directly, because the real-mouse `Update` kept clearing the simulated hover before capture.
+- `merge-sergei2-book.png`: the book at 4×4 after a page turn (spread 1: Mildred Stanhope, Reginald Underhill, Rose Ellery, Walter Pryce), with A3–A2 green behind it.
+- `merge-sergei2-4x4.png`: 4×4 open, 4 slots, the connected call's green halos.
+- `merge-sergei2-guide.png` (extra): the MainMenu-path session at the guide's `Book` stage, with the glow around the closed book.
+
+New art: `Assets/Sprites/callers/police.png` is **190×190**. Unity generated `police.png.meta` (untracked, left as generated, not referenced anywhere): Sprite, Multiple, 100 px per unit, one slice `police_0` at x 0, y 0, **190×186** (auto-trimmed), which fits inside the image.
+
+New public members from Sergei that other code relies on (for Design §3):
+- `PhoneBookView.PageTurnDirectionAt(Vector2 screen, Camera)` (-1/0/1; used by `CableInputController`). `PhoneBookView` now implements `IPointerClickHandler` (and an empty `IPointerDownHandler`), and the open book's button and the fold buttons are disabled at runtime.
+- `CableCursorMode.PageTurn` and `HandCursorGraphic.PageTurnDirection`.
+- `PhoneBookContact.IsEmergencyService`. `PhoneBookConfig.Parse` now rewrites names and order (see the decision above).
+- `SocketHaloGraphic` (with `Intensity`), which `SocketGraphic` and `SlowGuidePulse` use.
+- `SlowGuidePulse.UsePortraitHalo()` and `UseSilhouetteHalo()`, plus `SoftGuideOutline`.
+- `Resources/GuideSilhouette.shader` (`Switchboard/UI/GuideSilhouette`), loaded with `Resources.Load` (so it ships in builds).
+- `CallAudio.Bind(CallService)`: the `EarningsService` parameter is gone.
+
+Deviations: none from 7a. Dimmed wins over every halo, as the brief asked. The sort-order change above is Sergei's and is left for the lead.
+
+Follow-ups:
+- **Lead decision:** first-name versus surname book order (above). Whichever way it goes, update Design §5.7, D31, D36 and CLAUDE.md. Note the bubble's bold surnames, which were there because the book was sorted by surname.
+- **Material leak in EditMode:** `SlowGuidePulse` makes a `HideAndDontSave` material for the silhouette glow and frees it in `OnDestroy`. In EditMode tests `OnDestroy` doesn't run, so every test run leaves 2 materials in editor memory (I found 4 after two runs and destroyed them). Play Mode was fine. Small fix: free it in `OnDisable` too, or clean up in the test teardown.
+- **Closing the book:** Sergei's `PhoneBookView.Update` closes the open book on any press outside it. It reads `Pointer.current` directly, so integration checks can't simulate it through `ProcessPointer`; it needs a real click in the playtest.
+- **Hover checks:** while Unity reports focus, `CableInputController.Update` reads the real mouse every frame and overrides simulated hover. Plan §4 could mention disabling the controller for one captured frame, as I did.
+
+### Book order back to surnames (D50): report (2026-10-18)
+Result: done. The book is a real directory again: names as written in `PhoneBook.json` ("Moss, Ada"; services by their whole name), in the file's own order (services first, then people by surname), and the letter lookup goes by surname. The A–Z tabs stay hidden (`OpenBook/LetterTabs` inactive; the prefab and the tabs menu were not touched). The merge is still uncommitted; nothing was staged.
+
+Files changed:
+- `Assets/Scripts/UI/PhoneBookConfig.cs`: removed the "Surname, First" → "First Surname" flip, the first-name `OrderBy` and `using System.Linq`. `PhoneBookContact.IsEmergencyService` stays. It is now e7acec5's `Parse` plus that property.
+- `Assets/Scripts/UI/PhoneBookView.cs`: `FirstContactWithName` is `FirstContactWithSurname` again with e7acec5's rule: the first letter of a service's whole name or of a "Surname, First" entry, otherwise the last word (old-style "First Surname"). It uses `IsEmergencyService` and still reads the filtered `directory`, so it follows `SetVisibleSockets`. The `ShowLetter` summary says "surname" again. Still `UU` in git (merge conflict file).
+- `Assets/Tests/Game/Editor/PhoneBookTabTests.cs`: the helper is `Surnames` again and the five letter tests have e7acec5's names and surname expectations (`JumpsToTheSpreadWithTheFirstMatchingSurname`, `WorksOnTheFirstAndLastSpread`, `IgnoresLettersWithNoSurname`, `SurnameFirstNamesUseTheSurnameInsteadOfTheGivenName`, `UsesTheLastWordOfTheNameAsTheSurname`). Sergei's `ServicesStayFirstAndPeopleSortByGivenNameWithoutLosingSockets` is adapted to `ParseKeepsTheFileNamesOrderAndSockets` (names, sockets, trimming/upper-casing and `IsEmergencyService` kept as in the file). New `ServicesUseTheirWholeNameAndPeopleTheirSurname` (P for Police, F for Fire Brigade, A/B/M for surnames, no Z for "Abbott, Zoe"). A small `BookFrom(json)` helper was split out of `Book`.
+- `Assets/Tests/Game/Editor/PhoneBookFilterTests.cs`: back to HEAD's surname expectations (the nine names from "Dunmore, Mabel" to "Yardley, Lillian"; `HasLetter('V')` false at 3×3, true at 4×4). New `TheBookKeepsTheRealFileNamesAndOrder`: the book built from the real `PhoneBook.json` lists every entry with exactly the file's (trimmed) name in the file's order, and people keep their comma, so a flip or re-sort can't come back silently.
+
+Consumers of `PhoneBookContact.name` and the book's order (none matched by name; no fixes needed):
+- `NotepadBookLink`: `ContactTapped(name, socket)` notes `new JackId(socket)` only; the name is ignored.
+- `PhoneBookContactRow` / `PhoneBookPageView`: display only (`contactName.text = contact.name`), rows filled in `directory` order.
+- `FirstOrderGuide`, `SlowGuidePulse`: use `IsOpen`, `OpenChanged` and `ClosedBookGraphic` only; no names or order.
+- Page turning (`PageTurnDirectionAt`, `CanGoForward`/`CanGoBack`, `NextSpread`/`PreviousSpread`): count-based over `directory`, order-agnostic.
+- `PhoneBookBuilder`: Sergei only changed the fold buttons' transition; no names.
+- `CallCardView.Listed` (bold surname in the bubble) uses the domain `IPerson`, not the book, and fits surname order again. The domain side (`PeopleFileLoader`, `PhoneDirectory` surname sort, `ContentValidator` surname-order check) never used the UI flip.
+
+Tests: **474/474 EditMode** passed (472 before; +2: `ServicesUseTheirWholeNameAndPeopleTheirSurname` and `TheBookKeepsTheRealFileNamesAndOrder`; Sergei's parse test was adapted, not removed). `PhoneBookPageTurnTests` and `SocketHoverTests` pass unchanged.
+
+Console: clean after compile (only the known MCP "WebSocket is not initialised" line) and in Play Mode (only the engine's two "Ignoring depth surface … memoryless" lines around screenshots). Cleared at the end.
+
+Play Mode check (`Final.unity`, stepped frames; the book opened through `SetOpen(true)` and the page turned through `NextSpread()`, since the real page clicks were checked in the previous merge):
+- 3×3: 9 entries on 2 pages: Dunmore, Mabel (A2); Godfrey, Irene; Hollis, Arthur; Moss, Ada; Quigley, Bernard; Rook, Gertrude; Stanhope, Mildred; Underhill, Reginald; Yardley, Lillian (B1). `HasLetter('M')` true, `('V')` false.
+- Dev "Open board" (`TryGrantNext(ExtraClients)`), 4×4: 16 entries, Doctor (D4) first, then Cobbold, Dunmore, Ellery, Godfrey, Hollis, Marlow, Moss, Pennington, Pryce, Quigley, Rook, Stanhope, Underhill, Vickery, Yardley. A page turn went to spread 1 (Stanhope, Underhill, Vickery, Yardley), the book stayed open, `HasLetter('V')` true.
+- `OpenBook/LetterTabs`: `activeSelf` false, not visible.
+- Screenshots: `Temp/Captures/merge-sergei2-book-surname.png` (4×4, spread 1 after the turn) and `Temp/Captures/merge-sergei2-book-surname-3x3.png` (3×3, spread 0).
+- Editor left clean: not in Play Mode, not paused, `Final.unity` active and not dirty, `timeScale` 1, `captureDeltaTime` 0, no callbacks, no SessionState keys, Game view size unchanged. I destroyed 4 leaked `GuideSilhouette` materials from the test runs (the known `SlowGuidePulse` EditMode leak).
+
+Format-only re-saves: `TimeManager.asset` and `SampleScene.unity` were not touched. **Not discarded (outside my allowed list):** the test run at 20:01 wrote dynamic glyph data into `Assets/Fonts/BoecklinsUniverse/Boecklins Universe SDF.asset` and `Assets/Fonts/DellaRespira/Della Respira SDF.asset` (glyph/character tables and atlas filled in from rendered text, ~22k lines). These are TMP dynamic atlas side effects, not real changes; the orchestrator should discard them with `git checkout -- <file>` before committing. `Docs/Design.md` shows changes I did not make (presumably the orchestrator's D50 entry).
+
+Follow-ups:
+- Discard the two font asset re-saves (above). Plan §4 could list dynamic TMP font assets next to `TimeManager.asset` as known test-run re-saves, and possibly set their atlas population so the editor doesn't keep writing them.
+- The `SlowGuidePulse` material leak in EditMode tests (from the previous report) is still open.
+
+#### Merge verification (orchestrator, 2026-10-18)
+- EditMode tests re-run: 474/474 green. No conflict markers; `PhoneBook.json` untouched by this merge.
+- Lead decision D50: the book keeps the file's names ("Moss, Ada") and order (services, then surnames); Sergei's first-name sort and name flip were removed, the rest of his work kept. A–Z tabs stay hidden. Recorded in Design.md (D50, §5.7, §3, a second merge row).
+- Screenshots: `merge-sergei2.png` (halo on A1), `merge-sergei2-4x4.png` (green halos), `merge-sergei2-book-surname-3x3.png` (the starting nine, surname order).
+- The test runs filled in glyphs in the dynamic TMP fonts `Boecklins Universe SDF.asset` and `Della Respira SDF.asset` (~22k lines, glyph tables only); discarded as test-run noise. Plan §4 tip to add: dynamic TMP font assets change during test and Play runs; discard them like `TimeManager.asset`.
+- `police.png` (Mia, `13abb13`): 190×190, generated `.meta` with one slice 190×186 inside the image.
+- Open: the `SlowGuidePulse` hidden material isn't freed in EditMode tests (only `OnDestroy`); small fix for a later pass.
+- Committed and pushed on the lead's request (2026-10-18).

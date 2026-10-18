@@ -37,5 +37,6 @@ namespace Switchboard.UI
         public string name;
         public string socket;
         public string[] tags = Array.Empty<string>();
+        public bool IsEmergencyService => tags != null && Array.IndexOf(tags, "emergency-service") >= 0;
     }
 }

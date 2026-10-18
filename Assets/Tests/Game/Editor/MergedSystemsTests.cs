@@ -67,6 +67,59 @@ namespace Switchboard.Game.Tests
         }
 
         [Test]
+        public void FreshSessionFirstPortraitHasVisibleHaloUntilClicked()
+        {
+            session.Tick(3);
+            var card = All<CallCardView>().Single(c => c.Call != null);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Portrait));
+            var pulse = card.PortraitRect.GetComponent<SlowGuidePulse>();
+            Assert.That(pulse.IsShowing, Is.True);
+            var halo = card.PortraitRect.GetComponentInChildren<SocketHaloGraphic>();
+            Assert.That(halo, Is.Not.Null);
+            Assert.That(halo.color.a, Is.EqualTo(1f), "A fresh hint starts at full brightness");
+            Assert.That(halo.raycastTarget, Is.False);
+            var elapsed = typeof(SlowGuidePulse).GetField("elapsed", BindingFlags.Instance | BindingFlags.NonPublic);
+            elapsed.SetValue(pulse, 0f);
+            Invoke(pulse, "Refresh");
+            Assert.That(halo.color.a, Is.EqualTo(.45f).Within(.001));
+            Invoke(queue, "OnCardClicked", card);
+            Assert.That(pulse.IsShowing, Is.False);
+            Assert.That(halo.gameObject.activeSelf, Is.False);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.TaskText));
+        }
+
+        [Test]
+        public void FinishedFirstDialogueShowsBrightBookSilhouetteUntilOpened()
+        {
+            var card = AcceptOrder();
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.TaskText));
+            Assert.That(book.ClosedBookGraphic.GetComponent<SlowGuidePulse>(), Is.Null);
+            Field<TypingReveal>(card, "typing").Advance(60, 40);
+            Invoke(card, "TypeOn");
+            Invoke(guide, "LateUpdate");
+            Assert.That(card.IsTaskTextComplete, Is.True);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Book));
+            var pulse = book.ClosedBookGraphic.GetComponent<SlowGuidePulse>();
+            Assert.That(pulse.IsShowing, Is.True);
+            var halo = Field<Image>(pulse, "silhouetteHalo");
+            Assert.That(halo.isActiveAndEnabled, Is.True);
+            Assert.That(halo.sprite, Is.SameAs(((Image)book.ClosedBookGraphic).sprite));
+            Assert.That(halo.transform.GetSiblingIndex(), Is.LessThan(book.ClosedBookGraphic.transform.GetSiblingIndex()));
+            Assert.That(halo.raycastTarget, Is.False);
+            Assert.That(halo.material.shader.name, Is.EqualTo("Switchboard/UI/GuideSilhouette"));
+            Assert.That(ShaderUtil.ShaderHasError(halo.material.shader), Is.False);
+            Assert.That(halo.material.GetColor("_Color").a, Is.EqualTo(1f));
+            typeof(SlowGuidePulse).GetField("elapsed", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(pulse, 0f);
+            Invoke(pulse, "Refresh");
+            Assert.That(halo.material.GetColor("_Color").a, Is.EqualTo(.45f).Within(.001));
+            book.SetOpen(true);
+            Assert.That(halo.gameObject.activeSelf, Is.False);
+            Assert.That(pulse.IsShowing, Is.False);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.ReadingBook));
+        }
+
+        [Test]
         public void PurchasedCordJoinsCurrentGuideAndPickupClearsEveryPulse()
         {
             var card = AcceptOrder();
@@ -118,6 +171,8 @@ namespace Switchboard.Game.Tests
             bridge.Synchronize();
             Assert.That(call.State, Is.EqualTo(CallState.Connected));
             Assert.That(a.GetComponent<SocketGraphic>().IsCallConnected && b.GetComponent<SocketGraphic>().IsCallConnected, Is.True);
+            Assert.That(a.GetComponentInChildren<SocketHaloGraphic>(), Is.Not.Null);
+            Assert.That(b.GetComponentInChildren<SocketHaloGraphic>(), Is.Not.Null);
             var coins = All<IncomeCoinsView>().Single();
             Assert.That(coins.IsFlying, Is.True);
             Assert.That(session.Wallet.Cents, Is.EqualTo(before + 100));
@@ -127,6 +182,8 @@ namespace Switchboard.Game.Tests
             bridge.Synchronize();
             Assert.That(call.State, Is.EqualTo(CallState.OnHold));
             Assert.That(a.GetComponent<SocketGraphic>().IsCallConnected || b.GetComponent<SocketGraphic>().IsCallConnected, Is.False);
+            Assert.That(a.GetComponentInChildren<SocketHaloGraphic>(), Is.Null);
+            Assert.That(b.GetComponentInChildren<SocketHaloGraphic>(), Is.Null);
             Assert.That(cable.TryInsert(b), Is.True);
             bridge.Synchronize();
             Assert.That(call.State, Is.EqualTo(CallState.Connected));

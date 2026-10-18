@@ -56,6 +56,21 @@ namespace Switchboard.Game.Tests
 
         private static System.Predicate<string> Open(int side) => socket => new BoardSize(side, side).Contains(socket);
 
+        // D50: the book lists the real file exactly as written, so the designer's surname order is what players see.
+        [Test]
+        public void TheBookKeepsTheRealFileNamesAndOrder()
+        {
+            var file = AssetDatabase.LoadAssetAtPath<TextAsset>(PeopleFilePath);
+            Assert.That(file, Is.Not.Null, PeopleFilePath);
+            PhoneBookConfig raw = JsonUtility.FromJson<PhoneBookConfig>(file.text);
+            PhoneBookView book = Book();
+
+            Assert.That(book.ContactCount, Is.EqualTo(raw.contacts.Length));
+            for (int i = 0; i < raw.contacts.Length; i++)
+                Assert.That(book.ContactAt(i).name, Is.EqualTo(raw.contacts[i].name.Trim()), $"entry {i + 1}");
+            Assert.That(book.ContactAt(raw.contacts.Length - 1).name, Does.Contain(", "), "people stay \"Surname, First\"");
+        }
+
         [Test]
         public void AThreeByThreeBoardShowsTheStartingNineOnTwoPages()
         {
