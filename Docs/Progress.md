@@ -13,12 +13,14 @@
 | 5a. Economy file, shop, income, secret | done | ✅ 2026-10-18 (23 min) | ✅ 304/304 tests, scope clean | ✅ | e115c59 |
 | 5b. Extra wires and Notepad | done | ✅ 2026-10-18 (22 min) | ✅ 333/333 tests, scope clean | ✅ | 667adda |
 | 5c. Calls and pacing into Economy.json | done | ✅ 2026-10-18 (17 min) | ✅ 388/388 tests, scope clean | ✅ | f70b7df |
-| 7a. Board growth | done | ✅ 2026-10-18 (25 min) | ✅ 439/439 tests, scope clean | ✅ | d166ffa |
-| 6. Saves, Boot, Web build | not started | | | | |
-| 7b. Pacing and tutorial | not started | | | | |
-| 8. Sound and feel | not started | | | | |
-| 9. Mobile and Web polish | not started | | | | |
-| 10. Balance | not started | | | | |
+| 6. Board growth (built as 7a) | done | ✅ 2026-10-18 (25 min) | ✅ 439/439 tests, scope clean | ✅ | d166ffa |
+| 7. Hand-written calls and queues | not started | | | | |
+| 8. The new phone book | not started | | | | |
+| 9. Saves, Boot, Web build | not started | | | | |
+| 10. Tutorial | not started | | | | |
+| 11. Sound and feel | not started | | | | |
+| 12. Mobile and Web polish | not started | | | | |
+| 13. Balance | not started | | | | |
 
 A step moves through these statuses: not started → building → verifying → playtesting → done. It can also be blocked.
 
@@ -2082,3 +2084,16 @@ Follow-ups:
 - `police.png` (Mia, `13abb13`): 190×190, generated `.meta` with one slice 190×186 inside the image.
 - Open: the `SlowGuidePulse` hidden material isn't freed in EditMode tests (only `OnDestroy`); small fix for a later pass.
 - Committed and pushed on the lead's request (2026-10-18).
+
+### Steps 7c and 7d planned (orchestrator, 2026-10-18)
+- The designer proposed hand-written calls (`Calls.json`), call queues in `Economy.json` and a lookup-only phone book (`Book.json`). The lead and designer answered the open questions:
+  - the book gets a jack column, shown last
+  - the caller's name shows under the portrait
+  - the Notepad is dropped
+  - the book shows everyone from the start
+  - emergencies get their own `responseTime`, with a fine only for a miss
+  - no spawn timer: a free slot takes the next call; calls go strictly in order
+  - one `name` field, all money in cents, jacks as labels such as "C3", text in English
+  - caller slots start at 2 and grow with the board upgrades
+- Recorded as D51–D54 in Design.md. Full briefs for 7c (calls and queues) and 7d (the new book) are in Plan.md §9; both come before Step 6. Step 7b shrinks to the tutorial, because the queues now set the difficulty.
+- **Renumbered (lead, 2026-10-18)** so the numbers follow the build order: 7a → 6 (done), 7c → 7, 7d → 8, 6 → 9, 7b → 10, 8 → 11, 9 → 12, 10 → 13. Reports above keep the old numbers.

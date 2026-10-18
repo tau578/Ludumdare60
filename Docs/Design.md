@@ -6,6 +6,8 @@ Last updated 2026-10-18 · Plan: [Plan.md](Plan.md) · Progress: [Progress.md](P
 
 ## Implementation status
 
+> **Steps renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7 (hand-written calls), 7d → 8 (the new book), 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11 (sound and feel), 9 → 12 (mobile and Web polish), 10 → 13 (balance). Commit messages and older reports keep the old numbers.
+
 Level art pass (2026-10-18, lead requested): `BackgroundPanel.prefab` groups `main_background_0` with the existing 6×6 switchboard. Its twelve lamps indicate hovered/occupied rows and columns using supplied on/off sprites. This is presentation only; call rules and socket addresses are unchanged. Six caller anchors remain despite the five windows painted into the new background; their layout migration remains pending.
 
 | Step | State | What exists |
@@ -21,7 +23,7 @@ Level art pass (2026-10-18, lead requested): `BackgroundPanel.prefab` groups `ma
 | 5b | Done (2026-10-18) | `extra_wires` and `notepad` in `Economy.json` (D23, D40, D43). `StatSheet.Cords` (from `GameConfig.startingCords` = 3), `HasNotepad` and `Changed`; Domain `Notepad` (notes on the `Call`: `CallerNote`, `RecipientNote`). Coordinated changes to Sergei's code (D44): `CableInputController.AddCable(Color)` and `MaxCables` = 6, with tray re-spacing; `PhoneBookView.ContactTapped(name, socket)` and `ContactTapsEnabled`, with a transparent row tap area in `PhoneBook.prefab`. `CordBridge.EnsureCords` adds green, violet and ivory cords (`GameConfig.extraCordColors`); `NotepadBookLink` routes book taps; the bubble shows noted jacks. Accepted deviations: see 5.9. |
 | 5c | Done (2026-10-18) | `Economy.json` holds `startingCents`, `startingCords`, `pacing` and `calls` (D47), read by `EconomyFileLoader` into `CallTypeRecord`s and `PacingSettings`; the domain is unchanged. `CallerTypeDefinition` is card look only; `PacingProfile` and `Default.asset` are gone. Values unchanged (a real-file test pins them). Accepted deviations: a negative `startingCents` and half-written ranges are also reported; `startingCords` above 6 falls back to 3; `Validate Content` prefixes people messages with "People file: ". |
 | Upstream merge | Done (2026-10-18, `a173e75`) | Sergei's `2fc3810`: persistent wiring (D45) in `OperatorDesk`/`CallService` with `PersistentWiringTests`; "New order!" stamp and `StampExitAnimation`; bubble only on the last-clicked card; `CallAudio` and `BackgroundMusic`; board gold light; `CordBridge.Synchronize` and insertion anchors. His `CableInputController` keeps a held cord when a call card is clicked (it now references our `CallCardView`). Mia: new art, including `caller-04`/`caller-05` (slices fixed to 190×190, lead-approved). |
-| 7a | Done (2026-10-18) | Board growth (D42, D49). `Economy.json` gains `startingBoard` (3×3) and `startingClientSlots` (3); `board_1`–`board_3` (`extra_clients`) open 4×4, 5×5 and 6×6 with 4, 5 and 6 caller slots. Domain `BoardSize` (`MaxSide` = 6, the physical board) and `OpenBoard`; `StatSheet.Board` and `ClientSlots`; the spawner and callbacks use the open slot count and only people on open jacks. Closed jacks are dimmed and refuse hover, clicks and plugs (`SocketView.IsOpen`/`SetOpen`; a click bounces the held cord with the blocked sound); lamps of closed rows and columns are dimmed; the book shows only open jacks (`PhoneBookView.SetVisibleSockets`); closed caller slots get dark discs. `OpenBoardLink` (Game) pushes the open area on `StatSheet.Changed`. Fire Brigade C2 → E5, Reginald Underhill E5 → C2. `GameConfig.maxWaitingCalls` removed. Dev panel "Open board" and "Emergency: none open". Accepted deviations: see 5.9. |
+| 6 (was 7a) | Done (2026-10-18, `d166ffa`) | Board growth (D42, D49). `Economy.json` gains `startingBoard` (3×3) and `startingClientSlots` (3); `board_1`–`board_3` (`extra_clients`) open 4×4, 5×5 and 6×6 with 4, 5 and 6 caller slots. Domain `BoardSize` (`MaxSide` = 6, the physical board) and `OpenBoard`; `StatSheet.Board` and `ClientSlots`; the spawner and callbacks use the open slot count and only people on open jacks. Closed jacks are dimmed and refuse hover, clicks and plugs (`SocketView.IsOpen`/`SetOpen`; a click bounces the held cord with the blocked sound); lamps of closed rows and columns are dimmed; the book shows only open jacks (`PhoneBookView.SetVisibleSockets`); closed caller slots get dark discs. `OpenBoardLink` (Game) pushes the open area on `StatSheet.Changed`. Fire Brigade C2 → E5, Reginald Underhill E5 → C2. `GameConfig.maxWaitingCalls` removed. Dev panel "Open board" and "Emergency: none open". Accepted deviations: see 5.9. |
 | Sergei's branch | Merged (2026-10-18, `e7acec5`) | Sergei's work since `61dae7a`: a cash-register sound and `CallAudio.Bind(calls, earnings)`; fee coins flying to the money counter (`IncomeCoinsView`, `IncomeCoinGraphic`); jacks of a connected call glow green (`SocketGraphic`/`SocketView.SetCallConnected`, driven by `CordBridge`); the **first-order guide** (`FirstOrderGuide`, `FirstOrderGuideSequence`, `SlowGuidePulse`: on the first call the card, the book and the cords pulse in turn, and acting out of order cancels it); bigger socket and lamp art in the prefabs and `Final.unity`; `PhoneBook.json` names written "Surname, First". Merged with 7a: a closed jack's dimmed look wins over green; Sergei's `MergedSystemsTests` pick a call on open jacks. |
 | Sergei's branch, part 2 | Merged (2026-10-18, `6226ead`, with `1c337e7`), playtest pending | Hover halos on jacks (`SocketHaloGraphic`: yellow with a cord in hand, red over a used jack, green for a connected call; a closed jack never shows one); page turning by clicking either half of the open book, with a page-turn hand cursor; close on Escape or an outside click; guide visuals (`Resources/GuideSilhouette.shader`, `SoftGuideOutline`, a portrait ring and a book glow); the cash register plays on a call's first connection. His first-name book order was replaced by surname order (D50). |
 
@@ -74,7 +76,7 @@ A casual simulator. The player is a telephone switchboard operator in the era of
   - Extra income: sets the earnings multiplier (e.g. ×1.5, then ×2, then ×3).
   - Extra wires: sets the number of cords [5b].
   - Notepad: tapping a book entry notes its jack on every accepted call that person is part of (D23, D46) [5b].
-  - Extra clients: sets the board size and the caller slots, so more jacks and more people [7a].
+  - Extra clients: sets the board size and the caller slots, so more jacks and more people [6].
   - The secret (mystery) upgrade: one entry, the most expensive, with an effect still to be decided (D15).
 
   New upgrades of an existing type are added to the file without code.
@@ -108,11 +110,11 @@ The whole project is worked on together (D48, lead 2026-10-18). There are no own
   - `TryRemove(SocketView)`, `PlayBlockedFeedback()`
   - `InsertionRevision`, `LastInsertionAnchor`, `LastInsertionWasManual` (Sergei, `2fc3810`; read by `CordBridge` for the wrong-number anchor, D45)
 - `CableInputController` (5b): `AddCable(Color)`, `MaxCables`.
-- `PhoneBookView` (5b): `ContactTapped(name, socket)`, `ContactTapsEnabled`; (7a) `SetVisibleSockets(Predicate<string>)`, `PageCount`, `ContactAt`; (Sergei) `OpenChanged`, `ClosedBookGraphic`.
+- `PhoneBookView` (5b): `ContactTapped(name, socket)`, `ContactTapsEnabled`; (6) `SetVisibleSockets(Predicate<string>)`, `PageCount`, `ContactAt`; (Sergei) `OpenChanged`, `ClosedBookGraphic`.
 - Sergei's hooks (merged `6226ead`): `PhoneBookView.PageTurnDirectionAt(Vector2, Camera)` (used by `CableInputController`), `CableCursorMode.PageTurn`, `HandCursorGraphic.PageTurnDirection`, `PhoneBookContact.IsEmergencyService`, `SocketHaloGraphic`, `SlowGuidePulse.UsePortraitHalo()`/`UseSilhouetteHalo()`, `SoftGuideOutline`; `CallAudio.Bind(CallService)` no longer takes `EarningsService`.
 - Sergei's hooks (merged `e7acec5`): `CableController.PickedUp`, `SocketView.SetCallConnected` / `SocketGraphic.SetCallConnected`, `CordBridge.CableAdded`, `CallQueueView.OrderShown` / `CardOpened`, `CallAudio.ConnectionSucceeded`. `FirstOrderGuide` uses them.
 - `CablePhase` values: `Ready` (in the tray), `Held` (picked up, nothing plugged in), `OneEndConnected`, `Connected`.
-- `SocketView`: `Address` (e.g. `"C4"`), `Row`, `Column`, `PlugAnchor`, `IsOccupied`; (7a) `IsOpen`, `SetOpen(bool)`.
+- `SocketView`: `Address` (e.g. `"C4"`), `Row`, `Column`, `PlugAnchor`, `IsOccupied`; (6) `IsOpen`, `SetOpen(bool)`.
 - The cord input model: click a cord in the tray to pick it up, then click a jack to plug in. Clicking a plugged jack pulls that plug out. If the player pulls one plug of a connected cord and then clicks empty space, the plug snaps back to its jack ("restore", `ReconnectSocket`).
 - The board's objects in `Final.unity` are found **by component type, never by name**: `CableController`, `SocketView`, `CableInputController` and, from Step 5a, the shop's `UpgradeSlotView`s (D41, D44).
 - Two exceptions are found by name, because they have no component of their own. Renaming them means updating `GameInstaller`:
@@ -150,7 +152,7 @@ The whole project is worked on together (D48, lead 2026-10-18). There are no own
   - `Game.prefab` (`GameInstaller`, `GameLoopRunner`, `CordBridge`) and `GameUI.prefab`, at the root, with no overrides.
   - Prefer changing prefabs over scene overrides, so teammates' scene merges stay small. `GameInstaller` finds the views and the board's objects by type in its own scene at start.
   - `Game.unity` and the additive loading were removed (D38).
-- **`Boot.unity` (Step 6, then build index 0).** A tap-to-start screen, which unlocks browser audio, then loading.
+- **`Boot.unity` (Step 9, then build index 0).** A tap-to-start screen, which unlocks browser audio, then loading.
 - **`SampleScene.unity`** is not in the build list.
 - **The game has one screen,** in one scene (D38).
 
@@ -167,7 +169,7 @@ The whole project is worked on together (D48, lead 2026-10-18). There are no own
 - **`GameSession`** (Domain, plain C#) creates every domain service in dependency order and owns the tick order. Tests and the balance simulator build it without Unity.
 - **`GameInstaller`** (Game, `[DefaultExecutionOrder(-100)]`) is the only entry point. It:
   1. loads content
-  2. loads the save (from Step 6)
+  2. loads the save (from Step 9)
   3. finds the views and the board in its own scene, by type
   4. builds `CordBridge` and `GameSession`
   5. calls `Bind(...)` on the views
@@ -207,6 +209,8 @@ public void Tick(double dt)
 
 ## 5. Systems
 The step that introduces each part is shown in brackets.
+
+> **Planned change (D51–D54, Steps 7 and 8).** Hand-written calls in `Calls.json`, played from call queues in `Economy.json`, replace random spawning (5.2), call types, callbacks (5.3), the idle guard and the Notepad; `Book.json` replaces `PhoneBook.json` (5.7). The sections below describe the current build until those steps rewrite them.
 
 ### 5.1 Calls and their lifecycle [1, extended in 2 and 4]
 - **Classes:**
@@ -279,7 +283,7 @@ In the diagram, HungUp means `Ended` with reason `WrongConnection`, and Finished
   - The cord returning to the tray, including by pulling its second plug, ends the call as `DisconnectedEarly`.
   - Known: a call can earn for at most one frame between the click that pulls a plug and the bridge's report, because `GameLoopRunner.Update` may run before the cord input's `Update`. It is a fraction of a cent; accepted.
 
-### 5.2 Spawning [1 minimal, 2 full, 7 pacing]
+### 5.2 Spawning [1 minimal, 2 full, 6 slots]
 - **Classes:**
   - `CallSpawner`
   - `CallFactory`: resolves rate and duration. It uses the caller's override if set, otherwise a roll within the type's range. A roll is a whole number whenever the range contains one, so cards show readable rates and a finished call pays whole cents. Otherwise the roll is continuous.
@@ -293,16 +297,16 @@ In the diagram, HungUp means `Ended` with reason `WrongConnection`, and Finished
     - freeCords = cord count − Connected and OnHold calls (an on-hold call keeps its cord in the board, 2b)
     - So the stretch applies live and eases as soon as the player catches up.
   - An attempt with no room, or with no free caller and recipient, is skipped. The next one comes a fresh interval later, and skipped calls are never made up.
-  - **Cap (D17, D49):** nothing spawns while as many calls are live as there are open caller slots (`StatSheet.ClientSlots`: `startingClientSlots`, then the last bought `extra_clients`) [7a]. Every live call counts, connected ones included, because each one holds a caller slot. Due callbacks wait for a free slot too.
-  - Step 7b makes `base` depend on progress.
+  - **Cap (D17, D49):** nothing spawns while as many calls are live as there are open caller slots (`StatSheet.ClientSlots`: `startingClientSlots`, then the last bought `extra_clients`) [6]. Every live call counts, connected ones included, because each one holds a caller slot. Due callbacks wait for a free slot too.
+  - Progress-driven pacing was dropped (D51, D52): the call queues set the pace.
 - **Which type.** A weighted pick at the current progress, respecting each type's `maxSimultaneous`.
 - **Who.**
-  - The caller is a weighted pick among callers on open jacks (`OpenBoard`, 7a) who aren't busy.
+  - The caller is a weighted pick among callers on open jacks (`OpenBoard`, 6) who aren't busy.
   - The recipient comes from the type's recipient rule: any subscriber, or people with a tag. They must be on an open jack, not busy, and not the caller.
-  - A type with no open caller or recipient doesn't ring, and the weights are shared among the types that can. So emergencies start once the first service's jack opens (the Doctor at 4×4) [7a].
+  - A type with no open caller or recipient doesn't ring, and the weights are shared among the types that can. So emergencies start once the first service's jack opens (the Doctor at 4×4) [6].
 - **Busy (D18).** Anyone in a waiting, in-hand, connected or on-hold call can't be picked. Both the caller and the recipient of a pending callback can't be picked either.
-- **Progress** = lifetime earnings ÷ the goal's price (D19). Pacing curves (in `Economy.json`, Step 7b) turn it into the spawn interval and the type weights.
-- **Opening calls.** The first few calls of a new game are scripted and double as the tutorial [7b].
+- **Progress** = lifetime earnings ÷ the goal's price (D19). Pacing curves were planned to turn it into the spawn interval and the type weights; dropped by D51/D52.
+- **Opening calls.** The first few calls of a new game are scripted and double as the tutorial [10].
 - **Idle guard (D16).** After 60 s without player input, types that carry fines stop spawning [4] Their due callbacks wait too. The timeout is `pacing.idleTimeoutSeconds` in `Economy.json` (5c).
 
 ### 5.3 Callbacks [2]
@@ -354,8 +358,8 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
 - **`ConnectionRule`.** The default is that the two jacks equal the caller's and the recipient's jacks, in either order. A caller type may supply another rule later, for example long distance routed through a trunk jack.
 - **`ISwitchboard`** (the port) has `CordCount`, `ReturnToTray(CordId)` and `Refuse(CordId)`. `CordBridge` implements it in the game, and a fake implements it in tests.
 
-### 5.7 Directory [1 list, 3 book, 7a growth]
-- **`PhoneDirectory`** (Domain) provides `JackOf(person)`, `PersonAt(jack)`, and `ListedEntries` sorted by surname. It lists everyone; `OpenBoard` (7a) decides who is in the game: exactly the people on open jacks.
+### 5.7 Directory [1 list, 3 book, 6 growth]
+- **`PhoneDirectory`** (Domain) provides `JackOf(person)`, `PersonAt(jack)`, and `ListedEntries` sorted by surname. It lists everyone; `OpenBoard` (6) decides who is in the game: exactly the people on open jacks.
 - **Content:**
   - `PersonDefinition`: id, first name, last name, portrait, tags.
   - `PhoneDirectoryDefinition`: a list of `{ person, jackLabel }`.
@@ -364,15 +368,15 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
   - The closed book on the desk (`Sprites/book/table_book.png`) opens an overlay drawn with the `cover`, `page` and `back` sprites.
   - Rows are generated from data, N per page, and pooled.
   - A–Z tabs (3, D34): `PhoneBookTab` components call `PhoneBookView.ShowLetter(char)`, which opens the spread with the first surname starting with that letter: the part before the comma in "Surname, First" (the last word in the older "First Surname" form), or a service's whole name. Letters with no surname are greyed out. The tabs for the spread on show are near-white, bold, and stick out 8 px. **Hidden for now** (lead, 2026-10-18): `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab`, with the code and objects kept.
-  - Pages flip with tap or arrow keys (3). Swipe waits for `Pointer.current` in the cord input (Step 6).
+  - Pages flip with tap or arrow keys (3). Swipe waits for `Pointer.current` in the cord input (Step 9).
   - **Order (D50):** the book shows the names as written in `PhoneBook.json` ("Moss, Ada"; services by their whole name) in the file's order: services first, then people by surname, as a real directory does. The book never re-sorts or rewrites names.
   - Opening the book never pauses the game (D20).
-  - **Open-board filter (7a):** `PhoneBookView.SetVisibleSockets(predicate)` shows only the contacts on open jacks. Pages re-paginate in file order, so the services stay first and the surname order holds; `HasLetter` and the tabs follow the filter. `OpenBoardLink` sets it whenever the board grows or resets.
+  - **Open-board filter (6):** `PhoneBookView.SetVisibleSockets(predicate)` shows only the contacts on open jacks. Pages re-paginate in file order, so the services stay first and the surname order holds; `HasLetter` and the tabs follow the filter. `OpenBoardLink` sets it whenever the board grows or resets.
 
 ### 5.8 Economy [1]
 - **`Wallet`**:
   - `long Cents` plus a `double` fraction kept in [0, 1). Only whole cents move into the balance.
-  - The fraction is carried forward, and saved [6], so nothing is lost to rounding.
+  - The fraction is carried forward, and saved [9], so nothing is lost to rounding.
   - Never use `float` for money: at $100,000, a float can't register the fraction of a cent a call earns each frame.
   - Floating-point noise: when the remainder is within 1e-9 ¢ of a whole cent, that cent is credited.
 - **`EarningsService`** pays each connected call `min(dt, secondsLeft) × centsPerSecond × multiplier` every tick, so a finished call earns exactly duration × rate × multiplier. The multiplier is read live from `StatSheet.IncomeMultiplier`, so an upgrade bought mid-call applies at once (D12) [5a].
@@ -382,7 +386,7 @@ Due callbacks enter the queue in due order when there's room; otherwise they wai
   - They update the text only when the displayed value changes.
   - The HUD sits on its own nested canvas.
 
-### 5.9 Upgrades and stats [5a, 5b, 7]
+### 5.9 Upgrades and stats [5a, 5b, 6]
 The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition` assets with levels, a cost formula, stat modifiers and `UpgradeEffect` hooks.
 - **Entries.** `Economy.json` holds a flat list of one-time upgrades. Every entry has:
   - `id`: stable forever, because saves store bought ids
@@ -398,13 +402,13 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
   | `secret` | none | The goal. Exactly one. Its effect is code (D15); for now it shows "to be continued". | 5a |
   | `extra_wires` | `wires` | **Sets** the total number of cords. | 5b |
   | `notepad` | none | While owned, a tapped book entry notes its jack on every accepted call that person is part of (D23, D46). | 5b |
-  | `extra_clients` | `boardSize {cols, rows}`, `clientSlots` | **Sets** the open part of the board and the number of caller slots (D42, D49). | 7a |
+  | `extra_clients` | `boardSize {cols, rows}`, `clientSlots` | **Sets** the open part of the board and the number of caller slots (D42, D49). | 6 |
 
 - **Chains.** Entries of the same type form a chain in file order. Only the next unbought entry of a chain can be bought; there's no skipping. Values in a chain must grow.
 - **`UpgradeService`** (Domain) owns the set of bought ids.
   - `CanBuy(id)` returns a `PurchaseCheck` (`Ok`, `Unknown`, `Owned`, `NotNext`, `TooExpensive`).
   - `TryBuy(id)` checks that the entry exists, isn't owned, is next in its chain and is affordable, then spends through `Wallet.TrySpend` and raises `UpgradeBought`. Otherwise it changes nothing and returns false.
-  - A save restores the bought ids without spending [6].
+  - A save restores the bought ids without spending [9].
 - **`StatSheet`** recomputes every stat from the bought ids whenever they change. A stat is the value of the last bought entry in its chain, or the starting value from `Economy.json` if none is bought (multiplier 1, `startingCords`, `startingBoard`, `startingClientSlots`). Recomputing from scratch means nothing can be applied twice.
 - **`ShopShelf`** (Domain) decides what the shop's buttons show (D41). It has 3 rotating slots, each holding one chain. A slot keeps its chain until the chain is bought out, then takes the next chain (in order of first appearance in the file) that isn't shown yet. The secret is never on the shelf; it has its own pinned button.
 - **Multiplier.** It applies to the fee and the per-second pay, live, including calls already connected (D12, D32). Fines are never multiplied (D37).
@@ -416,7 +420,7 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
   - Dev "Reset upgrades" keeps the added cords (a cord can't be removed safely mid-call). The shop then offers the first wire entry again, and buying it adds nothing.
   - A book row takes taps only while the Notepad is owned. A row tap keeps the book open; without the Notepad, a tap falls through and closes the book as before.
   - Validator rules: `wires` must be above `startingCords`, at most 6, and growing; there can be at most one `notepad`.
-- **Board growth as built (7a, accepted deviations):**
+- **Board growth as built (6, accepted deviations):**
   - A wrong `startingBoard` or `startingClientSlots`, not only a missing one, also falls back to the full board and 6 slots, with a message.
   - Along the chain the board must grow (no side shrinks, at least one grows); `clientSlots` may stay level but never shrinks.
   - The people file's "enough recipients" check is judged on the full board; a new check needs at least 2 untagged people on the starting board. Its messages are prefixed "People file: ".
@@ -431,9 +435,9 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
   - `Progress = clamp01(balance ÷ secret cost)` drives the savings fill on the secret's button (D14, D41).
   - `GoalAffordable` fires the first time progress reaches 1.
   - Buying the secret raises `GoalPurchased`. For now the Game layer shows a "To be continued" panel, and play goes on.
-- **`CareerStats`** [6]: lifetime earnings, calls connected, fines paid, time played.
+- **`CareerStats`** [9]: lifetime earnings, calls connected, fines paid, time played.
 
-### 5.11 Feedback: UI and audio [1 HUD, 8 full]
+### 5.11 Feedback: UI and audio [1 HUD, 11 full]
 - **Views:** `MoneyCounterView`, `ShopView` (drives Sergei's shop buttons, including the savings fill; D41), `FloatingTextPool` (+$ and −$ popups).
 - **`FeedbackDirector`** maps domain events to sound cues and popups.
 - **`AudioService`:** a small pool of audio sources, looping sounds, and volume per category. Web builds have limited mixer and DSP support, so volume is handled in code.
@@ -444,7 +448,7 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
   - Distinct sounds for paid, hung up, missed and fined.
   - The team's plug sounds stay where they are.
 
-### 5.12 Save and load [6]
+### 5.12 Save and load [9]
 - **Saved:**
   - version
   - balance and fraction
@@ -481,10 +485,10 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
 | `CallerDefinition` | `id`, `person`, `type`, `weight`, optional `centsPerSecondOverride` [1]; optional favourite recipients [7] | The "caller config". This is how some callers become worth much more. |
 | ~~`PersonDefinition`~~, ~~`CallerDefinition`~~, ~~`PhoneDirectoryDefinition`~~ | Replaced in Step 1b by `Assets/Configs/PhoneBook.json` (D31). | Loaded and validated at startup. Errors are logged clearly, and a test runs the same check. |
 | `PhoneDirectoryDefinition` | entries `{ person, jackLabel }` | Jack labels are the `SocketView.Address` values, A1–F6. |
-| ~~`PacingProfile`~~ | Replaced in 5c by the `pacing` section of `Economy.json` (D47), read into the domain's `PacingSettings`. | Progress curves and opening calls [7] will extend that section. |
-| ~~`BoardLayoutDefinition`~~ | Not needed (7a): the open area is the top-left rectangle that `Economy.json` sets, and who joins follows from the jacks in `PhoneBook.json`. | |
+| ~~`PacingProfile`~~ | Replaced in 5c by the `pacing` section of `Economy.json` (D47), read into the domain's `PacingSettings`. | Progress curves were dropped by D51/D52. |
+| ~~`BoardLayoutDefinition`~~ | Not needed (6): the open area is the top-left rectangle that `Economy.json` sets, and who joins follows from the jacks in `PhoneBook.json`. | |
 | ~~`UpgradeDefinition`~~, ~~`UpgradeEffect`~~ | Replaced by the `upgrades` section of `Assets/Configs/Economy.json` (D39, D40). | See 6.4. |
-| `AudioCueLibrary` | event → cue [8] | Game layer only. |
+| `AudioCueLibrary` | event → cue [11] | Game layer only. |
 
 - **Shared types** live in Domain as `[Serializable]` structs with public fields, so Unity can serialize them inside Content assets. Example: `FloatRange { public float min, max; }`.
 - **Domain sees content through read-only interfaces:** `IGameContent`, `IPerson`, `ICaller`, `ICallerType`, `IDirectoryEntry` and so on. Tests use plain fakes.
@@ -521,12 +525,12 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
   - each type has enough possible recipients
   - `Economy.json` (6.4) [5a]
 
-### 6.4 `Economy.json` [5a, 5c, 7a] (D39)
+### 6.4 `Economy.json` [5a, 5c, 6] (D39)
 `Assets/Configs/Economy.json` belongs to the designer, who edits it by hand. Keep it readable, with one entry per line. The format is documented for him in `Docs/EconomyFile.md`.
 - **Sections:**
   - `upgrades` [5a]: see 5.9.
   - `startingCents`, `startingCords` (3–6) [5c].
-  - `startingBoard {cols, rows}` (1–6 per side) and `startingClientSlots` (1–6) [7a]. If either is missing or wrong, the game opens the full board and 6 slots, with a message.
+  - `startingBoard {cols, rows}` (1–6 per side) and `startingClientSlots` (1–6) [6]. If either is missing or wrong, the game opens the full board and 6 slots, with a message.
   - `pacing` [5c]: first-call delay, base interval, jitter, load factor and idle timeout.
   - `calls` [5c]: one entry per call type: `id`, `name`, `spawnWeight`, ranges `{min, max}` for rate, fee, duration and callback delay, response time, fines, callback flags, `maxSimultaneous`, `everyoneCalls`, `recipientTag`. Missing required fields are reported, never silently 0.
 
@@ -554,10 +558,10 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
 ## 8. Web constraints
 - **Single thread.** No threads, no `Task.Run`, no `async void`. All gameplay runs in the main loop.
 - **Game time only.** Gameplay timers use `Time.deltaTime`, clamped by `maximumDeltaTime`, never the system clock. Run In Background stays off, so timers pause in hidden tabs.
-- **Memory.** Pool cards, rows and popups. Avoid per-frame allocations and LINQ in per-frame code. Use sprite atlases and compressed textures [9].
-- **Audio unlock.** Browsers block audio until the player interacts, so the Boot scene has a tap-to-start screen [6].
-- **Input.** Nothing may depend on hover. The cord code needs `Pointer.current` instead of `Mouse.current` to work on touch (D28), before Step 6's phone check.
-- **Layout.** Landscape first. In portrait, show a "rotate your device" screen (D24) [9].
+- **Memory.** Pool cards, rows and popups. Avoid per-frame allocations and LINQ in per-frame code. Use sprite atlases and compressed textures [12].
+- **Audio unlock.** Browsers block audio until the player interacts, so the Boot scene has a tap-to-start screen [9].
+- **Input.** Nothing may depend on hover. The cord code needs `Pointer.current` instead of `Mouse.current` to work on touch (D28), before Step 9's phone check.
+- **Layout.** Landscape first. In portrait, show a "rotate your device" screen (D24) [12].
 
 ## 9. Extensibility
 - **New caller:**
@@ -572,7 +576,7 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
   - the stat in `StatSheet`, with a base value
   - the system that reads it
 - **Bigger board:** add or change an `extra_clients` line in `Economy.json` (board size, caller slots, price), and place people on the jacks it opens in `PhoneBook.json`. No code change.
-- **Mystery effect (D15):** react to `GoalPurchased` (once) and, from Step 6, to a loaded save with the secret bought (a lasting state). If it needs a new system, register that system in `GameSession`.
+- **Mystery effect (D15):** react to `GoalPurchased` (once) and, from Step 9, to a loaded save with the secret bought (a lasting state). If it needs a new system, register that system in `GameSession`.
 
 ## 10. Decisions
 Statuses:
@@ -599,40 +603,44 @@ Statuses:
 | D14 | Savings bar = balance ÷ goal price. It is drawn as a fill inside the secret upgrade's shop button (D41). | decided (lead, 2026-10-18) | 5a |
 | D15 | What happens after the mystery upgrade (ending, prestige, or play continues). The save keeps career and run data apart either way. | open | before the real goal effect |
 | D16 | Idle guard: types that carry fines stop spawning after 60 s without input. | default | 4 |
-| D17 | Waiting-card cap = 6 (the caller panel has 6 slots). Since 7a (D49): live calls never outnumber the open caller slots (`startingClientSlots`, then `clientSlots`). | default; updated by D49 | 2 |
+| D17 | Waiting-card cap = 6 (the caller panel has 6 slots). Since Step 6 (D49): live calls never outnumber the open caller slots (`startingClientSlots`, then `clientSlots`). | default; updated by D49 | 2 |
 | D18 | A person can't be in two calls at once. | default | 2 |
-| D19 | Difficulty is driven by lifetime earnings. | default | 7 |
+| D19 | Difficulty is driven by lifetime earnings. | superseded by D51/D52 (the call queues) | – |
 | D20 | The book and the shop never pause the game. | default | 3 |
-| D21 | Board growth uses pre-laid-out sections with cover plates. **Superseded by D42** (dimmed closed jacks; plates only if Mia draws them later). | superseded | 7 |
+| D21 | Board growth uses pre-laid-out sections with cover plates. **Superseded by D42** (dimmed closed jacks; plates only if Mia draws them later). | superseded | 6 |
 | D22 | Jack assignments are fixed in data. | default | 1 |
 | D23 | Book QoL: tapping an entry in the phone book notes its jack on the call in hand (since D46: on every accepted call that person is part of) (e.g. "Ada Moss (C3) / wants Basil Thorne (A5)"). Not built in from the start: it is sold in the shop as a cheap one-entry upgrade, `type` `notepad` in `Economy.json` (D40). The designer can drop it by deleting the entry. Sergei's book gets a tapped-entry event as a coordinated change by our agent (D44). | decided (lead, 2026-10-18) | 5b |
-| D24 | Portrait on phones shows a "rotate your device" screen. | default | 9 |
-| D25 | Save progression only; no in-flight calls and no offline earnings. | default | 6 |
-| D26 | Hosting target (itch.io, own site, …). It affects storage and compression settings. | open | 6 |
-| D27 | Currency, number scale, and target time to the mystery upgrade. Placeholder numbers until then (D43). The designer tunes them in `Economy.json`. | open | 10 |
-| D28 | Touch input in the cord code (`Pointer.current`). Built by us like any other change (D48). | decided | 6 |
+| D24 | Portrait on phones shows a "rotate your device" screen. | default | 12 |
+| D25 | Save progression only; no in-flight calls and no offline earnings. | default | 9 |
+| D26 | Hosting target (itch.io, own site, …). It affects storage and compression settings. | open | 9 |
+| D27 | Currency, number scale, and target time to the mystery upgrade. Placeholder numbers until then (D43). The designer tunes them in `Economy.json`. | open | 13 |
+| D28 | Touch input in the cord code (`Pointer.current`). Built by us like any other change (D48). | decided | 9 |
 | D30 | Division of work: Sergei builds the UI components (phone book, shop panel, main menu, visuals); our agents build the rules and data, and wire his components to them. Steps 3, 5 and 6 become wiring steps. | superseded by D48 (wiring steps still apply; the split of who builds what does not) | 1b |
 | D31 | One people file. `Assets/Configs/PhoneBook.json` is the single source of people, jacks and per-caller settings. Each contact has `name` (written "Surname, First", e.g. "Moss, Ada", since Sergei's merge `e7acec5`; services use their whole name, e.g. "Fire Brigade"; the loader still reads "Ada Moss", and the game shows "Ada Moss" on cards), `socket`, `portrait` (sprite name), `type` (call type id) and optional `rate` / `fee` overrides (0 = use the type). Sergei's book reads only `name` and `socket` from it, unchanged; our game reads every field. The per-person ScriptableObjects from Step 1 are removed. Call types and game settings stay ScriptableObjects. Portraits appear on the call card, not in the book. Names are in English. | decided (lead, 2026-10-17) | 1b |
 | D32 | Connection fee. On a correct connection the caller pays a one-off fee, then the per-second rate. The fee comes from a range on the caller type, with an optional per-caller override (the same simple config as the rate; no tiers). It is paid once per call: not on a wrong connection, not again after hold and resume. The multiplier applies: earnings = (fee + seconds × rate) × multiplier. The card shows both, e.g. "10¢ + 5¢/s". The "Paid" stamp includes the fee, and "+10¢" pops up on connection. | decided (lead, 2026-10-17) | 1b |
 | D33 | Scene flow: `MainMenu` → `Game` → `Level` (build indices 0, 1, 2). Sergei's menu loads the next build index, which is `Game`; `Game` loads `Level` additively. Superseded by D38: `MainMenu` → `Final`. | superseded | 1b |
 | D34 | Phone book A–Z tabs are added to `PhoneBookView` by our Step 3 agent (then a coordinated change; since D48 no approval is needed). | decided (lead, 2026-10-18) | 3 |
-| D35 | The directory grows to 36 people, one on every jack A1–F6, in Step 3. Portraits are reused until more are drawn. From Step 7 the game starts on a 3×3 part of the board and the book shows only the people on open jacks (D42). | decided (lead, 2026-10-18) | 3 |
+| D35 | The directory grows to 36 people, one on every jack A1–F6, in Step 3. Portraits are reused until more are drawn. From Step 6 the game starts on a 3×3 part of the board and the book shows only the people on open jacks (D42). | decided (lead, 2026-10-18) | 3 |
 | D36 | Emergency services (Police, Fire Brigade, Doctor) replace 3 of the 36 people on their jacks (33 people + 3 services). They are listed **first** in `PhoneBook.json`, so the book shows them at the top of page 1; the people follow, sorted by surname. The validator allows that leading block of `emergency-service` entries. Sergei's book code is unchanged (it shows file order). | decided (lead, 2026-10-18) | 4 |
 | D37 | Step 4 numbers: an emergency must be connected within **30 s**. Fines: **$2** for a miss or a wrong patch, **$1** for cutting a connected emergency off early (not multiplied). Emergency pay: fee 20–40¢, 5–10¢/s, 10–20 s calls. About **1 call in 6** is an emergency (a temporary `spawnWeight` on each caller type: Regular 5, Emergency 1, until Step 7's `weightByProgress`), and at most one at a time. Any person can place an emergency call (`everyoneCalls`); services never call, and regular calls never go to a service (`recipientTag` empty = untagged people only). Services are JSON entries with `"tags": ["emergency-service"]` and no portrait or type. | decided (lead, 2026-10-18) | 4 |
 | D38 | One final scene, `Final.unity` (formerly `Level.unity`), built from prefab instances: Sergei's prefabs plus our `Game.prefab` and `GameUI.prefab`. Build list: `MainMenu` (0), `Final` (1); `Game.unity` is removed. Our code finds the board's objects by type at start. (The "prefabs are owned" rule was dropped by D48.) Sergei's first merge (`1c20569`, unpacked copies) was reverted in `cdc5876`. This carries out D29. | decided (lead, 2026-10-18) | before 5 |
 | D39 | Economy config file. The economy is controlled by the designer through one hand-edited file, `Assets/Configs/Economy.json`, with sections: `upgrades` [5a]; `calls`, `pacing` and `startingCents` [5c]. Presentation (card badges, colours) stays in Unity assets. Domain rules keep reading values through interfaces, so only Content loaders, the validator and tests change. A format guide for the designer lives in `Docs/EconomyFile.md`. | decided (lead, 2026-10-18) | 5a |
 | D40 | Upgrade model (the designer's proposal, adapted): a flat list of one-time entries with `id`, `type`, `name`, `description`, `costCents` and the type's fields. Types: `extra_income` (`incomeMultiplier`), `extra_wires` (`wires`), `notepad`, `extra_clients` (`boardSize`, `clientSlots`), `secret` (exactly one). Every value **sets** the resulting state (wires total, not wires added). Entries of one type form a chain in file order; only the next unbought one can be bought; values in a chain must grow. Ids are never renamed once players have saves. No levels, cost formula or stat modifiers; this replaces the old 5.9 plan. The designer's `clientPool` is dropped (D42). | decided (lead, 2026-10-18) | 5a |
 | D41 | The shop is Sergei's `UpgradeShopPanel` with its 4 buttons. The bottom button is pinned to the `secret` upgrade and shows the savings fill (D14). The top 3 rotate: each shows the next offer of one chain, and when a chain is bought out its button takes the next chain not yet shown, in file order (`ShopShelf`). A button with nothing to offer shows Sergei's placeholder look and can't be clicked. The name, description and price are drawn inside his button prefab by a small component in his folder, added as a coordinated change (D44); our `ShopView` drives it. | decided (lead, 2026-10-18) | 5a |
-| D42 | Board growth [7]. The game starts on a 3×3 part of the board (rows A–C, columns 1–3). Exactly the people whose jack is on the open part are in the game, and the book shows only them, so the designer picks the starting group by placing people on those jacks. `extra_clients` sets the open board size and the caller slots. Closed jacks are dimmed and can't be clicked (cover plates only if Mia draws them). The emergency services join when the board opens over their jacks, so emergencies come later in a session.  Changes the board and book code directly (D48). Supersedes D21. | decided (lead, 2026-10-18) | 7 |
+| D42 | Board growth [6]. The game starts on a 3×3 part of the board (rows A–C, columns 1–3). Exactly the people whose jack is on the open part are in the game, and the book shows only them, so the designer picks the starting group by placing people on those jacks. `extra_clients` sets the open board size and the caller slots. Closed jacks are dimmed and can't be clicked (cover plates only if Mia draws them). The emergency services join when the board opens over their jacks, so emergencies come later in a session.  Changes the board and book code directly (D48). Supersedes D21. | decided (lead, 2026-10-18) | 6 |
 | D43 | Placeholder upgrade prices (until the designer's file; D27): income ×1.5 for $8, ×2.0 for $20, ×3.0 for $50; the secret $250. From 5b: wires 4, 5 and 6 for $5, $8 and $13 (start 3); Notepad $3. | default | 5a |
 | D44 | Sergei's missing hooks are built by our agents as coordinated changes (lead, 2026-10-18), each brief listing the approved files: the shop button texts and savings fill [5a]; adding cords at runtime to his cord input and tray [5b]; a tapped-entry event in his phone book [5b]. | superseded by D48 | 5a |
 | D45 | Persistent wiring (Sergei's `2fc3810`, adopted by the lead 2026-10-18). Several calls can be accepted at once; taking a card no longer swaps. Cords stay plugged when calls end. A closed circuit connects any accepted call it is correct for; taking a card connects it at once if its circuit is already plugged. A wrong number needs a manual insertion against an anchored end that belongs to an accepted call. The bubble shows only on the card last clicked. Supersedes D03; see 5.1 and 5.6. | decided (lead, 2026-10-18) | 5b merge |
 | D46 | Notepad under D45: a tapped book entry notes that person's jack on every accepted call still waiting to connect (Taken or Connecting) where they are the caller or the recipient, including duplicates. Ringing, connected, on-hold and ended calls are never noted. | decided (lead, 2026-10-18) | 5b fix |
 | D47 | Step 5c details: `startingCents`, `startingCords` (3–6), `pacing` and `calls` live in `Economy.json`; the old asset fields are deleted, not kept as a fallback (`CallerTypeDefinition` keeps only `id` and the card style; `PacingProfile` and `Default.asset` go). Ranges are `{ "min", "max" }` objects. Call type ids keep the `type.` style because `PhoneBook.json` references them; the type's display `name` moves into the file. `maxWaitingCalls` and the cord colours stay in `GameConfig`. | decided (lead, 2026-10-18) | 5c |
 | D48 | No ownership split (lead, 2026-10-18). The team works on the whole project together: no owners, no read-only folders, no coordinated changes and no approval lists. A step changes whatever files it needs; its brief names them, and its report lists them. Teammates still push to `main`, so pre-flight merges their changes first. Supersedes D30 and D44, and the ownership parts of D38. | decided (lead, 2026-10-18) | now |
-| D49 | Board growth details (lead, 2026-10-18): three `extra_clients` upgrades open 4×4, 5×5 and 6×6 from a 3×3 start, and each also sets the caller slots (3 → 4 → 5 → 6). The board is controlled from `Economy.json`: `startingBoard`, `startingClientSlots` and every upgrade's size, slots and price live there (no sizes in code), and they replace `GameConfig.maxWaitingCalls`. The physical 6×6 board and 6 slots in `Final.unity` are the only limits. One emergency service per new ring: Doctor D4 (4×4), Fire Brigade moves C2 → E5 (5×5, swapping with Reginald Underhill), Police B6 (6×6). Built as Step 7a, before Step 6; progress pacing and the tutorial become Step 7b. | decided (lead, 2026-10-18) | 7a |
+| D49 | Board growth details (lead, 2026-10-18): three `extra_clients` upgrades open 4×4, 5×5 and 6×6 from a 3×3 start, and each also sets the caller slots (3 → 4 → 5 → 6). The board is controlled from `Economy.json`: `startingBoard`, `startingClientSlots` and every upgrade's size, slots and price live there (no sizes in code), and they replace `GameConfig.maxWaitingCalls`. The physical 6×6 board and 6 slots in `Final.unity` are the only limits. One emergency service per new ring: Doctor D4 (4×4), Fire Brigade moves C2 → E5 (5×5, swapping with Reginald Underhill), Police B6 (6×6). Built as Step 6 (numbered 7a when it was built); the tutorial is Step 10. | decided (lead, 2026-10-18) | 6 |
 | D50 | Phone book order (lead, 2026-10-18): the most realistic version. Names are written and shown "Surname, First" ("Moss, Ada"), services by their whole name; the book lists services first, then people in surname order, exactly the file's order (checked by `Validate Content`). The letter lookup goes by surname. The A–Z tabs stay hidden for now. Replaces the first-name order in Sergei's `6226ead`. | decided (lead, 2026-10-18) | merge |
-| D29 | Merge into one scene. The `Game.unity` + `Level.unity` split is temporary; it keeps Sergei's actively edited scene conflict-free. Once his cord work settles, and with his agreement, move the `Game` object and the `GameUI` prefab into one scene, then remove `Game.unity` and the additive loading. Do it at the latest before the first Web build. **Done as D38 (2026-10-18).** | done | 6 |
+| D51 | Hand-written calls (designer's proposal, lead 2026-10-18). Every call is an entry in a new `Assets/Configs/Calls.json`: `id`, `icon` (portrait), `name` (shown under the portrait), `message` (the bubble text), `from` and `to` jacks as labels such as "C3", `durationSeconds`, `connectCents`, `centsPerSecond`, and for emergencies `responseTimeSeconds` and `penaltyCents`. All money in cents, all text in English. The only fine is for a missed emergency (no wrong-patch or cut-off fine). Replaces random spawning, call types and their weights, callbacks, the busy tracker, the idle guard and the pacing timer: supersedes D16, D18, D19, the spawning parts of D17, D36/D37's numbers and fines, and the `calls`/`pacing` parts of D47. | decided (lead, 2026-10-18) | 7 |
+| D52 | Call queues (lead 2026-10-18). `Economy.json` has `startPool` (call ids for a new game) and a `stagePool` on each `extra_clients` entry; buying one replaces the queue and starts it at its first call. Calls play in order and loop; success or a wrong number doesn't change the order. Each open caller slot holds one call, and a free slot takes the next queued call at once (no timer). A call waiting on a busy line stays on its card. A call still on a card is skipped when the queue comes round to it (orchestrator rule, so no call shows twice). Caller slots start at 2 (`startingClientSlots`) and grow with the board upgrades (3, 4, 5 as placeholders). | decided (lead, 2026-10-18) | 7 |
+| D53 | The phone book is a lookup only (designer, lead 2026-10-18). A new `Assets/Configs/Book.json` replaces `PhoneBook.json`: each entry has `name` ("SURNAME, First"), `profession`, `address`, `emergencyService` and `jack` (shown as the last column); entries may share a jack. The book shows every entry from the start, services first, then names alphabetically (the real-directory order of D50); the rules don't read it. Supersedes D31 and the book part of D42. | decided (lead, 2026-10-18) | 8 |
+| D54 | The Notepad upgrade is dropped (designer, lead 2026-10-18). Supersedes D23, D43 and D46. | decided (lead, 2026-10-18) | 7 |
+| D29 | Merge into one scene. The `Game.unity` + `Level.unity` split is temporary; it keeps Sergei's actively edited scene conflict-free. Once his cord work settles, and with his agreement, move the `Game` object and the `GameUI` prefab into one scene, then remove `Game.unity` and the additive loading. Do it at the latest before the first Web build. **Done as D38 (2026-10-18).** | done | 9 |
 
 ## 11. Glossary
 - **Jack / socket / line:** a hole in the board, labelled like `C4`. A line is a jack with a subscriber on it.
