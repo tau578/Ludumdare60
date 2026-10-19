@@ -27,6 +27,7 @@ namespace Switchboard.Game
         private CallQueueView callQueue;
         private Action newGame;
         private bool open;
+        private GamePauseMenu pauseMenu;
         private GUIStyle style;
 
         public void Bind(GameSession gameSession, CallQueueView queue, Action startNewGame = null)
@@ -34,6 +35,7 @@ namespace Switchboard.Game
             session = gameSession;
             callQueue = queue;
             newGame = startNewGame;
+            pauseMenu = FindFirstObjectByType<GamePauseMenu>();
         }
 
         private void Update()
@@ -46,7 +48,7 @@ namespace Switchboard.Game
 
         private void OnGUI()
         {
-            if (session == null) return;
+            if (session == null || (pauseMenu != null && pauseMenu.PresentationOpen)) return;
             float scale = Mathf.Min(Screen.width / ReferenceWidth, Screen.height / ReferenceHeight);
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
             if (style == null) style = new GUIStyle(GUI.skin.button) { fontSize = 13, wordWrap = true };

@@ -88,10 +88,13 @@ namespace Switchboard.UI
             var fillArea = Rect("Savings", background.transform, 12, 60, 158, 3);
             var fill = Picture("Fill", fillArea, 0, 0, 158, 3, null);
             fill.color = new Color(1, .83f, .35f, .75f);
+            // Hide the savings lines for now; keep their bindings for the shop's progress updates.
+            fill.enabled = false;
             fill.rectTransform.anchorMin = Vector2.zero; fill.rectTransform.anchorMax = Vector2.one;
             fill.rectTransform.offsetMin = fill.rectTransform.offsetMax = Vector2.zero;
             var highlight = Picture("Ready", background.transform, 0, 0, 182, 3, null);
             highlight.color = new Color(1, .83f, .35f);
+            highlight.enabled = false;
             highlight.gameObject.SetActive(false);
             view.Configure(button, background, placeholder, group, title, description, price, fill.rectTransform, highlight.gameObject);
             view.ConfigureArtwork(emblem, blank, cable, income, secret, neutral, dark);

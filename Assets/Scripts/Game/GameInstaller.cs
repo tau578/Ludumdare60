@@ -89,8 +89,11 @@ namespace Switchboard.Game
             }
             List<GamePauseMenu> pauseMenus = LevelScene.FindAll<GamePauseMenu>(scene);
             if (pauseMenus.Count == 1)
+            {
                 pauseMenus[0].Bind(autosave != null ? autosave.SaveNow : (System.Action)null,
                     LevelScene.FindAll<CableInputController>(scene).Find(c => c != null), bookView, audio);
+                goalPanel.ConfigurePresentation(pauseMenus[0]);
+            }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             // Added at runtime so no scene or prefab references a type that release builds leave out.
             gameObject.AddComponent<DevPanel>().Bind(Session, callQueue,
