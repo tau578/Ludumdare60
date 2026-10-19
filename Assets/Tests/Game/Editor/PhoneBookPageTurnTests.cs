@@ -6,6 +6,8 @@ using Switchboard.UI;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.UI;
 
 namespace Switchboard.Game.Tests
@@ -39,6 +41,53 @@ namespace Switchboard.Game.Tests
                 return fold.TransformPoint(fold.rect.center);
             }
             return opened.TransformPoint(opened.rect.center + new Vector2(x, y));
+        }
+
+        [Test]
+        public void TabTogglesBookAndIsIgnoredWhilePaused()
+        {
+            var keyboard = InputSystem.AddDevice<Keyboard>();
+            var update = typeof(PhoneBookView).GetMethod("Update", BindingFlags.NonPublic | BindingFlags.Instance);
+            try
+            {
+                book.SetOpen(false);
+                PressTab();
+                Assert.That(book.IsOpen, Is.True);
+                PressTab();
+                Assert.That(book.IsOpen, Is.False);
+                book.InputEnabled = false;
+                PressTab();
+                Assert.That(book.IsOpen, Is.False, "Tab must not open the book behind the pause menu");
+                book.SetOpen(true);
+                PressTab();
+                Assert.That(book.IsOpen, Is.True, "Tab must not close it while paused either");
+            }
+            finally { InputSystem.RemoveDevice(keyboard); }
+
+            void PressTab()
+            {
+                InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+                InputSystem.Update();
+                InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.Tab));
+                InputSystem.Update();
+                update.Invoke(book, null);
+            }
+        }
+
+        [Test]
+        public void ShortcutButtonOpensBookAndRespectsInputLock()
+        {
+            var shortcut = root.transform.Find("ClosedBook/BookShortcut").GetComponent<Button>();
+            book.SetOpen(false);
+            book.InputEnabled = false;
+            Assert.That(shortcut.interactable, Is.False);
+            shortcut.onClick.Invoke();
+            Assert.That(book.IsOpen, Is.False);
+            book.InputEnabled = true;
+            Assert.That(shortcut.interactable, Is.True);
+            shortcut.onClick.Invoke();
+            Assert.That(book.IsOpen, Is.True);
+            Assert.That(shortcut.gameObject.activeInHierarchy, Is.False, "hint hides with the closed cover");
         }
         private void Click(float x, float y = 0, PointerEventData.InputButton button = PointerEventData.InputButton.Left)
         {

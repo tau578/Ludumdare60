@@ -233,6 +233,10 @@ PrefabInstance:
       propertyPath: m_OverrideSorting
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 1396041268426815798, guid: 615f72dfb112df04f8c3126f4fd16233, type: 3}
+      propertyPath: m_AdditionalShaderChannelsFlag
+      value: 25
+      objectReference: {fileID: 0}
     - target: {fileID: 6098586587117084618, guid: 615f72dfb112df04f8c3126f4fd16233, type: 3}
       propertyPath: m_Name
       value: PhoneBook
@@ -251,7 +255,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7138997417137881578, guid: 615f72dfb112df04f8c3126f4fd16233, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: -62
+      value: -135
       objectReference: {fileID: 0}
     - target: {fileID: 7138997417137881578, guid: 615f72dfb112df04f8c3126f4fd16233, type: 3}
       propertyPath: m_AnchoredPosition.y
@@ -331,7 +335,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7923760783174194518, guid: 615f72dfb112df04f8c3126f4fd16233, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: -325
+      value: -216
       objectReference: {fileID: 0}
     - target: {fileID: 7923760783174194518, guid: 615f72dfb112df04f8c3126f4fd16233, type: 3}
       propertyPath: m_AnchoredPosition.y
@@ -348,6 +352,22 @@ PrefabInstance:
     - target: {fileID: 7923760783174194518, guid: 615f72dfb112df04f8c3126f4fd16233, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8200000000000000101, guid: 615f72dfb112df04f8c3126f4fd16233, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: -102.7
+      objectReference: {fileID: 0}
+    - target: {fileID: 8200000000000000101, guid: 615f72dfb112df04f8c3126f4fd16233, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -132.4
+      objectReference: {fileID: 0}
+    - target: {fileID: 8200000000000000108, guid: 615f72dfb112df04f8c3126f4fd16233, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4293458687
+      objectReference: {fileID: 0}
+    - target: {fileID: 8200000000000000108, guid: 615f72dfb112df04f8c3126f4fd16233, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
