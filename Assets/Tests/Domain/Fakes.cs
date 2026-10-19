@@ -114,6 +114,23 @@ namespace Switchboard.Domain.Tests
         public void Refuse(CordId cord) => Refused.Add(cord);
     }
 
+    /// <summary>Saves kept in a dictionary instead of PlayerPrefs or the browser (9a).</summary>
+    internal sealed class MemoryStorage : ISaveStorage
+    {
+        public Dictionary<string, string> Keys { get; } = new Dictionary<string, string>();
+        public int Writes { get; private set; }
+
+        public string Read(string key) => Keys.TryGetValue(key, out string value) ? value : null;
+
+        public void Write(string key, string value)
+        {
+            Keys[key] = value;
+            Writes++;
+        }
+
+        public void Delete(string key) => Keys.Remove(key);
+    }
+
     /// <summary>Three jacks the calls use: A1, B2 and C3. "Ada wants Basil" joins A1 and B2.</summary>
     internal sealed class TestWorld
     {

@@ -83,6 +83,10 @@ public class Menu : MonoBehaviour
                                       Mouse.current.middleButton.wasPressedThisFrame))
             return true;
 
+        // Touch: a tap closes the press-start panel on phones (D28)
+        if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
+            return true;
+
         // Gamepad
         if (Gamepad.current != null && Gamepad.current.allControls.Any(c => c is ButtonControl btn && btn.wasPressedThisFrame))
             return true;

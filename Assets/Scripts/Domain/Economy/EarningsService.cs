@@ -20,6 +20,9 @@ namespace Switchboard.Domain
 
         public event Action<ConnectionFeePaidArgs> ConnectionFeePaid;
 
+        /// <summary>Every fee and per-second payment of this session, for the career stats.</summary>
+        public double TotalPaidCents { get; private set; }
+
         // Runs before CallService.Tick and pays only the time left, so the last partial second is paid exactly.
         public void Tick(double dt)
         {
@@ -49,6 +52,7 @@ namespace Switchboard.Domain
         {
             if (!(cents > 0)) return false;
             call.CentsEarned += cents;
+            TotalPaidCents += cents;
             wallet.Earn(cents);
             return true;
         }

@@ -28,15 +28,20 @@ namespace Switchboard.UI
         private void OnEnable()
         {
             if (!Application.isPlaying || rows == null) return;
-            originalCursorVisible = Cursor.visible;
+            originalCursorVisible = SystemPointer.Visible;
             Refresh(Vector3.zero);
         }
+        // Mouse and touch alike (D28); a finger leaves no hover behind.
         private void Update()
         {
-            if (Mouse.current != null && Application.isFocused)
-                ProcessPointer(Mouse.current.position.ReadValue(), Mouse.current.leftButton.wasPressedThisFrame);
+            var pointer = Pointer.current;
+            if (pointer == null || !Application.isFocused) return;
+            bool pressed = pointer.press.wasPressedThisFrame;
+            bool hover = !(pointer is Touchscreen) || pressed || pointer.press.isPressed;
+            ProcessPointer(pointer.position.ReadValue(), pressed, hover);
         }
-        public void ProcessPointer(Vector2 position, bool leftPressed)
+        public void ProcessPointer(Vector2 position, bool leftPressed) => ProcessPointer(position, leftPressed, true);
+        public void ProcessPointer(Vector2 position, bool leftPressed, bool hover)
         {
             if (EventSystem.current == null) return;
             var patch = AudioVolumeSettings.Patch;
@@ -67,7 +72,7 @@ namespace Switchboard.UI
             for (int r = 0; r < rows.Length; r++)
             {
                 for (int s = 0; s < rows[r].Sockets.Length; s++)
-                    rows[r].Sockets[s].SetHighlighted(rowIndex == r && socketIndex == s && (patch.HeldCable >= 0 || plug >= 0));
+                    rows[r].Sockets[s].SetHighlighted(hover && rowIndex == r && socketIndex == s && (patch.HeldCable >= 0 || plug >= 0));
             }
             var canvas = overlay.GetComponentInParent<Canvas>();
             var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
@@ -75,14 +80,15 @@ namespace Switchboard.UI
             Refresh(world);
             bool inside = RectTransformUtility.RectangleContainsScreenPoint((RectTransform)transform, position, camera);
             bool heldNow = patch.HeldCable >= 0;
-            hand.gameObject.SetActive(!heldNow && inside);
-            if (!heldNow && inside)
+            bool showHand = hover && !heldNow && inside;
+            hand.gameObject.SetActive(showHand);
+            if (showHand)
             {
                 hand.transform.position = world;
                 hand.Grabbing = plug >= 0;
                 hand.transform.SetAsLastSibling();
             }
-            Cursor.visible = heldNow || inside ? false : originalCursorVisible;
+            SystemPointer.Visible = heldNow || inside ? false : originalCursorVisible;
         }
         private void Refresh(Vector3 pointer)
         {
@@ -102,7 +108,7 @@ namespace Switchboard.UI
                 foreach (var socket in row.Sockets) socket.SetHighlighted(false);
             }
             if (hand != null) hand.gameObject.SetActive(false);
-            Cursor.visible = originalCursorVisible;
+            SystemPointer.Visible = originalCursorVisible;
         }
         private void OnApplicationFocus(bool focused) { if (!focused) OnDisable(); }
     }

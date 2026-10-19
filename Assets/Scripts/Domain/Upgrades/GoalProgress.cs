@@ -16,6 +16,8 @@ namespace Switchboard.Domain
             this.upgrades = upgrades ?? throw new ArgumentNullException(nameof(upgrades));
             this.wallet = wallet ?? throw new ArgumentNullException(nameof(wallet));
             upgrades.UpgradeBought += OnUpgradeBought;
+            // A secret restored from a save is simply owned: neither event fires for it.
+            affordableRaised = IsPurchased;
         }
 
         /// <summary>Raised once, the first time the balance covers the goal.</summary>

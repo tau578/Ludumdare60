@@ -144,7 +144,7 @@ Every upgrade is bought **once**. An entry looks like this:
 | `description` | One short line under the title, such as "Earn x1.5". |
 | `costCents` | The price in **cents**: 800 is $8.00, 25000 is $250.00. Must be above 0. |
 
-**Never rename an id once players have played.** Saves remember bought upgrades by id (from Step 9), so a renamed id counts as never bought. You can change the name, description and price at any time.
+**Never rename an id once players have played.** Since Step 9a the game saves the ids of the upgrades a player bought, so a renamed id counts as never bought, and an entry you delete is simply forgotten. You can change the name, description and price at any time.
 
 ### Types
 

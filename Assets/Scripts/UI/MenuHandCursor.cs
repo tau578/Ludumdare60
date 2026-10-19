@@ -10,11 +10,14 @@ namespace Switchboard.UI
         private bool originalVisible;
         public HandCursorGraphic Hand => hand;
         public void Configure(HandCursorGraphic graphic, VolumeCablePanel panel) { hand = graphic; volumePanel = panel; }
-        private void OnEnable() { originalVisible = Cursor.visible; }
+        private void OnEnable() { originalVisible = SystemPointer.Visible; }
         private void LateUpdate()
         {
-            if (Mouse.current == null || !Application.isFocused) { Hide(); return; }
-            UpdatePointer(Mouse.current.position.ReadValue());
+            // Mouse and touch alike (D28); on a touchscreen the hand shows only while a finger is down.
+            var pointer = Pointer.current;
+            if (pointer == null || !Application.isFocused) { Hide(); return; }
+            if (pointer is Touchscreen && !pointer.press.isPressed && !pointer.press.wasPressedThisFrame) { Hide(); return; }
+            UpdatePointer(pointer.position.ReadValue());
         }
         public void UpdatePointer(Vector2 position)
         {
@@ -31,12 +34,12 @@ namespace Switchboard.UI
                 hand.transform.position = world;
                 hand.Grabbing = false;
             }
-            Cursor.visible = inside || volumeOwnsPointer ? false : originalVisible;
+            SystemPointer.Visible = inside || volumeOwnsPointer ? false : originalVisible;
         }
         private void Hide()
         {
             if (hand != null) hand.gameObject.SetActive(false);
-            Cursor.visible = originalVisible;
+            SystemPointer.Visible = originalVisible;
         }
         private void OnDisable() => Hide();
         private void OnApplicationFocus(bool focused) { if (!focused) Hide(); }

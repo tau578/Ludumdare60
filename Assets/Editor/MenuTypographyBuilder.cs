@@ -43,8 +43,14 @@ namespace Switchboard.Editor
                     if (button)
                     {
                         text.enableAutoSizing = true;
-                        text.fontSizeMax = 24;
-                        text.fontSizeMin = 20;
+                        // Keep the established size; use the Options Go back button's vertical placement.
+                        text.fontSizeMax = 18;
+                        text.fontSizeMin = 12;
+                        text.margin = Vector4.zero;
+                        var position = text.rectTransform.anchoredPosition;
+                        position.y = 3.3f;
+                        text.rectTransform.anchoredPosition = position;
+                        PrefabUtility.RecordPrefabInstancePropertyModifications(text.rectTransform);
                     }
                     EditorUtility.SetDirty(text);
                     PrefabUtility.RecordPrefabInstancePropertyModifications(text);

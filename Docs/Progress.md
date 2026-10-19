@@ -16,7 +16,8 @@
 | 6. Board growth (built as 7a) | done | ✅ 2026-10-18 (25 min) | ✅ 439/439 tests, scope clean | ✅ | d166ffa |
 | 7. Hand-written calls and queues | done | ✅ 2026-10-18 (36 min) | ✅ 431/431 tests, scope clean | ✅ | 8e48320 |
 | 8. The new phone book | done | ✅ 2026-10-18 (20 min) | ✅ 445/445 tests, scope clean | ✅ | f82ed29 |
-| 9. Saves, Boot, Web build | not started | | | | |
+| 9a. Saves, touch, menu, pause | done | ✅ 2026-10-19 (37 min + 21 min fix + 24 min pause + 15 min corner) | ✅ 503/503 tests, scope clean | ✅ | 580c610 |
+| 9b. First Web build on itch | done | ✅ 2026-10-19 (37 min; cursor fixes discarded) | ✅ 517/517 tests, scope clean | ✅ | 709be9d |
 | 10. Tutorial | not started | | | | |
 | 11. Sound and feel | not started | | | | |
 | 12. Mobile and Web polish | not started | | | | |
@@ -2515,3 +2516,1070 @@ Follow-ups:
 - **The build** uses Gzip with Decompression Fallback, so the same files also run on the VPS later.
 - **Saves** go to `localStorage` (Design 5.12), because itch gives every upload a new URL.
 - **Where it's recorded:** Design D26 and §8, the Plan's Step 9 outline, and CLAUDE.md.
+
+### Step 9a prep (orchestrator, 2026-10-19)
+- **Pre-flight:** up to date with origin (`5c85114`); 445/445 EditMode green; console clean; editor idle on `Final`; no format-only re-saves.
+- **Found:** Unity's **Web Build Support module is not installed** for 6000.3.6f1 (only `MacStandaloneSupport`). The Player Settings still have Brotli (0) and no Decompression Fallback.
+- **Decisions (lead, D55):**
+  - Step 9 is split into 9a (saves and touch, testable in the editor) and 9b (the Web build on itch). The lead installs the module before 9b.
+  - On load the queue replays unfinished calls.
+  - A "New game" button in the main menu.
+  - Agents may push to the itch Draft page.
+- **Brief notes:**
+  - Sergei's menu (`MenuTemplates` asmdef) checks only keyboard, mouse and gamepad on its press-start panel, so a phone couldn't get past it. 9a adds touch there and in the volume patch.
+  - His `AudioVolumeSettings` saves the volume patch in PlayerPrefs; 9b moves it to the browser storage.
+  - itch serves every HTML game from one shared domain, so the `localStorage` keys name the game (`operator.save`).
+
+
+### Step 9a report: 2026-10-19
+Result: done
+
+Playable now: progress survives a restart. Press Play in `Final`, earn and buy (for example dev "+ $100", then `income_1` and `board_1`), stop, and press Play again. The balance is the same to the cent, the upgrades are owned, the board opens 4x4 with 3 caller slots before the first call, the extra cords are in the tray, and the shop offers the next entries. Calls that were still on cards ring again first. In `MainMenu`, "New game" sits under Continue while a save exists; it asks "Start a new game? Your money and upgrades will be lost." and "Start over" deletes the save and starts a fresh game. The cord input, the volume patch and the menu hand now read `Pointer.current`, so taps work like clicks.
+
+How to test: the Plan's Step 9a script works, with these notes:
+1. **Script step 5:** after Start over, go back to the menu before connecting a call or buying anything. A new game with nothing done writes no save (deviation 1), so New game is hidden again. Once you connect a call, the game saves and New game shows.
+2. **Script step 6:** `MainMenu.unity` has no press-start panel. `Menu.pressStartPanel` is empty, so the menu opens straight away. The touch check in `Menu.IsAnyInput` is in place for when a panel is added (9b). In the Device Simulator, tap Continue, then tap a cord and two jacks.
+3. **Dev panel:** a new "New game" button at the bottom deletes the save, career included, and reloads `Final` as a new game.
+4. **A broken save** logs one plain warning at start. For example: "Save: the saved game couldn't be read (it isn't valid JSON), so the backup of the save before it was loaded."
+
+Created:
+- **Domain** (`Assets/Scripts/Domain/Save/`):
+  - `SaveData.cs`: `SaveData` (`version`, `cents`, `fraction`, `upgrades`, `queuePosition`, `career`) and `CareerData` (`earnedCents`, `callsConnected`, `finesPaidCents`, `secondsPlayed`). `CurrentVersion` is 1.
+  - `SaveMigrations.cs`: `SaveMigration(fromVersion, Action<SaveData>)`, and `SaveMigrations.Run(data, steps, targetVersion)`, which runs one version at a time. `SaveMigrations.All` is empty, because v1 is the first format.
+  - `ISaveStorage.cs`: `Read`, `Write` and `Delete` of a string by key.
+  - `CareerStats.cs`: starts from the saved career. It counts:
+    - a call's first connection (`CallStateChanged` to Connected, not from OnHold)
+    - `FineApplied.TakenCents`
+    - ticked seconds
+    - earnings, read from `EarningsService.TotalPaidCents`
+- **Content:** `SaveFile.cs`:
+  - the keys `operator.save` and `operator.save.backup`
+  - `ToJson`, `TryParse` (with a plain reason) and `Load()`, which returns a `SaveLoad`: the data, a `SaveSource` (New, Main or Backup) and plain messages
+  - `Write` (backup first), `Delete` and `HasSave`
+- **Game** (`Assets/Scripts/Game/Save/`):
+  - `PlayerPrefsStorage.cs`: `PlayerPrefs.Save()` after each write or delete.
+  - `SaveStorage.cs`: a stateless factory, `Create()` and `OpenFile()`. 9b switches Web builds here.
+  - `Autosave.cs`: added at runtime by `GameInstaller`, like `FirstOrderGuide`. It saves after a purchase, every 10 s of unscaled time if the JSON changed, on `OnApplicationFocus(false)` and `OnApplicationPause(true)`, and on `OnDestroy`. `Stop()` ends it.
+  - `NewGameMenu.cs`: the menu's New game. It shows the button only while `HasSave`, opens and closes the confirm panel, and Start over deletes the save and calls `Menu.onPlayButtonClick()`.
+- **Tests:**
+  - `Assets/Tests/Domain/SaveFileTests.cs` (18 cases)
+  - `Assets/Tests/Domain/SaveSessionTests.cs` (19 cases)
+  - `Assets/Tests/Game/Editor/SaveIsolationTests.cs` (1)
+  - all with `.meta`, plus the folder metas for `Domain/Save` and `Game/Save`
+
+Changed:
+- **Domain:**
+  - `GameSession`:
+    - The constructor takes an optional `SaveData`. It restores the wallet's cents and fraction, then `Upgrades.Restore(ids)` before `StatSheet` is built, and `Queue.Restore(position)` after the queue is built. `Career` comes last.
+    - New members: `CaptureSave()`, `Career`, `IsRestored` and `HasProgress`. `Career.Tick` runs in `Tick`, right after the clock.
+  - `UpgradeService`:
+    - `Restore(ids)`: known ids only, nothing spent, no event.
+    - `OwnedIds()` in file order, and `OwnsAny`.
+  - `CallQueue`:
+    - It keeps a small list of the live calls dealt from the current pool, with their pool index. The list is cleared on `Restart` and pruned on `CallEnded`.
+    - `ResumePosition` returns the oldest such live call's index, or `Position` when there is none.
+    - `Restore(position)`: a position outside the pool starts at 0. `TakeNext` now returns the index.
+  - `GoalProgress`: `affordableRaised` starts as `IsPurchased`, so a loaded secret fires neither event.
+  - `EarningsService`: `TotalPaidCents`, every fee and per-second payment of the session. This is the earnings hook: it adds one double, with no event and no allocation per frame. Dev money doesn't count.
+- **Game:**
+  - `GameInstaller`:
+    - It loads the save after the content and before the session, and logs each `SaveLoad` message as one warning.
+    - It binds `Autosave` and passes the dev panel a New game action.
+    - All of this happens **only in Play Mode** (deviation 2).
+  - `DevPanel`: `Bind(..., Action startNewGame)`, plus the "New game" button.
+- **UI (touch, D28):**
+  - `CableInputController.Update` reads `Pointer.current` (`position`, `press.wasPressedThisFrame`). On a `Touchscreen` with no finger down, it hides pointers entirely while no cord is held. While a cord is held, the cord stays where the finger lifted, with no hover halo, tray highlight or hand.
+  - New overload `ProcessPointer(position, pressed, hover)`. The old two-argument one calls it with `hover: true`, so the integration checks are unchanged. `UpdatePointers` takes `showHand`.
+  - `VolumeCablePanel`: the same change, including a `ProcessPointer(position, pressed, hover)` overload. With hover off, the socket highlights and the hand stay hidden.
+  - `MenuHandCursor`: reads `Pointer.current`. On a touchscreen the hand shows only while a finger is down.
+  - `Menu.IsAnyInput` (Sergei's `MenuTemplates`): `Touchscreen.current.primaryTouch.press.wasPressedThisFrame` counts as input.
+  - `BoardGoldLight` stays on `Mouse.current`. It only reacts to hover (a soft light that follows the cursor), so there is nothing to tap.
+- **Tests:** `Fakes.cs` gains `MemoryStorage`, an in-memory `ISaveStorage` that counts writes.
+- **Docs:**
+  - `Docs/EconomyFile.md`: the "Never rename an id" line now says that since Step 9a the game saves bought ids, so a renamed id counts as never bought and a deleted entry is forgotten.
+  - `Docs/Plan.md` §8: the touch row is narrowed to what's left.
+
+Scene and prefab changes:
+- `Assets/Scenes/MainMenu.unity`. Sergei's `StartMenu` prefab asset is untouched. Everything is a scene object or an override:
+  - **New scene objects:**
+    - `StartMenu/MainMenu/New_Game_Button` (with `New_Game_Text`): a copy of the scene-only `Continue_Button`, the same style and 3x scale, text "New game", and no persistent listener. `NewGameMenu` adds its listener.
+    - `StartMenu/NewGameMenu`: an active, full-stretch RectTransform holding the `NewGameMenu` component. Its references: `menu`, `newGameButton`, `confirmPanel`, `startOverButton` and `cancelButton`.
+    - `StartMenu/NewGameMenu/ConfirmPanel` (inactive): a full-screen backdrop (black at 60%, a raycast target on purpose, so it is modal) and a 1100×420 cream `Plate` with the UISprite.
+      - `Message`: "Start a new game? Your money and upgrades will be lost.", 44 pt Della Respira, no auto size, raycast off.
+      - `Start_Over_Button` at (-260, -100) and `Cancel_Button` at (260, -100), copies of the menu buttons.
+  - **Overrides:** the six menu buttons are re-spaced 110 apart so New game fits under Continue: Play Game 225, Continue 115, New game 5, Options -105, Credits -215, Quit -325. The old 122 spacing with 90 px tall buttons left no room (deviation 4).
+  - The rest of the diff is Unity reordering existing YAML blocks. I checked the counts of the existing objects and overrides; they are the same as before.
+  - Glyphs: `Della Respira SDF` (dynamic) has every character of the new texts (`HasCharacters` true, none missing).
+  - Our buttons sit under `Menu`, so `SceneUiAudio` gives them the click sound, and `Menu.Awake` turns off their navigation like the others.
+- `Final.unity`, `Game.prefab` and every other prefab are unchanged. `Autosave` is added at runtime.
+
+Tests: 483/483 EditMode (445 before; 38 new).
+- **`SaveFileTests`:**
+  - the key names
+  - round trip
+  - a 9,000,000,000,123¢ balance and a 1/3 fraction survive the JSON
+  - empty storage gives a quiet new game
+  - a v1 JSON string loads
+  - missing fields keep their defaults
+  - an injected v1→v2→v3 chain runs once, in order, and an up-to-date save runs nothing
+  - a v1 save needs no steps
+  - a v7 save with unknown fields loads what it can, with one "newer version" message
+  - the backup holds the previous good save
+  - the same save twice keeps the older backup
+  - a corrupt main (broken JSON, empty, `{}`, an array) falls back to the backup, with one message and the broken data kept
+  - corrupt main and backup give a new game with one message
+  - a broken main is never copied over the backup
+  - Delete removes both keys and keeps other keys
+- **`SaveSessionTests`:**
+  - capture, then JSON, then load gives the same balance, fraction, ids, stats, queue position and career, and unfinished calls ring again in order
+  - empty storage starts with `Economy.json`'s starting values (the real file)
+  - a loaded `board_1`+`board_2`+`wires_1`+`income_1` save (real file) opens 5×5 with 4 slots, 4 cords and ×1.5 before the first tick, and the first tick deals `call_201`–`call_204`
+  - unknown ids are ignored and missing ones are not bought
+  - restoring spends nothing and raises no `UpgradeBought`
+  - a loaded secret is `IsPurchased`, and neither goal event fires
+  - the oldest live call from the current pool wins
+  - calls from an older pool don't count
+  - no live calls gives `Position`
+  - out of range (5, 99, -1) gives 0
+  - a saved position deals from there
+  - a connection counts once across hold and resume
+  - the career counts fee and pay but not dev money, and ticked seconds
+  - fines count the amount taken (150 of a 200 fine)
+  - the career adds to the saved numbers
+  - `HasProgress` is false until something happens
+  - a capture is a snapshot
+- **`SaveIsolationTests`:** an EditMode game ignores a planted real save, adds no `Autosave` and leaves the key untouched. Without the Play Mode gate the first run failed 4 Game tests: their sessions autosaved into the real PlayerPrefs and leaked a `board_1` save between tests. I deleted those leaked keys.
+
+Console: clean. Only the known MCP "WebSocket is not initialised" and "TCS … already completed" lines and the engine's two "memoryless" lines around screenshots appeared.
+
+Screenshots (`Temp/Captures/`):
+- `step-09a.png`: the game after a reload with `board_1`, `income_1` and `wires_1` bought: $177.00, a 4×4 board, 4 cords, three cards (call_102–104, which were on cards at the stop), and the shop offering `wires_2`, `board_2` and `income_2`.
+- `step-09a-menu.png`: the menu with New game under Continue.
+- `step-09a-confirm.png`: the confirm panel over the dimmed menu.
+
+Checked in Play Mode (stepped frames):
+- **Fresh start:** $0, 3×3, 2 slots, 2 cords, no save written.
+- **Earn and buy:** dev money, then `income_1` and `board_1` saved at once, then `wires_1` (4 cords in the tray). "Clear calls" moved the queue to call_102–104, and I took call_103.
+- **Stop:** the save had `queuePosition` 1, and the backup held the previous save.
+- **Reload:**
+  - restored, $177.00 and 0.25¢
+  - 4×4 with 16 open jacks, 3 slots, 4 cords on the bridge, ×1.5
+  - the shelf showed `wires_2`, `board_2` and `income_2`
+  - call_102, 103 and 104 rang again (all Incoming)
+- **`MainMenu` with a save:**
+  - New game was shown.
+  - Clicking it (EventSystem raycast clicks) opened the confirm panel. Cancel closed it and kept both keys.
+  - Start over deleted both keys and loaded a fresh `Final`: not restored, $0, 3×3, 2 cords.
+- **`MainMenu` without a save:** New game was hidden. Continue loaded `Final`.
+- **Dev "New game":** buying `income_1` wrote a save. New game deleted both keys and reloaded `Final` fresh, and the old session did not re-save on destroy.
+- **Corrupt main plus good backup:** the backup loaded (4321¢, ×1.5) with the one plain warning above.
+- **Touch path:** taps through `ProcessPointer(pos, true, true)`, with `(pos, false, false)` for "finger up" in between:
+  - picked a cord (still held after the finger lifted, hand off)
+  - plugged C1 (OneEndConnected)
+  - plugged C3 (Connected C1–C3, no cord held), with no hand or hover between taps
+- **Real taps:** I tried a simulated `Touchscreen` device too. Its state reached the device, but the EventSystem and `Application.isFocused` ignore input while Unity is in the background, so a real tap can't be driven from an agent. For that test I set `InputSystem.settings.editorInputBehaviorInPlayMode` in memory and restored it straight away. It is the in-memory default settings object, not an asset, so no file changed. I removed the device.
+- **Smoke run:** about 24 s of game time at ×10 with no errors.
+
+Housekeeping:
+- **PlayerPrefs:** `operator.save` and `operator.save.backup` are deleted, so the lead's playtest starts fresh. `Switchboard.AudioPatch.v1` is untouched.
+- **Format-only re-saves:** the dynamic fonts `Della Respira SDF.asset` (glyphs added by the glyph check and Play) and `Boecklins Universe SDF.asset` (test run) were discarded with `git checkout`. `TimeManager.asset` and `SampleScene.unity` were not touched.
+- **Editor:** not in Play Mode and not paused, `timeScale` 1, no callbacks, SessionState keys or extra input devices left, the Game view at 1920×1080, and `Final.unity` active and not dirty.
+- **Git:** nothing staged or committed.
+
+Deviations from Design/Plan:
+1. **A new game with nothing done writes no save.** `GameSession.HasProgress` is true once money moved from the start, anything is owned or a call connected, and always for a loaded save. `Autosave` skips the write until then. Without this, the `OnDestroy` save on stop would write a save at once, and the playtest's "back in the menu the button is hidden" after Start over could never hold. Time played alone isn't progress.
+2. **Saves only in Play Mode.** `GameInstaller` uses the save and `Autosave` only when `Application.isPlaying`, because the Game EditMode tests build `Final` through `GameInstaller.Start` and were writing the player's real save. `SaveIsolationTests` guards this. The dev panel's New game is likewise only wired in Play Mode.
+3. **No press-start panel to close.** `MainMenu.unity`'s `Menu.pressStartPanel` is empty, so the menu shows at once. Touch was added to `IsAnyInput` as the brief asks, but in this scene there is nothing for it to close yet (9b's audio unlock needs one).
+4. **The menu buttons were moved** (overrides on Sergei's instance) to fit New game under Continue with even 110 spacing. The confirm panel's buttons keep the menu's 3x style.
+5. **Unknown ids are dropped on the next save.** They are ignored on load, as the brief says, and not carried along, so an entry the designer deletes and later restores is no longer owned.
+6. **Career earnings** are kept to the whole cent (rounded at each capture), so at most half a cent is lost per session. The wallet's own fraction is saved exactly.
+7. **The 10 s check writes almost every time** during play, because `secondsPlayed` changes. That's one small PlayerPrefs write every 10 s, never per frame.
+8. **Migrations work on `SaveData`, not raw JSON.** A later step that renames a field keeps the old field in `SaveData` for its migration to move. `JsonUtility` fills fields a file leaves out with their defaults.
+9. **Load messages are warnings** ("Save: ..."), one per fallback. A backup that is also from a newer version gives two.
+
+Follow-ups:
+- **"Play Game" and "Continue"** both load the game (`onPlayButtonClick`). With saves, Play Game now also continues, which may confuse players. The lead could drop it or decide what it means.
+- **Design.md (orchestrator):**
+  - 5.12: the key is `operator.save`, not `switchboard.save`; New game, `HasProgress` and the Play Mode gate.
+  - 4.4: step 2 is built.
+  - 5.10: `CareerStats` is built, earnings via `EarningsService.TotalPaidCents`.
+  - 6.2: the career is owned by `GameSession.Career`.
+  - 4.5's touch line is done.
+  - §3: the `ProcessPointer(position, pressed, hover)` overloads on `CableInputController` and `VolumeCablePanel`.
+- **9b:** `SaveStorage.Create()` is the single switch point for `BrowserStorage`. `Autosave.SaveNow()` is public, ready for a `.jslib` `visibilitychange` hook. A press-start panel in `MainMenu` would give the audio-unlock tap.
+- **Real touch checks** need the lead: the Device Simulator now, a phone in 9b/12. The menu buttons are 480×90 reference px, fine for fingers. The confirm buttons are the same size.
+
+#### Step 9a verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 483/483 green (445 before, 38 new). Console clean. My run left no format-only re-saves.
+- **Scope:** 13 tracked files changed plus the new Save folders, codec and tests. All of them were named in the brief or the launch notes; nothing is staged.
+  - `MainMenu.unity`: +1288/−151. The removed lines are Unity reordering existing blocks (the `LevelLoader` prefab instance moved); the new objects are `New_Game_Button` and `NewGameMenu`.
+  - `Final.unity` and every prefab are unchanged.
+- **Screenshots checked:**
+  - `step-09a.png`: a reloaded game at $177.00 on a 4×4 board with 4 cords and three unfinished calls back on cards.
+  - `step-09a-menu.png`: Play Game, Continue, New game, Options, Credits, Quit.
+  - `step-09a-confirm.png`: the confirm plate with Start over and Cancel.
+- **Code skim:**
+  - `GameSession` restores before `StatSheet`, `CallQueue` and the shelf are built.
+  - `CallQueue` remembers each dealt call's pool index, so `ResumePosition` is exact.
+  - `SaveFile.Write` copies the previous main save to the backup only when it still parses.
+  - `Autosave` captures only on its occasions.
+  - `GameInstaller` opens the save only in Play Mode.
+- **Docs updated:**
+  - `Design.md`: the 9a status row, 4.4, 4.5 touch, 5.10 `CareerStats`, and the 5.12 deviations.
+  - `Plan.md`: §4 (saves in tests), the Step 9b notes, and Step 10 (the guide on reload).
+  - `CLAUDE.md`: the next step.
+- **For the lead at the playtest:** the 5.12 deviations, plus the question of the menu's "Play Game" and "Continue" buttons, which now do the same thing.
+
+#### Step 9a playtest (lead, 2026-10-19), menu fix requested
+- The menu was confusing: "Play Game" and "Continue" did the same thing.
+- **The lead's new order** (D55 amended):
+  - **No save:** New Game first, then Options, Credits, Quit. Continue is hidden, and New Game starts at once with no question.
+  - **With a save:** Continue first, then New Game (with the confirmation), Options, Credits, Quit.
+- **Play Game is removed** from the menu prefab, not just hidden (lead).
+- Sent to a fix agent.
+
+
+### Step 9a fix report: 2026-10-19
+Result: done
+
+Playable now: the main menu follows the lead's new order. Without a save it shows New Game, Options, Credits, Quit Game; New Game goes straight into a fresh game. With a save it shows Continue, New Game, Options, Credits, Quit Game; Continue loads the game, and New Game opens the confirm panel. "Play Game" is gone. Every button label is centred in its plate. In Options the mute socket is now first on the left of each row: mute, 25, 50, 75, 100.
+
+How to test:
+1. **No save.** Delete the save (dev panel "New game", or start fresh), open `MainMenu` and press Play. You see four buttons, evenly spaced, with New Game first. Click New Game: `Final` loads as a new game with no question.
+2. **With a save.** Earn something in `Final` so the game saves, then go back to `MainMenu`. You see five buttons with Continue first. Continue loads your game. New Game opens the panel: Cancel closes it, and Start over deletes the save and starts fresh.
+3. **Labels.** Every label sits in the middle of its plate, including Start over and Cancel. Descenders (p, y, Q) no longer hang below the plate.
+4. **Volume.** Options: each row reads mute, 25, 50, 75, 100. Your saved patch comes back as it was (yours is Master 100, Music 25, SFX 100). Plugging into the leftmost socket mutes that channel.
+
+Created:
+- `Assets/Tests/Game/Editor/MainMenuLayoutTests.cs` (+ `.meta`): 8 tests.
+
+Changed:
+- `Assets/Scripts/Game/Save/NewGameMenu.cs`:
+  - new fields `continueButton`, `menuButtons` (top to bottom), `centreY` (-50) and `spacing` (122)
+  - `Apply(hasSave)` shows or hides Continue, closes the panel, and lays out the active buttons
+  - `OnNewGame()` starts at once without a save and asks with one
+  - `SlotY(index, count, centre, spacing)` is a static helper, so the layout can be tested
+- `Assets/Tools/rodrigo_menu_tools/Runtime/Prefabs/StartMenu.prefab` (Sergei's menu prefab):
+  - `Play_Game_Button` and its text are deleted
+  - the references to it are cleared: `Menu.MainMenuFirstButton` (no code reads it), `Options_Button`'s select-on-up, `Quit_Game_Button`'s select-on-down, and the prefab `EventSystem`'s first-selected (`Menu` clears the selection at run time anyway)
+  - labels `Options_Text`, `Credits_Text`, `Quit_Game_Text`: auto size 12–18, bottom margin 3, Center/Middle, stretched with zero offsets. `Credits_Text` lost a trailing line break ("Credits\n").
+- `Assets/Scenes/MainMenu.unity`:
+  - the 11 orphaned overrides on `Play_Game_Button`/`Play_Game_Text` are removed with `PrefabUtility.RemoveUnusedOverrides`
+  - the scene's font-size overrides (max 24, min 20, auto size) on the three prefab labels are reverted, so the prefab's values apply. The scene keeps its font override (Della Respira).
+  - `New_Game_Text` now reads "New Game"
+  - `Continue_Text`, `New_Game_Text`, `Start_Over_Text` and `Cancel_Text` get the same label settings
+  - `NewGameMenu` is wired to Continue and the five buttons
+  - the stored button positions are the "with a save" layout: 194, 72, -50, -172, -294
+- `Assets/Prefabs/UI/VolumeCablePanel.prefab` (the three rows in Options) and `Assets/Prefabs/UI/MasterVolumeCableSlider.prefab` (the old single row, inactive in the scene):
+  - sockets and labels moved: mute -300, 25 at -95, 50 at 110, 75 at 315, 100 at 520
+  - the resting plugs and wires were redrawn at the default socket
+  - re-saving also wrote default values for fields added to the socket, plug and cable graphics since these prefabs were last saved (`faceSprite`, `dimmedTint`, `heldSprite`, `insertedSprite`, `artworkTint`, `thicknessScale`). They are defaults, so nothing looks different.
+- `Assets/Scripts/UI/AudioVolumeSettings.cs`: one comment. The level table is unchanged.
+- `Assets/Editor/VolumeCableSliderBuilder.cs`: a rebuilt row puts mute first (`x = -300 + (i + 1) % 5 * 205`).
+- `Assets/Editor/MenuTypographyBuilder.cs`: button labels get 18/12 and the bottom margin, so re-running "Apply Main Menu Fonts" won't undo the centring. If re-run, it would also apply these values to the two "Go back" buttons, which this pass left alone.
+- `Docs/Design.md` 5.12: deviation 7 rewritten.
+
+How it works:
+- **Spacing:** the visible buttons are positioned from `NewGameMenu` (no layout group). Sergei's buttons are prefab children and the two new ones are scene objects, so they can't share a layout-group parent without changing the prefab's structure. The visible buttons sit 122 apart (the prefab's original spacing), centred on y -50, the same centre as the 9a column.
+- **Volume:** I moved the sockets on screen and kept their indices. Socket 4 is still mute and 0–3 are still 25–100, so every saved `Switchboard.AudioPatch.v1` keeps its meaning with no migration, and the default patch (all three rows at 50 %) is unchanged. The panel finds sockets by object, not by position, so no code had to change. The game scene (`Final`) has no volume patch; only `MainMenu` shows one.
+- **Labels:** the TMP alignment was already Center/Middle, and the rects were already stretched with zero offsets. Measured in Play Mode, the capitals were centred to within 0.3 units. The real cause was size: auto size filled the 30-unit plate at 21.9–24 pt, so lowercase-heavy words looked low, and descenders and the Q's tail hung below the plate. Della Respira's metrics at 90 pt: ascent 96.5, cap height 72, x-height 42, descent -26.7. At 18 pt with a 3-unit bottom margin (the text is raised 1.5 units), the mixed-case word is centred and the descenders stay on the plate.
+
+Tests: 491/491 EditMode (483 before; 8 new in `MainMenuLayoutTests`):
+- the slot maths (5 and 4 buttons)
+- without a save (preview scene of `MainMenu`): New Game, Options, Credits, Quit, evenly spaced and centred, with Continue hidden
+- with a save: Continue first, and New Game opens the panel, which Cancel closes
+- no `Play_Game` object is left in the prefab or the scene, and the menu, buttons, `NewGameMenu` and EventSystem have no missing references
+- all 7 labels are Center, stretched with zero offsets, 18 max and margin 3, with no stray whitespace. Every character is in Della Respira's source font, checked with `FontEngine.TryGetGlyphIndex` (the font is dynamic, so the saved atlas isn't the reference; the check does say "→" is missing).
+- the mute socket is drawn first in both volume prefabs, with each label over its socket
+- old socket indices keep their volumes (25 %, mute, 100 %), and the default patch stays at 50 %
+
+Console: clean. The only lines were the known MCP "WebSocket is not initialised" and the engine's two "memoryless" lines around screenshots.
+
+Screenshots (`Temp/Captures/`):
+- `step-09a-menu-nosave.png`: New Game, Options, Credits, Quit Game, centred labels
+- `step-09a-menu-save.png`: Continue, New Game, Options, Credits, Quit Game
+- `step-09a-confirm.png` (replaced): the confirm panel with centred Start over and Cancel
+- `step-09a-volume.png`: Options with mute first in all three rows, showing the lead's own patch
+
+Checked in Play Mode (stepped frames, EventSystem raycast clicks):
+- **No save:** Continue hidden, and New Game first at y 133 (4 slots). Clicking New Game loaded `Final` at once with no panel: not restored, $0, nothing owned.
+- **With a save** (a test save):
+  - Continue first at 194, and New Game at 72.
+  - New Game opened the panel. Cancel closed it and kept the save.
+  - New Game, then Start over, deleted both keys and loaded a fresh `Final`.
+- **Smoke run:** about 24 s of game time in `Final` at ×10, with no errors. Stopping wrote no save (nothing happened).
+- **Volume:** the lead's patch showed Music on the 25 socket (second from the left). Picking up the Music plug and plugging it into the leftmost socket gave socket 4 and volume 0.
+
+Housekeeping:
+- **PlayerPrefs:** `operator.save`, `operator.save.backup` and `Switchboard.AudioPatch.v1` were read at the start and written back exactly as found (the lead's $10.00 save with its backup, and the patch `[3,0,3]`). No other keys were touched.
+- **Format-only re-saves discarded** with `git checkout`: `Della Respira SDF.asset` and `Boecklins Universe SDF.asset`. `TimeManager.asset` and `SampleScene.unity` were not touched.
+- **Editor:** not in Play Mode and not paused, `timeScale` 1, no callbacks or SessionState keys left, the Game view at 1920×1080, `Final.unity` open, active and saved, and the console cleared.
+- **Git:** nothing staged or committed.
+
+Deviations from Design/Plan:
+1. The labels are smaller (18 pt maximum instead of 24). Centring them in the 30-unit plates meant the descenders had to fit.
+2. `Menu.MainMenuFirstButton` is cleared, not re-pointed: no code reads it, and the prefab can't reference the scene's Continue button.
+
+Follow-ups:
+- The two "Go back" buttons (Options, Credits) still use 24/20 auto size, so their labels look large and a little low, as the menu buttons did before. They weren't in the list; the same settings would fix them.
+- The quit label reads "Quit Game" (Sergei's text). The lead's list says "Quit"; I left the text alone.
+- **Missing music tracks.** `RandomMusicPlayer.tracks` in `StartMenu.prefab` and `Music_randomizer.prefab` points to two audio files (GUIDs `a84ac8ff…` and `e974b80e…`) that aren't in the repo at HEAD. So the menu music references are missing, in the scene too. This predates the fix, and the new missing-reference test skips that component.
+
+#### Step 9a fix verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 491/491 green. Console clean, and no format-only re-saves are left.
+- **Scope:** the fix touched `NewGameMenu`, `StartMenu.prefab` (Play Game deleted), `MainMenu.unity`, both volume prefabs, `AudioVolumeSettings` (a comment only), `VolumeCableSliderBuilder`, `MenuTypographyBuilder` and the new `MainMenuLayoutTests`. All of them follow from the lead's three items.
+- **Screenshots checked:**
+  - `step-09a-menu-save.png`: Continue, New Game, Options, Credits, Quit Game, evenly spaced, with the labels centred.
+  - `step-09a-volume.png`: mute first on every row. The lead's patch is restored (Master 100, Music 25, SFX 100).
+- **The volume sockets moved on screen and kept their numbers,** so saved patches need no conversion.
+- **Missing menu tracks:** the two missing audio GUIDs (`a84ac8ff…`, `e974b80e…`) belong to the menu package's `Music_randomizer` and have been missing since the package was added (`3522d9a`). They're in Plan §8 now.
+
+#### Step 9a playtest, round 2 (lead, 2026-10-19)
+- **Volume patch:** the sockets sit a bit right of each row's centre. Fix: centre them.
+- **No way back to the main menu.** The lead chose a pause menu (D56), built now with the socket fix as "Step 9a, pass 2" (Plan), before 9b.
+
+
+### Step 9a pass 2 report: 2026-10-19
+Result: done
+
+Playable now: the game has a pause menu. A small pause button (two bars) sits above the board's top-left corner; it and Esc open a modal "Paused" panel with Resume, Options and Main Menu. While paused, game time stops (pay, call durations and emergency countdowns freeze), the ring and call sounds pause, and the cord input is off, so a cord held before pausing is still in hand after Resume. Options shows the main menu's volume patch, with a Back button. Main Menu saves, then loads `MainMenu`, where Continue picks the game up again. Every button click now keeps a held cord. In both Options screens the five volume sockets sit centred in each row. The menu's quit button reads "Quit".
+
+How to test: the Plan's pass 2 playtest script works as written. Notes:
+1. **Esc** while paused resumes, also from the Options page (the brief's rule); Back returns from Options to the main page.
+2. **The pause button** is above the board, not above the caller column: there is only about 60 reference px above the column, too little for an 88 px button (deviation 1).
+3. **A held cord and buttons:** holding a cord, click the pause button, a shop button or the "Keep playing" button: the cord stays in hand. Clicks on empty space, the tray and closed jacks behave as before.
+
+Created:
+- `Assets/Scripts/Game/Views/GamePauseMenu.cs` (+ `.meta`): the pause menu. `Bind(saveNow, cordInput, book, callAudio, sceneLoader = null)`, `Pause()`, `Resume()`, `HandleEscape()`, `ShowOptions()`, `ShowMain()`, `GoToMainMenu()`, `IsPaused`, `OptionsOpen`. It reads Esc through `Keyboard.current`. Named `GamePauseMenu` because Sergei's menu package already has an unused global `PauseMenu` (`Pause.prefab`, in no scene).
+- `Assets/Tests/Game/Editor/GamePauseMenuTests.cs` (+ `.meta`): 6 tests.
+
+Changed:
+- `Assets/Scripts/UI/CableInputController.cs`:
+  - New `Suspended` property. While suspended, `Update` and `ProcessPointer` only hide the pointers: no pick, plug or drop, and `heldCable` is kept. The press in the frame that resumes is ignored, so the Resume click can't plug the jack under the button.
+  - **Every button keeps a held cord:** in the "empty space" branch, a click whose target has a `Selectable` in its parents no longer returns the cord. The only buttons on the board are the four shop slots, the book (already excluded) and "Keep playing"; the tray, sockets and cards have no `Selectable`, so their behaviour is unchanged. The check runs only on a press.
+- `Assets/Scripts/UI/PhoneBookView.cs`: `InputEnabled` (off while paused: keys and outside clicks leave the book as it is) and `ClosesOnEscape` (off once the pause menu is bound; the pause menu then closes the open book itself, so the Esc order between the two `Update`s doesn't matter).
+- `Assets/Scripts/Game/CallAudio.cs`: `SetPaused(bool)` pauses and resumes its ring and feedback sources, `IsPaused`, and a `PausedChanged` event.
+- `Assets/Scripts/Game/SceneUiAudio.cs`: listens to `CallAudio.PausedChanged` and pauses the phone babble (it lives on the `BackgroundMusic` prefab, which persists across scenes). Music and menu clicks keep playing.
+- `Assets/Scripts/Game/GameLoopRunner.cs`: no `Tick` when `Time.deltaTime` is 0, so not even a free caller slot deals a call while paused.
+- `Assets/Scripts/Game/GameInstaller.cs`: binds the scene's `GamePauseMenu` (if there is one) with `Autosave.SaveNow` (null outside Play Mode), the cord input, the book and `CallAudio`.
+- `Assets/Editor/VolumeCableSliderBuilder.cs`: sockets at `x = -410 + (i + 1) % 5 * 205`, the fixed socket at -580.
+- `Assets/Editor/VolumeOptionsBuilder.cs`: the fixed-socket line says -580 too (that socket is deleted by the wall-output conversion anyway).
+- `Assets/Tests/Game/Editor/MainMenuLayoutTests.cs`: a centred-row test (2 cases) and a "Quit" check in the label test.
+- `Docs/Plan.md` §8: the "A held cord drops on button clicks" row is removed; "the quit label reads Quit Game" is removed from "Menu leftovers".
+
+Scene and prefab changes:
+- `Assets/Prefabs/Game/GameUI.prefab`: a new `Pause` child (full stretch) with its own canvas (override sorting, order 16: above the book at 10 and the Goal dialog at 15, below the hand cursor and held plugs at 20), a `GraphicRaycaster` and `GamePauseMenu`.
+  - `PauseButton`: 88×88 at (-490, 490), the dark panel plate with the gold outline, two 14×42 cream bars (raycast off), a tinted `Button` with no navigation. It overlaps no jack, card, caller panel or shop (checked in Play Mode at 1920×1080).
+  - `Dialog` (inactive): `Blocker` (a copy of the Goal backdrop, black at 60 %, a raycast target on purpose), `Main` (600×470 plate: "Paused", Resume, Options, Main Menu, copies of "Keep playing") and `Options` (1240×900 plate, inactive: "Options", a nested `VolumeCablePanel.prefab` instance at 0.85 scale, Back).
+  - Wired: buttons, pages, `CardTakeSound`'s `UiClickSound` for the clicks, and `menuSceneIndex` 0.
+  - All labels are LiberationSans SDF (the static atlas has every glyph; the test checks it) with raycast off.
+  - The rest of the diff is Unity reordering YAML: the old prefab's 96 named objects are all still there.
+- `Assets/Prefabs/UI/VolumeCablePanel.prefab` and `Assets/Prefabs/UI/MasterVolumeCableSlider.prefab`: sockets, labels and the mute icon at mute -410, 25 at -205, 50 at 0, 75 at 205, 100 at 410; the resting plugs and wires redrawn at the 50 socket. In the single-row prefab, the fixed socket and plug moved from -530 to -580, so 70 px stay free between it and the mute socket. In the three-row panel, the cable starts at its wall anchor (-650), about 200 px from the mute socket. The socket indices are unchanged, so saved patches keep their meaning.
+- `Assets/Tools/rodrigo_menu_tools/Runtime/Prefabs/StartMenu.prefab`: `Quit_Game_Text` reads "Quit". `MainMenu.unity` has no override on that text, so nothing changed there. The label keeps the centred settings of the 9a fix.
+- `Final.unity` and `MainMenu.unity` are not changed by this pass. `Final` picks the pause menu up from `GameUI.prefab`.
+
+Tests: 499/499 EditMode (491 before; 8 new):
+- `GamePauseMenuTests` (on `Final` in a preview scene, the installer bound, then the menu re-bound with a logging save and scene loader):
+  - pause stops time, saves, shows the dialog, suspends the cords, the book and the call sounds; resume restores the previous ×5
+  - Esc with the book open closes only the book; Esc again pauses; again resumes
+  - Main Menu saves, then loads build index 0, and sets `timeScale` 1
+  - Options shows the volume patch; Back returns
+  - a held cord survives pause and resume: clicks while paused change nothing, and the same click after Resume works
+  - the panel is a modal between the book and the cursor, its labels have the glyphs, and the pause button is at least 88×88 with its bars raycast off
+- `MainMenuLayoutTests`: the sockets are at -410…410 in both prefabs with room left of the mute socket (2 cases); the quit label reads "Quit".
+
+Console: clean after clearing. During Play Mode checks the engine's two "memoryless" lines appeared around screenshots, and once "the PlayerLoop internal function has been called recursively": that came from loading a scene inside an `execute_code` call while frames were stepped with `EditorApplication.Step()`, not from game code.
+
+Screenshots (`Temp/Captures/`):
+- `step-09a2-button.png` (1920×1080) and `step-09a2-button-720.png` (1280×720): the pause button above the board's top-left corner
+- `step-09a2-paused.png`: the "Paused" panel over the dimmed game
+- `step-09a2-options.png`: Options inside the pause panel, the lead's patch (Master 100, Music 25, SFX 100), sockets centred
+- `step-09a2-volume.png`: the main menu's Options with the centred sockets
+- `step-09a2-menu.png`: the main menu with Continue, New Game, Options, Credits, Quit
+
+Checked in Play Mode (stepped frames, calls inside `Canvas.willRenderCanvases`):
+- **Held cord:** picked a cord from the tray (`ProcessPointer`), then pressed at the pause button and at a shop button: still held. Pause, Options, Back, Resume: still held (`Cable_04`, Held).
+- **Freeze:** paused for 30 frames: game time stayed at 0.86 s, the emergency `call_303` kept 29.14 s left, the money didn't move, and `CallAudio` was paused. After Resume the countdown moved on (29.06) and `timeScale` was 1.
+- **Volume patch at `timeScale` 0:** picked up the Master plug, moved the pointer 200 px and the plug followed, then plugged it back into 100 %.
+- **Saves:** pausing wrote the save. With the money changed after the pause, Main Menu wrote the new balance before `MainMenu` loaded, and `timeScale` was 1 there. Continue (build index 1) restored the game at $170.24.
+- **Smoke run:** about 28 s of game time at ×10 in `Final`, no errors.
+
+Housekeeping:
+- **PlayerPrefs:** `operator.save`, `operator.save.backup` and `Switchboard.AudioPatch.v1` were read at the start (the lead's $169.00 save with 7 upgrades, its backup, and the patch `[3,0,3]`) and written back exactly as found, checked string for string.
+- **Format-only re-saves:** none this time (`TimeManager.asset`, both dynamic TMP fonts and `SampleScene.unity` are untouched).
+- **Mia's `Assets/RawArt/art.png`:** Unity generated `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta`; both are left untracked and untouched.
+- **Editor:** not in Play Mode and not paused, `timeScale` 1, `AudioListener.pause` false, no callbacks or SessionState keys left, the Game view at 1920×1080, `Final.unity` open, active and not dirty, console cleared.
+- **Git:** nothing staged or committed.
+
+Deviations from Design/Plan:
+1. **The pause button sits above the board's top-left corner, not above the caller column.** The column reaches to about 60 reference px from the top edge, and an 88 px button doesn't fit there. The strip above the board is free at every 16:9 size and far from the book, the shop and the Dev button.
+2. **Esc in Options resumes** (as the brief says) instead of going back to the main page; Back does that.
+3. **Saving dedupes:** `Autosave.SaveNow()` skips a write when the JSON equals the last one it wrote, so Main Menu right after a pause writes nothing new (the pause already saved the same state).
+4. **Clicks keep a held cord on every `Selectable`**, not only the pause button, which closes the Plan §8 item. Clicks on non-button modal backdrops (the Goal dialog's blocker) and the dev panel's IMGUI buttons still count as empty space.
+5. **While paused the book keeps its state:** its keys and outside-click closing are off, so a book left open behind the pause panel is still open after Resume.
+
+Follow-ups:
+- **Design.md (orchestrator):** D56 is built; 4.3 gains the pause canvas at order 16; §3 gains `CableInputController.Suspended`, `PhoneBookView.InputEnabled` and `ClosesOnEscape`, and `CallAudio.SetPaused`.
+- **Touch:** the pause button is 88 reference px, about 32 pt on an 844×390 phone. Fine for a mouse, a bit small for a finger; Step 12 could enlarge it or add a hit margin.
+- **The dev panel's Speed button while paused** sets `timeScale` and so runs the game behind the panel. It's dev-only; ignore it or let it respect the pause.
+- **Sergei's unused `PauseMenu` and `Pause.prefab`** in the menu package could be deleted in a cleanup to avoid confusion with `GamePauseMenu`.
+
+#### Step 9a pass 2 verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 499/499 green. Console clean.
+- **Scope:** `GamePauseMenu` plus tests (new). Changed: `GameUI.prefab` (the `Pause` child), `CableInputController`, `PhoneBookView`, `CallAudio`, `SceneUiAudio`, `GameLoopRunner`, `GameInstaller`, the two volume prefabs and their builders, `StartMenu.prefab` (Quit) and `MainMenuLayoutTests`. `Final.unity` is unchanged.
+  - Mia's `Assets/RawArt/art.png` came in with `5b028d9` (fast-forward); Unity generated `Assets/RawArt.meta` and `art.png.meta`, untracked.
+- **Selectable check:** the tray, sockets and board prefabs have no `Selectable`, so clicking the tray still returns a held cord. Only buttons keep it.
+- **Screenshots checked:**
+  - `step-09a2-button.png`: the pause button above the board's top-left corner, clear of the cards.
+  - `step-09a2-paused.png`: the "Paused" panel.
+  - `step-09a2-options.png`: the volume patch inside it, centred.
+  - `step-09a2-volume.png`: the main menu's Options, centred, mute first.
+- **For the lead:** the pause panel and button have a placeholder look (LiberationSans, flat green), not the menu's serif style. Mia could draw them.
+
+#### Step 9a playtest, round 3 (lead, 2026-10-19)
+- **The pause button moves to the top-right corner** (lead's choice). It is anchored to the screen corner, and the editor-only Dev button moves aside.
+- **Quit only in Windows and Mac builds.** It is hidden in the Web build, where `Application.Quit` does nothing. This moves forward from the 9b outline.
+
+
+### Step 9a pass 3 report: 2026-10-19
+Result: done
+
+Playable now: the pause button sits in the screen's top-right corner. It is anchored to that corner, so it follows the real corner at every aspect ratio. The dev panel's "Dev" button sits just left of it. The main menu hides Quit in Web builds and closes the gap: with a save it shows Continue, New Game, Options, Credits; without one, New Game, Options, Credits. The editor and the Windows and Mac builds still show Quit.
+
+How to test:
+1. Play `Final` at 1920×1080, 1280×720 and 844×390. The pause button is in the top-right corner, above the shop panel and clear of the money plaque. "Dev" is left of it. Click Dev: its buttons open as a row going left along the top edge, above the board.
+2. The pause button works as before: the panel opens, and Resume brings the game back.
+3. In the editor, the main menu still shows Quit. The Web layout is covered by `MainMenuLayoutTests` and the screenshot `step-09a3-menu-web.png`; the real Web check comes with the 9b build.
+
+Created: none.
+
+Changed:
+- `Assets/Scripts/Game/Save/NewGameMenu.cs`:
+  - New `quitButton` field.
+  - `QuitAvailable` is false only in Web players (`UNITY_WEBGL && !UNITY_EDITOR`).
+  - `Apply(saveExists)` now calls the new `Apply(saveExists, quitVisible)`, which shows or hides Quit before the evenly spaced layout runs, so a hidden Quit leaves no gap.
+- `Assets/Scripts/Game/DevTools/DevPanel.cs`:
+  - "Dev" now sits left of the pause button: 6 px from the top, 84 px in from the right edge (the button's 6 px margin, its 72 px width and a 6 px gap).
+  - When open, its buttons form a row going left at the same height, not a column going down (deviation 2).
+- `Assets/Tests/Game/Editor/GamePauseMenuTests.cs`: the 88 px size check moved into a new corner test (below).
+- `Assets/Tests/Game/Editor/MainMenuLayoutTests.cs`: Web cases (below).
+- `Docs/Design.md` 4.3: the pause-menu line now gives the 72 px size, the corner anchor, the Dev button and `QuitAvailable`.
+- `Docs/Plan.md` 9b outline: the Quit item now says 9a pass 3 did it.
+
+Scene and prefab changes:
+- `Assets/Prefabs/Game/GameUI.prefab`, `Pause/PauseButton`:
+  - anchors and pivot moved to (1, 1), the top-right corner; position (-6, -6); size 72×72 (it was 88×88 at (-490, 490) from the centre)
+  - the two bars scaled down to match: 12×34 at ±10 (they were 14×42 at ±12)
+  - nothing else in the prefab changed
+- `Assets/Scenes/MainMenu.unity`: `NewGameMenu.quitButton` is wired to the `StartMenu` instance's `Quit_Game_Button`. That one field is the only change this pass made to the scene.
+- `Final.unity`: not changed.
+
+Tests: 503/503 EditMode (499 before; 4 new):
+- `GamePauseMenuTests.ThePauseButtonSitsInTheTopRightCorner`:
+  - anchors and pivot at (1, 1), at least 72×72, with a margin of 0 to 16 px
+  - its bottom edge at most 80 px from the top, so it stays above the shop
+  - the `Pause` parent stretches over the whole screen
+- `MainMenuLayoutTests.OnWebQuitIsHiddenAndTheRestStayEvenlySpaced` (two cases, with and without a save): the expected buttons in order, evenly spaced around the centre, and Quit inactive. Showing Quit again puts it back last.
+- `MainMenuLayoutTests.QuitShowsInTheEditorAndDesktopBuilds`: `QuitAvailable` is true in the editor, and `Apply(true)` shows Quit.
+
+Console: clean (cleared at the end). The engine's two "memoryless" lines appeared around screenshots in Play Mode.
+
+Screenshots (`Temp/Captures/`):
+- `step-09a3-corner.png` (1920×1080): the pause button in the corner with "Dev" left of it
+- `step-09a3-corner-phone.png` (844×390): the same on a wide phone, where the corner is well right of the shop
+- `step-09a3-dev-open.png` (1920×1080): the opened dev row along the top edge
+- `step-09a3-menu-web.png`: the main menu with `Apply(true, false)`: Continue, New Game, Options, Credits, evenly spaced
+- `step-09a3.png`: the smoke run
+
+Checked in Play Mode (stepped frames, checks inside `Canvas.willRenderCanvases`):
+- **Overlap check:** the pause button and all nine dev buttons were compared with every active raycast target and the shop panel and `HeaderSlot` rects, at 1920×1080, 1280×720 and 844×390. Nothing overlaps.
+
+  | Size | Pause button | Shop panel's top | Pause to shop's right edge |
+  |---|---|---|---|
+  | 1920×1080 | 6–78 px from the top | 86 px | (stacked: shop starts below) |
+  | 1280×720 | 4–52 px | 57 px | (stacked: shop starts below) |
+  | 844×390 | 2–28 px | 31 px | 56 px of free space |
+
+  The dev row spans x 1122–1836 at 1920×1080 and doesn't reach the board or the caller column.
+- An EventSystem raycast at the button's centre at 844×390 hits `PauseButton` first.
+- **Smoke run:** `MainMenu`, then `Final` via `LoadScene(1)`, about 80 s of game time at ×10. No errors or warnings from game code.
+
+Housekeeping:
+- **PlayerPrefs:** I read `operator.save`, `operator.save.backup` and `Switchboard.AudioPatch.v1` at the start: $71.00 with 5 upgrades, its backup, and the patch `[3,1,3]`. Play Mode rewrote the save, so I wrote all three back exactly as found and checked them string for string.
+- **Format-only re-saves discarded** with `git checkout --`: `ProjectSettings/TimeManager.asset`, `Assets/Fonts/BoecklinsUniverse/Boecklins Universe SDF.asset` and `Assets/Fonts/DellaRespira/Della Respira SDF.asset`. `SampleScene.unity` was untouched.
+- `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta` are left as they were.
+- **Editor:**
+  - not in Play Mode
+  - `timeScale` 1, `AudioListener.pause` false
+  - no callbacks or SessionState keys left
+  - the Game view at 1920×1080
+  - `Final.unity` open, active and not dirty
+  - console cleared
+- **Git:** nothing staged or committed.
+
+Deviations from Design/Plan:
+1. **The pause button is 72×72, not 88.** At 16:9 the shop panel's art starts 86 px from the top, right under the corner. An 88 px button with a margin would reach into it. On wider screens the corner moves right of the shop, but one fixed size keeps the layout simple.
+2. **The open dev panel is a row along the top edge, not a column.** A column below the pause button, or below a Dev button left of it, would hang over the shop slots. Each slot is a buy `Button` 390 px wide, and an IMGUI click there also clicks the slot under it. The old column already overlapped slot 1's right edge. The row keeps the same buttons in the same order, going left from "Close", and covers nothing clickable.
+
+Follow-ups:
+- Plan §4's "Dev panel (2a)" row still says the button is in the top-right corner. It is now just left of the pause button and opens as a row (orchestrator).
+- On an 844×390 phone the pause button is 26 physical px. That's fine for a mouse but small for a finger, so Step 12 could add a larger invisible hit area. There's room for one in the corner on wide phones.
+
+#### Step 9a pass 3 verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 503/503 green. Console clean, and no re-saves are left.
+- **Scope:** `NewGameMenu` (`quitButton`, `QuitAvailable`), `DevPanel` (the Dev button left of pause, the panel as a row), `GameUI.prefab` (`PauseButton` anchored top-right, 72×72), `MainMenu.unity` (one reference), and two test files.
+- **Screenshots checked:**
+  - `step-09a3-corner.png`: the pause button in the top-right corner above the shop, with Dev to its left.
+  - `step-09a3-menu-web.png`: Continue, New Game, Options, Credits, evenly spaced.
+- **For the lead:** the button is 72 px, not 88, so it clears the shop's top edge. On phones it may be small for a finger; Step 12 can add a bigger invisible hit area.
+- Committed and pushed on the lead's request (2026-10-19), with no teammate pushes since `5b028d9`. The lead's playtest of pass 3 isn't confirmed yet.
+- Left out of the commit: `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta`, which Unity generated for Mia's `art.png`.
+- **Playtest (lead, 2026-10-19):** 9a is OK, including pass 3 (the pause button in the corner, Quit hidden on Web). Every deviation listed in the 9a reports and Design 5.12 is accepted. Step 9a is done.
+- **Web Build Support** for 6000.3.6f1 is installed (`PlaybackEngines/WebGLSupport`), and Unity was restarted. Step 9b is unblocked.
+
+### Step 9b prep (orchestrator, 2026-10-19)
+- **Pre-flight:**
+  - `git fetch`: up to date with origin (`e4002fe`); only the untracked `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta` (left alone, as in 9a).
+  - Unity connected (`Ludumdare60@67eac6d9bbf6b918`), idle, not in Play Mode, active scene `MainMenu`; console clean.
+  - EditMode 503/503 green; the run left no format-only re-saves.
+  - Web Build Support installed; the editor is still on the Mac platform. Player settings today: Brotli (0), no Decompression Fallback, the Default template, `productName` `ludumdare-60`.
+  - `~/bin/butler` v15.32.0 reaches `llazypixell/operator` (no channels yet).
+  - No Chrome extension is connected, so the agent checks the build in headless Chrome over the DevTools protocol with a throwaway profile (Node 26 has a built-in `WebSocket`).
+- **Brief:** the Plan's outline is now a full brief. The orchestrator's technical choices, for the lead to confirm at the playtest:
+  - a project Web template `Operator` (full-window canvas, no Unity footer, title "Operator!"), because the Default template's fixed 960×600 canvas and footer don't fit itch's frame
+  - `productName` and `companyName` unchanged, because the Mac editor's PlayerPrefs file is named after them
+  - the editor stays on the Web platform after the first build
+  - the volume patch keeps its key `Switchboard.AudioPatch.v1`
+  - a `visibilitychange`/`pagehide` hook that saves synchronously, because hidden tabs run no frames
+- **Launch:** one agent at high effort; it may push to the itch Draft page (D55).
+
+
+### Step 9b report: 2026-10-19
+Result: partial. The build, the browser saves and the local browser checks are done. **The itch push was refused:** "itch.io API error (400): Please verify your account's email address before uploading a build". The lead needs to verify the itch account's email (itch.io › Settings › Email addresses), then run `~/bin/butler push Builds/Web llazypixell/operator:html5` (the build in `Builds/Web` is ready) or ask for the push. `butler status llazypixell/operator` still shows no channel.
+
+Playable now: `Tools/Switchboard/Build Web` builds the game into `Builds/Web` (23.8 MB). Served locally, it fills the browser window with no Unity footer, shows New Game, Options, Credits (no Quit), and plays. In the browser, progress and the volume patch live in `localStorage`, so they survive a reload and a new upload, and the game saves the moment the page is hidden or closed.
+
+How to test (until the push works): build with the menu, then `cd Builds/Web && python3 -m http.server 8000` and open `http://localhost:8000`. After the push, use the Plan's playtest script. `Docs/WebBuild.md` explains building, butler, the itch page settings and where saves live.
+
+Created:
+- `Assets/Scripts/Game/Save/BrowserStorage.cs`, with two types:
+  - `BrowserStorage` (`ISaveStorage` over the `.jslib`). `IsAvailable()` probes `localStorage` by setting and removing a test key. A refused write or delete logs one warning per page load. Outside Web players it's inert: not available, reads null.
+  - `BrowserPageHidden`: `Register(Action)` and `Unregister(Action)`. It does nothing outside Web players.
+- `Assets/Scripts/Game/Save/BrowserStorage.jslib`:
+  - `localStorage` read, write and delete, and the probe, each in its own try/catch. A failure comes back as status 0.
+  - Returned strings use `_malloc` + `stringToUTF8`, as Unity 6's manual says; keys and values are read with `UTF8ToString`.
+  - `OperatorStorage_ClaimWarning(id)` keeps the "warn once per page load" flags in JavaScript.
+  - `OperatorPage_SetHiddenCallback`: listens for `visibilitychange` (only when the page becomes hidden) and `pagehide`, and calls the C# callback inside the event through `{{{ makeDynCall('v', 'cb') }}}`.
+  - Its importer is Web only: Unity's default for `.jslib`, so the `.meta` has no settings.
+- `Assets/Scripts/Game/Editor/WebBuild.cs`, the menu `Tools/Switchboard/Build Web`:
+  - applies the D26 settings (Gzip, Decompression Fallback, `PROJECT:Operator`)
+  - switches the editor to Web if needed
+  - deletes `Builds/Web` and builds the enabled build-list scenes as a release build
+  - logs one line with the time, the size and the butler command, or the build's errors
+- `Assets/WebGLTemplates/Operator/`, with metas:
+  - `index.html`, based on Unity 6's Default template, keeping its loader code, template variables and `#if` blocks
+  - `TemplateData/style.css`
+  - `TemplateData/webmemd-icon.png` (Unity's, used only by the diagnostics overlay)
+  - `thumbnail.png` (Unity's Minimal one)
+  - The template draws a canvas that fills the window and follows its size, with no footer, logo or fullscreen button.
+  - It has a dark background (`#15110d`), a plain cream-and-gold loading bar under the title "Operator!", no scrollbars, `touch-action: none` on the canvas, the viewport meta tag always on, the page title "Operator!", Unity's error and warning banner, and an empty favicon (no `/favicon.ico` 404 in the console).
+- `Assets/Tests/Game/Editor/WebBuildTests.cs` (14 tests, below).
+- `Docs/WebBuild.md`, the team guide.
+
+Changed:
+- `Assets/Scripts/Game/Save/SaveStorage.cs`: `Create()` returns `BrowserStorage` in Web players while the probe works. Otherwise it returns `PlayerPrefsStorage`, with one warning per page load. The editor and desktop builds always get `PlayerPrefsStorage`. The choice itself is the public seam `Choose(webPlayer, browserWorks, browser, warnFallback)`.
+- `Assets/Scripts/Game/Save/Autosave.cs`: `Bind` registers `SaveNow` with `BrowserPageHidden`; `Stop` (also called from `OnDestroy`) unregisters it. The summary comment now lists the hidden-page save.
+- `Assets/Scripts/Game/Save/PlayerPrefsStorage.cs`, `Assets/Scripts/Domain/Save/ISaveStorage.cs`: comments only.
+- `Assets/Scripts/UI/AudioVolumeSettings.cs`:
+  - It reads and writes its patch through `SaveStorage.Create()`, with the same key and the same JSON.
+  - New `Load(ISaveStorage)` returns a fresh `VolumePatchState`; new `Save(VolumePatchState, ISaveStorage)`.
+  - `SaveKey` is now public.
+  - It still reads at `SubsystemRegistration`. The browser check shows the `.jslib` works that early.
+- `ProjectSettings/ProjectSettings.asset`:
+  - `webGLTemplate` `APPLICATION:Default` → `PROJECT:Operator`
+  - `webGLCompressionFormat` 0 (Brotli) → 1 (Gzip)
+  - `webGLDecompressionFallback` 0 → 1
+  - `m_BuildTargetBatching` gained a WebGL entry (static and dynamic batching 0), which the platform switch wrote. Kept, as the brief says.
+  - `productName` and `companyName` are unchanged.
+
+Scene and prefab changes: none.
+
+Tests: 517/517 EditMode (503 before; 14 new in `WebBuildTests`), green both on the Mac platform and on Web:
+- `TheEditorSavesInPlayerPrefs`: `Create()` returns `PlayerPrefsStorage`, and `BrowserStorage.IsAvailable()` is false in the editor.
+- `Choose` cases:
+  - `DesktopNeverAsksTheBrowser`
+  - `AWebPlayerUsesTheBrowserWhileItsStorageWorks`
+  - `AWebPlayerWithBlockedStorageFallsBackToPlayerPrefsWithAWarning`
+- `TheVolumePatchIsStoredUnderItsKeyAndReadBack`: the exact JSON under `Switchboard.AudioPatch.v1`, then a round trip.
+- `AMissingOrBrokenPatchGivesTheDefault`, 5 cases: missing, empty, not JSON, version 2, two cables in one row.
+- `TheCommittedPlayerSettingsBuildGzipWithFallbackAndOurTemplate`, which also checks that threads are off.
+- `TheTemplateHasWhatTheLoaderNeeds`: the loader, data, framework and code variables, `createUnityInstance`, the banner, the viewport tag and the title, and no footer.
+- `TheBuildListIsMainMenuThenFinal`.
+- `TheBrowserPluginIsForWebPlayersOnly`: Web yes; editor, any platform, Mac and Windows no.
+
+Console: clean. The two Play Mode smoke runs logged only the engine's two "memoryless" lines. The console was cleared at the end.
+
+Screenshots (`Temp/Captures/`):
+- browser at 1280×720:
+  - `step-09b-menu.png`: New Game, Options, Credits
+  - `step-09b-game.png`: `Final` after New Game
+  - `step-09b-menu-with-save.png`: Continue, New Game, Options, Credits
+  - `step-09b-continue.png`: $71.00, the 4×4 board, and the shop offering `board_2` ($25) and `income_2` ($20)
+  - `step-09b-options.png`: the planted patch: Master 25, Music mute, SFX 100
+- browser at 844×390 with touch:
+  - `step-09b-phone-menu.png`
+  - `step-09b-phone.png`: the game after a tap on New Game
+- editor: `step-09b.png`, the smoke run in `Final` reached from `MainMenu`
+
+The build:
+- First run of the menu (2026-10-19, 15:10 to 15:20): about 10 minutes, about 5 of them the platform switch and reimport. Unity's own figure for the build itself is 5.0 min.
+- A second build, after a template change, took 0.3 min.
+- Total size 23.8 MB:
+  - `Build/Web.data.unityweb` 12.5 MB
+  - `Build/Web.wasm.unityweb` 12.4 MB
+  - `Build/Web.framework.js.unityweb` 90 KB
+  - `Build/Web.loader.js` 48 KB
+  - `index.html` 3 KB, `TemplateData` 3 KB
+
+Browser checks: headless Chrome 155 with SwiftShader WebGL, a throwaway profile in the scratchpad, and Node scripts over the DevTools protocol, against `python3 -m http.server 8000 --bind 127.0.0.1` (no compression headers, like itch). All six checks of the brief pass, rerun in full on the final build:
+1. **Loading.** The page loads in 1.3–2.4 s and the title is "Operator!". The canvas is 1280×720 at (0, 0), with a render size of 1280×720, a scroll size equal to the window, and no footer. The menu shows New Game, Options and Credits, without Quit.
+   - The canvas also follows a window resize: the real headless viewport of 1280×633 re-laid out the menu.
+2. **New Game** loads `Final`, and it runs.
+3. **Saves:**
+   - I planted a save in `localStorage` (`cents` 7100, `income_1` + `board_1`) and reloaded. The menu showed Continue first. Continue gave $71.00 and the 4×4 board, and the shop offered the next entries.
+   - 12 s later `operator.save` had changed (`secondsPlayed` 300 → 309.9), and `operator.save.backup` held the planted save string for string.
+4. **Hidden-page hook:**
+   - **Synthetic events.** I overrode `document.visibilityState` to "hidden" and dispatched `visibilitychange`. The save changed inside that same synchronous `Runtime.evaluate`, and the backup now held the previous save. A dispatched `pagehide` did the same. A `visibilitychange` while the page was visible didn't save.
+   - **Real hidden state.** Headless Chrome does hide the page when a second tab is opened in front (`Target.createTarget`): `document.visibilityState` became "hidden", a new save was written, and the backup held the previous one.
+   - Reloading a running game also writes a save, through `pagehide`.
+5. **Volume patch.** The patch `{"version":1,"rows":[0,1,2],"sockets":[0,4,3]}` was written to `localStorage`. After a reload, Options showed it. So the `.jslib` call at `SubsystemRegistration` works.
+6. **Phone size.** At 844×390 (mobile emulation, DPR 2, touch on), the canvas is 844×390 and renders at 1688×780, with no scroll. A touch tap (`Input.dispatchTouchEvent`) on New Game started the game.
+- **Browser console:**
+  - No errors or exceptions from our code.
+  - The remaining lines come from Unity itself:
+    - "You can reduce startup time if you configure your web server to add Content-Encoding: gzip": expected with the Decompression Fallback
+    - "ERROR: Shader Hidden/CoreSRP/CoreCopy" and "Hidden/Universal/HDRDebugView shader is not supported on this GPU", logged at log level, not as errors: URP's debug shaders on WebGL
+    - one "Trying to get length of sound which is not loaded yet", not from our scripts (see Follow-ups)
+    - Chrome's "GPU stall due to ReadPixels" performance notes from SwiftShader
+  - The first build's only console error, the browser's automatic `/favicon.ico` 404, is gone since the template's empty icon.
+- **Audio unlock:** no press-start panel was added. Unity logged "Audio context resumed after 0.303 seconds". Headless Chrome can't tell whether sound is heard, so the lead's step 1 (the first tap's click sound) is the real check.
+- Chrome and the server are stopped, and the profile is deleted. The scripts stay in the scratchpad.
+
+Housekeeping:
+- **PlayerPrefs:** at the start, `operator.save` and `operator.save.backup` were absent, and `Switchboard.AudioPatch.v1` was `{"version":1,"rows":[0,1,2],"sockets":[3,1,3]}`. All three were put back exactly as found (the save keys deleted, the patch rewritten) and checked string for string.
+- **Discarded build and format re-saves**, after each of the two builds:
+  - `Assets/Settings/UniversalRP.asset`: URP's shader-stripping prefilter fields, rewritten at build time
+  - `Assets/UniversalRenderPipelineGlobalSettings.asset`: `m_RuntimeSettings` filled at build time
+  - `ProjectSettings/TimeManager.asset`
+  - the two dynamic TMP fonts
+  - the `preloadedAssets` entry the Input System writes into `ProjectSettings.asset` during a build: the editor's in-memory list stays empty, so the file line is a leftover; it was put back to `[]`
+  - `SampleScene.unity` was untouched.
+- `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta` were left untouched.
+- **Editor:**
+  - on the Web platform (WebGL), as the brief decided
+  - not in Play Mode, `timeScale` 1
+  - no callbacks or SessionState keys left
+  - `Final.unity` open, active and not dirty
+  - console cleared
+- **Git:** nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+1. **The itch push didn't happen** (account email unverified, see the top). Everything before it is done.
+2. **The hidden-page callback** is a function pointer (`makeDynCall` plus a `[MonoPInvokeCallback]` static method), not `SendMessage`, so no GameObject name is involved. Its one static field, `BrowserPageHidden.handler` (the bound `Autosave.SaveNow`), is the documented exception. The "warn once" flags live in the `.jslib`, so C# has no other statics with state.
+3. **`BrowserStorage` compiles everywhere.** Its imports exist only under `UNITY_WEBGL && !UNITY_EDITOR`; elsewhere the same private methods return "unavailable". The editor compiles the class, and the tests can reference it.
+4. **Unity's Default template's fullscreen button and footer are gone,** as the brief says. Its `alert()` on a load failure is replaced by the error banner, which is readable on a phone and doesn't block.
+5. **Design 5.12's example key** `switchboard.save` isn't used. The keys stay `operator.save` and `operator.save.backup` (D55, as the brief says).
+
+Follow-ups:
+- **Lead:**
+  - verify the itch account's email, then push (or ask for the push)
+  - set the itch page settings in `Docs/WebBuild.md`
+  - run the Plan's playtest script, including the first-tap sound and a real phone
+- **Every build rewrites three files** (the URP asset, the URP global settings, and `preloadedAssets` in `ProjectSettings.asset`), and they have to be discarded before a commit (`Docs/WebBuild.md` says how). A later step could make `WebBuild` restore them itself, for example by re-saving `PlayerSettings` after the build.
+- **Plan §4 lessons:**
+  - Start a build from `execute_code` with `EditorApplication.delayCall` plus `ExecuteMenuItem`, and watch `~/Library/Logs/Unity/Editor.log` for "Build Web:". With Unity in the background, the second build's delayCall started late: about 7 minutes of wall time for a 0.3 min build.
+  - Headless Chrome needs `Emulation.setDeviceMetricsOverride` in every CDP session: the override ends when the session closes, and the real headless viewport is 1280×633.
+  - Clear `localStorage` from a same-origin static page (for example `/TemplateData/style.css`). Clearing it on the game page and reloading lets `pagehide` write a fresh save.
+  - In Play Mode with Unity in the background, the `Step()` callback runs only when the editor ticks. Have it write a file when done and wait on that file.
+- **"Trying to get length of sound which is not loaded yet"** appears once on the menu in the browser. It isn't from our scripts. The likely source is the menu package's `Music_randomizer`, whose two clips were never committed (Plan §8, "Menu leftovers").
+- At 844×390 the board scene shows its side margins (brown bars left and right). That's Step 12's layout work.
+
+#### Step 9b verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 517/517 green (503 before, 14 new), with the editor on the Web platform. Console clean. My run left no format-only re-saves.
+- **Scope:** every changed file was named in the brief: `SaveStorage`, `Autosave`, `AudioVolumeSettings`, two comment-only files, `ProjectSettings.asset`, plus the new `BrowserStorage` (`.cs` and `.jslib`), `WebBuild`, the `Operator` template, `WebBuildTests` and `Docs/WebBuild.md`. No scene or prefab changed, and nothing is staged.
+  - `ProjectSettings.asset`: Gzip, Decompression Fallback, `PROJECT:Operator`, and a WebGL batching entry written by the platform switch. `productName` is unchanged.
+- **Build:** `Builds/Web` holds `index.html`, `TemplateData/` and four files in `Build/`, 23.8 MB in all. The `.unityweb` names are what Unity gives Gzip files when the fallback is on.
+- **Screenshots checked:**
+  - `step-09b-menu.png`: the browser menu at 1280×720 fills the page: New Game, Options, Credits, and no footer.
+  - `step-09b-continue.png`: a save planted in `localStorage` came back as $71.00 on a 4×4 board.
+  - `step-09b-phone.png`: 844×390 with touch fills the screen. The brown side bars are Step 12's layout work.
+- **Code skim:**
+  - The `.jslib` wraps every `localStorage` call in try/catch and keeps its warn-once flags in JavaScript.
+  - The hidden-page hook calls `Autosave.SaveNow` inside the `visibilitychange` and `pagehide` events, through one static callback (the documented exception).
+  - `SaveStorage.Choose` is the tested seam.
+  - The volume patch keeps its key and JSON.
+- **Blocked:** itch refused the upload until the account's email address is verified. The lead does that, then runs the push or asks for it.
+- **Build re-saves:** every build rewrites the URP asset, the URP global settings and `preloadedAssets` in `ProjectSettings.asset`. `Docs/WebBuild.md` says to undo them before a commit.
+- **Pushed (orchestrator, on the lead's go-ahead after the email check):** `butler push Builds/Web llazypixell/operator:html5` uploaded 23.81 MiB. `butler status` shows the `html5` channel, upload #19875492, build #2162093, version 1, processed. The lead sets the itch page settings next.
+
+#### Step 9b playtest, round 1 (lead, 2026-10-19), fix requested
+- On itch it "works well so far". One problem: **the game's hand cursor and the system pointer show at the same time** in the browser.
+- **Orchestrator's notes for the fix:**
+  - Unity Web's `Cursor.visible` sets the canvas's inline `style.cursor` to `none` or `default` (`_JS_Cursor_SetShow` in the framework). The template's CSS sets no cursor, and the Player settings have no default cursor.
+  - Three components write `Cursor.visible`: `CableInputController` (every `Update`, and `HidePointers`), `MenuHandCursor` (every `LateUpdate`) and `VolumeCablePanel` (`LateUpdate`).
+- **Art merge before the fix:** merged Mia's `3ca8bc9` ("upd8 caller pngs", 13 caller PNGs, no metas). `caller-02.png` is now 190×190, but its slice is 190×191, so Unity drops the sprite (Plan §8). The other slices fit inside their PNGs; `police.png` is 191×191 with a 190×186 slice. Fixed in the same pass.
+- Sent to a fix agent; it may push the fixed build to the Draft page (D55).
+
+
+### Step 9b fix report: 2026-10-19
+Result: done. The fixed build is on the itch Draft page: `html5` build **#2162255** (version 2, processed).
+
+Playable now: in the browser the game's hand is the only pointer wherever it is drawn. When the mouse leaves the game (onto itch's page around the game frame), the hand disappears with it instead of staying frozen at the edge, and it comes back on the first move over the game. `caller-02` shows again.
+
+**The cause (measured in headless Chrome before changing code):**
+- I served the 9b build with the framework's `_JS_Cursor_SetShow` patched on the fly (CDP `Fetch`) to log every call, plus a MutationObserver on the canvas's `style`.
+- Inside the game everything was already right. On the menu, the board, over a stored cord, with a cord held and over the open book, the canvas cursor was `none` whenever the hand was drawn. It was `default` on the pause page, where no hand is drawn.
+- Unity only calls `_JS_Cursor_SetShow` when `Cursor.visible` changes. Writes in between don't reach the page, and that is harmless.
+- **The real cause: the browser sends no mouse moves once the pointer leaves the page.** itch shows the game in an iframe inside a bigger page. I rebuilt that locally: a host page on another port with the game in a 960×540 iframe.
+  - When the mouse left the frame, Unity kept the last position.
+  - `Application.isFocused` stayed true, because the iframe keeps focus after a click.
+  - So the hand stayed drawn at the frame's edge while the system pointer moved on over the page: both visible at once (`step-09b-fix-iframe-menu-left.png`, `step-09b-fix-iframe-game-left.png`).
+  - In the editor this can't happen, because the Game view keeps reporting positions outside its area.
+- Ruled out:
+  - **Focus differences:** Unity starts with `isFocused` true even before the iframe gets focus, and the hand already hid the pointer then.
+  - **Stale captures:** `cursorWasVisible` was `true` after MainMenu → Final, and the pause page showed the pointer.
+  - **Unity's cache:** it skips repeated values, but every change reached the canvas.
+  - **Chrome repaint:** never more than one value per frame reached the browser's style.
+- **A second, smaller finding:** in the pause menu's Options, `CableInputController` (suspended) and `VolumeCablePanel` both wrote `Cursor.visible` every frame, which flipped the canvas `default` → `none` about 60 times a second. The last writer won only because of the update order (Chrome showed `none`). In the other order, the volume hand and the system pointer would both show.
+
+**The fix (one rule):** a mouse that has left the page counts like a lifted finger (D28): no hover, so no hand. Only a held cord stays where it was last put. That's the same as touch between taps, and in the editor nothing changes.
+- **Who owns `Cursor.visible`:**
+  - unchanged: each component that draws a hand hides the system pointer while it draws, and gives it back when it stops
+  - new: while the pause menu is open, the cord input leaves the cursor alone, because it hid its hand once when pausing; the pause panel's volume patch owns the cursor
+
+Created:
+- `Assets/Scripts/UI/BrowserPointer.jslib`: `OperatorPointer_IsOverPage()`.
+  - On its first call it adds capture-phase, passive listeners on `window`: `mousemove` and `mouseover` set "over", and `mouseout` with no `relatedTarget` (leaving the page itself) sets "outside".
+  - The state lives on `Module.operatorPointer`. It starts "outside", so no hand is drawn at a stale position before the first move.
+  - Its importer is Web only (Unity's default for `.jslib`).
+- `Assets/Scripts/UI/BrowserPointer.cs` (`Switchboard.UI`, static, no state):
+  - `IsOverPage` calls the `.jslib` under `UNITY_WEBGL && !UNITY_EDITOR`; elsewhere it's always true.
+  - `Hovers(bool touch, bool fingerDown, bool overPage)` is the rule.
+  - `Hovers(Pointer)` is the shortcut that `MenuHandCursor` uses.
+
+Changed:
+- `Assets/Scripts/UI/MenuHandCursor.cs`: the touch-only "no finger, no hand" check is now `BrowserPointer.Hovers(pointer)`.
+- `Assets/Scripts/UI/VolumeCablePanel.cs`: `hover` comes from `BrowserPointer.Hovers(...)`.
+- `Assets/Scripts/UI/CableInputController.cs`:
+  - `Update` returns at once while suspended, instead of calling `HidePointers` every frame. The `Suspended` setter still hides everything once.
+  - `hover` comes from `BrowserPointer.Hovers(...)`.
+  - `ProcessPointer` (used by tests and checks) is unchanged.
+- `Assets/Sprites/callers/caller-02.png.meta`: the slice is now 190×190, from 190×191, to fit the PNG.
+  - All 13 sprites in `Assets/Sprites/callers/` now load with `AssetDatabase.LoadAssetAtPath<Sprite>`; `caller-02` was null before.
+  - The other slices already fit and weren't touched: `caller-01`, `-11` and `-12` are 190×191 in 191×191 or 190×191 PNGs.
+  - **`police.png`** is 191×191 with a 190×186 slice. It loads, but the slice starts at the bottom-left corner, so the top 5 pixel rows and the right column are cut off. Left as it is (the brief: don't change slices that fit); Mia or the lead can decide whether the slice should be the full 191×191.
+- `Assets/Tests/Game/Editor/WebBuildTests.cs`: 8 new tests, listed under Tests.
+
+Scene and prefab changes: none.
+
+Tests: 525/525 EditMode (517 before; new below).
+- `ThePointerHoversOnlyOverThePage`, 6 cases:
+  - `AMouseOverThePageHovers`
+  - `AMouseOverThePageHoversWhilePressed`
+  - `AMouseOffThePageDoesNotHover`
+  - `AMouseOffThePageDoesNotHoverWhilePressed`
+  - `AFingerDownHovers`
+  - `ALiftedFingerDoesNotHover`
+- `TheEditorPointerIsAlwaysOverTheGame`
+- `TheBrowserPluginIsForWebPlayersOnly` now runs for both `.jslib` files. That's one new case; it was one test before.
+
+Console: clean. The Play Mode smoke run (11 s of game time in `Final`, stepped) logged only the engine's two "memoryless" lines. The console was cleared at the end.
+
+Screenshot: `Temp/Captures/step-09b-fix.png`, the editor smoke run. Browser shots in `Temp/Captures/`:
+- before the fix, with the iframe host:
+  - `step-09b-fix-iframe-menu-left.png`
+  - `step-09b-fix-iframe-game-left.png`: the hand frozen in the game while the mouse is outside
+- after the fix, with the iframe host:
+  - `step-09b-fix-after-iframe-menu-left.png`, `-game-left.png`: no hand once the mouse is outside
+  - `-game-back.png`: the hand back
+  - `-held-left.png`: a held cord stays put
+- after the fix, at 1280×720:
+  - `step-09b-fix-menu.png`
+  - `-continue.png`: a planted save, $71.00, the 4×4 board
+  - `-callers.png`: portraits in the caller column
+  - `-held-cord.png`
+  - `-book.png`: the hand over the open book
+  - `-paused.png`
+  - `-pause-options.png`
+  - `-phone-menu.png`, `-phone.png`: 844×390 touch, a tap on New Game starts the game
+
+Build and browser checks (`Tools/Switchboard/Build Web`: 2.7 min, 23.8 MB; `_OperatorPointer_IsOverPage` is in the framework):
+- **Loading:** 1.3 s, title "Operator!". Browser console on load plus New Game:
+  - Unity's four "ERROR: Shader" log lines (URP debug shaders, as in 9b)
+  - Chrome's "The AudioContext was not allowed to start" warnings until the first click, then "Audio context resumed"
+  - No errors or exceptions from our code.
+- **Canvas cursor `none` wherever the hand shows** (call log after the fix):
+  - menu over Continue: `none`
+  - board: `none`
+  - over a stored cord: `none`
+  - holding a cord over the board (the plug is the pointer): `none`
+  - over the open book: `none`
+  - pause page, no hand: `default`
+  - pause Options, over the patch: `none`; outside the patch: `default`
+  - Now a single write per change; before the fix there were about 35 writes a second each way.
+- **iframe host after the fix:**
+  - mouse never in the game: `default`, no hand
+  - mouse over the menu: `none` plus the hand
+  - mouse out to the host page: no hand
+  - in the game the same; back inside, the hand returns on the first move
+  - with a cord held and the mouse out, the plug stays where it was, as with touch
+- **Planted save:** Continue showed $71.00, the 4×4 board and the shop's next offers.
+- **Caller portraits:** they show in the caller column.
+- **Phone, 844×390 with touch:** the canvas is 844×390 and renders at 1688×780; a tap on New Game starts the game.
+
+itch:
+- `~/bin/butler push Builds/Web llazypixell/operator:html5` uploaded 23.82 MiB as a patch from #2162093.
+- `butler status llazypixell/operator` shows `html5`, upload #19875492, **build #2162255 (version 2), processed (✓)**.
+- No push anywhere else.
+
+Housekeeping:
+- **PlayerPrefs:**
+  - at the start: `operator.save` and `operator.save.backup` absent, `Switchboard.AudioPatch.v1` = `{"version":1,"rows":[0,1,2],"sockets":[3,1,3]}`
+  - at the end, put back exactly as found and checked
+- **Discarded build and format re-saves:**
+  - `Assets/Settings/UniversalRP.asset` and `Assets/UniversalRenderPipelineGlobalSettings.asset`
+  - `ProjectSettings/TimeManager.asset`
+  - the two dynamic TMP fonts
+  - the build's `preloadedAssets` entry, put back to `[]`
+- **Kept as found:** the 9b `ProjectSettings.asset` changes (Gzip, fallback, `PROJECT:Operator`, the WebGL batching entry) and the other uncommitted 9b files. `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta` were left alone.
+- **Editor:**
+  - Web platform, idle, not in Play Mode, `timeScale` 1
+  - `Final.unity` active and not dirty
+  - no callbacks left
+  - console cleared
+- **Browser:**
+  - The server and Chrome are stopped, and the Chrome profile is deleted.
+  - The scripts stay in the scratchpad: `fix-probe.mjs`, which serves the logging framework; `fix-verify.mjs`; `fix-iframe*.mjs`; and `host/index.html`, the iframe host, served on port 8001.
+- **Git:** nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+- **The fix adds a small `.jslib` and C# pair, not just a change to who writes `Cursor.visible`.** The cause was missing mouse events outside the page, which no `Cursor.visible` ordering can fix.
+- **`CableInputController` no longer writes the cursor every frame while paused.** That's a small behaviour change: if the window loses focus while paused, the next `HidePointers` happens through `OnApplicationFocus`, as before.
+
+Follow-ups:
+- **Lead:** play the Draft page (build #2162255).
+  1. Move the mouse in and out of the game frame on the menu, the board and the open book: the hand should leave with the mouse.
+  2. Over the pause Options patch there should be one pointer.
+  3. `caller-02`'s portrait is back.
+- `police.png`'s 190×186 slice cuts the top 5 rows off the portrait. Decide whether to make it 191×191.
+- A held cord stays drawn where the mouse left the page, as with touch. If that looks odd on itch, a later step could hide the plug too while the mouse is outside.
+- Plan §4 lessons:
+  - To see what Unity sends to the page, serve a patched framework through CDP `Fetch.fulfillRequest`. Headless Chrome 155 exposes no `style.cursor` setter to hook.
+  - itch's iframe can be imitated with a host page on a second local port.
+  - `Builds/Web` is deleted and recreated by every build, so restart `python3 -m http.server` afterwards: its working folder is gone.
+
+#### Step 9b fix verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 525/525 green (517 before, 8 new). Console clean apart from one MCP bridge line. No re-saves are left.
+- **Scope:**
+  - new: `BrowserPointer.cs` and `BrowserPointer.jslib`
+  - changed: `CableInputController`, `MenuHandCursor`, `VolumeCablePanel` (hover goes through `BrowserPointer`; the cord input stops writing the cursor while paused)
+  - `caller-02.png.meta` (slice height 191 → 190), `WebBuildTests`
+  - No scene or prefab changed.
+- **Screenshots checked:**
+  - `step-09b-fix-iframe-game-left.png`: before the fix, with the mouse moved out of an itch-like frame, the hand stays frozen on the board.
+  - `step-09b-fix-after-iframe-game-left.png`: after the fix, the hand is gone, and the caller portraits show.
+- **The cause:** the hand was hidden correctly while the mouse was over the game. But a browser sends no mouse moves once the pointer leaves the page (itch's iframe), so the hand stayed drawn at the edge next to the system pointer. A mouse off the page now counts like a lifted finger (D28).
+- **On itch:** `html5` build #2162255 (version 2), processed.
+- **Open:** whether `police.png` (191×191) should use its full size instead of a 190×186 slice (lead or Mia).
+
+#### Step 9b playtest, round 2 (lead, 2026-10-19): the cursor still flickers in Arc
+- **The lead's report on build #2162255:** "nothing changed". In Arc (a Chromium browser on macOS), the system pointer flickers next to the game's hand all the time: in the menu, in Options and in the game. It shows and hides on every one-pixel move.
+- **No project setting hides the pointer.** Player Settings has only Default Cursor (an image the system pointer becomes) and Cursor Hotspot, both empty here.
+- **Measured in the lead's Arc** (`localhost:8000`, in the game, 10 s of mouse moves, with a console snippet that only watched):
+  - the canvas's `style.cursor` changed once, to `none`, and stayed `none`
+  - 653 `pointermove` events, all `mouse`, all on `unity-canvas`
+  - no mouse-out from the page, no blur, DPR 1
+- **Conclusion:** our scripts hold the pointer hidden steadily; the browser shows a hidden pointer anyway. Unity's framework writes the canvas cursor only in `_JS_Cursor_SetShow` and `_JS_Cursor_SetImage`.
+- **Next:** check Chrome and Safari, then decide. The orchestrator recommends making the system pointer the hand (Default Cursor and `Cursor.SetCursor`) instead of hiding it.
+- **Other browsers (lead):** Safari is fine; Chrome flickers like Arc. It's a Chromium-on-macOS problem with a hidden (`cursor: none`) pointer, so it must be fixed: Chrome is the most common browser.
+- **Before choosing a fix:** the lead tries a transparent 1×1 cursor image instead of `none` in Chrome's console, with no rebuild. If the flicker stops, the fix is to hide the pointer with a transparent `Cursor.SetCursor` image and keep the drawn hand; otherwise, option A (the system pointer becomes the hand).
+- **Test result (lead, Chrome):** with the canvas cursor set to a transparent 1×1 PNG (`url(data:image/png…) 0 0, auto`), the flicker stopped, and only the game's hand shows.
+- **Fix decided:** on Web, the system pointer is hidden with that transparent image instead of `Cursor.visible = false` (`cursor: none`). The drawn hand stays as it is. Sent to a fix agent (pass 2); it may push to the Draft page (D55).
+
+
+
+### Step 9b fix pass 2 report: 2026-10-19
+Result: done. The build is on the itch Draft page: `html5` build **#2162638** (version 3, processed).
+
+Playable now: in Web players the system pointer is hidden with a transparent 1×1 image (the CSS form the lead tested in Chrome) instead of Unity's `cursor: none`, so Chrome and Arc on macOS should show only the game's drawn hand. The hand's art and size are unchanged. **Headless Chrome can't show the OS pointer**, so the real look (no flicker in Chrome and Arc, Safari still fine) is the lead's check.
+
+How to test: open the Draft page in Chrome or Arc on the Mac and move the mouse slowly over the menu, Options, the board, the open book and the pause Options patch. Only the drawn hand should show, with no system arrow flashing next to it. On the pause page (no hand) the normal arrow shows. Moving the mouse out of the game frame shows the normal arrow outside, and the hand comes back on the first move inside.
+
+Changed:
+- `Assets/Scripts/UI/BrowserPointer.cs`: new `SystemPointerVisible` (get and set), the one switch for the system pointer.
+  - Web players: calls the `.jslib`.
+  - Editor and desktop builds: plain `Cursor.visible`, as before.
+  - It is the only file in `Assets/` that touches `Cursor.visible`. It doesn't use `Cursor.SetCursor`.
+- `Assets/Scripts/UI/BrowserPointer.jslib`: two new functions next to `OperatorPointer_IsOverPage`.
+  - `OperatorPointer_SetSystemShown(shown)`:
+    - hidden: the canvas `style.cursor` becomes exactly `url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=) 0 0, auto`
+    - shown: `default`, which is what Unity's own `Cursor.visible = true` writes
+    - It writes only when the value changes. It also rewrites if the canvas no longer holds what it last wrote, because Unity's player writes `default` twice while starting up (measured), and a stale cache would otherwise leave the arrow showing next to the hand.
+  - `OperatorPointer_IsSystemShown()`: the state last set (shown until the first hide).
+  - The file has no `"none"` value. Its importer is still Web only.
+- `Assets/Scripts/UI/CableInputController.cs`, `MenuHandCursor.cs`, `VolumeCablePanel.cs`: every show, hide and capture (`cursorWasVisible`, `originalVisible`, `originalCursorVisible`) goes through `BrowserPointer.SystemPointerVisible`.
+  - The logic is the same. Two lines are rewritten from `a || b ? false : original` to the equivalent `!a && !b && original`.
+  - The first fix's rules stay: a mouse off the page counts as no hover, and the cord input leaves the cursor alone while paused.
+- `Assets/Tests/Game/Editor/WebBuildTests.cs`: 6 new tests (below).
+- **Grep of `Assets/`** (the menu package under `Assets/Tools/` included): there are no other `Cursor.visible`, `Cursor.SetCursor` or `Cursor.lockState` writes. The only cursor-related hits are `m_CursorLockBehavior: 0` in `Final.unity` and the menu package's `Pause.prefab` and `StartMenu.prefab`. That is a serialized setting of the Input System's UI module (lock behaviour), not a visibility write, so it was left alone.
+
+Created: none (the scratchpad scripts below aside).
+
+Scene and prefab changes: none.
+
+Tests: 531/531 EditMode (525 before), with the editor on Web. New:
+- `OutsideWebPlayersTheSystemPointerIsCursorVisible`: setting it changes `Cursor.visible`, and reading it follows `Cursor.visible`.
+- `OnlyBrowserPointerTouchesCursorVisible`: no `.cs` under `Assets/` outside `BrowserPointer.cs` (tests excluded) contains `Cursor.visible`.
+- `TheHandsShowAndHideThePointerThroughBrowserPointer`, 3 cases (`CableInputController`, `MenuHandCursor`, `VolumeCablePanel`): each captures and sets the pointer through `BrowserPointer.SystemPointerVisible`, and none uses `Cursor.SetCursor`.
+- `TheBrowserHidesThePointerWithATransparentImage`: the `.jslib` holds the exact transparent-image value and `'default'`, and no `'none'` or `"none"`.
+- "The `.jslib` is for Web only" was already covered by `TheBrowserPluginIsForWebPlayersOnly` (both `.jslib` files) and still passes.
+
+Console: clean. The Play Mode smoke run (11 s of game time in `Final`, stepped) logged only the engine's two "memoryless" lines. The console was cleared at the end.
+
+Screenshot: `Temp/Captures/step-09b-fix2.png` (the editor smoke run). Browser shots, all in `Temp/Captures/`:
+- `step-09b-fix2-menu.png`, `-menu-options.png`
+- `-continue.png`: a planted save, $71.00, the 4×4 board
+- `-held-cord.png`, `-book.png`, `-paused.png`, `-pause-options.png`
+- `-iframe-game.png`: the game in an itch-like iframe
+
+The build: `Tools/Switchboard/Build Web` ran twice, at 2.0 min and 1.9 min, 23.8 MB each. The second build carries the "rewrite if overwritten" guard. `_OperatorPointer_SetSystemShown` is in the framework.
+
+Browser checks (headless Chrome 155, the second build, `python3 -m http.server`):
+- **Method:**
+  - At each spot the mouse settles, then moves 1 px at a time 120 times over about 2 s.
+  - A MutationObserver on the canvas `style` counts every change.
+  - The framework is served with `_JS_Cursor_SetShow` patched to log calls.
+- **Results** (`fix2-verify.mjs`, 12/12 OK):
+  - **Startup:** before any mouse move the canvas is `default`, from Unity's own two `_JS_Cursor_SetShow(1)` calls at startup. After that, Unity made no cursor calls at all.
+  - **Transparent image wherever the hand is drawn:**
+    - the menu over Continue and over Options, and the menu's empty area
+    - the menu's Options, over the patch and outside it (the menu hand covers both)
+    - the board, over a stored cord, holding a cord, and over the open book
+    - the pause Options patch
+  - **`default` where no hand is drawn:** the pause page, and the pause Options outside the patch.
+  - **No flips while moving:** 0 changes during the 120 moves at every spot, and `none` was never seen. Each change happened once, on arrival: the hide on the first move, the scene change, opening a panel.
+- **iframe host** (the game at 960×540 inside a page on a second port, like itch; `fix2-iframe.mjs`, 6/6 OK):
+  - `default` before the mouse enters
+  - the transparent image over the menu
+  - `default` once the mouse leaves to the host page
+  - the same in the game, and back to the transparent image on the first move inside
+- **Planted save:** Continue showed $71.00 and the 4×4 board, and the shop offered the next entries. After the run, `operator.save` had moved on (`secondsPlayed` 300 → 355; a $2 fine from a missed emergency).
+- **Browser console:**
+  - Unity's usual "ERROR: Shader" log lines (URP debug shaders), and Chrome's "AudioContext was not allowed to start" warnings before the first click. No errors or exceptions from the game.
+  - One `MutationObserver` TypeError and one `/favicon.ico` 404 came from the check itself: the probe's hook runs on the static `style.css` page used to clear `localStorage`, which has no canvas or icon. They are not in the game page.
+- **Not checkable headless:** whether the OS pointer is actually hidden on screen. The lead does the final look in Chrome, Arc and Safari.
+
+itch:
+- `~/bin/butler push Builds/Web llazypixell/operator:html5` uploaded 23.82 MiB as a patch from #2162255.
+- `butler status llazypixell/operator` shows `html5`, upload #19875492, **build #2162638 (version 3), processed (✓)**.
+- No push anywhere else.
+
+Housekeeping:
+- **PlayerPrefs:** at the start, `operator.save` and `operator.save.backup` were absent, and `Switchboard.AudioPatch.v1` = `{"version":1,"rows":[0,1,2],"sockets":[3,1,3]}`. At the end they were put back exactly as found and checked.
+- **Discarded after each build:**
+  - `Assets/Settings/UniversalRP.asset` and `Assets/UniversalRenderPipelineGlobalSettings.asset`
+  - `ProjectSettings/TimeManager.asset`
+  - the two dynamic TMP fonts
+  - the `preloadedAssets` entry, put back to `[]`
+- **Kept as found:** the 9b `ProjectSettings.asset` changes and the other uncommitted 9b and first-fix files. `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta` were left alone. `SampleScene.unity` was untouched.
+- **Editor:**
+  - Web platform, idle, not in Play Mode, `timeScale` 1
+  - `Final.unity` active and not dirty
+  - no callbacks left
+  - console cleared
+- **Browser:**
+  - The servers (8000, 8001) and Chrome are stopped, and the profile is deleted.
+  - The new scripts stay in the scratchpad: `fix2-verify.mjs`, `fix2-iframe.mjs` and `fix2-startup.mjs` (the startup and blur/focus probe).
+- **Git:** nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+- **The `.jslib` also rewrites when the canvas was overwritten,** not only when the requested state changes. Unity's player writes `default` twice while starting up, so a pure "on change" cache could leave the arrow showing until the next state change. It still never writes the same value twice in a row.
+
+Follow-ups:
+- **Lead:**
+  - Play build #2162638 in Chrome and Arc on macOS: only the drawn hand should show, with no flicker, on the menu, in Options, on the board, over the open book and over the pause Options patch.
+  - Check that Safari still behaves.
+- **Plan §4 lesson:** Unity Web's `Cursor.visible = false` writes `cursor: none`, which Chromium on macOS doesn't keep hidden. Hide the pointer through `BrowserPointer.SystemPointerVisible` (a transparent image) and never write `Cursor.visible` directly; `OnlyBrowserPointerTouchesCursorVisible` guards it.
+- Still open from the first fix: `police.png`'s 190×186 slice, and whether a held cord should hide while the mouse is outside the frame.
+
+#### Step 9b fix pass 2 verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 531/531 green (525 before, 6 new). Console clean, and no re-saves are left.
+- **Scope:** `BrowserPointer.cs`/`.jslib` (`SystemPointerVisible`, `OperatorPointer_SetSystemShown`), plus `CableInputController`, `MenuHandCursor`, `VolumeCablePanel` and `WebBuildTests`. No scene or prefab changed, and nothing is staged.
+- **Code skim:**
+  - `BrowserPointer` is the only file outside the tests that touches `Cursor.visible`.
+  - The `.jslib` hides the pointer with exactly the transparent PNG cursor the lead tested, and never writes `none`.
+  - It rewrites only on a change, or when Unity's startup has overwritten the canvas.
+- **On itch:** `html5` build #2162638 (version 3), processed.
+- **Lead's look still owed:** headless Chrome can't draw the OS pointer, so the lead checks Chrome, Arc and Safari by eye.
+
+#### Step 9b playtest, round 3 (lead, 2026-10-19): cursor fixes discarded
+- **On itch the flicker stayed with fix pass 2** (build #2162638), also in a private window, although the same build didn't flicker on `localhost:8000` or inside a cross-site frame on `localhost:8001`. The lead also sees the double pointer in the Unity editor.
+- **Sergei's fix** (`07678dc` "cursor fix" on `Sergei's_branch`):
+  - the system pointer becomes the hand: Player Settings › Default Cursor `cursor_pointing.png` (hotspot 20, 2)
+  - `Cursor.SetCursor` swaps grab and page-turn images, 64×64 PNGs in `Assets/Sprites/Cursors/`
+  - `HandCursorGraphic` no longer draws a mesh
+  - His branch starts from `6226ead`, before Steps 7–9a, so it can't be merged into main as it is. The lead asked him to bring it onto main.
+  - Still open in his approach: while a cord's plug is the pointer it hides the system pointer with `Cursor.visible = false` (`cursor: none`), which flickers in Chrome.
+- **Discarded on the lead's request** (orchestrator, directly):
+  - the two fix passes: `BrowserPointer.cs`/`.jslib` deleted
+  - `CableInputController`, `MenuHandCursor` and `VolumeCablePanel` back to `HEAD`
+  - the 14 cursor tests and the `BrowserPointer.jslib` case removed from `WebBuildTests`
+  - The Step 9b Web build work and the `caller-02` slice fix stay. The fix reports above stay as history.
+
+### PNG cursors reapplied on main at 1.5x (2026-10-19)
+- Ported the cursor presentation from `07678dc` without switching branches or replacing the newer cable/pause/touch logic. Current menu asset edits remain in place.
+- Re-exported the original polygon geometry at 96×96 instead of 64×64; all four RGBA textures retain transparency. Imports use Cursor type, readable/uncompressed data, no mipmaps or NPOT scaling, and a 128 texture-size limit.
+- Default Cursor is cursor_pointing.png at hotspot (30, 3). Grab uses (43.5, 42), page left (63, 34.5), page right (33, 34.5). MenuHandCursor, VolumeCablePanel and CableInputController now select PNGs through HandCursorGraphic; its old hand mesh is empty. Picking up a plug continues to show the existing plug artwork and hide the hand.
+- Verified all four files and import settings, six serialized hand texture bindings, project default/hotspot, and reviewed the PNGs. Runtime and editor assemblies compile with Unity's Roslyn compiler, including existing tests; diff check passes. Live Play Mode and Unity test-runner execution were not available in this session.
+
+### Options board artwork and frame correction (2026-10-19)
+- Fixed the white options board: board_matte is a Single sprite, so its reference must use fileID 21300000, as in SwitchboardPanel; the previous stale multiple-sprite subasset ID did not resolve.
+- Moved the three wall anchors under the left frame. Wires now have their own layer beneath an aligned, RectMask2D-clipped copy of the left frame; row lamps and movable plugs stay above it. Reuses the original board artwork without creating another texture or changing patch rules.
+- Options heading now copies Operator's font colour exactly. Validated sprite/import references, local object and hierarchy links, aligned frame positions, hidden anchors, wire/frame/plug order, and title colour equality. Asset-only change; live Play Mode visual verification remains outstanding.
+
+#### Step 9b done (lead, 2026-10-19)
+- **Playtest OK:**
+  - The game plays in the browser from the itch Draft page.
+  - Progress survived reloads and today's re-uploads.
+  - It runs smoothly on the lead's iPhone.
+- **Accepted for later:**
+  - the black side strips on wide phones (Step 12)
+  - itch's fullscreen button on the iPhone (an Apple limit; Step 12 notes the embed option)
+- **Double pointer:** Sergei brought his cursor fix onto main (`d79421d`, entry below) while this was being committed. It still needs a check in a Web build in Chrome or Arc: holding a cord still hides the pointer with `Cursor.visible = false` (Plan §8).
+- **Commits:** `709be9d` (Step 9b) and `b4d39aa` (the metas for Mia's `RawArt`, matching Sergei's branch).
+
+#### Pointer follow-up (orchestrator, directly; lead 2026-10-19)
+- **The lead's report:** Sergei's PNG cursors flickered in the Unity editor too.
+- **The cause:** `HandCursorGraphic.ApplyCursor` called `Cursor.SetCursor` on every frame, and `CableInputController` wrote `Cursor.visible = true` on every frame. Each write puts Unity's arrow back.
+- **The fix:**
+  - The image changes only when it differs.
+  - `HandCursorGraphic.SetSystemPointerVisible` writes visibility only on a change, and puts the image back after showing the pointer again.
+  - `CableInputController`, `MenuHandCursor` and `VolumeCablePanel` go through it.
+  - Its cache is reset at each Play (`SubsystemRegistration`).
+  - 517/517 EditMode tests green.
+- **Measured in Chrome** (`localhost:8000`, a fresh build): 0 canvas cursor changes in 10 s and 1,663 mouse moves; the cursor stayed Unity's 96×96 `.cur` hand.
+- **It depends on the monitor:** on the MacBook's built-in screen the hand is steady in Chrome and in the editor. On the lead's external display (120–140 Hz), Chrome flickers the pointer by itself, and the editor shows the hand only while a button is held. Not pursued further. Step 12 checks other machines.
+- **Cross-check (lead):** itch build #2162638 (fix pass 2: the drawn hand with a transparent-image pointer) is steady on the built-in screen too. Every approach tried today works on a normal screen; only the lead's external display flickers.
+- **Cursor size (lead):** Sergei's 96×96 hands were too big, and 64×64 (the old hand at full 1080p) still looked big in the lead's 0.75× Game view, because a system pointer doesn't shrink with the view. They were re-exported at **48×48** with his `Tools/Art/export_hand_cursors.py` (`ICON_SCALE` 0.75). `HandCursorGraphic.IconScale` is 0.75, and the Default Cursor hotspot is (15, 1.5). The metas and GUIDs are unchanged. 517/517 green.
+
+#### Back to the drawn hand (lead, 2026-10-19; orchestrator, directly)
+- **Why:** Sergei's PNG pointer has one pixel size and doesn't resize with the window (the 96, 64 and 48 px exports tried). The lead chose the drawn hand, which scales with the game everywhere.
+- **Changed:**
+  - `HandCursorGraphic`, `CableInputController`, `MenuHandCursor` and `VolumeCablePanel` are back to their `709be9d` versions (the drawn hand, from before `d79421d`).
+  - Every pointer show and hide now goes through the new `SystemPointer` (`.cs` + Web-only `.jslib`). It writes only on a change. In browsers it hides with a transparent 1×1 image and re-hides if Unity rewrites the canvas cursor while starting up.
+  - The cord input leaves the pointer alone while paused (as in fix pass 1).
+  - Player Settings › Default Cursor is cleared (hotspot 0, 0).
+  - Sergei's `Assets/Sprites/Cursors` images and `Tools/Art` exporter stay as he pushed them, unused. The scenes still hold his texture fields on `HandCursorGraphic`; Unity drops them at the next save.
+- **Tests:** `WebBuildTests` gained `OnlySystemPointerTouchesCursorVisible`, `TheBrowserHidesThePointerWithATransparentImage`, and the `SystemPointer.jslib` case of the Web-only plugin test. 521/521 green.
+- **On itch:** pushed as `html5` build #2163273 (version 4) on the lead's request, for the lead's online test.
+

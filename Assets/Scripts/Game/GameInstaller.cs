@@ -16,6 +16,7 @@ namespace Switchboard.Game
         [SerializeField] private GameLoopRunner loopRunner;
 
         private OpenBoardLink boardLink;
+        private Autosave autosave;
 
         public GameSession Session { get; private set; }
 
@@ -48,11 +49,18 @@ namespace Switchboard.Game
             foreach (string error in ContentValidator.ValidateCallJacks(calls.Calls, book.Entries))
                 Debug.LogError($"Calls file: {error}", config);
 
+            // The save loads after the content and before the session is built (Design 4.4, step 2). EditMode tests
+            // build the game outside Play Mode, and must never read or write the player's real save.
+            SaveFile saveFile = Application.isPlaying ? SaveStorage.OpenFile() : null;
+            SaveLoad save = saveFile?.Load();
+            if (save != null)
+                foreach (string message in save.Messages) Debug.LogWarning(message, this);
+
             // Trim unused prefab cords before binding; missing starting cords are added below.
             cordBridge.Attach(scene, config.ExtraCordColors, economy.StartingCords);
             if (cordBridge.CordCount > economy.StartingCords)
                 Debug.LogWarning($"The scene has {cordBridge.CordCount} cords but Economy.json starts with {economy.StartingCords}.", config);
-            Session = new GameSession(new GameContent(economy), cordBridge, tutorial: true);
+            Session = new GameSession(new GameContent(economy), cordBridge, save?.Data, tutorial: true);
             cordBridge.Bind(Session.Desk, Session.Calls);
             cordBridge.EnsureCords(Session.Stats.Cords);
             Session.Stats.Changed += OnStatsChanged;
@@ -73,9 +81,20 @@ namespace Switchboard.Game
             if (guide == null) guide = gameObject.AddComponent<FirstOrderGuide>();
             guide.Bind(callQueue, Session.Calls, bookView,
                 LevelScene.FindAll<CableController>(scene).ToArray(), cordBridge);
+            if (saveFile != null)
+            {
+                autosave = GetComponent<Autosave>();
+                if (autosave == null) autosave = gameObject.AddComponent<Autosave>();
+                autosave.Bind(Session, saveFile);
+            }
+            List<GamePauseMenu> pauseMenus = LevelScene.FindAll<GamePauseMenu>(scene);
+            if (pauseMenus.Count == 1)
+                pauseMenus[0].Bind(autosave != null ? autosave.SaveNow : (System.Action)null,
+                    LevelScene.FindAll<CableInputController>(scene).Find(c => c != null), bookView, audio);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             // Added at runtime so no scene or prefab references a type that release builds leave out.
-            gameObject.AddComponent<DevPanel>().Bind(Session, callQueue);
+            gameObject.AddComponent<DevPanel>().Bind(Session, callQueue,
+                saveFile != null ? () => StartNewGame(saveFile) : (System.Action)null);
 #endif
         }
 
@@ -84,6 +103,14 @@ namespace Switchboard.Game
             if (Session != null) Session.Stats.Changed -= OnStatsChanged;
             boardLink?.Dispose();
             boardLink = null;
+        }
+
+        // Dev "New game": the same as the menu's Start over, then this scene again from scratch.
+        private void StartNewGame(SaveFile saveFile)
+        {
+            if (autosave != null) autosave.Stop();
+            saveFile.Delete();
+            SceneManager.LoadScene(gameObject.scene.buildIndex);
         }
 
         // Cords are only ever added: one can't be taken away safely mid-call.

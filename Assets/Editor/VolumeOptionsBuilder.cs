@@ -100,7 +100,7 @@ namespace Switchboard.Editor
                     title.text = names[i]; title.rectTransform.anchoredPosition = new Vector2(0, 94); title.fontSize = 28;
                     rows[i] = row.GetComponent<VolumeCableSlider>();
                     rows[i].SetChannel((AudioVolumeChannel)i, colors[i]);
-                    rows[i].FixedSocket.rectTransform.anchoredPosition = new Vector2(-530, 0);
+                    rows[i].FixedSocket.rectTransform.anchoredPosition = new Vector2(-580, 0);
                     rows[i].FixedSocket.rectTransform.sizeDelta = new Vector2(84, 84);
                     foreach (var socket in rows[i].Sockets)
                     {
