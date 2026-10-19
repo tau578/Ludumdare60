@@ -8,9 +8,9 @@ namespace Switchboard.Domain
         private readonly GameClock clock = new GameClock();
         private readonly long startingCents;
 
-        /// <param name="save">A loaded save, restored while the services are built so nothing binds to a new game
-        /// first (5.12); null starts a new game with Economy.json's starting values.</param>
-        public GameSession(IGameContent content, ISwitchboard switchboard, SaveData save = null)
+        /// <param name="save">Loaded progress; null starts a new game.</param>
+        /// <param name="tutorial">Only new games start with one tutorial call.</param>
+        public GameSession(IGameContent content, ISwitchboard switchboard, SaveData save = null, bool tutorial = false)
         {
             if (content == null) throw new ArgumentNullException(nameof(content));
             if (switchboard == null) throw new ArgumentNullException(nameof(switchboard));
@@ -23,7 +23,7 @@ namespace Switchboard.Domain
             Stats = new StatSheet(Upgrades, content.StartingCords, content.StartingBoard, content.StartingClientSlots,
                 content.StartPool);
             Board = new OpenBoard(Stats);
-            Queue = new CallQueue(Calls, Stats);
+            Queue = new CallQueue(Calls, Stats, tutorial && save == null);
             if (save != null) Queue.Restore(save.queuePosition);
             Shelf = new ShopShelf(Upgrades);
             Goal = new GoalProgress(Upgrades, Wallet);

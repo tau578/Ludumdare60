@@ -21,6 +21,7 @@ namespace Switchboard.UI
         [SerializeField, Range(0, 1)] private float dimmedTextAlpha = .45f;
 
         public event Action Clicked;
+        public Graphic GuideGraphic => background;
         private Image emblem;
         private ColorBlock defaultColors;
         private bool pointerInside;

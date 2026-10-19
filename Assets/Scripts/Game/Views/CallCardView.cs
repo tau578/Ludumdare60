@@ -410,6 +410,7 @@ namespace Switchboard.Game
         {
             if (text == typedText) return;
             typedText = text;
+            speechLabel.richText = true;
             speechLabel.text = text;
             speechLabel.maxVisibleCharacters = 0;
             speechLabel.ForceMeshUpdate();

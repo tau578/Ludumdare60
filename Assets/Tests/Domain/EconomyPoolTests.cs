@@ -150,13 +150,24 @@ namespace Switchboard.Domain.Tests
             Assert.That(catalog.StartingCords, Is.EqualTo(6));
         }
 
-        [TestCase(1, "below the 2 cords the tray is built with")]
+        [Test]
+        public void OneStartingCordAllowsTheTwoCordUpgrade()
+        {
+            EconomyCatalog catalog = EconomyFileLoader.Load(File(Start.Replace("'startingCords': 2", "'startingCords': 1"), null,
+                "{ 'id': 'wires_1', 'type': 'extra_wires', 'name': 'Extra cord', 'costCents': 150, 'wires': 2 }"));
+            Assert.That(catalog.Errors, Is.Empty);
+            Assert.That(catalog.StartingCords, Is.EqualTo(1));
+            Assert.That(catalog.Upgrades, Has.Some.Matches<IUpgrade>(upgrade => upgrade.Id == "wires_1" && upgrade.Wires == 2));
+        }
+
+        [TestCase(0, "below the minimum of 1 cord")]
+        [TestCase(-2, "below the minimum of 1 cord")]
         [TestCase(7, "more than the tray holds")]
-        public void StartingCordsOutsideTwoToSixFallBackToTwo(int cords, string message)
+        public void StartingCordsOutsideOneToSixFallBackToTwo(int cords, string message)
         {
             EconomyCatalog catalog = EconomyFileLoader.Load(File(Start.Replace("'startingCords': 2", "'startingCords': " + cords), null));
             Assert.That(catalog.StartingCords, Is.EqualTo(2));
-            AssertSingleError(catalog, "startingCords " + cords, message, "Use 2 to 6");
+            AssertSingleError(catalog, "startingCords " + cords, message, "Use 1 to 6");
         }
 
         [Test]

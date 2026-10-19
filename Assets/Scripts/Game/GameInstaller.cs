@@ -60,7 +60,7 @@ namespace Switchboard.Game
             cordBridge.Attach(scene, config.ExtraCordColors, economy.StartingCords);
             if (cordBridge.CordCount > economy.StartingCords)
                 Debug.LogWarning($"The scene has {cordBridge.CordCount} cords but Economy.json starts with {economy.StartingCords}.", config);
-            Session = new GameSession(new GameContent(economy), cordBridge, save?.Data);
+            Session = new GameSession(new GameContent(economy), cordBridge, save?.Data, tutorial: true);
             cordBridge.Bind(Session.Desk, Session.Calls);
             cordBridge.EnsureCords(Session.Stats.Cords);
             Session.Stats.Changed += OnStatsChanged;

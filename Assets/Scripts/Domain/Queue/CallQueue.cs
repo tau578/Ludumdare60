@@ -6,7 +6,7 @@ namespace Switchboard.Domain
     /// <summary>
     /// The call queue (D52). Calls play in pool order and loop; every free caller slot takes the next call at once.
     /// The pool follows StatSheet (the last bought extra_clients's stagePool, or the startPool), and a new pool
-    /// starts at its first call. A call still on a card is skipped, so no call shows twice.
+    /// starts at its first call. Live calls and other requests from the same caller are skipped.
     /// </summary>
     public sealed class CallQueue
     {
@@ -16,12 +16,15 @@ namespace Switchboard.Domain
         // Live calls dealt from the current pool, with their pool index, so a save can replay them (D55).
         private readonly List<DealtCall> dealt = new List<DealtCall>();
         private IReadOnlyList<CallScript> pool;
+        private bool waitingForFirstCall;
+        private Call tutorialCall;
 
-        public CallQueue(CallService calls, StatSheet stats)
+        public CallQueue(CallService calls, StatSheet stats, bool tutorial = false)
         {
             this.calls = calls ?? throw new ArgumentNullException(nameof(calls));
             this.stats = stats ?? throw new ArgumentNullException(nameof(stats));
             pool = stats.CallPool;
+            waitingForFirstCall = tutorial;
             stats.Changed += OnStatsChanged;
             calls.CallEnded += OnCallEnded;
         }
@@ -65,6 +68,19 @@ namespace Switchboard.Domain
         /// <summary>Fills every free open slot, in order, at once.</summary>
         public void Tick()
         {
+            if (waitingForFirstCall)
+            {
+                if (tutorialCall == null)
+                {
+                    int index = TakeNext();
+                    if (index < 0) return;
+                    tutorialCall = calls.Add(new CallRequest(pool[index]));
+                    dealt.Add(new DealtCall(tutorialCall.Id, index));
+                }
+                if (!tutorialCall.ConnectionFeePaid && tutorialCall.State != CallState.Ended) return;
+                waitingForFirstCall = false;
+                tutorialCall = null;
+            }
             while (calls.Live.Count < stats.ClientSlots)
             {
                 int index = TakeNext();
@@ -81,7 +97,7 @@ namespace Switchboard.Domain
             {
                 int index = (Position + step) % count;
                 CallScript script = pool[index];
-                if (script == null || calls.IsLive(script)) continue;
+                if (script == null || calls.IsLive(script) || HasLiveCaller(script.Name)) continue;
                 Position = (index + 1) % count;
                 return index;
             }
@@ -91,6 +107,15 @@ namespace Switchboard.Domain
         private void OnStatsChanged()
         {
             if (!ReferenceEquals(stats.CallPool, pool)) Restart();
+        }
+
+        private bool HasLiveCaller(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            foreach (Call call in calls.Live)
+                if (string.Equals(call.Request.Script.Name.Trim(), name.Trim(), StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
         }
 
         private void OnCallEnded(CallEndedArgs e)

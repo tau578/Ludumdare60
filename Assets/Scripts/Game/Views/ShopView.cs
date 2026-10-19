@@ -22,6 +22,8 @@ namespace Switchboard.Game
         private readonly Action[] clickHandlers = new Action[SlotCount];
         private readonly IUpgrade[] shownOffers = new IUpgrade[SlotCount];
         private readonly SlotState[] shownStates = new SlotState[SlotCount];
+        private readonly SlowGuidePulse[] guidePulses = new SlowGuidePulse[SlotCount];
+        private IUpgrade firstCordUpgrade;
         private UpgradeService upgrades;
         private ShopShelf shelf;
         private GoalProgress goal;
@@ -46,6 +48,8 @@ namespace Switchboard.Game
             Canvas.ForceUpdateCanvases();
             found.Sort((a, b) => b.transform.position.y.CompareTo(a.transform.position.y));
             upgrades = service;
+            var cordChain = upgrades.ChainOf(UpgradeKind.ExtraWires);
+            firstCordUpgrade = cordChain.Count > 0 ? cordChain[0] : null;
             shelf = offers;
             goal = savings;
             wallet = money;
@@ -70,10 +74,15 @@ namespace Switchboard.Game
             for (int i = 0; i < SlotCount; i++)
             {
                 if (slots[i] != null && clickHandlers[i] != null) slots[i].Clicked -= clickHandlers[i];
+                if (guidePulses[i] != null) guidePulses[i].SetShowing(false);
+                guidePulses[i] = null;
+                shownOffers[i] = null;
+                shownStates[i] = SlotState.None;
                 slots[i] = null;
                 clickHandlers[i] = null;
             }
             shelf = null;
+            firstCordUpgrade = null;
             moneyCounter = null;
         }
 
@@ -139,6 +148,16 @@ namespace Switchboard.Game
             if (state == SlotState.Empty) view.ShowEmpty();
             else if (state == SlotState.Owned) view.Show(title, OwnedText, string.Empty, true);
             else view.Show(title, offer.Description, MoneyFormat.Dollars(offer.CostCents), state == SlotState.Affordable);
+
+            bool showGuide = offer != null && offer == firstCordUpgrade && upgrades.CanBuy(offer.Id) == PurchaseCheck.Ok;
+            if (showGuide && guidePulses[slot] == null && view.GuideGraphic != null)
+            {
+                var graphic = view.GuideGraphic;
+                guidePulses[slot] = graphic.GetComponent<SlowGuidePulse>();
+                if (guidePulses[slot] == null) guidePulses[slot] = graphic.gameObject.AddComponent<SlowGuidePulse>();
+                guidePulses[slot].UseSilhouetteHalo();
+            }
+            if (guidePulses[slot] != null) guidePulses[slot].SetShowing(showGuide);
         }
     }
 }

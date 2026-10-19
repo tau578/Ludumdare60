@@ -70,6 +70,32 @@ namespace Switchboard.Game.Tests
         }
 
         [Test]
+        public void FirstCordHintTracksAffordabilityAndStopsAfterPurchase()
+        {
+            var shop = All<ShopView>().Single();
+            var first = session.Upgrades.ChainOf(UpgradeKind.ExtraWires)[0];
+            var slots = All<UpgradeSlotView>().OrderByDescending(s => s.transform.position.y).ToArray();
+            int index = Enumerable.Range(0, ShopShelf.SlotCount).Single(i => session.Shelf.OfferAt(i) == first);
+            var graphic = slots[index].GuideGraphic;
+            Invoke(shop, "LateUpdate");
+            Assert.That(graphic.GetComponent<SlowGuidePulse>(), Is.Null);
+            session.Wallet.Earn(first.CostCents);
+            Invoke(shop, "LateUpdate");
+            var pulse = graphic.GetComponent<SlowGuidePulse>();
+            Assert.That(pulse.IsShowing, Is.True);
+            session.Wallet.TrySpend(1);
+            Invoke(shop, "LateUpdate");
+            Assert.That(pulse.IsShowing, Is.False);
+            session.Wallet.Earn(1);
+            Invoke(shop, "LateUpdate");
+            Assert.That(pulse.IsShowing, Is.True);
+            Assert.That(session.Upgrades.TryBuy(first.Id), Is.True);
+            session.Wallet.Earn(10000);
+            Invoke(shop, "LateUpdate");
+            Assert.That(pulse.IsShowing, Is.False, "Later cord upgrades must not repeat the tutorial");
+        }
+
+        [Test]
         public void FreshGameHidesLockedPlacesAndShopPurchasesRevealThem()
         {
             Assert.That(session.Stats.Cords, Is.EqualTo(2));
@@ -111,7 +137,7 @@ namespace Switchboard.Game.Tests
         public void FreshSessionFirstPortraitHasVisibleHaloUntilClicked()
         {
             session.Tick(3);
-            Assert.That(All<CallCardView>().Count(c => c.Call != null), Is.EqualTo(2), "both start slots fill at once");
+            Assert.That(All<CallCardView>().Count(c => c.Call != null), Is.EqualTo(1), "only the tutorial call appears at first");
             var card = All<CallCardView>().Single(c => c.Call == session.Calls.Live[0]);
             Assert.That(card.Call.Request.Script.Id, Is.EqualTo("call_001"));
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Portrait));
