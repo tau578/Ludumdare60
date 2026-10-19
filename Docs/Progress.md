@@ -3536,6 +3536,17 @@ Follow-ups:
   - the 14 cursor tests and the `BrowserPointer.jslib` case removed from `WebBuildTests`
   - The Step 9b Web build work and the `caller-02` slice fix stay. The fix reports above stay as history.
 
+### PNG cursors reapplied on main at 1.5x (2026-10-19)
+- Ported the cursor presentation from `07678dc` without switching branches or replacing the newer cable/pause/touch logic. Current menu asset edits remain in place.
+- Re-exported the original polygon geometry at 96×96 instead of 64×64; all four RGBA textures retain transparency. Imports use Cursor type, readable/uncompressed data, no mipmaps or NPOT scaling, and a 128 texture-size limit.
+- Default Cursor is cursor_pointing.png at hotspot (30, 3). Grab uses (43.5, 42), page left (63, 34.5), page right (33, 34.5). MenuHandCursor, VolumeCablePanel and CableInputController now select PNGs through HandCursorGraphic; its old hand mesh is empty. Picking up a plug continues to show the existing plug artwork and hide the hand.
+- Verified all four files and import settings, six serialized hand texture bindings, project default/hotspot, and reviewed the PNGs. Runtime and editor assemblies compile with Unity's Roslyn compiler, including existing tests; diff check passes. Live Play Mode and Unity test-runner execution were not available in this session.
+
+### Options board artwork and frame correction (2026-10-19)
+- Fixed the white options board: board_matte is a Single sprite, so its reference must use fileID 21300000, as in SwitchboardPanel; the previous stale multiple-sprite subasset ID did not resolve.
+- Moved the three wall anchors under the left frame. Wires now have their own layer beneath an aligned, RectMask2D-clipped copy of the left frame; row lamps and movable plugs stay above it. Reuses the original board artwork without creating another texture or changing patch rules.
+- Options heading now copies Operator's font colour exactly. Validated sprite/import references, local object and hierarchy links, aligned frame positions, hidden anchors, wire/frame/plug order, and title colour equality. Asset-only change; live Play Mode visual verification remains outstanding.
+
 #### Step 9b done (lead, 2026-10-19)
 - **Playtest OK:**
   - The game plays in the browser from the itch Draft page.
@@ -3544,5 +3555,5 @@ Follow-ups:
 - **Accepted for later:**
   - the black side strips on wide phones (Step 12)
   - itch's fullscreen button on the iPhone (an Apple limit; Step 12 notes the embed option)
-- **Still open:** the double pointer, which waits for Sergei's cursor fix (Plan §8).
+- **Double pointer:** Sergei brought his cursor fix onto main (`d79421d`, entry below) while this was being committed. It still needs a check in a Web build in Chrome or Arc: holding a cord still hides the pointer with `Cursor.visible = false` (Plan §8).
 - **Commits:** `709be9d` (Step 9b) and `b4d39aa` (the metas for Mia's `RawArt`, matching Sergei's branch).

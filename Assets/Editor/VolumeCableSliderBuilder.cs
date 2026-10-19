@@ -95,9 +95,11 @@ namespace Switchboard.Editor
                 audio.playOnAwake = false;
                 audio.spatialBlend = 0;
                 audio.volume = .6f;
-                root.gameObject.AddComponent<VolumeCableSlider>().Configure(fixedSocket, choices, wire, first, second, hand, audio,
+                var slider = root.gameObject.AddComponent<VolumeCableSlider>();
+                slider.Configure(fixedSocket, choices, wire, first, second, hand, audio,
                     AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Cable/PlugInsert.wav"),
                     AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Cable/PlugRemove.wav"));
+                slider.SetArtwork(AssetDatabase.LoadAssetAtPath<CableArtwork>("Assets/Content/CableArtwork.asset"));
                 return PrefabUtility.SaveAsPrefabAsset(root.gameObject, PrefabPath);
             }
             finally { Object.DestroyImmediate(root.gameObject); }
@@ -116,6 +118,7 @@ namespace Switchboard.Editor
         private static SocketGraphic Socket(string name, Transform parent, Vector2 position)
         {
             var socket = Rect(name, parent, new Vector2(100, 100), position).gameObject.AddComponent<SocketGraphic>();
+            socket.FaceSprite = AssetDatabase.LoadAllAssetsAtPath("Assets/Sprites/board/node.png").OfType<Sprite>().First();
             socket.raycastTarget = true;
             return socket;
         }

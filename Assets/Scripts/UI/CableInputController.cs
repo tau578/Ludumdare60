@@ -258,6 +258,11 @@ namespace Switchboard.UI
         private void UpdatePointers(Vector2 position, SocketView socket, StoredCableView stored, int pageTurn, bool overOpenBook,
             bool showHand)
         {
+            if (Application.isPlaying && !ownsCursor)
+            {
+                cursorWasVisible = Cursor.visible;
+                ownsCursor = true;
+            }
             var selected = ActiveCable;
             if (hoveredSocket != socket && hoveredSocket != null) hoveredSocket.SetPointerState(false, selected);
             hoveredSocket = socket;
@@ -287,15 +292,12 @@ namespace Switchboard.UI
                 handCursor.gameObject.SetActive(handVisible);
                 if (handVisible)
                 {
-                    SwitchboardUISorting.SetLayer(handCursor.gameObject, SwitchboardUISorting.Cursor);
-                    RectTransformUtility.ScreenPointToLocalPointInRectangle(area, position, camera, out var local);
-                    handCursor.rectTransform.anchoredPosition = local;
                     handCursor.Grabbing = CursorMode == CableCursorMode.Grab;
                     handCursor.PageTurnDirection = CursorMode == CableCursorMode.PageTurn ? pageTurn : 0;
-                    handCursor.transform.SetAsLastSibling();
+                    handCursor.ApplyCursor();
                 }
             }
-            if (ownsCursor) Cursor.visible = !handVisible && (selected == null || !selected.IsPointerVisible);
+            if (ownsCursor) Cursor.visible = handVisible || selected == null || !selected.IsPointerVisible;
         }
 
         private bool Owns(CableController owner)
@@ -314,6 +316,7 @@ namespace Switchboard.UI
             foreach (var cable in cables) if (cable != null) cable.HidePointer();
             if (handCursor != null) handCursor.gameObject.SetActive(false);
             if (ownsCursor) Cursor.visible = cursorWasVisible;
+            ownsCursor = false;
         }
         private void OnApplicationFocus(bool focused) { if (!focused) HidePointers(); }
         private void OnDisable() { HidePointers(); ownsCursor = false; heldCable = null; }
