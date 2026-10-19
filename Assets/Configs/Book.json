@@ -13,7 +13,7 @@
     { "name": "Clive Quinn", "profession": "Teacher", "address": "Voyager Rd. 10", "emergencyService": false, "jack": "A4" },
     { "name": "Violet Fairweather", "profession": "Writer", "address": "Voyager Rd. 12", "emergencyService": false, "jack": "B3" },
     { "name": "Winston Tuttle", "profession": "Shopkeeper", "address": "High St. 4", "emergencyService": false, "jack": "C2" },
-    { "name": "PC Percy Plodwell", "profession": "Constable", "address": "Station Rd. 5", "emergencyService": false, "jack": "E2" },
+    { "name": "PC Percy Plodwell", "profession": "Constable", "address": "Station Rd. 5", "emergencyService": false, "jack": "D3" },
     { "name": "Harrier Du Boid", "profession": "Detective", "address": "Voyager Rd. 11", "emergencyService": false, "jack": "B5" }
   ]
 }

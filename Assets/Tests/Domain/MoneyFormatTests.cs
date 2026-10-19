@@ -4,6 +4,15 @@ namespace Switchboard.Domain.Tests
 {
     public sealed class MoneyFormatTests
     {
+        [TestCase(0, "0¢")]
+        [TestCase(5.5, "6¢")]
+        [TestCase(100, "100¢")]
+        [TestCase(101, "$1")]
+        [TestCase(150, "$2")]
+        [TestCase(384, "$4")]
+        public void CompactPricesRoundOnlyForDisplay(double cents, string expected) =>
+            Assert.That(MoneyFormat.Compact(cents), Is.EqualTo(expected));
+
         [TestCase(0, "$0.00")]
         [TestCase(5, "$0.05")]
         [TestCase(120, "$1.20")]

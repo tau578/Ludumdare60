@@ -6,16 +6,14 @@
   "startPool": ["call_001", "call_002", "call_007", "call_005", "call_006", "call_004", "call_003", "call_008", "call_009", "call_010"],
   "upgrades": [
     {"id": "wires_1", "type": "extra_wires", "name": "Extra cord", "description": "2 cords", "costCents": 25, "wires": 2},
-    {"id": "wires_2", "type": "extra_wires", "name": "Extra cord", "description": "3 cords", "costCents": 180, "wires": 3},
-    {"id": "wires_3", "type": "extra_wires", "name": "Extra cord", "description": "4 cords", "costCents": 550, "wires": 4},
-    {"id": "wires_4", "type": "extra_wires", "name": "Extra cord", "description": "5 cords", "costCents": 1600, "wires": 5},
-    {"id": "wires_5", "type": "extra_wires", "name": "Extra cord", "description": "6 cords", "costCents": 2500, "wires": 6},
-    {"id": "board_1", "type": "extra_clients", "name": "Bigger board", "description": "5x5, 4 callers", "costCents": 350, "boardSize": {"cols": 5, "rows": 5}, "clientSlots": 4, "stagePool": ["call_101", "call_103", "call_109", "call_105", "call_002", "call_106", "call_110", "call_111", "call_008", "call_108", "call_102", "call_007", "call_104", "call_003", "call_107"]},
-    {"id": "board_2", "type": "extra_clients", "name": "Bigger board", "description": "6x6, 4 callers", "costCents": 1600, "boardSize": {"cols": 6, "rows": 6}, "clientSlots": 4, "stagePool": ["call_201", "call_207", "call_002", "call_211", "call_109", "call_208", "call_210", "call_111", "call_203", "call_101", "call_209", "call_212", "call_202", "call_106", "call_205", "call_010", "call_110", "call_206", "call_108", "call_204"]},
-    {"id": "income_1", "type": "extra_income", "name": "Better rates", "description": "Earn x1.5", "costCents": 100, "incomeMultiplier": 1.5},
-    {"id": "income_2", "type": "extra_income", "name": "Good rates", "description": "Earn x2", "costCents": 300, "incomeMultiplier": 2},
-    {"id": "income_3", "type": "extra_income", "name": "Top rates", "description": "Earn x3", "costCents": 1000, "incomeMultiplier": 3},
-    {"id": "income_4", "type": "extra_income", "name": "Premium rates", "description": "Earn x4", "costCents": 3000, "incomeMultiplier": 4},
-    {"id": "secret", "type": "secret", "name": "???", "description": "Something big", "costCents": 7000}
+    {"id": "wires_2", "type": "extra_wires", "name": "Extra cord", "description": "3 cords", "costCents": 300, "wires": 3},
+    {"id": "wires_3", "type": "extra_wires", "name": "Extra cord", "description": "4 cords", "costCents": 1200, "wires": 4},
+    {"id": "board_1", "type": "extra_clients", "name": "Bigger board", "description": "5x5, 4 callers", "costCents": 210, "boardSize": {"cols": 5, "rows": 5}, "clientSlots": 4, "stagePool": ["call_101", "call_103", "call_109", "call_105", "call_002", "call_106", "call_110", "call_111", "call_008", "call_108", "call_102", "call_007", "call_104", "call_003", "call_107"]},
+    {"id": "board_2", "type": "extra_clients", "name": "Bigger board", "description": "6x6, 4 callers", "costCents": 1820, "boardSize": {"cols": 6, "rows": 6}, "clientSlots": 4, "stagePool": ["call_201", "call_207", "call_002", "call_211", "call_109", "call_208", "call_210", "call_111", "call_203", "call_101", "call_209", "call_212", "call_202", "call_106", "call_205", "call_010", "call_110", "call_206", "call_108", "call_204"]},
+    {"id": "income_1", "type": "extra_income", "name": "Better rates", "description": "Earn x2", "costCents": 130, "incomeMultiplier": 2},
+    {"id": "income_2", "type": "extra_income", "name": "Good rates", "description": "Earn x4", "costCents": 390, "incomeMultiplier": 4},
+    {"id": "income_3", "type": "extra_income", "name": "Top rates", "description": "Earn x8", "costCents": 2100, "incomeMultiplier": 8},
+    {"id": "income_4", "type": "extra_income", "name": "Premium rates", "description": "Earn x16", "costCents": 7280, "incomeMultiplier": 16},
+    {"id": "secret", "type": "secret", "name": "???", "description": "Something big", "costCents": 25000}
   ]
 }

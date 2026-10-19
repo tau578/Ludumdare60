@@ -14,6 +14,11 @@ namespace Switchboard.Domain
 
         public static string Cents(double cents) => cents.ToString("0.##", Invariant) + "¢";
 
+        // Compact card prices only; accounting retains full precision.
+        public static string Compact(double cents) => cents > 100
+            ? "$" + System.Math.Round(cents / 100, System.MidpointRounding.AwayFromZero).ToString("0", Invariant)
+            : System.Math.Round(cents, System.MidpointRounding.AwayFromZero).ToString("0", Invariant) + "¢";
+
         public static string Rate(double centsPerSecond) => Cents(centsPerSecond) + "/s";
 
         // The card's badge: the one-off fee plus the per-second rate, e.g. "10¢ + 5¢/s" (D32).
