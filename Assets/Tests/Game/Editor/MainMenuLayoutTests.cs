@@ -139,7 +139,7 @@ namespace Switchboard.Game.Tests
             foreach (VolumeCableSlider row in rows)
             {
                 float[] x = row.Sockets.Select(s => s.rectTransform.anchoredPosition.x).ToArray();
-                Assert.That(rowCount == 3 ? x : new[] { x[4], x[0], x[1], x[2], x[3] }, Is.Ordered, row.name);
+                Assert.That(new[] { x[4], x[0], x[1], x[2], x[3] }, Is.Ordered, row.name);
                 for (int i = 0; i < 5; i++)
                 {
                     var label = (RectTransform)(rowCount == 3 ? panel.transform.Find(lamps[i]) : row.transform.Find(labels[i]));
@@ -148,7 +148,7 @@ namespace Switchboard.Game.Tests
             }
         }
 
-        // The shared board reserves its left strip for row lamps; the standalone legacy row keeps mute first.
+        // Both layouts start with mute; the shared board also reserves its left strip for row lamps.
         [TestCase("Assets/Prefabs/UI/VolumeCablePanel.prefab")]
         [TestCase("Assets/Prefabs/UI/MasterVolumeCableSlider.prefab")]
         public void SocketRowsFitTheirLayoutAndClearTheCableAnchor(string path)
@@ -163,7 +163,7 @@ namespace Switchboard.Game.Tests
                     : new[] { -410f, -205f, 0f, 205f, 410f }), row.name);
                 Assert.That(((RectTransform)row.transform).rect.center.x, Is.EqualTo(0f), row.name);
                 float anchor = row.WallAnchor != null ? row.WallAnchor.anchoredPosition.x : row.FixedSocket.rectTransform.anchoredPosition.x;
-                int first = board ? 0 : 4;
+                int first = 4;
                 float socketLeft = x[first] - row.Sockets[first].rectTransform.sizeDelta.x / 2;
                 float anchorRight = anchor + (row.FixedSocket != null ? row.FixedSocket.rectTransform.sizeDelta.x / 2 : 0);
                 Assert.That(socketLeft - anchorRight, Is.GreaterThanOrEqualTo(60f), row.name + ": the cable's left end crowds the first socket");
