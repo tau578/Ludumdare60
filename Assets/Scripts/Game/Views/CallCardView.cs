@@ -1,6 +1,7 @@
 using System;
 using Switchboard.Content;
 using Switchboard.Domain;
+using Switchboard.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -19,6 +20,7 @@ namespace Switchboard.Game
         [SerializeField] private Image portrait;
         [SerializeField, Tooltip("The caller's name under the portrait.")] private TMP_Text nameLabel;
         [SerializeField] private TMP_Text rateLabel;
+        private TMP_Text connectionLabel;
         [SerializeField] private GameObject stamp;
         [SerializeField] private TMP_Text stampLabel;
         [SerializeField] private Outline stampOutline;
@@ -110,7 +112,12 @@ namespace Switchboard.Game
             cordColors = cordColorOf;
             portrait.sprite = callerPortrait != null ? callerPortrait : defaultPortrait;
             if (nameLabel != null) nameLabel.text = call.Request.Script.Name;
-            rateLabel.text = MoneyFormat.CardRate(call.Request.ConnectionFeeCents, call.Request.CentsPerSecond);
+            if (connectionLabel != null)
+            {
+                connectionLabel.text = MoneyFormat.Cents(call.Request.ConnectionFeeCents);
+                rateLabel.text = MoneyFormat.Cents(call.Request.CentsPerSecond) + "/s";
+            }
+            else rateLabel.text = MoneyFormat.CardRate(call.Request.ConnectionFeeCents, call.Request.CentsPerSecond);
             ApplyStyle(style);
             shownRingFill = -1;
             ringWasUrgent = false;
@@ -135,12 +142,19 @@ namespace Switchboard.Game
             bool onCord = state == CallState.Connected || onHold;
 
             bool waiting = state == CallState.Incoming || inHand;
-            // The type badge sits on top while the call waits; once connected the earnings take that place.
+            // The type badge sits on top while the call waits.
             bool showTypeBadge = waiting && typeBadge != null && !string.IsNullOrEmpty(typeBadgeLabel.text);
             if (typeBadge != null) typeBadge.SetActive(showTypeBadge);
             // The response timer stops for good on a correct connection (D09), so the ring goes with it.
             if (responseRingRoot != null) responseRingRoot.SetActive(Call.HasResponseTime && waiting);
-            earningsBadge.SetActive(onCord);
+            earningsBadge.SetActive(false);
+            nameLabel.gameObject.SetActive(!onCord);
+            earningsLabel.gameObject.SetActive(onCord);
+            if (onCord)
+            {
+                shownCents = (long)Math.Floor(Call.CentsEarned + 1e-9);
+                earningsLabel.text = MoneyFormat.Dollars(shownCents);
+            }
             cordRing.gameObject.SetActive(onCord);
             if (onCord && Call.Cord is CordId cord && cordColors != null) cordRing.color = Faded(cordColors(cord), onHold);
             earningsLabel.color = Faded(earningsColor, onHold);
@@ -229,6 +243,7 @@ namespace Switchboard.Game
         {
             if (initialized) return;
             initialized = true;
+            AddCallerDecorations();
             defaultPortrait = portrait.sprite;
             stampRect = (RectTransform)stamp.transform;
             stampSize = stampRect.rect.size;
@@ -243,6 +258,84 @@ namespace Switchboard.Game
             if (rateOutline != null) rateOutlineColor = rateOutline.effectColor;
             if (typeBadgeBackground != null) typeBadgeColor = typeBadgeBackground.color;
             if (responseRing != null) ringColor = responseRing.color;
+        }
+
+        private void AddCallerDecorations()
+        {
+            var overlay = new GameObject("Caller labels", typeof(RectTransform)).GetComponent<RectTransform>();
+            overlay.SetParent(transform, false);
+            overlay.anchorMin = portrait.rectTransform.anchorMin;
+            overlay.anchorMax = portrait.rectTransform.anchorMax;
+            overlay.pivot = portrait.rectTransform.pivot;
+            overlay.sizeDelta = portrait.rectTransform.sizeDelta;
+            overlay.anchoredPosition = portrait.rectTransform.anchoredPosition;
+            overlay.SetSiblingIndex(portrait.transform.GetSiblingIndex() + 1);
+            var oldRate = rateLabel.transform.parent.GetComponent<Image>();
+            var oldName = nameLabel.transform.parent.GetComponent<Image>();
+            if (oldRate != null) oldRate.enabled = false;
+            if (oldName != null) oldName.enabled = false;
+            if (rateOutline != null) rateOutline.enabled = false;
+            AddRateCircle(overlay);
+            connectionLabel = Instantiate(rateLabel, overlay.transform);
+            connectionLabel.name = "Connection reward";
+            PlaceDecorationText(connectionLabel, overlay.transform, new Vector2(47.2f, 47.4f), new Vector2(43, 35), 23);
+            PlaceDecorationText(rateLabel, overlay.transform, new Vector2(58.4f, 19.5f), new Vector2(37, 31), 20);
+            PlaceDecorationText(nameLabel, overlay.transform, new Vector2(0, -49), new Vector2(130, 32), 28);
+            if (typeBadge != null)
+            {
+                var badge = (RectTransform)typeBadge.transform;
+                badge.SetParent(overlay, false);
+                badge.anchorMin = new Vector2(.5f - 52f / 152f, .5f - 84f / 152f);
+                badge.anchorMax = new Vector2(.5f + 52f / 152f, .5f - 70f / 152f);
+                badge.offsetMin = badge.offsetMax = Vector2.zero;
+                typeBadgeLabel.enableAutoSizing = true;
+                typeBadgeLabel.fontSizeMin = 9;
+                typeBadgeLabel.fontSizeMax = 16;
+                typeBadgeLabel.alignment = TextAlignmentOptions.Midline;
+            }
+            // Reuse the name plate for earnings, without the old counter's background.
+            Color counterColor = earningsLabel.color;
+            PlaceDecorationText(earningsLabel, overlay.transform, new Vector2(0, -49), new Vector2(130, 32), 28);
+            earningsLabel.color = counterColor;
+            earningsBadge.SetActive(false);
+        }
+
+        private static void AddRateCircle(RectTransform parent)
+        {
+            var rim = new GameObject("Larger per-second circle", typeof(RectTransform), typeof(CanvasRenderer))
+                .AddComponent<CircleGraphic>();
+            rim.transform.SetParent(parent, false);
+            rim.raycastTarget = false;
+            rim.color = new Color32(172, 164, 104, 255);
+            Vector2 centre = new Vector2(.5f, .5f) + new Vector2(58.4f, 19.5f) / 152f;
+            rim.rectTransform.anchorMin = centre - Vector2.one * (21f / 152f);
+            rim.rectTransform.anchorMax = centre + Vector2.one * (21f / 152f);
+            rim.rectTransform.offsetMin = rim.rectTransform.offsetMax = Vector2.zero;
+            var fill = new GameObject("Teal fill", typeof(RectTransform), typeof(CanvasRenderer)).AddComponent<CircleGraphic>();
+            fill.transform.SetParent(rim.transform, false);
+            fill.raycastTarget = false;
+            fill.color = new Color32(23, 83, 81, 255);
+            fill.rectTransform.anchorMin = Vector2.one * .04f;
+            fill.rectTransform.anchorMax = Vector2.one * .96f;
+            fill.rectTransform.offsetMin = fill.rectTransform.offsetMax = Vector2.zero;
+        }
+
+        private static void PlaceDecorationText(TMP_Text label, Transform parent, Vector2 position, Vector2 size, float fontSize)
+        {
+            label.transform.SetParent(parent, false);
+            var rect = label.rectTransform;
+            rect.pivot = new Vector2(.5f, .5f);
+            // Match the artwork proportionally when the queue resizes the portrait.
+            rect.anchorMin = new Vector2(.5f, .5f) + (position - size * .5f) / 152f;
+            rect.anchorMax = new Vector2(.5f, .5f) + (position + size * .5f) / 152f;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            label.margin = Vector4.zero;
+            label.alignment = TextAlignmentOptions.Midline;
+            label.enableAutoSizing = true;
+            label.fontSizeMin = 7;
+            label.fontSizeMax = fontSize;
+            label.color = new Color32(255, 249, 224, 255);
+            label.raycastTarget = false;
         }
 
         // Not colour alone (Design 5.4): the badge text and the ring carry the meaning, the accent only adds to it.

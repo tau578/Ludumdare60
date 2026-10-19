@@ -15,8 +15,8 @@ namespace Switchboard.Domain
         // All the team's cord tray holds (5b).
         public const int MaxCords = 6;
 
-        // The caller panel in Final.unity has six slots, the most that can ever open (D49).
-        public const int MaxClientSlots = 6;
+        // At most four calls can be open, including the final board upgrade.
+        public const int MaxClientSlots = 4;
 
         private readonly UpgradeService upgrades;
         private readonly int startingCords;

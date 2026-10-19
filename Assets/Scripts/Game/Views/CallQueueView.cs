@@ -137,6 +137,9 @@ namespace Switchboard.Game
         {
             slotVisibility = new CanvasGroup[slots.Length];
             preferredSlotSizes = new Vector2[slots.Length];
+            if (slots.Length > 0 && slots[0] != null &&
+                slots[0].parent.TryGetComponent<VerticalLayoutGroup>(out var layoutGroup))
+                layoutGroup.spacing = Mathf.Max(layoutGroup.spacing, 40f);
             for (int i = 0; i < slots.Length; i++)
             {
                 if (slots[i] == null) continue;

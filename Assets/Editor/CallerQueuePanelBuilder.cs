@@ -102,7 +102,7 @@ namespace Switchboard.Editor
             RectTransform slots = Rect("Slots", panel, PanelSize);
             VerticalLayoutGroup layout = slots.gameObject.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(30, 30, 16, 16);
-            layout.spacing = 12;
+            layout.spacing = 40;
             layout.childAlignment = TextAnchor.UpperCenter;
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = false;

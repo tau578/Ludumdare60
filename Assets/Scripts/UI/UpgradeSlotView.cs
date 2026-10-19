@@ -105,7 +105,6 @@ namespace Switchboard.UI
         {
             if (emblem != null)
             {
-                SetArtwork(false, false);
                 Show("MAX", "", "", false);
                 SetFill(0); SetHighlight(false);
                 return;
