@@ -36,60 +36,85 @@ namespace Switchboard.Domain.Tests
             foreach (string fragment in fragments) Assert.That(catalog.Errors[0], Does.Contain(fragment));
         }
 
+        // The designer balances Economy.json at any time (lead, 2026-10-19): these check the rules, not the entries.
         [Test]
-        public void TheRealFileLoadsTenEntriesWithNoProblems()
+        public void TheRealFileLoadsEveryEntryWithNoProblems()
         {
             var file = AssetDatabase.LoadAssetAtPath<TextAsset>(EconomyFilePath);
             Assert.That(file, Is.Not.Null, EconomyFilePath);
             EconomyCatalog catalog = EconomyFileLoader.Load(file.text);
-            Assert.That(catalog.Errors, Is.Empty);
-            Assert.That(catalog.Upgrades.Count, Is.EqualTo(10));
-            Assert.That(catalog.Upgrades[6].Id, Is.EqualTo("income_1"));
-            Assert.That(catalog.Upgrades[6].Kind, Is.EqualTo(UpgradeKind.ExtraIncome));
-            Assert.That(catalog.Upgrades[6].CostCents, Is.EqualTo(800));
-            Assert.That(catalog.Upgrades[6].IncomeMultiplier, Is.EqualTo(1.5));
-            int[] wires = { 4, 5, 6 };
-            long[] costs = { 500, 800, 1300 };
-            for (int i = 0; i < 3; i++)
+            Assert.That(catalog.Errors, Is.Empty, string.Join("\n", catalog.Errors));
+            Assert.That(catalog.Upgrades.Count, Is.EqualTo(JsonUtility.FromJson<EconomyFileData>(file.text).upgrades.Length),
+                "every entry loads");
+            Assert.That(catalog.StartingCords, Is.InRange(1, StatSheet.MaxCords));
+            int secrets = 0;
+            int cords = catalog.StartingCords;
+            double multiplier = 1;
+            foreach (IUpgrade upgrade in catalog.Upgrades)
             {
-                Assert.That(catalog.Upgrades[i].Id, Is.EqualTo("wires_" + (i + 1)));
-                Assert.That(catalog.Upgrades[i].Kind, Is.EqualTo(UpgradeKind.ExtraWires));
-                Assert.That(catalog.Upgrades[i].Wires, Is.EqualTo(wires[i]));
-                Assert.That(catalog.Upgrades[i].CostCents, Is.EqualTo(costs[i]));
+                Assert.That(upgrade.Kind, Is.Not.EqualTo((UpgradeKind)3), "no Notepad (D54)");
+                Assert.That(upgrade.CostCents, Is.GreaterThan(0), upgrade.Id);
+                if (upgrade.Kind == UpgradeKind.Secret) secrets++;
+                else if (upgrade.Kind == UpgradeKind.ExtraWires)
+                {
+                    Assert.That(upgrade.Wires, Is.InRange(cords + 1, StatSheet.MaxCords), $"{upgrade.Id}: each cord step adds cords");
+                    cords = upgrade.Wires;
+                }
+                else if (upgrade.Kind == UpgradeKind.ExtraIncome)
+                {
+                    Assert.That(upgrade.IncomeMultiplier, Is.GreaterThan(multiplier), $"{upgrade.Id}: each rate step earns more");
+                    multiplier = upgrade.IncomeMultiplier;
+                }
             }
-            for (int i = 0; i < 3; i++)
-                Assert.That(catalog.Upgrades[3 + i].Kind, Is.EqualTo(UpgradeKind.ExtraClients), "the board entries follow the cords");
-            Assert.That(catalog.Upgrades[9].Kind, Is.EqualTo(UpgradeKind.Secret));
-            Assert.That(catalog.Upgrades[9].CostCents, Is.EqualTo(25000));
-            foreach (IUpgrade upgrade in catalog.Upgrades) Assert.That(upgrade.Kind, Is.Not.EqualTo((UpgradeKind)3), "no Notepad (D54)");
+            Assert.That(secrets, Is.EqualTo(1), "exactly one secret goal");
         }
 
         [Test]
         public void GameConfigReferencesTheRealFile()
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
-            Assert.That(config.LoadEconomy().Upgrades.Count, Is.EqualTo(10));
-            Assert.That(config.LoadEconomy().StartingCords, Is.EqualTo(2));
+            Assert.That(config.EconomyFileText, Is.EqualTo(AssetDatabase.LoadAssetAtPath<TextAsset>(EconomyFilePath).text));
+            EconomyCatalog fromFile = EconomyFileLoader.Load(config.EconomyFileText);
+            Assert.That(config.LoadEconomy().Upgrades.Count, Is.EqualTo(fromFile.Upgrades.Count));
+            Assert.That(config.LoadEconomy().StartingCords, Is.EqualTo(fromFile.StartingCords));
             Assert.That(config.ExtraCordColors.Count, Is.EqualTo(3));
             Assert.That(config.Validate(), Is.Empty);
         }
 
         [Test]
-        public void TheRealShelfMatchesTheArtworkAndReplacesCompletedChains()
+        public void TheRealShelfShowsOneEntryPerChainAndReplacesCompletedChains()
         {
             var file = AssetDatabase.LoadAssetAtPath<TextAsset>(EconomyFilePath);
-            var upgrades = new UpgradeService(EconomyFileLoader.Load(file.text).Upgrades, new Wallet(100000));
+            IReadOnlyList<IUpgrade> all = EconomyFileLoader.Load(file.text).Upgrades;
+            long total = 0;
+            foreach (IUpgrade upgrade in all) total += upgrade.CostCents;
+            var upgrades = new UpgradeService(all, new Wallet(total));
             var shelf = new ShopShelf(upgrades);
-            Assert.That(new[] { shelf.OfferAt(0).Id, shelf.OfferAt(1).Id, shelf.OfferAt(2).Id },
-                Is.EqualTo(new[] { "wires_1", "board_1", "income_1" }));
-            Assert.That(upgrades.TryBuy("board_1"), Is.True);
-            Assert.That(upgrades.TryBuy("board_2"), Is.True);
-            Assert.That(shelf.OfferAt(1).Id, Is.EqualTo("board_3"));
-            Assert.That(upgrades.TryBuy("board_3"), Is.True);
-            Assert.That(shelf.OfferAt(1), Is.Null, "no fourth chain since the Notepad went (D54)");
-            Assert.That(shelf.OfferAt(0).Id, Is.EqualTo("wires_1"));
-            Assert.That(shelf.OfferAt(2).Id, Is.EqualTo("income_1"));
+
+            // The chains in file order, without the secret, which has its own button.
+            var chains = new List<UpgradeKind>();
+            foreach (UpgradeKind kind in upgrades.Kinds)
+                if (kind != UpgradeKind.Secret) chains.Add(kind);
+            for (int slot = 0; slot < ShopShelf.SlotCount; slot++)
+            {
+                IUpgrade expected = slot < chains.Count ? upgrades.ChainOf(chains[slot])[0] : null;
+                Assert.That(shelf.OfferAt(slot), Is.SameAs(expected), $"slot {slot + 1} shows the first entry of chain {slot + 1}");
+            }
+
+            // Buying out the chain in the middle slot brings the next chain not on the shelf; the other slots stay.
+            if (chains.Count < 2) return;
+            IUpgrade first = shelf.OfferAt(0), last = shelf.OfferAt(2);
+            foreach (IUpgrade upgrade in upgrades.ChainOf(chains[1]))
+            {
+                Assert.That(shelf.OfferAt(1), Is.SameAs(upgrade), "a chain is sold in order");
+                Assert.That(upgrades.TryBuy(upgrade.Id), Is.True, upgrade.Id);
+            }
+            IUpgrade next = chains.Count > ShopShelf.SlotCount ? upgrades.ChainOf(chains[ShopShelf.SlotCount])[0] : null;
+            Assert.That(shelf.OfferAt(1), Is.SameAs(next), "a bought-out chain makes room for the next one, or leaves the slot empty");
+            Assert.That(shelf.OfferAt(0), Is.SameAs(first));
+            Assert.That(shelf.OfferAt(2), Is.SameAs(last));
         }
+
         [Test]
         public void AValidFilePasses() => Assert.That(Load(Income("income_1", 800, 1.5f), Secret).Errors, Is.Empty);
 

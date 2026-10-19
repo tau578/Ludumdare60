@@ -3587,3 +3587,86 @@ Follow-ups:
 - **The bubble shape is Sergei's** (`64da110`, `SpeechBubbleGraphic`): one procedurally drawn outline around the body and the tail, with 18 px corners, a light rim and a dark outline. Its settings are in the Inspector. Our sprite version (images in `Assets/Content/UI`) was built at the same time and set aside by the lead; it stays only on the local branch `bubble-ours`.
 - **Text colour (ours):** very dark brown `#33241A` for the bubble's label (it was navy) and the book's text (it was `#2C302A`). The book's detail line is `#5C4535` (it was `#4E5046`). Contrast on the page: 14.0:1 and 8.4:1 (it was 12.6 and 7.7). `PhoneBookBuilder` uses the same colours.
 
+
+## Test and font fix report: 2026-10-19
+Result: done
+Playable now: nothing changed in play, except that the pause panel draws its text from static fonts that look the same. The tests no longer break when the designer balances his three files.
+How to test: open the pause menu (pause button or Esc) and Options in it. "Paused", "Resume", "Options", "Main Menu" and "Back" look as Sergei made them. EditMode is all green.
+Created:
+- `Assets/Fonts/BoecklinsUniverse/Boecklins Universe SDF Static.asset` (+ `.meta`)
+- `Assets/Fonts/DellaRespira/Della Respira SDF Static.asset` (+ `.meta`)
+- Both are Static TMP font assets made from Sergei's TTFs with the same settings as his dynamic ones (90 pt sampling, padding 9, SDFAA, 1024×1024, default material), holding all 95 printable ASCII characters. They have no runtime link to the TTF.
+Changed:
+- Tests: `Assets/Tests/Domain/BoardGrowthTests.cs`, `BookFileTests.cs`, `CallsFileTests.cs`, `EconomyBoardTests.cs`, `EconomyFileTests.cs`, `EconomyPoolTests.cs`, `SaveSessionTests.cs`; `Assets/Tests/Game/Editor/MergedSystemsTests.cs`, `PhoneBookEntriesTests.cs`, `PhoneBookPageTurnTests.cs`
+- `Assets/Prefabs/Game/GameUI.prefab`: the six pause-panel labels' font and material only (12 lines), plus one blank `m_Name:` line Unity rewrote with a trailing space
+- Docs: `Docs/Design.md`, `Docs/Plan.md`, this report
+Scene and prefab changes: `GameUI.prefab` `Pause/Dialog`: `Main/Title` and `Options/Title` now use `Boecklins Universe SDF Static`; `Resume`, `Options`, `MainMenu` and `Back` labels use `Della Respira SDF Static`. Sizes, colours and layout are unchanged. `Final.unity` has no overrides on them and is unchanged.
+Tests: 533/533 EditMode, none skipped (before: 506/533). No new tests: 25 real-file tests rewritten (several renamed, listed below) and Sergei's Tab test fixed.
+Console: clean
+Screenshot: `Temp/Captures/pause-static-font.png`, an offscreen render of `GameUI.prefab`'s pause dialog with the static fonts. No Play Mode was used, so no PlayerPrefs were touched.
+
+What each failing test was:
+- **(a) pinned the designer's real numbers: rewritten to check the rule, with values read from the loaded files.**
+  - `BoardGrowthTests`:
+    - `TheRealFilesPlayTheStartPoolOnThreeByThreeInTwoSlots` → **`TheRealFilesPlayTheStartPoolOnTheStartingBoardAndSlots`**. Every call fits the start board, every start slot fills, the pool starts at its first call and loops, every start-pool call rings, and no caller has two live calls. "No emergencies in the start pool" and the exact play order were dropped: the designer now puts emergencies there, and the new one-call-per-caller rule reorders calls on purpose (b).
+    - `TheRealBookHasOneServicePerNewRing` → **`TheRealBooksServicesAreAllOnTheBiggestBoard`**. All three services are now on the 4×4 start.
+  - `BookFileTests`:
+    - `TheRealFilePassesWithServicesFirstAndEveryEntryFilledIn` → **`TheRealFilePassesWithServicesFirstThenNamesInOrder`**. No problems, `contactsPerPage` and the entry count come from the file, services first in file order, then names A–Z, and every jack a call uses is in the book. The 36-jack and C3 checks were dropped. Profession and address were dropped too, because Design 6.6 allows them to be empty.
+    - `TheRealFileWritesSurnamesInCapitalsAndUsesOnlyPlainText` → **`TheRealFileUsesOnlyPlainText`** (ASCII only, no `<`/`>` in book text). The capitals were the designer's own style, and he has changed it on purpose.
+  - `CallsFileTests.TheRealFileLoadsWithNoProblemsAndOnlyStraightQuotes` (name kept). Every call loads, the file is ASCII only, every caller and jack is in the book, durations are above 0, and an emergency has a response time and a fine. The "≥ 40 calls" check and the pay ranges were dropped.
+  - `EconomyBoardTests.TheRealFileStartsOnThreeByThreeAndGrowsInThreeSteps` → **`TheRealFileStartsOnItsStartingBoardAndEveryStepGrows`**.
+  - `EconomyFileTests`:
+    - `TheRealFileLoadsTenEntriesWithNoProblems` → **`TheRealFileLoadsEveryEntryWithNoProblems`**. Entry count from the file, exactly one secret, cord and rate chains grow, no Notepad.
+    - `GameConfigReferencesTheRealFile` (name kept). GameConfig's text is the file's text.
+    - `TheRealShelfMatchesTheArtworkAndReplacesCompletedChains` → **`TheRealShelfShowsOneEntryPerChainAndReplacesCompletedChains`**. The shop artwork follows the upgrade kind, not the slot, so no order rule was lost.
+  - `EconomyPoolTests`:
+    - `TheRealFilesHaveTheShippedQueues` → **`TheRealFilesQueuesFitTheirBoards`**. Kept: "the first start call isn't an emergency (the guide's call)".
+    - `ValidateContentNamesACallOutsideTheStartingBoard` (name kept). It now finds a call outside the start board in `Calls.json` and swaps it in however the line is spaced. If none exists, it reports Ignored.
+  - `SaveSessionTests.ALoadedBoardTwoOpensFiveByFiveAndDealsFromItsStagePool` → **`ALoadedBoardUpgradeOpensItsOwnSizeBeforeTheFirstCall`**. Loads the whole board chain plus the first cord and rate entries; expects the first live calls to be the stage pool's first different callers.
+  - `MergedSystemsTests`:
+    - `FreshGameHidesLockedPlacesAndShopPurchasesRevealThem`, `PurchasedCordJoinsCurrentGuideAndPickupClearsEveryPulse` and `NewCordKeepsConnectionHighlightsCoinsAndAudio` (names kept). Counts, prices and slots come from `Economy.json`. The bought cord is "the cable that became active", no longer `Cable_04`.
+  - `PhoneBookEntriesTests`:
+    - `TheRealBookShowsEveryEntryInTheLoadersOrder` and `ARowShowsTheNameThenProfessionAndAddressAndTheJackLast` (names kept). Expected rows come from the loader.
+    - `AFreshGameOnTheThreeByThreeBoardListsEveryone` → **`AFreshGameOnTheStartingBoardListsEveryone`**.
+  - `PhoneBookPageTurnTests` (seven tests, names kept). The real book now fits on one spread (14 entries, 7 per page), so there was no page to turn. The page-turn and cursor mechanics now read a four-spread sample book with the real page size. `PageTurningGoesThroughTheWholeBook` reads the real file and works for any number of spreads, including one.
+- **(b) old behaviour changed on purpose:** covered inside the rewrites above (1 starting cord, one live call per caller). The one-call tutorial start needed no test change: `GameInstaller` and the real-file sessions in tests load a save or build `GameSession` without the flag.
+- **(c) real bugs:** none.
+- **Other: `PhoneBookPageTurnTests.TabTogglesBookAndIsIgnoredWhilePaused`** (Sergei's new test from `578163e`). Not a game bug. In EditMode the Input System runs "Editor" updates, and `wasPressedThisFrame` only counts player updates, so the queued Tab never counted as "pressed this frame" on any machine. In Play Mode the game gets player updates and Tab works. The test now turns on the Input System's `runPlayerUpdatesInEditMode` (internal, through reflection) while it presses Tab, and restores it in `finally`.
+- **Pause font (Task B):** `GamePauseMenuTests.ThePanelIsAModalAboveTheBookAndBelowTheCursor` passes. The panel uses **Boecklins Universe SDF Static** (titles) and **Della Respira SDF Static** (button labels). The shared dynamic font assets were not edited and were not re-saved this time.
+
+Housekeeping: discarded the `ProjectSettings/TimeManager.asset` re-save. No changes to the dynamic TMP fonts, `SampleScene.unity`, the URP assets or `preloadedAssets`. The editor is idle, not in Play Mode, with `Final.unity` active and not dirty (it was on `MainMenu` at the start). Nothing is staged, committed or pushed.
+
+Deviations from Design/Plan:
+- **The one-call tutorial start does not run on Continue.** The orchestrator's note said it did, but the merge `baed5b4` added `tutorial && save == null` in `GameSession`. So it runs on a new game, and again after a reload while a new game hasn't saved yet. Plan's Step 10 outline says so and keeps the open question (new game only? a saved flag?).
+- Design.md: a status row for the designer's balance pass. 5.2 gains the one-call-per-caller skip and the tutorial start. 5.7 and 6.6 now say names are free text ("First Surname" since `7312e43`), and 6.4 that the designer sets the numbers (`startingCords` 1–6, currently a 4×4 start with 3 slots). D49, D52 and D53 are annotated as changed by the designer. Plan §4 has the "Real-file tests check rules, not numbers" row.
+
+Follow-ups:
+- **The designer's guides now disagree with his files** (not edited, as asked):
+  - `Docs/EconomyFile.md`:
+    - line 46: "the game starts on a 3x3 corner"
+    - line 48: "the shipped first call pays 10¢ + 20 × 5¢" (now 25¢ + 4.8¢/s for 25 s)
+    - lines 70/72 and 105/119: the examples show `startingCords` 2 and `startingClientSlots` 2
+    - line 111: `startingCords` "2 to 6" (now 1 to 6); line 160: "2 in the shipped file" (now 1); line 223: "outside 2 to 6"
+    - line 184: one emergency service per new ring (Doctor D4, Fire Brigade E5, Police B6), now all three on the 4×4 start
+    - line 97: "until saves arrive in Step 9, every restart"
+    - The guide also doesn't mention the one-call tutorial start or the one-live-call-per-caller skip (5.2).
+    - Line 26's example call and line 205's "3x3" example message are only illustrations.
+  - `Docs/BookFile.md`:
+    - line 25 and line 39: names "SURNAME, First" and the surname order (the file now uses "First Surname", so the book sorts by first name)
+    - line 28: services "the Police, the Fire Brigade and the Doctor" (now "Police station", "Fire station", "Hospital")
+    - line 13: example `contactsPerPage` 6 (the file uses 7; the default 6 is still right)
+    - line 68: an example message
+- **Code text that still says "SURNAME, First":** `BookFileLoader`'s "the name is missing. Write it "SURNAME, First"" message, and the `ShowLetter` comment in `PhoneBookView`. Worth a word with the designer before changing.
+- **Validator gap from the one-call-per-caller rule:** `EconomyFileLoader` warns when a pool has fewer *different calls* than its slots, but now what matters is *different callers*. The current pools are fine (7, 9 and 11 callers for 3, 4 and 6 slots).
+- The static fonts hold printable ASCII only. A new pause label with "¢", "—" or accented letters needs a regenerated font; `GamePauseMenuTests` would catch it. Sergei's main menu still uses the dynamic fonts (outside this pass).
+
+#### Merge and check (orchestrator, 2026-10-19)
+- **Merged:** tarbaev.d's second "Configs wip" (`4fe1ce9`, one line in Calls.json plus a new `CallsFileTests` check) and Sergei's new shop sounds and music ducking (`2c0d99d`). Our uncommitted work went on top through a stash.
+- **One conflict, in `PhoneBookPageTurnTests`:** kept the real-book check and counted spreads with Sergei's `PageCount`.
+- **Sergei changed the book on purpose:** only the corner folds turn pages, a click elsewhere on the open book closes it, and a click outside keeps it open. `CheckPageCursor` now expects the pointing hand over a row.
+- **Result:** EditMode 543/543 green, and `Validate Content` found no problems.
+- **Play Mode run in `Final`** (about 50 s of game time at ×5, no errors or warnings):
+  - It starts on 4×4 with 3 slots, 1 cord and one tutorial call.
+  - After that call connected through `OperatorDesk`, the other two slots filled, money rose to $1.19, and no caller showed twice.
+  - The editor's PlayerPrefs were restored exactly.
+

@@ -12,6 +12,7 @@ namespace Switchboard.UI
         [SerializeField] private Text pageNumber;
         [SerializeField] private Text emptyMessage;
         private readonly List<PhoneBookContactRow> rows = new List<PhoneBookContactRow>();
+        private RectTransform jackDivider;
 
         public void Configure(RectTransform list, PhoneBookContactRow template, Text number, Text empty)
         {
@@ -23,6 +24,21 @@ namespace Switchboard.UI
 
         public void Render(BookCatalog book, int pageIndex, string message = null)
         {
+            if (jackDivider == null)
+            {
+                var line = new GameObject("Jack column red margin", typeof(RectTransform), typeof(CanvasRenderer))
+                    .AddComponent<Image>();
+                line.transform.SetParent(transform, false);
+                line.transform.SetAsFirstSibling();
+                line.color = new Color32(210, 112, 112, 100);
+                line.raycastTarget = false;
+                jackDivider = line.rectTransform;
+                jackDivider.anchorMin = new Vector2(.5f, 0);
+                jackDivider.anchorMax = new Vector2(.5f, 1);
+                jackDivider.sizeDelta = new Vector2(2, -24);
+            }
+            // Keep the margin just before the Jack column on either page, independently of mirrored paper art.
+            jackDivider.anchoredPosition = new Vector2(entries.anchoredPosition.x + entries.rect.width * .32f, 0);
             IReadOnlyList<BookEntry> contacts = book.Entries;
             int perPage = book.ContactsPerPage;
             int start = pageIndex * perPage;

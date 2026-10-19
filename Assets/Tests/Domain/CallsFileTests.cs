@@ -239,6 +239,7 @@ namespace Switchboard.Domain.Tests
             Assert.That(catalog.Find("call_011"), Is.Not.Null);
         }
 
+        // The designer balances Calls.json at any time (lead, 2026-10-19): this checks the rules, not the numbers.
         [Test]
         public void TheRealFileLoadsWithNoProblemsAndOnlyStraightQuotes()
         {
@@ -246,24 +247,24 @@ namespace Switchboard.Domain.Tests
             Assert.That(file, Is.Not.Null, CallsFilePath);
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>("Assets/Content/GameConfig.asset");
             CallsCatalog catalog = config.LoadCalls();
-            Assert.That(catalog.Errors, Is.Empty);
-            Assert.That(catalog.Calls.Count, Is.GreaterThanOrEqualTo(40));
+            Assert.That(catalog.Errors, Is.Empty, string.Join("\n", catalog.Errors));
+            Assert.That(catalog.Calls.Count, Is.EqualTo(JsonUtility.FromJson<CallsFileData>(file.text).calls.Length), "every call loads");
             foreach (char c in file.text)
                 Assert.That(c < 128, Is.True, $"'{c}' is not plain ASCII; the card font may lack it (use straight quotes)");
+
+            BookCatalog book = config.LoadBook();
+            var callers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (BookEntry entry in book.Entries) callers.Add(entry.Name);
+            Assert.That(ContentValidator.ValidateCallJacks(catalog.Calls, book.Entries), Is.Empty, "every jack a call uses is in the book");
             foreach (CallScript call in catalog.Calls)
             {
-                if (!call.IsEmergency)
-                {
-                    Assert.That(call.ConnectCents, Is.InRange(5, 15), call.Id);
-                    Assert.That(call.CentsPerSecond, Is.InRange(3, 8), call.Id);
-                    Assert.That(call.DurationSeconds, Is.InRange(15, 30), call.Id);
-                    continue;
-                }
-                Assert.That(call.ConnectCents, Is.InRange(20, 40), call.Id);
-                Assert.That(call.CentsPerSecond, Is.InRange(5, 10), call.Id);
-                Assert.That(call.DurationSeconds, Is.InRange(10, 20), call.Id);
-                Assert.That(call.ResponseTimeSeconds, Is.EqualTo(30), call.Id);
-                Assert.That(call.PenaltyCents, Is.EqualTo(200), call.Id);
+                Assert.That(callers.Contains(call.Name.Trim()), Is.True, $"{call.Id}: {call.Name} is in the book");
+                Assert.That(call.DurationSeconds, Is.GreaterThan(0), call.Id);
+                Assert.That(call.ConnectCents, Is.GreaterThanOrEqualTo(0), call.Id);
+                Assert.That(call.CentsPerSecond, Is.GreaterThanOrEqualTo(0), call.Id);
+                if (!call.IsEmergency) continue;
+                Assert.That(call.ResponseTimeSeconds, Is.GreaterThan(0), call.Id);
+                Assert.That(call.PenaltyCents, Is.GreaterThanOrEqualTo(0), call.Id);
             }
         }
     }

@@ -33,28 +33,28 @@ namespace Switchboard.Domain.Tests
             foreach (string fragment in fragments) Assert.That(catalog.Errors[0], Does.Contain(fragment));
         }
 
+        // The designer balances Economy.json at any time (lead, 2026-10-19): this checks the rules, not the sizes.
         [Test]
-        public void TheRealFileStartsOnThreeByThreeAndGrowsInThreeSteps()
+        public void TheRealFileStartsOnItsStartingBoardAndEveryStepGrows()
         {
             EconomyCatalog catalog = EconomyFileLoader.Load(AssetDatabase.LoadAssetAtPath<TextAsset>(EconomyFilePath).text);
-            Assert.That(catalog.Errors, Is.Empty);
-            Assert.That(catalog.StartingBoard, Is.EqualTo(new BoardSize(3, 3)));
-            Assert.That(catalog.StartingClientSlots, Is.EqualTo(2), "D52: two caller slots at the start");
-            var boards = new List<IUpgrade>();
+            Assert.That(catalog.Errors, Is.Empty, string.Join("\n", catalog.Errors));
+            Assert.That(catalog.StartingBoard.IsValid, Is.True, catalog.StartingBoard.ToString());
+            Assert.That(catalog.StartingClientSlots, Is.InRange(1, StatSheet.MaxClientSlots));
+            BoardSize board = catalog.StartingBoard;
+            int slots = catalog.StartingClientSlots;
             foreach (IUpgrade upgrade in catalog.Upgrades)
-                if (upgrade.Kind == UpgradeKind.ExtraClients) boards.Add(upgrade);
-            Assert.That(boards.Count, Is.EqualTo(3));
-            long[] costs = { 1000, 2500, 6000 };
-            for (int i = 0; i < 3; i++)
             {
-                Assert.That(boards[i].Id, Is.EqualTo("board_" + (i + 1)));
-                Assert.That(boards[i].Name, Is.EqualTo("Bigger board"));
-                Assert.That(boards[i].BoardSize, Is.EqualTo(new BoardSize(4 + i, 4 + i)));
-                Assert.That(boards[i].ClientSlots, Is.EqualTo(3 + i));
-                Assert.That(boards[i].Description, Is.EqualTo($"{4 + i}x{4 + i}, {3 + i} callers"));
-                Assert.That(boards[i].CostCents, Is.EqualTo(costs[i]));
+                if (upgrade.Kind != UpgradeKind.ExtraClients) continue;
+                BoardSize size = upgrade.BoardSize;
+                Assert.That(size.IsValid, Is.True, upgrade.Id);
+                Assert.That(size.Cols >= board.Cols && size.Rows >= board.Rows && !size.Equals(board), Is.True,
+                    $"{upgrade.Id}: {size} is bigger than {board}");
+                Assert.That(upgrade.ClientSlots, Is.InRange(slots, StatSheet.MaxClientSlots), $"{upgrade.Id}: slots never shrink");
+                board = size;
+                slots = upgrade.ClientSlots;
             }
-            Assert.That(catalog.MostClientSlots, Is.EqualTo(5));
+            Assert.That(catalog.MostClientSlots, Is.EqualTo(slots), "the last step opens the most slots");
         }
 
         [Test]

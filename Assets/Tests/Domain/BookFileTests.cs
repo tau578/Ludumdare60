@@ -207,48 +207,46 @@ namespace Switchboard.Domain.Tests
             Assert.That(Names(Load(File(people))), Is.EqualTo(new[] { "Police", "COBBOLD, Doris", "MOSS, Ada", "ZOUCH, Albert" }));
         }
 
+        // The designer balances Book.json at any time (lead, 2026-10-19): these check the rules, not the entries.
         [Test]
-        public void TheRealFilePassesWithServicesFirstAndEveryEntryFilledIn()
+        public void TheRealFilePassesWithServicesFirstThenNamesInOrder()
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
             Assert.That(config, Is.Not.Null, GameConfigPath);
             BookCatalog book = config.LoadBook();
+            var file = JsonUtility.FromJson<BookFileData>(config.BookFileText);
 
             Assert.That(book.Errors, Is.Empty, string.Join("\n", book.Errors));
-            Assert.That(book.ContactsPerPage, Is.EqualTo(6));
-            Assert.That(book.Entries.Count, Is.EqualTo(39), "36 converted entries and 3 household members");
-            Assert.That(Names(book).Take(3), Is.EqualTo(new[] { "Police", "Fire Brigade", "Doctor" }));
-            var jacks = new HashSet<string>();
+            int perPage = file.contactsPerPage == BookFileData.Unset ? BookFileLoader.DefaultContactsPerPage : file.contactsPerPage;
+            Assert.That(book.ContactsPerPage, Is.EqualTo(perPage), "the file sets contactsPerPage");
+            Assert.That(book.Entries.Count, Is.EqualTo(file.entries.Length), "every entry is listed");
+            Assert.That(book.Entries.Count, Is.GreaterThan(0));
+            string[] services = file.entries.Where(e => e.emergencyService).Select(e => e.jack.Trim().ToUpperInvariant()).ToArray();
+            Assert.That(book.Entries.Take(services.Length).Select(e => e.Jack), Is.EqualTo(services), "services first, in the file's order");
             for (int i = 0; i < book.Entries.Count; i++)
             {
                 BookEntry entry = book.Entries[i];
-                jacks.Add(entry.Jack);
-                Assert.That(entry.Profession, Is.Not.Empty, entry.Name);
-                Assert.That(entry.Address, Is.Not.Empty, entry.Name);
-                Assert.That(entry.IsEmergencyService, Is.EqualTo(i < 3), entry.Name);
-                if (i < 4) continue;
+                Assert.That(entry.Name, Is.Not.Empty, $"entry {i + 1}");
+                Assert.That(entry.Jack, Is.Not.Empty, entry.Name);
+                Assert.That(entry.IsEmergencyService, Is.EqualTo(i < services.Length), entry.Name);
+                if (i <= services.Length) continue;
                 Assert.That(string.CompareOrdinal(book.Entries[i - 1].Name.ToUpperInvariant(), entry.Name.ToUpperInvariant()),
-                    Is.LessThan(0), $"{book.Entries[i - 1].Name} before {entry.Name}");
+                    Is.LessThanOrEqualTo(0), $"{book.Entries[i - 1].Name} before {entry.Name}");
             }
-            Assert.That(jacks.Count, Is.EqualTo(36), "every jack has someone");
-            Assert.That(book.Entries.Count(e => e.Jack == "C3"), Is.EqualTo(2), "MOSS, Ada shares her line");
+            Assert.That(ContentValidator.ValidateCallJacks(config.LoadCalls().Calls, book.Entries), Is.Empty,
+                "every jack a call uses is in the book");
         }
 
         [Test]
-        public void TheRealFileWritesSurnamesInCapitalsAndUsesOnlyPlainText()
+        public void TheRealFileUsesOnlyPlainText()
         {
             var file = AssetDatabase.LoadAssetAtPath<TextAsset>(BookFilePath);
             Assert.That(file, Is.Not.Null, BookFilePath);
             foreach (char c in file.text)
                 Assert.That(c == '\n' || c == '\r' || (c >= ' ' && c <= '~'), Is.True, $"'{c}' may be missing from the book's font");
             foreach (BookEntry entry in BookFileLoader.Load(file.text).Entries)
-            {
-                if (entry.IsEmergencyService) continue;
-                int comma = entry.Name.IndexOf(", ", System.StringComparison.Ordinal);
-                Assert.That(comma, Is.GreaterThan(0), entry.Name);
-                string surname = entry.Name.Substring(0, comma);
-                Assert.That(surname, Is.EqualTo(surname.ToUpperInvariant()), entry.Name);
-            }
+                foreach (string part in new[] { entry.Name, entry.Profession, entry.Address })
+                    Assert.That(part.IndexOfAny(new[] { '<', '>' }), Is.EqualTo(-1), $"{entry.Name}: no rich-text tags in the book");
         }
     }
 }

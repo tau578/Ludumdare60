@@ -138,30 +138,39 @@ namespace Switchboard.Domain.Tests
             Assert.That(session.Shelf.OfferAt(0).Id, Is.EqualTo("board_1"));
         }
 
+        // The designer balances Economy.json and Book.json at any time (lead, 2026-10-19), so the real-file tests
+        // check the rules and read the numbers from the files.
         [Test]
-        public void TheRealFilesPlayTheStartPoolOnThreeByThreeInTwoSlots()
+        public void TheRealFilesPlayTheStartPoolOnTheStartingBoardAndSlots()
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
             EconomyCatalog economy = config.LoadEconomy();
-            var session = new GameSession(new GameContent(economy), new FakeSwitchboard { CordCount = 2 });
+            Assert.That(economy.Errors, Is.Empty, string.Join("\n", economy.Errors));
+            BoardSize start = economy.StartingBoard;
+            var session = new GameSession(new GameContent(economy), new FakeSwitchboard { CordCount = economy.StartingCords });
             var played = new List<string>();
             int most = 0;
             session.Calls.CallAdded += e =>
             {
                 played.Add(e.Call.Request.Script.Id);
-                Assert.That(Small.Contains(e.Call.Request.From) && Small.Contains(e.Call.Request.To), Is.True, e.Call.Request.Script.Id);
-                Assert.That(e.Call.Request.Script.IsEmergency, Is.False, "the start pool has no emergencies");
+                Assert.That(start.Contains(e.Call.Request.From) && start.Contains(e.Call.Request.To), Is.True,
+                    $"{e.Call.Request.Script.Id} on the {start} start board");
             };
 
-            // Ten minutes in which the player connects every call at once.
+            // The player connects every call at once, until the pool has gone round twice (at most an hour).
             int nextCord = 0;
             var live = new List<Call>();
-            for (int tick = 0; tick < 20 * 600; tick++)
+            var callers = new HashSet<string>();
+            for (int tick = 0; tick < 20 * 3600 && played.Count <= 2 * economy.StartPool.Count; tick++)
             {
                 session.Tick(0.05);
                 most = System.Math.Max(most, session.Calls.Live.Count);
                 live.Clear();
                 live.AddRange(session.Calls.Live);
+                callers.Clear();
+                foreach (Call call in live)
+                    Assert.That(callers.Add(call.Request.Script.Name.Trim().ToUpperInvariant()), Is.True,
+                        $"{call.Request.Script.Name} has one live call at a time");
                 foreach (Call call in live)
                 {
                     if (call.State != CallState.Incoming) continue;
@@ -170,37 +179,32 @@ namespace Switchboard.Domain.Tests
                 }
             }
 
-            Assert.That(session.Stats.Board, Is.EqualTo(new BoardSize(3, 3)));
-            Assert.That(session.Stats.ClientSlots, Is.EqualTo(2));
-            Assert.That(most, Is.EqualTo(2));
+            Assert.That(session.Stats.Board, Is.EqualTo(start));
+            Assert.That(session.Stats.ClientSlots, Is.EqualTo(economy.StartingClientSlots));
+            Assert.That(most, Is.EqualTo(economy.StartingClientSlots), "every start slot fills");
+            Assert.That(played[0], Is.EqualTo(economy.StartPool[0].Id), "the pool starts at its first call");
             Assert.That(played.Count, Is.GreaterThan(economy.StartPool.Count), "the pool loops");
-            for (int i = 0; i < played.Count; i++)
-                Assert.That(played[i], Is.EqualTo(economy.StartPool[i % economy.StartPool.Count].Id), "calls play in pool order");
+            var pool = new HashSet<string>();
+            foreach (CallScript call in economy.StartPool) pool.Add(call.Id);
+            foreach (string id in played) Assert.That(pool.Contains(id), Is.True, $"{id} comes from the start pool");
+            foreach (string id in pool) Assert.That(played, Has.Member(id), "every start-pool call rings");
         }
 
         [Test]
-        public void TheRealBookHasOneServicePerNewRing()
+        public void TheRealBooksServicesAreAllOnTheBiggestBoard()
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
             BookCatalog book = config.LoadBook();
-            var jacks = new Dictionary<string, string>();
-            foreach (BookEntry entry in book.Entries) jacks[entry.Name] = entry.Jack;
+            EconomyCatalog economy = config.LoadEconomy();
+            Assert.That(book.Errors, Is.Empty, string.Join("\n", book.Errors));
 
-            Assert.That(jacks["Doctor"], Is.EqualTo("D4"));
-            Assert.That(jacks["Fire Brigade"], Is.EqualTo("E5"));
-            Assert.That(jacks["Police"], Is.EqualTo("B6"));
-            Assert.That(jacks["UNDERHILL, Reginald"], Is.EqualTo("C2"));
-
-            // Each bigger board brings exactly one service.
-            int[] services = { 0, 1, 2, 3 };
-            for (int side = 3; side <= 6; side++)
-            {
-                var size = new BoardSize(side, side);
-                int count = 0;
-                foreach (BookEntry entry in book.Entries)
-                    if (entry.IsEmergencyService && size.Contains(entry.Jack)) count++;
-                Assert.That(count, Is.EqualTo(services[side - 3]), size.ToString());
-            }
+            // The last board in the chain is the most the player can open; a service beyond it could never be called.
+            BoardSize biggest = economy.StartingBoard;
+            foreach (IUpgrade upgrade in economy.Upgrades)
+                if (upgrade.Kind == UpgradeKind.ExtraClients) biggest = upgrade.BoardSize;
+            foreach (BookEntry entry in book.Entries)
+                if (entry.IsEmergencyService)
+                    Assert.That(biggest.Contains(entry.Jack), Is.True, $"{entry.Name} on {entry.Jack}, inside {biggest}");
         }
     }
 }

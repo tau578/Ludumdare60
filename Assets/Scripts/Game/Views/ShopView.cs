@@ -146,7 +146,8 @@ namespace Switchboard.Game
             shownStates[slot] = state;
 
             UpgradeSlotView view = slots[slot];
-            view.SetArtwork(offer?.Kind == UpgradeKind.ExtraWires, offer?.Kind == UpgradeKind.ExtraIncome, offer?.Kind == UpgradeKind.Secret);
+            if (offer != null)
+                view.SetArtwork(offer.Kind == UpgradeKind.ExtraWires, offer.Kind == UpgradeKind.ExtraIncome, offer.Kind == UpgradeKind.Secret);
             string title = offer == null ? string.Empty : offer.Kind == UpgradeKind.ExtraWires ? "More Cables"
                 : offer.Kind == UpgradeKind.ExtraClients ? "More Clients"
                 : offer.Kind == UpgradeKind.ExtraIncome ? "More Profit"

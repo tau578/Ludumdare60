@@ -52,11 +52,17 @@ namespace Switchboard.Game
             child.hideFlags = HideFlags.DontSave;
             child.layer = gameObject.layer;
             var rect = (RectTransform)child.transform;
-            rect.SetParent(transform, false);
-            rect.SetAsFirstSibling();
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.sizeDelta = new Vector2(24, 24);
+            var original = (RectTransform)transform;
+            // A child renders above its parent Image; a preceding sibling renders underneath.
+            rect.SetParent(original.parent, false);
+            rect.SetSiblingIndex(original.GetSiblingIndex());
+            rect.anchorMin = original.anchorMin;
+            rect.anchorMax = original.anchorMax;
+            rect.pivot = original.pivot;
+            rect.sizeDelta = original.sizeDelta + new Vector2(24, 24);
+            rect.anchoredPosition3D = original.anchoredPosition3D;
+            rect.localRotation = original.localRotation;
+            rect.localScale = original.localScale;
             portraitHalo = child.AddComponent<SocketHaloGraphic>();
             portraitHalo.raycastTarget = false;
             portraitHalo.Intensity = 1.4f;

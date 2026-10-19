@@ -15,7 +15,7 @@ namespace Switchboard.UI
     {
         public const int MaxCables = 6;
         private const float TraySlotSpacing = 270;
-        private const float TrayUsableWidth = 830;
+        public const float TrayCentreX = 0;
         private const float TraySlotY = -140;
         private const float TraySlotWidth = 252;
         private const float TraySlotHeight = 94.5f;
@@ -130,14 +130,18 @@ namespace Switchboard.UI
             else DestroyImmediate(part);
         }
 
-        public static float TraySpacing(int count) =>
-            count > 0 ? Mathf.Min(TraySlotSpacing, TrayUsableWidth / count) : TraySlotSpacing;
+        public static float TraySpacing(int count) => count > 3 ? 190f : TraySlotSpacing;
 
-        public static Vector2 TraySlotPosition(int index, int count) =>
-            new Vector2((index - (count - 1) * .5f) * TraySpacing(count), TraySlotY);
+        public static Vector2 TraySlotPosition(int index, int count)
+        {
+            int row = index / 3;
+            int columns = Mathf.Min(3, count - row * 3);
+            float y = count > 3 ? -105f - row * 85f : TraySlotY;
+            return new Vector2(TrayCentreX + (index % 3 - (columns - 1) * .5f) * TraySpacing(count), y);
+        }
 
         public static Vector2 TraySlotSize(int count) =>
-            new Vector2(TraySlotWidth * TraySpacing(count) / TraySlotSpacing, TraySlotHeight);
+            new Vector2(TraySlotWidth, TraySlotHeight) * (TraySpacing(count) / TraySlotSpacing);
 
         public static float TrayPreviewScaleFor(int count) => TrayPreviewScale * TraySpacing(count) / TraySlotSpacing;
 

@@ -184,38 +184,29 @@ namespace Switchboard.Domain.Tests
                     "{ 'id': 'wires_1', 'type': 'extra_wires', 'name': 'Extra cord', 'costCents': 500, 'wires': 4 }")),
                 "Upgrade 1 \"wires_1\": wires 4 is not above the 4 cords the game starts with", "5 or more");
 
+        // The designer balances the queues at any time (lead, 2026-10-19): this checks the rules, not the pools.
         [Test]
-        public void TheRealFilesHaveTheShippedQueues()
+        public void TheRealFilesQueuesFitTheirBoards()
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
             CallsCatalog calls = config.LoadCalls();
             EconomyCatalog economy = config.LoadEconomy(calls);
-            Assert.That(economy.Errors, Is.Empty);
-            Assert.That(economy.StartingClientSlots, Is.EqualTo(2));
-            Assert.That(economy.StartPool.Count, Is.EqualTo(8));
-            Assert.That(economy.StartPool[0].Id, Is.EqualTo("call_001"), "a simple first call for the guide");
-            foreach (CallScript call in economy.StartPool) Assert.That(call.IsEmergency, Is.False, call.Id);
-
-            var boards = new List<IUpgrade>();
+            Assert.That(economy.Errors, Is.Empty, string.Join("\n", economy.Errors));
+            Assert.That(economy.StartPool.Count, Is.GreaterThan(0));
+            Assert.That(economy.StartPool[0].IsEmergency, Is.False, "a simple first call for the guide");
+            AssertFits("startPool", economy.StartPool, economy.StartingBoard);
             foreach (IUpgrade upgrade in economy.Upgrades)
-                if (upgrade.Kind == UpgradeKind.ExtraClients) boards.Add(upgrade);
-            int[] sizes = { 10, 12, 14 };
-            string[] services = { "D4", "E5", "B6" };
-            for (int i = 0; i < 3; i++)
             {
-                IReadOnlyList<CallScript> pool = boards[i].StagePool;
-                Assert.That(pool.Count, Is.EqualTo(sizes[i]), boards[i].Id);
-                int emergencies = 0;
-                bool newService = false;
-                foreach (CallScript call in pool)
-                {
-                    if (!call.IsEmergency) continue;
-                    emergencies++;
-                    if (call.To.Label == services[i]) newService = true;
-                }
-                Assert.That(emergencies, Is.GreaterThanOrEqualTo(2), boards[i].Id);
-                Assert.That(newService, Is.True, $"{boards[i].Id} adds calls for the service on {services[i]}");
+                if (upgrade.Kind != UpgradeKind.ExtraClients) continue;
+                Assert.That(upgrade.StagePool.Count, Is.GreaterThan(0), upgrade.Id);
+                AssertFits(upgrade.Id, upgrade.StagePool, upgrade.BoardSize);
             }
+        }
+
+        private static void AssertFits(string where, IReadOnlyList<CallScript> pool, BoardSize board)
+        {
+            foreach (CallScript call in pool)
+                Assert.That(board.Contains(call.From) && board.Contains(call.To), Is.True, $"{where}: {call.Id} on {board}");
         }
 
         [Test]
@@ -230,10 +221,19 @@ namespace Switchboard.Domain.Tests
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
             CallsCatalog calls = config.LoadCalls();
-            string economy = config.EconomyFileText.Replace("\"startPool\": [ \"call_001\"", "\"startPool\": [ \"call_201\"");
+            BoardSize start = config.LoadEconomy(calls).StartingBoard;
+            CallScript outside = null;
+            foreach (CallScript call in calls.Calls)
+                if (!start.Contains(call.From) || !start.Contains(call.To)) { outside = call; break; }
+            if (outside == null) Assert.Ignore($"Every call fits the {start} starting board, so there is none to move into the start pool.");
+
+            // Swap the start pool's first id for that call, however the designer spaced the line.
+            var first = new System.Text.RegularExpressions.Regex("(\"startPool\"\\s*:\\s*\\[\\s*\")[^\"]*\"");
+            string economy = first.Replace(config.EconomyFileText, "${1}" + outside.Id + "\"", 1);
             Assert.That(economy, Is.Not.EqualTo(config.EconomyFileText), "setup");
+            JackId jack = start.Contains(outside.From) ? outside.To : outside.From;
             IReadOnlyList<string> errors = ContentValidator.ValidateEconomy(economy, calls);
-            Assert.That(errors, Has.Some.Contains("startPool: call_201 uses A5, but the startingBoard opens only 3x3"));
+            Assert.That(errors, Has.Some.Contains($"startPool: {outside.Id} uses {jack}, but the startingBoard opens only {start}"));
         }
     }
 }
