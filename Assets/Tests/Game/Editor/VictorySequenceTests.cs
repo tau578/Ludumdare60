@@ -90,7 +90,34 @@ namespace Switchboard.Game.Tests
             view.Skip();
             Assert.That(view.IsFinished, Is.True);
             Assert.That(Button("Keep Playing").IsInteractable(), Is.True);
-            Assert.That(Button("Skip").gameObject.activeSelf, Is.False);
+            Assert.That(view.PresentationCanvas.GetComponentsInChildren<Button>(true).Any(b => b.name == "Skip"), Is.False);
+        }
+
+        [Test]
+        public void CityUsesEveryPortraitOnceAndConnectionsAnimateInSeparatePairs()
+        {
+            goalPanel.PreviewVictory();
+            var images = view.PresentationCanvas.GetComponentsInChildren<Image>(true).Where(i => i.name == "Portrait").ToArray();
+            var allPortraits = AssetDatabase.FindAssets("t:Sprite", new[] { "Assets/Sprites/callers" })
+                .SelectMany(g => AssetDatabase.LoadAllAssetsAtPath(AssetDatabase.GUIDToAssetPath(g)).OfType<Sprite>()).ToArray();
+            Assert.That(images.Select(i => i.sprite), Is.EquivalentTo(allPortraits), "every portrait, including police, appears exactly once");
+            Assert.That(images.All(i => i.sprite != null), Is.True);
+            Assert.That(images.Select(i => i.sprite).Distinct().Count(), Is.EqualTo(images.Length));
+            var links = (int[,])typeof(VictorySequenceView).GetField("Links", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null);
+            var endpoints = links.Cast<int>().ToArray();
+            Assert.That(endpoints.Distinct().Count(), Is.EqualTo(endpoints.Length), "no resident may be connected twice");
+            Assert.That(links.GetLength(0), Is.EqualTo(images.Length / 2));
+            var plugs = view.PresentationCanvas.GetComponentsInChildren<RectTransform>(true).Where(r => r.name.StartsWith("Plug ")).ToArray();
+            view.RenderAt(6f);
+            var before = plugs.Select(r => r.anchoredPosition).ToArray();
+            view.RenderAt(6.2f);
+            int moving = plugs.Where((r, i) => Vector2.Distance(r.anchoredPosition, before[i]) > .1f).Count();
+            Assert.That(moving, Is.GreaterThanOrEqualTo(2), "several wires must be travelling at once");
+            view.RenderAt(14f);
+            Assert.That(view.IsFinished, Is.False, "the old ending now falls inside the slower animation");
+            Assert.That(Button("Keep Playing").IsInteractable(), Is.False);
+            view.Skip();
+            Assert.That(Button("Keep Playing").IsInteractable(), Is.True);
         }
 
         [Test]

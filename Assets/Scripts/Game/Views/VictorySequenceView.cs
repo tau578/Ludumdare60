@@ -11,13 +11,14 @@ namespace Switchboard.Game
     /// <summary>Unscaled 2D victory timeline. All generated objects belong to one disposable modal canvas.</summary>
     public sealed class VictorySequenceView : MonoBehaviour
     {
-        public const float Duration = 14f;
+        private const float PlaybackSpeed = 1.5f;
+        public const float Duration = 26f / PlaybackSpeed;
         [SerializeField] private Sprite frameSprite, buttonSprite;
         [SerializeField] private TMP_FontAsset titleFont, bodyFont;
         [SerializeField] private Sprite[] portraits;
         [SerializeField] private AudioClip connectSound, clickSound;
         private GameObject overlay;
-        private RectTransform panel, town, hills, farHills;
+        private RectTransform panel, town, skyline, farSkyline;
         private CanvasGroup panelGroup, titleGroup, controls;
         private VictoryTownGraphic roads;
         private readonly List<RectTransform> buildings = new List<RectTransform>();
@@ -25,7 +26,7 @@ namespace Switchboard.Game
         private readonly List<CableGraphic> wires = new List<CableGraphic>();
         private readonly List<RectTransform> tips = new List<RectTransform>();
         private readonly List<LampGlowGraphic> glows = new List<LampGlowGraphic>();
-        private Button skip;
+        private Material clothMaterial, frameMaterial;
         private AudioSource audioSource;
         private Action continueGame, mainMenu;
         private float elapsed;
@@ -34,12 +35,25 @@ namespace Switchboard.Game
         public bool IsFinished => elapsed >= Duration;
         public Canvas PresentationCanvas => overlay != null ? overlay.GetComponent<Canvas>() : null;
         private static readonly Color Cream = new Color(1,.96f,.81f);
-        private static readonly Vector2[] Sites = {
-            new Vector2(-620,175), new Vector2(-370,180), new Vector2(-115,190), new Vector2(170,205), new Vector2(470,185), new Vector2(690,240),
-            new Vector2(-660,-85), new Vector2(-445,-65), new Vector2(-135,-95), new Vector2(100,-30), new Vector2(350,-70), new Vector2(650,-15),
-            new Vector2(-550,-285), new Vector2(-230,-290), new Vector2(70,-245), new Vector2(460,-270) };
-        private static readonly int[] Residents = { 1, 3, 5, 6, 9, 11 };
-        private static readonly int[,] Links = { {0,1}, {1,2}, {0,3}, {3,4}, {4,5}, {1,4}, {2,5} };
+        // Dense blocks rather than detached houses. Back-to-front ordering keeps the street frontage readable.
+        private static readonly Vector2[] Sites = CreateSites();
+        private static readonly int[] Residents = { 0, 2, 4, 6, 8, 10, 12, 14, 15, 17, 19, 21, 23 };
+        // Disjoint pairs: every resident participates in at most one connection.
+        // The thirteenth portrait is still present, without reusing anyone to make an extra pair.
+        private static readonly int[,] Links = { {0,8}, {5,2}, {10,3}, {1,11}, {9,6}, {7,4} };
+
+        private static Vector2[] CreateSites()
+        {
+            var result = new Vector2[24];
+            for (int row = 0; row < 3; row++)
+                for (int column = 0; column < 8; column++)
+                    result[row * 8 + column] = new Vector2(-717.5f + column * 205, 100 - row * 180 + (column % 3) * 5);
+            return result;
+        }
+        private static float BuildingHeight(int site) => 145 + (site * 7 % 5) * 19;
+        // Two concurrent connections per wave, interleaved across town with unequal travel times.
+        private static float WireStart(int wire) => 6.8f + (wire / 2) * 4.2f + (wire * 7 % 5) * .18f;
+        private static float WireDuration(int wire) => 2.8f + (wire * 5 % 7) * .17f;
 
         public void Play(Action onContinue, Action onMainMenu)
         {
@@ -64,7 +78,9 @@ namespace Switchboard.Game
             if (elapsed < Duration && keyboard != null &&
                 (keyboard.escapeKey.wasPressedThisFrame || keyboard.spaceKey.wasPressedThisFrame)) Skip();
             RenderAt(Mathf.Min(Duration, elapsed + Time.unscaledDeltaTime));
-            int connections = Mathf.Clamp(Mathf.FloorToInt((elapsed - 5.5f) / .43f) + 1, 0, Links.GetLength(0));
+            int connections = 0;
+            for (int i = 0; i < Links.GetLength(0); i++)
+                if (elapsed * PlaybackSpeed >= WireStart(i) + WireDuration(i)) connections++;
             if (connections > soundedConnections)
             {
                 if (connectSound != null && audioSource != null) audioSource.PlayOneShot(connectSound, .45f);
@@ -83,24 +99,25 @@ namespace Switchboard.Game
         {
             if (overlay == null) return;
             elapsed = Mathf.Clamp(seconds,0,Duration);
-            float enter = Smooth(elapsed/.65f);
+            float timeline = elapsed * PlaybackSpeed;
+            float enter = Smooth(timeline/.65f);
             panelGroup.alpha = enter;
             panel.localScale = Vector3.one * Mathf.Lerp(.93f,1,enter);
-            float camera = Smooth((elapsed-.8f)/10.5f);
-            town.localScale = Vector3.one * Mathf.Lerp(1.14f,.68f,camera);
-            town.anchoredPosition = new Vector2(0,Mathf.Lerp(-30,-265,camera));
-            farHills.anchoredPosition = new Vector2(0,Mathf.Lerp(0,-110,camera));
-            hills.anchoredPosition = new Vector2(0,Mathf.Lerp(-95,-195,camera));
-            roads.Reveal = Mathf.Clamp01((elapsed-.7f)/2.5f); roads.SetVerticesDirty();
-            for(int i=0;i<buildings.Count;i++) buildings[i].localScale = Vector3.one * Pop((elapsed-1.25f-i*.12f)/.65f);
+            float camera = Smooth((timeline-.8f)/24.4f);
+            town.localScale = Vector3.one * Mathf.Lerp(1.04f,.94f,camera);
+            town.anchoredPosition = new Vector2(0,Mathf.Lerp(-180,-195,camera));
+            farSkyline.anchoredPosition = new Vector2(0,Mathf.Lerp(0,-90,camera));
+            skyline.anchoredPosition = new Vector2(0,Mathf.Lerp(-95,-180,camera));
+            roads.Reveal = Mathf.Clamp01((timeline-.7f)/2.5f); roads.SetVerticesDirty();
+            for(int i=0;i<buildings.Count;i++) buildings[i].localScale = Vector3.one * Pop((timeline-1.1f-(i*11%24)*.075f)/.7f);
             for(int i=0;i<badges.Count;i++)
             {
-                badges[i].localScale = Vector3.one * Pop((elapsed-3.35f-i*.23f)/.6f);
-                glows[i].color = new Color(1,.83f,.43f,elapsed>5.1f ? .55f+.1f*Mathf.Sin(elapsed*1.7f+i) : .18f);
+                badges[i].localScale = Vector3.one * Pop((timeline-3.65f-(i*7%Residents.Length)*.13f)/.6f);
+                glows[i].color = new Color(1,.83f,.43f,timeline>6.8f ? .55f+.1f*Mathf.Sin(timeline*1.7f+i) : .18f);
             }
             for(int i=0;i<wires.Count;i++)
             {
-                float t=Smooth((elapsed-5-i*.43f)/.55f);
+                float t=Smooth((timeline-WireStart(i))/WireDuration(i));
                 wires[i].gameObject.SetActive(t>0);
                 Vector2 a=badges[Links[i,0]].anchoredPosition, b=badges[Links[i,1]].anchoredPosition;
                 a.y-=46; b.y-=46;
@@ -108,10 +125,9 @@ namespace Switchboard.Game
                 wires[i].SetEndpoints(a,end);
                 tips[i].anchoredPosition=end; tips[i].gameObject.SetActive(t>0);
             }
-            titleGroup.alpha=Smooth((elapsed-10.5f)/1.5f);
-            controls.alpha=Smooth((elapsed-12)/1.2f);
-            controls.interactable=controls.blocksRaycasts=elapsed>=13.2f;
-            skip.gameObject.SetActive(elapsed<13.2f);
+            titleGroup.alpha=Smooth((timeline-21)/2f);
+            controls.alpha=Smooth((timeline-23.5f)/1.5f);
+            controls.interactable=controls.blocksRaycasts=timeline>=25f;
         }
 
         private static float Smooth(float t) => Mathf.SmoothStep(0,1,Mathf.Clamp01(t));
@@ -133,35 +149,37 @@ namespace Switchboard.Game
             overlay.AddComponent<AudioChannelSource>().Configure(AudioVolumeChannel.Sfx,.4f);
             var blocker=Image("Backdrop",root,Vector2.zero,new Vector2(4000,3000),null,new Color(.05f,.06f,.05f,.88f));
             blocker.raycastTarget=true;
-            panel=Rect("Panel",root,Vector2.zero,new Vector2(1770,970));panelGroup=panel.gameObject.AddComponent<CanvasGroup>();
-            Image("Frame",panel,Vector2.zero,panel.sizeDelta,frameSprite,new Color(1,1,1));
-            var viewport=Rect("City viewport",panel,new Vector2(0,-5),new Vector2(1580,820));
-            viewport.gameObject.AddComponent<RectMask2D>();
+            panel=Rect("Panel",root,Vector2.zero,new Vector2(1900,1040));panelGroup=panel.gameObject.AddComponent<CanvasGroup>();
+            // Separate the cloth and trim at render time, preserving the original painted edges.
+            // The cloth image writes a stencil mask; the city fills it and the trim sits in front.
+            var layerShader = Resources.Load<Shader>("VictoryPanelLayers");
+            clothMaterial = new Material(layerShader) { name = "Victory cloth mask" };
+            clothMaterial.SetFloat("_FrameLayer", 0);
+            frameMaterial = new Material(layerShader) { name = "Victory frame" };
+            frameMaterial.SetFloat("_FrameLayer", 1);
+            var cloth = Image("Cloth mask",panel,Vector2.zero,panel.sizeDelta,frameSprite,Color.white);
+            cloth.material = clothMaterial;
+            cloth.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+            var viewport=Rect("City viewport",cloth.transform,Vector2.zero,panel.sizeDelta);
             Art("Sky",viewport,Vector2.zero,viewport.sizeDelta,VictoryTownGraphic.Shape.Sky,Color.white);
-            var sun=Rect("Sunlight",viewport,new Vector2(570,255),new Vector2(230,230));
+            var sun=Rect("Sunlight",viewport,new Vector2(570,160),new Vector2(230,230));
             sun.gameObject.AddComponent<LampGlowGraphic>().color=new Color(1,.81f,.43f,.45f);
-            Circle("Sun",viewport,new Vector2(570,255),100,new Color(1,.87f,.61f,.9f));
-            farHills=Art("Distant hills",viewport,Vector2.zero,new Vector2(1800,500),VictoryTownGraphic.Shape.Hills,new Color(.43f,.54f,.47f)).rectTransform;
-            hills=Art("Near hills",viewport,new Vector2(0,-95),new Vector2(1800,500),VictoryTownGraphic.Shape.Hills,new Color(.35f,.47f,.34f)).rectTransform;
-            hills.GetComponent<VictoryTownGraphic>().Variant=2;
-            town=Rect("Town camera",viewport,Vector2.zero,new Vector2(1600,700));
-            roads=Art("Roads",town,Vector2.zero,town.sizeDelta,VictoryTownGraphic.Shape.Roads,Cream);
-            for(int i=0;i<28;i++)
-            {
-                var tree=Art("Tree "+i,town,new Vector2(-730+(i*173)%1460,-290+(i*113)%570),new Vector2(44,78),
-                    VictoryTownGraphic.Shape.Tree,i%2==0?new Color(.23f,.37f,.27f):new Color(.42f,.48f,.28f));
-                tree.rectTransform.pivot=new Vector2(.5f,0);
-            }
+            Circle("Sun",viewport,new Vector2(570,160),100,new Color(1,.87f,.61f,.9f));
+            farSkyline=Art("Distant skyline",viewport,Vector2.zero,new Vector2(1800,380),VictoryTownGraphic.Shape.Skyline,new Color(.47f,.49f,.45f)).rectTransform;
+            skyline=Art("Near skyline",viewport,new Vector2(0,-95),new Vector2(1800,380),VictoryTownGraphic.Shape.Skyline,new Color(.39f,.42f,.36f)).rectTransform;
+            skyline.GetComponent<VictoryTownGraphic>().Variant=2;
+            town=Rect("Town camera",viewport,Vector2.zero,new Vector2(1700,850));
+            roads=Art("Streets",town,Vector2.zero,town.sizeDelta,VictoryTownGraphic.Shape.Roads,Cream);
             for(int i=0;i<Sites.Length;i++)
             {
-                var house=Art("House "+i,town,Sites[i],new Vector2(105+i%3*14,112+i%4*17),VictoryTownGraphic.Shape.House,Color.white);
+                var house=Art("House "+i,town,Sites[i],new Vector2(164+i%3*6,BuildingHeight(i)),VictoryTownGraphic.Shape.Building,Color.white);
                 house.Variant=i;house.rectTransform.pivot=new Vector2(.5f,0);buildings.Add(house.rectTransform);
             }
             var wireRoot=Rect("Connections",town,Vector2.zero,town.sizeDelta);
             var badgeRoot=Rect("Residents",town,Vector2.zero,town.sizeDelta);
             for(int i=0;i<Residents.Length;i++)
             {
-                int site=Residents[i];Vector2 pos=Sites[site]+Vector2.up*(112+site%4*17+46);
+                int site=Residents[i];Vector2 pos=Sites[site]+Vector2.up*(BuildingHeight(site)+46);
                 var badge=Rect("Resident "+i,badgeRoot,pos,new Vector2(94,94));badges.Add(badge);
                 var glow=Rect("Connection glow",badge,Vector2.zero,new Vector2(155,155)).gameObject.AddComponent<LampGlowGraphic>();
                 glow.raycastTarget=false;glows.Add(glow);
@@ -174,16 +192,16 @@ namespace Switchboard.Game
             for(int i=0;i<Links.GetLength(0);i++)
             {
                 var wire=Rect("Wire "+i,wireRoot,Vector2.zero,town.sizeDelta).gameObject.AddComponent<CableGraphic>();
-                wire.raycastTarget=false;wire.InsulationColor=colors[i%3];wire.ThicknessScale=.75f;wire.MaximumSag=85;wires.Add(wire);
+                wire.raycastTarget=false;wire.InsulationColor=colors[i%3];wire.ThicknessScale=.65f;wire.MaximumSag=55+(i*17%65);wires.Add(wire);
                 tips.Add(Circle("Plug "+i,wireRoot,Vector2.zero,12,new Color(.94f,.77f,.4f)).rectTransform);
             }
-            var title=Label("Thank you",panel,new Vector2(0,265),new Vector2(1340,225),"thank you for\nconnecting us!",82,titleFont);
+            Image("Frame",panel,Vector2.zero,panel.sizeDelta,frameSprite,Color.white).material = frameMaterial;
+            var title=Label("Thank you",panel,new Vector2(0,366),new Vector2(900,175),"thank you for\nconnecting us!",64,titleFont);
             title.color=new Color(1,.9f,.61f);titleGroup=title.gameObject.AddComponent<CanvasGroup>();
             var shadow=title.gameObject.AddComponent<Shadow>();shadow.effectDistance=new Vector2(2,-3);shadow.effectColor=new Color(.18f,.16f,.11f,.65f);
-            var actions=Rect("Final actions",panel,new Vector2(0,105),new Vector2(750,72));controls=actions.gameObject.AddComponent<CanvasGroup>();
+            var actions=Rect("Final actions",panel,new Vector2(0,-434),new Vector2(750,72));controls=actions.gameObject.AddComponent<CanvasGroup>();
             MakeButton("Main Menu",actions,new Vector2(-190,0),new Vector2(340,72),36,()=>Finish(false));
             MakeButton("Keep Playing",actions,new Vector2(190,0),new Vector2(340,72),36,()=>Finish(true));
-            skip=MakeButton("Skip",panel,new Vector2(720,400),new Vector2(150,44),24,Skip);
         }
 
         private void Finish(bool keep)
@@ -234,5 +252,10 @@ namespace Switchboard.Game
             label.textWrappingMode=TextWrappingModes.NoWrap;return label;
         }
         private void OnDisable() => Hide();
+        private void OnDestroy()
+        {
+            if (clothMaterial != null) Destroy(clothMaterial);
+            if (frameMaterial != null) Destroy(frameMaterial);
+        }
     }
 }

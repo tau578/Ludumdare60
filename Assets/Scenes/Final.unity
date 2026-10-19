@@ -1764,6 +1764,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: GameUI
       objectReference: {fileID: 0}
+    - target: {fileID: 1905403398251874441, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4292799726
+      objectReference: {fileID: 0}
+    - target: {fileID: 1905403398251874441, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
     - target: {fileID: 2669094763824447469, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
       propertyPath: m_Pivot.x
       value: 0
@@ -1843,6 +1851,30 @@ PrefabInstance:
     - target: {fileID: 2669094763824447469, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4575128140570276128, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4286239474
+      objectReference: {fileID: 0}
+    - target: {fileID: 4575128140570276128, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 7413759084569855240, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4292799726
+      objectReference: {fileID: 0}
+    - target: {fileID: 7413759084569855240, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 7500993664092844827, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 9080462672623491533, guid: d79192f7f45a745dc9b72a58b908ef78, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

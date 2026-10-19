@@ -113,6 +113,16 @@ Teammates still push to `main`, so pre-flight always merges first (see the git r
 - **Screenshots:** `manage_camera screenshot` with `output_folder: "Temp/Captures"` (git-ignored). Never save under `Assets/`. Take them while Play Mode is paused or being stepped.
 - **Leave the editor clean:** idle, not in Play Mode, compiled, `Final.unity` saved as the active scene, console clean, and no temporary callbacks or editor state left behind.
 
+## Web build and publish (itch.io)
+When the lead asks for a new build or to publish, the main session can do this directly (team guide: `Docs/WebBuild.md`):
+1. **Build:** run `Tools/Switchboard/Build Web` without blocking MCP: from `execute_code`, `EditorApplication.delayCall += () => EditorApplication.ExecuteMenuItem("Tools/Switchboard/Build Web");`. Then wait until a new `Build Web:` line appears in `~/Library/Logs/Unity/Editor.log` (about 2 min). The build goes to `Builds/Web` (git-ignored). The editor stays on the Web platform.
+2. **Undo the build's re-saves** with `git checkout --`:
+   - `Assets/Settings/UniversalRP.asset` and `Assets/UniversalRenderPipelineGlobalSettings.asset`
+   - `ProjectSettings/TimeManager.asset` and the dynamic TMP fonts (`Boecklins Universe SDF.asset`, `Della Respira SDF.asset`)
+   - In `ProjectSettings.asset`, set `preloadedAssets` back to `[]`, keeping any intended change.
+3. **Optional local check:** `python3 -m http.server 8000 --bind 127.0.0.1 --directory Builds/Web`, then open `http://127.0.0.1:8000`. Stop the server afterwards.
+4. **Publish to the itch Draft page:** `~/bin/butler push Builds/Web llazypixell/operator:html5` (the lead allows Draft pushes, D55). Then poll `~/bin/butler status llazypixell/operator` until the new build shows ✓, and give the lead the build number. butler is logged in; `butler login` needs a real Terminal. Never write the Draft page's secret link anywhere, and never make the page public: that's the lead's call.
+
 ## Open items (Plan §8)
 Known issues and to-dos, such as touch input in the cord code, held cords dropping on button clicks, stale editor-menu paths and the hidden A–Z tabs, are listed in `Docs/Plan.md` §8. A step that fixes one removes it there.
 
