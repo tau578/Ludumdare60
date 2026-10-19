@@ -126,6 +126,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b1abc7df6d73b947a7a118bf8f67d86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.HandCursorGraphic
+  pointingTexture: {fileID: 2800000, guid: c779fd84cacd404b81e93a14bce34df8, type: 3}
+  grabTexture: {fileID: 2800000, guid: bd44452de935411aa496ff13ad052522, type: 3}
+  pageLeftTexture: {fileID: 2800000, guid: 5f34362e27a64a049d705b336edaab10, type: 3}
+  pageRightTexture: {fileID: 2800000, guid: 2de26732f7724df899a62f204a3abdc3, type: 3}
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
