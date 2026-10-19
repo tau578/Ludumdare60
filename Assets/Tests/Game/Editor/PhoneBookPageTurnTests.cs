@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Linq;
 using Switchboard.Cables;
+using Switchboard.Content;
 using NUnit.Framework;
 using Switchboard.UI;
 using UnityEditor;
@@ -14,15 +15,24 @@ namespace Switchboard.Game.Tests
 {
     public sealed class PhoneBookPageTurnTests
     {
+        private static readonly FieldInfo ContactsConfig =
+            typeof(PhoneBookView).GetField("contactsConfig", BindingFlags.NonPublic | BindingFlags.Instance);
         private GameObject root;
         private PhoneBookView book;
         private RectTransform opened;
+        private TextAsset realFile;
+        private TextAsset sampleFile;
 
         [SetUp]
         public void SetUp()
         {
             root = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/PhoneBook.prefab"));
             book = root.GetComponent<PhoneBookView>();
+            // The designer's Book.json may fit on one spread, so the page-turn checks read a sample book of four spreads
+            // with the real page size; PageTurningGoesThroughTheWholeBook reads the real file.
+            realFile = (TextAsset)ContactsConfig.GetValue(book);
+            sampleFile = new TextAsset(SampleBook(BookFileLoader.Load(realFile.text).ContactsPerPage));
+            ContactsConfig.SetValue(book, sampleFile);
             typeof(PhoneBookView).GetMethod("Awake", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(book, null);
             root.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
             book.SetOpen(true);
@@ -31,7 +41,18 @@ namespace Switchboard.Game.Tests
         }
 
         [TearDown]
-        public void TearDown() { if (root != null) Object.DestroyImmediate(root); }
+        public void TearDown()
+        {
+            if (root != null) Object.DestroyImmediate(root);
+            if (sampleFile != null) Object.DestroyImmediate(sampleFile);
+        }
+
+        private static string SampleBook(int perPage)
+        {
+            var entries = Enumerable.Range(1, perPage * 2 * 3 + 1)
+                .Select(i => $"{{ \"name\": \"Sample {i:00}\", \"jack\": \"{(char)('A' + i % 6)}{i % 6 + 1}\" }}");
+            return $"{{ \"contactsPerPage\": {perPage}, \"entries\": [ {string.Join(", ", entries)} ] }}";
+        }
 
         private Vector2 Position(float x, float y = 0)
         {
@@ -48,8 +69,15 @@ namespace Switchboard.Game.Tests
         {
             var keyboard = InputSystem.AddDevice<Keyboard>();
             var update = typeof(PhoneBookView).GetMethod("Update", BindingFlags.NonPublic | BindingFlags.Instance);
+            // Outside Play Mode InputSystem.Update() runs an editor update, and wasPressedThisFrame only counts player
+            // updates (as the game gets in Play Mode), so the test runs player updates while it presses Tab.
+            var flags = BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public;
+            object manager = typeof(InputSystem).GetField("s_Manager", flags).GetValue(null);
+            PropertyInfo playerUpdates = manager.GetType().GetProperty("runPlayerUpdatesInEditMode", flags);
+            object wasRunning = playerUpdates.GetValue(manager);
             try
             {
+                playerUpdates.SetValue(manager, true);
                 book.SetOpen(false);
                 PressTab();
                 Assert.That(book.IsOpen, Is.True);
@@ -62,7 +90,11 @@ namespace Switchboard.Game.Tests
                 PressTab();
                 Assert.That(book.IsOpen, Is.True, "Tab must not close it while paused either");
             }
-            finally { InputSystem.RemoveDevice(keyboard); }
+            finally
+            {
+                playerUpdates.SetValue(manager, wasRunning);
+                InputSystem.RemoveDevice(keyboard);
+            }
 
             void PressTab()
             {
@@ -160,6 +192,10 @@ namespace Switchboard.Game.Tests
         [Test]
         public void PageTurningGoesThroughTheWholeBook()
         {
+            ContactsConfig.SetValue(book, realFile);
+            book.ReloadContacts();
+            BookCatalog real = BookFileLoader.Load(realFile.text);
+            Assert.That(book.ContactCount, Is.EqualTo(real.Entries.Count), "the whole book, not only the starting board");
             int spreads = (book.PageCount + 1) / 2;
             Assert.That(book.PageTurnDirectionAt(Position(-200), null), Is.Zero);
             for (int spread = 1; spread < spreads; spread++)
@@ -278,10 +314,10 @@ namespace Switchboard.Game.Tests
                 Assert.That(cursor.PageTurnDirection, Is.EqualTo(-1));
                 Canvas.ForceUpdateCanvases();
                 var row = opened.GetComponentInChildren<PhoneBookContactRow>();
-                // Rows no longer take clicks (D54), so over a row the hand shows its half's page turn.
+                // Only the corner folds turn pages (Sergei, 2c0d99d); over a row the hand points, and a click closes the book.
                 input.ProcessPointer(row.transform.position, false);
-                Assert.That(input.CursorMode, Is.EqualTo(CableCursorMode.PageTurn));
-                Assert.That(cursor.PageTurnDirection, Is.EqualTo(-1));
+                Assert.That(input.CursorMode, Is.EqualTo(CableCursorMode.Pointing));
+                Assert.That(cursor.PageTurnDirection, Is.Zero);
                 if (holding)
                 {
                     Assert.That(input.ActiveCable, Is.SameAs(cable));

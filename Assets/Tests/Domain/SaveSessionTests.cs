@@ -95,30 +95,44 @@ namespace Switchboard.Domain.Tests
             Assert.That(session.Career.Capture().secondsPlayed, Is.EqualTo(0));
         }
 
+        // Economy.json sets the chains (the designer balances it at any time), so the expected values come from the file.
         [Test]
-        public void ALoadedBoardTwoOpensFiveByFiveAndDealsFromItsStagePool()
+        public void ALoadedBoardUpgradeOpensItsOwnSizeBeforeTheFirstCall()
         {
-            var save = new SaveData
+            var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
+            EconomyCatalog economy = config.LoadEconomy();
+            IUpgrade board = null, wires = null, income = null;
+            var owned = new List<string>();
+            foreach (IUpgrade upgrade in economy.Upgrades)
             {
-                version = 1,
-                cents = 123,
-                upgrades = new List<string> { "board_1", "board_2", "wires_1", "income_1" }
-            };
+                if (upgrade.Kind == UpgradeKind.ExtraClients) { board = upgrade; owned.Add(upgrade.Id); }
+                else if (upgrade.Kind == UpgradeKind.ExtraWires && wires == null) { wires = upgrade; owned.Add(upgrade.Id); }
+                else if (upgrade.Kind == UpgradeKind.ExtraIncome && income == null) { income = upgrade; owned.Add(upgrade.Id); }
+            }
+            if (board == null) Assert.Ignore("Economy.json has no extra_clients entry to load.");
+            var save = new SaveData { version = 1, cents = 123, upgrades = owned };
 
             GameSession session = RealSession(save);
 
-            Assert.That(session.Stats.Board, Is.EqualTo(new BoardSize(5, 5)), "open before the first call rings");
-            Assert.That(session.Stats.ClientSlots, Is.EqualTo(4));
-            Assert.That(session.Board.IsOpen(new JackId("E5")), Is.True);
-            Assert.That(session.Board.IsOpen(new JackId("F1")), Is.False);
-            Assert.That(session.Stats.Cords, Is.EqualTo(4));
-            Assert.That(session.Stats.IncomeMultiplier, Is.EqualTo(1.5));
+            BoardSize size = board.BoardSize;
+            Assert.That(session.Stats.Board, Is.EqualTo(size), "open before the first call rings");
+            Assert.That(session.Stats.ClientSlots, Is.EqualTo(board.ClientSlots));
+            Assert.That(session.Board.IsOpen(new JackId($"{size.LastRow}{size.Cols}")), Is.True, "the far corner is open");
+            if (size.Cols < BoardSize.MaxSide)
+                Assert.That(session.Board.IsOpen(new JackId($"A{size.Cols + 1}")), Is.False, "the next column stays closed");
+            if (wires != null) Assert.That(session.Stats.Cords, Is.EqualTo(wires.Wires));
+            if (income != null) Assert.That(session.Stats.IncomeMultiplier, Is.EqualTo(income.IncomeMultiplier));
             Assert.That(session.Calls.Live, Is.Empty);
             Assert.That(session.Shelf.OfferAt(0) ?? session.Shelf.OfferAt(1), Is.Not.Null);
 
             session.Tick(0.05);
 
-            Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_201", "call_202", "call_203", "call_204" }));
+            // The board's stage pool deals in order, one live call per caller.
+            var expected = new List<string>();
+            var callers = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+            foreach (CallScript call in board.StagePool)
+                if (expected.Count < board.ClientSlots && callers.Add(call.Name.Trim())) expected.Add(call.Id);
+            Assert.That(LiveIds(session), Is.EqualTo(expected));
             Assert.That(session.Wallet.Cents, Is.EqualTo(123));
         }
 
