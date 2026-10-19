@@ -11,7 +11,7 @@ Design: [Design.md](Design.md) · Progress: [Progress.md](Progress.md)
    - Check that Unity is connected, idle, and has a clean console.
    - Make sure the step's decisions (Design §10) are settled, and check the open items (§8) the step could pick up.
    - Refine the step's brief with anything learned so far.
-2. **Build (one implementer agent).** The agent gets the brief, works only through Unity MCP, and returns a report (§7).
+2. **Build (one implementer agent, run at high effort).** The agent gets the brief, works only through Unity MCP, and returns a report (§7).
 3. **Verify (orchestrator).**
    - Re-run all EditMode tests and read the console.
    - Run a Play Mode smoke test and take a screenshot.
@@ -105,12 +105,18 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Nested canvas sorting in a prefab (2b) | To give a child its own sorting order inside a prefab (e.g. the halo's order 9), set `m_OverrideSorting` through `SerializedObject`. `manage_prefabs` and the `overrideSorting` setter leave it off, because inside prefab contents the nested canvas counts as a root canvas. |
 | Game view size (3) | Set it with `PlayModeWindow.SetCustomRenderingResolution`, for example 1280×720 or 844×390, and set it back to 1920×1080 afterwards. Each new size stays in the Game view's size list as an editor preference, not a project file. |
 | Tests on Assembly-CSharp types (3) | `Assets/Tests/Editor/` (the cable tests' asmdef) can't see Assembly-CSharp types such as `PhoneBookView`. Put such tests in our `Assets/Tests/Game/Editor/`, which has no asmdef and compiles into Assembly-CSharp-Editor. |
-| Dev panel (2a) | F1 or the "Dev" button in the top-right corner: + $10, Call now, Emergency now (4), Speed ×5/×1, Show/Hide times, Clear calls. Editor and development builds only. Its IMGUI clicks also reach the cord input as "empty space" clicks. |
+| Dev panel (2a) | F1 or the "Dev" button, just left of the pause button in the top-right corner (since 9a pass 3 it opens as a row along the top edge): + $10, Call now, Emergency now (4), Speed ×5/×1, Show/Hide times, Clear calls. Editor and development builds only. Its IMGUI clicks also reach the cord input as "empty space" clicks. |
 | Format-only re-saves (4) | Test runs and Play Mode can re-save `ProjectSettings/TimeManager.asset` (as well as `SampleScene.unity`) with only format changes. Discard them with `git checkout -- <file>` and mention it in the report. |
 | Layout in prefab editing (5a) | Unity's layout groups don't run while a prefab is edited from code, so an editor menu that resizes children must set their `sizeDelta` directly (as `Update Upgrade Shop Buttons` does). |
 | Disabled buttons (5a) | Setting `Button.interactable = false` applies the button's grey, half-transparent disabled tint and changes the shop's look. To make a button inert, ignore the click in our view and dim it ourselves. |
 | Book row clicks (5b) | Row taps only reach `PhoneBookContactRow` while `ContactTapsEnabled` is on (Notepad owned); otherwise the open book's button gets the click and closes. Simulate them with EventSystem raycasts inside a `Canvas.willRenderCanvases` handler. |
 | Buying in Play Mode (5a) | Connect a call through `OperatorDesk.OnCircuitClosed` to check fees and pay without plugging cords; the dev panel's "+ $100" and "Reset upgrades" call `GameSession` methods directly. |
+| Art merges (6) | Re-exported images can keep a slice bigger than the new texture, and Unity then drops the sprite with no console message. Compare PNG sizes (`sips -g pixelWidth -g pixelHeight`) with the `.meta` rects, or load the path with `AssetDatabase.LoadAssetAtPath<Sprite>` and check it isn't null. |
+| Dynamic TMP fonts (merge) | Test and Play runs fill glyphs into Sergei's dynamic font assets (`Boecklins Universe SDF.asset`, `Della Respira SDF.asset`): thousands of changed lines. Discard them with `git checkout -- <file>` like `TimeManager.asset`, and mention it. |
+| Simulated hover vs. the real mouse (merge) | While Unity has focus, `CableInputController` reads the real mouse every frame and overrides a simulated hover. Disable the controller for the one captured frame. |
+| Deleting files (7) | Delete through MCP (`delete_script`, `manage_asset` `delete`) or a plain `rm` followed by `refresh_unity`. Never use `git rm`: it stages the deletion. |
+| Renaming an asset (8) | Rename or move it with `manage_asset` (Unity's `AssetDatabase.MoveAsset`), never in the file system: Unity keeps the GUID, so every prefab and asset that references it still finds it with no re-wiring (`PhoneBook.json` → `Book.json`). Git shows a delete plus a new file until both are staged. |
+| Saves in tests (9a) | EditMode tests run `GameInstaller.Start`, so anything that reads or writes PlayerPrefs there touches the lead's real save. `GameInstaller` opens the save only when `Application.isPlaying`; `SaveIsolationTests` guards it. Play Mode checks write `operator.save` and `operator.save.backup`: delete both at the end. |
 | Missing JSON fields (5c) | `JsonUtility.FromJson` keeps field initializers for fields the file leaves out, also inside nested objects in arrays. Use a marker initializer (NaN, or a named `Unset` constant) to tell "missing" from 0. |
 
 ## 5. Definition of done (every step)
@@ -123,6 +129,7 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 - [ ] The report is in `Docs/Progress.md`, including any deviations from Design.md.
 
 ## 6. Launch prompt (orchestrator → agent)
+Launch the agent with the Agent tool (`subagent_type: general-purpose`) at **`effort: "high"`**, unless the lead asks otherwise.
 ```
 You are implementing Step N of the Switchboard Operator game in this Unity project, using the Unity MCP server.
 Read Docs/Design.md, Docs/Plan.md (sections 3–7 and "Step N") and Docs/Progress.md before changing anything.
@@ -153,16 +160,21 @@ Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs 
 
 | Item | Notes | Planned |
 |---|---|---|
-| Touch input in the cord code | Use `Pointer.current` instead of `Mouse.current` in `CableInputController.Update`, and hide the hand cursor on touch (D28). | Step 6 |
-| A held cord drops on button and book-row clicks | Any click off a jack counts as "empty space" and returns the held cord. A call-card click already keeps it (`2fc3810`). The lead prefers that buttons and book rows keep it too. | any step; Step 9 at the latest |
+| Touch input: what's left after 9a | 9a moved the cord input, the volume patch and the menu hand to `Pointer.current` (a tap is a click; no hand or hover while no finger is down) and added touch to `Menu.IsAnyInput`. Agents can't drive real touches in the editor (the EventSystem and `Application.isFocused` ignore input while Unity is in the background), so a Device Simulator or phone check is still owed. `BoardGoldLight` stays on `Mouse.current` on purpose: it is a hover-only light. | lead's 9a playtest; phones in 9b/12 |
 | `CableInputController` references `Switchboard.Game.CallCardView` | The UI code depends on the Game layer. A small interface or marker component on the card would keep the layers apart. | cleanup, any step |
-| Stale paths in editor menus | `LevelBackgroundBuilder` and `GamePresentationBuilder` still name `Assets/Scenes/Level.unity` (now `Final.unity`, same GUID). `PhoneBookBuilder` points at a missing `Assets/Settings/PhoneBook.json` (the file is `Assets/Configs/PhoneBook.json`). | cleanup, any step |
+| Stale paths in editor menus | `LevelBackgroundBuilder` and `GamePresentationBuilder` still name `Assets/Scenes/Level.unity` (now `Final.unity`, same GUID); `GamePresentationBuilder` opens it additively, so check what it does before changing the path. `PhoneBookBuilder.CreatePhoneBook`'s message still says "Open Level". (`PhoneBookBuilder`'s book path was fixed in Step 8.) | cleanup, any step |
 | A–Z tabs are hidden | `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab` (lead, 2026-10-18); the code, objects and tests stay. `Tools/Switchboard/Update Phone Book Tabs` rebuilds them active, so untick them again after running it. | |
 | Loose scene objects | `SwitchboardCanvas` and `EventSystem` are loose in `Final.unity`; making them prefabs would keep scene merges small. | optional |
-| Sound effects | Ring, alarm, coins, paid, fine, hang-up: find them or generate them. | before Step 8 |
-| Art imports | `caller-04` and `caller-05` were re-exported at 190×190 while their slices stayed 191 tall, so Unity dropped them (fixed). After resizing a sprite sheet, re-slice it in the Sprite Editor. | tip |
+| Sound effects | Ring, alarm, coins, paid, fine, hang-up: find them or generate them. | before Step 11 |
+| Art imports | Mia has no Unity, so her re-exports keep the old slices: `caller-04`/`05` (5b) and `caller-06`/`07`/`08` (6) came back at 190×190 with 191×191 slices, and Unity dropped them silently (all fixed to 190×190 in the `.meta`). After every art merge, compare each changed PNG's size with its `.meta` sprite rect. `Assets/Sprites/board/caller.png` (229×190, slice 190×191) has no sprite for the same reason; nothing uses it yet. | check after art merges |
+| Closed caller-slot covers (6) | Closed slots are hidden since Sergei's `041fb90` (Step 6's dark discs are gone). A cover-plate drawing from Mia could show them as closed. | when art exists |
+| Unused random helpers (7) | `IRandom`, `SeededRandom`, `RandomExtensions` and `FloatRange` in `Domain/Common` have no users since the spawner went. Delete them, or keep `IRandom` if a later step needs randomness. | cleanup, any step |
+| "New order!" stamp over the emergency badge (7) | While a call rings, the stamp hides half the EMERGENCY badge and most of the countdown ring. This predates Step 7. | Step 11 or 12 |
+| `PhoneBookContactRow.OnPointerDown` (8) | Rows have no raycast target since Step 8 dropped the tap image, so it can never be called. Harmless; remove it in a cleanup. | cleanup, any step |
+| Menu leftovers (9a fix) | The Options and Credits "Go back" buttons keep the old 24/20 label sizes (big, slightly low). The menu package's `Music_randomizer` (in `StartMenu.prefab` and `Music_randomizer.prefab`) points at two tracks never committed (`a84ac8ff…`, `e974b80e…`, since `3522d9a`), so it plays nothing. | Step 12, or with 9b |
+| `SlowGuidePulse` material in EditMode tests | The guide's hidden book-glow material is freed only in `OnDestroy`, which EditMode tests don't run, so each test run leaves 2 materials in editor memory. Free it in `OnDisable` too, or in the test teardown. | cleanup, any step |
 
-Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `UpgradeShopPanel/HeaderSlot`, or update `GameInstaller` with the rename. `PhoneBook.json` keeps the book's format, `contactsPerPage` and the surname order.
+Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `UpgradeShopPanel/HeaderSlot`, or update `GameInstaller` with the rename. `Book.json` keeps its format and `contactsPerPage`; the book sorts itself (D53), so the file's order doesn't matter.
 
 ## 9. Steps
 
@@ -177,13 +189,19 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 5a | Economy file, shop, income, secret goal | `Economy.json` drives Sergei's shop; income upgrades; the secret fills as a savings bar |
 | 5b | Extra wires and the Notepad | Buy cords and the Notepad (changes to the cord input and the book) |
 | 5c | Calls and pacing into `Economy.json` | The designer tunes the whole economy in one file |
-| 6 | Saves, Boot scene, first Web build | Plays in a browser, and progress survives a reload |
-| 7 | Board growth and pacing | The board and the difficulty grow over a session |
-| 8 | Sound and feel | Rings, alarms, coins and animations |
-| 9 | Mobile and Web polish | Good on phones and desktop browsers |
-| 10 | Balance | A tuned time to reach the mystery upgrade |
+| 6 | Board growth (built as "7a") | Start on 3×3; buy 4×4, 5×5, 6×6 |
+| 7 | Hand-written calls | The designer's `Calls.json` and call queues replace random calls; 2 slots at the start |
+| 8 | The new phone book | `Book.json`: name, profession, address, jack; everyone listed from the start |
+| 9a | Saves and touch input | Progress survives a restart; New game; taps work |
+| 9b | First Web build on itch.io | Plays in a browser, and progress survives a reload and a new upload |
+| 10 | Tutorial | A guided first call |
+| 11 | Sound and feel | Rings, alarms, coins and animations |
+| 12 | Mobile and Web polish | Good on phones and desktop browsers |
+| 13 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–5c are fully specified. Steps 6–10 are outlines. The orchestrator turns each one into a full brief before launching it.
+Steps 1–8 are built. Step 9 is split (D55): **9a** (saves, touch) has a full brief and comes next; **9b** (the Web build on itch.io, D26) waits for the Web Build Support module. Steps 9b–13 are outlines; the orchestrator turns each one into a full brief before launching it.
+
+> **Renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7, 7d → 8, 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11, 9 → 12, 10 → 13. The briefs of done steps, commit messages and older reports keep the numbers they were written with.
 
 ---
 
@@ -1136,45 +1154,542 @@ No team-owned file changes. `Final.unity` and the prefabs shouldn't need to chan
 - moving card styles or portraits into a file
 - changing `PhoneBook.json`
 
-### Step 6: Saves and first Web build (outline). The `MainMenu` is the start screen: it replaces our planned `Boot.unity` and doubles as the tap-to-start audio unlock (D30, D33).
-- **Saving:**
-  - `SaveData` with a version number and migrations; `SaveService`.
-  - `PlayerPrefsStorage` and `BrowserStorage` (a `.jslib` writing `localStorage`, plus a backup key).
-  - Autosave as described in Design §5.12.
-- **`Boot.unity`:** tap to start, then load `Game`.
-- **Web build** through `manage_build`, to `Builds/Web/` (git-ignored).
-- **Depends on** D26 (hosting). Includes the touch-input open item (§8).
-- **Tests:**
-  - Saving and loading gives back the same data.
-  - Migration from a v1 test file.
-  - Unknown ids are ignored.
+### Step 6: Board growth (D42, D48, D49), built as "7a"
+
+**Goal.** The game starts on a small board and the player buys it bigger. A new game opens only rows A–C and columns 1–3 (9 jacks) and 3 caller slots. Three `extra_clients` upgrades open 4×4, 5×5 and 6×6, each also adding a caller slot. Only people on open jacks are in the game: they call, they're called, and they're in the book. Built before Step 6 (lead, 2026-10-18). **Recommended effort:** high.
+
+**Playable result.**
+- **Start.**
+  - Press Play: only the top-left 3×3 of the board is live. The other jacks, and their row (D–F) and column (4–6) lamps and labels, are visibly dimmed. They don't react to hover or clicks, and a held cord can't go in.
+  - Only 3 caller slots take calls. The other 3 look closed.
+  - The book lists only the 9 people on A1–C3. There are no emergencies yet, because no emergency service is on the open board.
+- **Buying "Bigger board" (4×4).**
+  - Row D and column 4 light up at once, the 7 new people join the book and start calling, and a 4th slot opens.
+  - The Doctor (D4) is now on the board, so emergencies can ring.
+  - 5×5 brings the Fire Brigade (E5) and 6×6 the Police (B6), so emergencies come more often as the board grows.
+- **The full board** at 6×6 plays exactly like today.
+
+**Decisions** (lead, 2026-10-18; D49):
+- **Three steps:** 4×4, 5×5, 6×6, as `extra_clients` entries in `Economy.json` (D40: values set the result, chains grow).
+- **Caller slots grow with the board:** 3, then 4, 5 and 6. The same upgrade sets both.
+- **Services, one per new ring:**
+  - The Doctor stays on D4 (4×4).
+  - The Fire Brigade moves from C2 to E5 (5×5), swapping with Reginald Underhill, who goes to C2.
+  - The Police stays on B6 (6×6).
+  - The services stay first in `PhoneBook.json`.
+  - The starting nine are then Arthur Hollis A1, Mabel Dunmore A2, Mildred Stanhope A3, Lillian Yardley B1, Irene Godfrey B2, Gertrude Rook B3, Bernard Quigley C1, Reginald Underhill C2 and Ada Moss C3.
+- **Pacing curves and the tutorial are Step 7b**, not this step.
+- **No ownership split (D48).** Change the board, lamp, socket, cord-input, caller-panel and phone-book code directly where needed. List every changed file in the report.
+
+**The board is controlled from `Economy.json`** (lead, 2026-10-18). Every board value comes from the file, and nothing about sizes is hard-coded:
+- the starting board size and the starting caller slots
+- each upgrade's board size, caller slots, price, name and description
+- how many board upgrades there are: the designer adds or removes `extra_clients` lines, with no code change
+- where people and services sit: `PhoneBook.json`, so who joins at which size follows from their jacks
+
+No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests outside test fixtures. The only fixed limit is the physical board in `Final.unity` (6×6 sockets) and the 6 caller slots in the scene. The game reads those from the scene; the validator uses the known 6×6 board (`ContentValidator.BoardJacks`) and 6 slots, and reports a size beyond them.
+
+**Economy file additions** (the field names are a proposal, as in 5c):
+```json
+"startingBoard": { "cols": 3, "rows": 3 },
+"startingClientSlots": 3,
+...
+{ "id": "board_1", "type": "extra_clients", "name": "Bigger board", "description": "4x4, 4 callers", "costCents": 1000, "boardSize": { "cols": 4, "rows": 4 }, "clientSlots": 4 },
+{ "id": "board_2", "type": "extra_clients", "name": "Bigger board", "description": "5x5, 5 callers", "costCents": 2500, "boardSize": { "cols": 5, "rows": 5 }, "clientSlots": 5 },
+{ "id": "board_3", "type": "extra_clients", "name": "Bigger board", "description": "6x6, 6 callers", "costCents": 6000, "boardSize": { "cols": 6, "rows": 6 }, "clientSlots": 6 },
+```
+- **Prices** are placeholders ($10, $25, $60) for the designer to tune.
+- **Use "x", not "×"** in texts, unless the glyph is confirmed in the static LiberationSans atlas.
+- **Where the entries go:** after `notepad`, before `secret`. Since the shop shows the first 3 chains in file order, "Bigger board" appears once a chain sells out: the $3 Notepad, usually. The designer can reorder the lines.
+- **`cols` and `rows`:** columns are 1–6 and rows are A–F. The open area is always the top-left rectangle: rows A to the `rows`-th letter, and columns 1 to `cols`.
+- **Validator rules,** in plain words like the others:
+  - `startingBoard` and each `boardSize` are 1–6 per side. Along the chain, neither side shrinks and at least one grows. The first entry is bigger than `startingBoard`.
+  - `startingClientSlots` and `clientSlots` are 1–6, the caller panel's slots, and never shrink along the chain.
+  - Missing `startingBoard` or `startingClientSlots`: a plain message, and the game falls back to the full board and 6 slots, so it still starts. The shipped file always has both.
+  - Remove the "arrives in Step 7" gate for `extra_clients`.
+- **`GameConfig.maxWaitingCalls` goes away.** `startingClientSlots` and `clientSlots` replace it (D17's rule becomes "live calls never outnumber the open slots"). The installer warns if the scene's caller panel has fewer slots than the file can open.
+
+**How it fits together:**
+- **Domain:**
+  - `StatSheet` gains `BoardCols`, `BoardRows` and `ClientSlots`: starting values plus the last bought `extra_clients`, raising `Changed`.
+  - A small `OpenBoard` helper (or similar) answers `IsOpen(JackId)`.
+- **Spawner and callbacks** read the live slot count instead of the fixed `maxLiveCalls`. The spawner only picks callers and recipients on open jacks. A type with no open recipient (an emergency before 4×4) or no open caller doesn't spawn, and `SpawnWeight` is shared among the types that can.
+  - Callbacks are always for people already in the game. The board never shrinks in play, so they stay valid.
+- **The board:**
+  - A closed jack is dimmed and ignores hover, clicks and cord placement. That's a `SocketView` open flag, honoured by `CableInputController`'s jack hit-testing.
+  - The lamps for closed rows and columns are dimmed and never light. The F label is plain text.
+  - `CordBridge` or a small Game-layer view pushes the open area to the board whenever `StatSheet.Changed` fires.
+- **The caller panel:** closed slots get a dark, translucent cover with raycasts off, and cards only use open slots. Check that the `CallerQueuePanel` art still reads well, and include a screenshot.
+- **The book:**
+  - The phone book shows only contacts on open jacks. Add a filter to `PhoneBookView`, such as `SetVisibleSockets(...)` or a predicate. Pages re-paginate, services stay first, and the surname order holds.
+  - Hidden A–Z tabs stay hidden. `HasLetter` must respect the filter.
+  - The Notepad keeps working.
+- **People-file checks:**
+  - "Each type has enough recipients" is judged on the **full** board. A call type whose recipients are all on closed jacks is fine.
+  - New check: the starting board needs at least 2 untagged people, or no call could ever ring. Report it plainly.
+- **Dev panel:**
+  - "Emergency now" does nothing (or says why in its label) while no service is open.
+  - Add "Open board" to buy the next `extra_clients` for free, like the other dev shortcuts.
+  - "Reset upgrades" closes the board again. To stay safe, it also clears live calls and returns cords whose plugs sit in jacks that are closing. Report what it does.
+- **No saves yet (Step 6):** a reload starts again on 3×3, as for all upgrades.
+
+**Tests:**
+- **Loader and validator:** every rule above, including defaults when the fields are missing.
+- **`StatSheet`:** board and slot values follow purchases and the reset.
+- **Spawner:**
+  - It never picks a closed-jack caller or recipient.
+  - Emergencies don't spawn until a service is open, then do.
+  - Live calls never exceed the open slots, and callbacks respect them.
+  - A 3×3 session of 10 minutes (seeded) only ever involves the starting nine.
+- **People file:** the move (Fire Brigade E5, Reginald Underhill C2), and the real file passes `Validate Content`.
+- **Book filter:** an EditMode test in `Assets/Tests/Game/Editor/` showing the visible contacts and pages for a 3×3 open area.
+- **Board:** a closed `SocketView` refuses a cord (EditMode, if `CableConnectionTests` style allows; otherwise Play Mode smoke).
+
+**Playtest script:**
+1. **Start small.**
+   - Press Play in `Final.unity`. Only A–C × 1–3 is bright. Dimmed jacks don't light on hover, and a held cord can't be plugged into them.
+   - The other row and column lamps stay dark.
+   - Three caller slots take calls; the other three look closed.
+2. **The book.** Open it: only 9 people, on 2 pages, and no services. Calls only ever involve these 9.
+3. **Buy 4×4.** Earn $10 (the dev panel's "+ $100" is fine) and buy "Bigger board". Row D and column 4 open at once, 7 new people appear in the book, a 4th slot opens, and the Doctor is listed first.
+4. **Emergencies.** Within a minute or two (or with "Emergency now"), an emergency rings that wants the Doctor.
+5. **Buy 5×5 and 6×6.** The Fire Brigade (E5) joins at 5×5 and the Police (B6) at 6×6. At 6×6 the board, book and slots are as before this step.
+6. **Shop.** "Bigger board" showed up once a chain sold out, and is gone after 6×6.
+7. **Validator.** In `Economy.json`, set `board_2`'s `boardSize` to `{ "cols": 4, "rows": 4 }` and run `Validate Content`: a plain message says the board must grow. Undo it.
+8. **Reset.** "Reset upgrades" in the dev panel: the board shrinks back to 3×3 with no errors.
+
+**Out of scope:**
+- pacing curves and the tutorial (7b)
+- cover-plate art (only if Mia draws it)
+- animations and sounds for opening jacks (8)
+- saving (6)
+- balancing prices (10)
+
+### Step 7: Hand-written calls and call queues (D51, D52, D54)
+
+**Goal.** The designer writes every call by hand in a new `Assets/Configs/Calls.json`, and `Economy.json` decides which calls play, in which order, at each board size. Random calls, call types, callbacks, the idle guard, the call timer and the Notepad go away. The phone book stays as it is (`PhoneBook.json`) until Step 8. Built before saves and the Web build (Step 9) (lead, 2026-10-18). **Recommended effort:** high.
+
+**Playable result.**
+- **Start.** Press Play: the 3×3 board from Step 6 and **2** caller slots, both filled at once with the first two calls of `startPool`.
+  - Each card shows the call's portrait, **the caller's name under it**, and its pay ("12¢ + 5¢/s").
+  - Taking a card shows **the call's own `message`** in the speech bubble (typed out as today).
+- **Connect.** Patch the call's `from` jack to its `to` jack. The fee is paid, then the per-second pay, until `durationSeconds` runs out ("Paid" stamp). The slot takes **the next call in the queue at once**.
+- **Wrong patch.** "Wrong number!": the call ends with no fine and the next queued call takes the slot. The same call comes back only when the queue comes round to it.
+- **Emergency.** A queued call with `"emergency": true` shows the red badge and its own countdown (`responseTimeSeconds`).
+  - Missed: the "Missed" stamp and its `penaltyCents` fine.
+  - No fine for a wrong patch or for cutting it off.
+- **Bigger board.** Buying "Bigger board":
+  - the board grows and one more slot opens
+  - the queue switches to that upgrade's `stagePool`, starting from its first call
+  - calls already on cards finish normally
+
+**Decisions** (designer and lead, 2026-10-18; D51, D52, D54):
+- **`Calls.json`** (new, the designer's file, one call per line):
+  ```json
+  {
+    "calls": [
+      { "id": "call_001", "icon": "caller-01", "name": "Ada Moss", "message": "Connect me with Mabel Dunmore, please.", "from": "C3", "to": "A2", "durationSeconds": 20, "connectCents": 10, "centsPerSecond": 5 },
+      { "id": "call_002", "icon": "caller-08", "name": "Arthur Hollis", "message": "My neighbour is ill, get me the Doctor!", "from": "A1", "to": "D4", "durationSeconds": 15, "connectCents": 30, "centsPerSecond": 7, "emergency": true, "responseTimeSeconds": 30, "penaltyCents": 200 }
+    ]
+  }
+  ```
+  - The field names adapt the designer's draft to the file style used in `Economy.json`:
+    - `fullname` → `name`
+    - `duration` → `durationSeconds`
+    - `connectIncome` → `connectCents`
+    - `incomePerSecond` → `centsPerSecond`
+    - `responceTime` → `responseTimeSeconds`
+    - `penaltyCents` stays as it is
+  - **All money is in cents.** `centsPerSecond` may have decimals (the wallet carries fractions); `connectCents` and `penaltyCents` are whole cents.
+  - **Jacks are labels** such as `"C3"`: a row letter A–F, then a column 1–6, as on the board and in the book (designer: "from 1 and a").
+  - **`icon`** is a portrait sprite name, as `portrait` is in `PhoneBook.json` today (`caller-01` … `caller-12`, `police`).
+  - **`emergency`** defaults to false. `responseTimeSeconds` and `penaltyCents` are used only for emergencies.
+- **`Economy.json`:**
+  - **New `startPool`:** a list of call ids, the queue for a new game.
+  - **Each `extra_clients` entry gains a `stagePool`:** the queue once that entry is bought. Values set the result (D40): the queue is the last bought `extra_clients`'s `stagePool`, or `startPool`.
+  - **`startingClientSlots` becomes 2** (lead), and the board upgrades' `clientSlots` become 3, 4 and 5 (placeholders for the designer).
+  - **Removed:** the `calls` section (call types), the `pacing` section and the `notepad` entry. If an old file still has them, the validator says plainly that they're no longer used.
+  - **Names:** camelCase like the rest of the file: `startPool`, `stagePool` (the designer wrote `start_pool`, `stage_pool`; tell him in `EconomyFile.md`).
+- **The queue (D52):**
+  - **Slots.** Each open caller slot holds one call. Whenever a slot is free and the queue has a call, the next call appears in it **at once**: at the start, when a call ends, and when an upgrade opens a slot. There is no spawn timer.
+  - **Order.** Calls play in pool order and loop back to the first. Success or wrong number doesn't change the order.
+  - **Pool change.** Buying `extra_clients` replaces the queue and starts it at its first call.
+  - **Busy lines.** A call whose `from` or `to` jack is in use simply waits on its card until the player can connect it (a plug can't go into an occupied jack anyway). No skipping for busy lines.
+  - **No duplicate cards** (orchestrator rule, needed because the queue loops): a call that is still on a card is skipped when the queue comes round to it. If every call in the pool is on a card, the free slot stays empty until one ends.
+- **Rules that stay:** hold and resume (2b), persistent wiring (D45), the income multiplier (5a, on fee and pay, never on fines), cords (5b), and the board growth from Step 6 (closed jacks dimmed and refused, slots growing). The connection rule now compares the plugged pair with the call's own `from` and `to`, in either order, as today.
+- **Removed systems:**
+  - random spawning: `CallSpawner`, `CallFactory`, `PacingSettings`/`IPacingProfile`
+  - call types: `ICallerType`, `ICaller`, `CallTypeRecord`, type weights
+  - callbacks ("Calling again"): `CallbackScheduler`
+  - `BusyTracker` and `IdleGuard`
+  - the early cut-off fine and the wrong-patch fine
+  - the Notepad (D54): domain `Notepad`, `StatSheet.HasNotepad`, the `notepad` upgrade kind, `NotepadBookLink`, the noted jacks in the bubble, and the book's tap hooks if nothing else uses them
+
+  Delete the code and its tests rather than leaving it unused. Keep `UpgradeKind`'s other explicit values unchanged.
+
+**How it fits together:**
+- **Domain:**
+  - A call script type: id, name, icon, message, from, to, duration, fee, rate, emergency, response time, penalty.
+  - A small queue class that knows the current pool and position, follows `StatSheet` (the pool comes from the last bought `extra_clients`, like the board and slots), and fills free slots in `GameSession.Tick`.
+  - `CallRequest`/`Call` carry the script (or its values) instead of `ICaller`/`IPerson`/`ICallerType`.
+  - `ConnectionRule` uses the call's jacks.
+  - `PenaltyService` fines only missed emergencies.
+  - `OpenBoard.IsInGame(person)` goes; `IsOpen(jack)` stays.
+  - If `PhoneDirectory`, `IPerson` and the people catalog end up used only by the book, leave the book's own loading alone; Step 8 replaces it.
+- **Content:**
+  - A `Calls.json` loader and validator, next to `EconomyFileLoader`.
+  - `GameConfig` references `Calls.json` the way it references `Economy.json`.
+  - The card look: emergency calls use today's emergency card style (red badge and accent), regular calls the regular one. Keep the two `CallerTypeDefinition` assets as card styles, or simplify to two style fields; the look must not change.
+- **Game:**
+  - `CallQueueView`/`CallCardView`: the portrait from `icon`, the caller's name under the portrait, the bubble shows `message`. Remove the "wants" text, the Notepad notes and "Calling again".
+  - The rate badge, stamps, coins, halos, the hold look and the emergency countdown ring stay.
+  - `FirstOrderGuide` must still guide the first call.
+- **Dev panel:**
+  - Remove "Call now" and "Emergency now".
+  - Keep "+ $10/$100", "Speed", "Show times", "Clear calls" (the slots refill from the queue), "Open board" and "Reset upgrades".
+  - "Reset upgrades" also returns the queue to `startPool`'s first call.
+- **No saves yet (Step 9):** a reload starts the queue again from `startPool`'s first call.
+
+**Validator** (plain messages naming the call or entry and the fix, like the others):
+- **`Calls.json`:**
+  - a missing or unreadable file (the game still starts, with no calls)
+  - unique, non-empty ids
+  - required `name`, `icon` (a known portrait), `message`, `from`, `to`
+  - `durationSeconds` above 0; `connectCents`, `centsPerSecond` and `penaltyCents` not negative
+  - jack labels on the 6×6 board, and `from` different from `to`
+  - an emergency needs `responseTimeSeconds` above 0
+  - `responseTimeSeconds` or `penaltyCents` on a regular call gets a note that they're only used for emergencies
+- **`Economy.json`:**
+  - `startPool` present, not empty, and every id known
+  - every `extra_clients` has a non-empty `stagePool` of known ids
+  - every call in `startPool` fits inside `startingBoard`, and every call in a `stagePool` fits inside that entry's `boardSize`. Name the call and the jack: "call_014 uses E5, but board_1 opens only 4x4."
+  - a pool with fewer calls than its stage's slots gets a note (some slots would stay empty)
+  - the removed sections and the `notepad` type get a "no longer used" message
+- **Across files:** every jack used by a call has someone listed on it in the phone book, or the player can't find it. Until Step 8 that's `PhoneBook.json`.
+- **Missing values must not silently become 0** (the 5c lesson, Plan §4).
+
+**Shipped content** (placeholders the designer replaces):
+- Write `Calls.json` from today's people and jacks in `PhoneBook.json`, with portraits as there.
+- `startPool`: about 8 calls among the starting nine (A1–C3), no emergencies.
+- `board_1`'s `stagePool`: about 10 calls on 4×4, 2 of them emergencies to the Doctor (D4).
+- `board_2`'s `stagePool`: about 12 on 5×5, adding the Fire Brigade (E5).
+- `board_3`'s `stagePool`: about 14 on 6×6, adding the Police (B6).
+- **Values in today's ranges:**
+  - regular calls: fee 5–15¢, 3–8¢/s, 15–30 s
+  - emergencies: fee 20–40¢, 5–10¢/s, 10–20 s, `responseTimeSeconds` 30, `penaltyCents` 200
+- **Messages:** short, in English, in period voice ("Connect me with Ada Moss, please.", "Fire! Get me the Fire Brigade, quick!").
+- The first call of `startPool` should be a simple one for the guide.
+
+**Tests:**
+- **`Calls.json` loader:** the sample parses; each rule above has a test.
+- **Economy:** each pool rule; the removed sections; the real files pass `Validate Content`.
+- **Queue:**
+  - fills every free slot at once, in order
+  - loops
+  - skips a call still on a card
+  - is replaced on purchase, starting at its first call
+  - a wrong number frees the slot and the next call appears
+  - a connected call holds its slot until it ends
+  - a new slot from an upgrade fills at once
+  - `ResetUpgrades` returns to `startPool`
+- **Emergency:** the countdown; a miss fines `penaltyCents`, not multiplied; no fine for a wrong patch or a cut-off.
+- **Connection rule:** the call's own jacks, in either order.
+- **Cleanup:** remove the tests of deleted systems and list them in the report. Adapt Sergei's `MergedSystemsTests`, `FirstOrderGuideTests` and `CallAudioTests` to hand-written calls without weakening them.
+
+**Files this step may change:**
+- `Assets/Scripts/Domain/**`, `Assets/Scripts/Content/**`
+- in the Game layer: `GameInstaller`, `CallQueueView`, `CallCardView`, `DevPanel`, `OpenBoardLink`, `FirstOrderGuide` (only as needed); delete `NotepadBookLink`
+- `PhoneBookView` only to remove Notepad tap hooks nothing else uses
+- `Assets/Configs/Calls.json` (new) and `Economy.json`
+- `GameConfig.asset` and the two card-style assets
+- tests
+- `Docs/EconomyFile.md`: a "Calls.json" section and a "Call queues" section for the designer, with examples and the validator's messages. Remove the "Calls", "Pacing" and "Notepad" sections. Explain cents vs. seconds and jack labels, and that the book is only for looking things up.
+
+`PhoneBook.json` doesn't change. `Final.unity` and the prefabs shouldn't need to; say so if they do.
+
+**Playtest script:**
+1. **Start.** Press Play in `Final.unity`: 2 cards at once. Each shows a portrait with the caller's name under it; taking one shows its own request text.
+2. **Connect.** Patch the right pair: fee, per-second pay, "Paid". The slot fills with the next call at once.
+3. **Wrong number.** Patch a wrong pair: "Wrong number!", no fine, the next call appears.
+4. **Bigger board.** Dev "+ $100", buy "Bigger board" (or "Open board"): 4×4, a 3rd slot that fills at once, and calls from the new queue.
+5. **Emergency.** Within the new queue, an emergency for the Doctor shows the red badge and countdown. Let one run out: "Missed" and the $2 fine. Patch another wrong: no fine.
+6. **Edit the file.** In `Calls.json`, change the first call's message. Play: the new text shows. Undo it.
+7. **Validator.** Set a call in `startPool` to use `"from": "E5"` and run `Validate Content`: a plain message says it's outside the 3x3 start. Undo it.
+8. **No Notepad.** The shop never offers the Notepad.
+
+**Out of scope:**
+- `Book.json` and the new book layout (8)
+- saves (9)
+- the tutorial (10)
+- sounds (11)
+- balancing (13)
+- writing the real call list (the designer)
+
+### Step 8: The new phone book (D53)
+
+**Goal.** A new `Assets/Configs/Book.json` replaces `PhoneBook.json`. The book becomes a lookup only, with each entry's name, profession, address and jack. Every entry shows from the start: the emergency services first, then everyone alphabetically by name. Built after Step 7, before Step 9. **Recommended effort:** high.
+
+**Playable result.**
+- **Opening the book** shows every entry from the first minute, whatever the board size: services at the top, then names A–Z ("BELLAMY, Frank", "CRANE, Dr. Otis" …).
+- **Each row** shows name, profession, address and, last, the jack.
+- **Looking up a call** ("Connect me with Ada Moss") still works: find her by surname, read her jack, patch it.
+
+**Decisions** (designer and lead, 2026-10-18; D53):
+- **Format** (one entry per line):
+  ```json
+  {
+    "contactsPerPage": 6,
+    "entries": [
+      { "name": "Fire Brigade", "profession": "Fire station", "address": "Station Rd. 1", "emergencyService": true, "jack": "E5" },
+      { "name": "MOSS, Ada", "profession": "Seamstress", "address": "Oak St. 4", "emergencyService": false, "jack": "C3" }
+    ]
+  }
+  ```
+  - `contactsPerPage` is optional (default 6); the designer's draft left it out.
+  - `jack` is the column the designer forgot ("let's do it last column"), a label as in `Calls.json`.
+  - Several entries may share a jack, like a household line ("BELLAMY, Frank" and "BELLAMY, Miss Rose" at the same address).
+- **Order:** the book sorts itself. Services first, in file order; then everyone else by `name`, alphabetically and ignoring case. The designer writes "SURNAME, First", so this is the real-directory order of D50. The file's order doesn't matter.
+- **All entries show from the start.** Remove Step 6's book filter: `SetVisibleSockets` and `OpenBoardLink`'s book part. The board itself still grows.
+- **Letter lookup:** `HasLetter`/`ShowLetter` go by the first letter of `name`. The A–Z tabs stay hidden.
+- **Text in English.** Check that every glyph the shipped file uses is in the book's fonts.
+
+**How it fits together:**
+- `PhoneBookView`/`PhoneBookConfig` read `Book.json`. The domain doesn't read the book at all: calls carry their own jacks since Step 7.
+- Remove `PhoneBook.json` and whatever is left of the people model: `PeopleFileLoader`, `PeopleFileData`, `PeopleCatalog`, `PersonRecord`, `DirectoryRecord`, `IPerson`, `PersonExtensions` and `IDirectoryEntry`. Check that nothing else uses each one first. Step 7 already deleted `PhoneDirectory` and Step 6's people checks, and the people loader no longer reads `portrait`, `type`, `rate` or `fee`.
+- `GameConfig` references `Book.json` instead.
+- **Layout:**
+  - Show four columns, Name, Profession, Address, Jack, readable at 1920×1080 and at 1280×720 (Plan §4, Game view size).
+  - If four don't fit on Sergei's page, put profession and address on a smaller second line under the name, and keep the jack as the last column.
+  - Keep page turning, the hand cursor and the guide's book glow working.
+  - Drop the rows' unused tap image (`PhoneBookContactRow.tapArea` in `PhoneBook.prefab`), left over from the Notepad (D54).
+  - Include screenshots of both sizes.
+- **Validator** (plain messages):
+  - the file is missing or empty
+  - a missing `name` or `jack`
+  - a jack that isn't on the 6×6 board
+  - duplicate names
+  - every call's `from` and `to` jack in `Calls.json` has at least one book entry (moved here from Step 7's interim check, `ContentValidator.ValidateCallJacks`)
+  - `profession` and `address` may be empty
+- **Shipped `Book.json`:** convert today's 36 contacts with their jacks. Write names as "SURNAME, First" and keep the three services. Professions and addresses are English placeholders in period style, families sharing an address now and then. The designer replaces them.
+- **Docs:** a "Book.json" section in `Docs/EconomyFile.md` (or a sibling `Docs/BookFile.md` linked from it). The orchestrator updates the CLAUDE.md lines that name `PhoneBook.json`.
+
+**Tests:**
+- the loader and each validator rule
+- the order: services first, then names alphabetically, whatever the file's order
+- every entry visible on a 3×3 board
+- `HasLetter`
+- the page count with `contactsPerPage`
+- the jack column's text
+- the real file passes `Validate Content`
+- Remove the Step 6 book-filter tests and replace them with "all entries show".
+
+**Playtest script:**
+1. **Open the book at the start (3×3).** All entries show: services first, then A–Z. Each row has a profession, an address and a jack.
+2. **Look up a call.** Take a call, find the person in the book, patch their jack: it connects.
+3. **Turn pages.** Page turning works through the whole book.
+4. **Edit the file.** In `Book.json`, change someone's profession. Play: the new text shows. Undo it.
+5. **Validator.** Remove the entry on a jack a call uses and run `Validate Content`: a plain message names the call and the jack. Undo it.
+
+**Out of scope:**
+- portraits in the book
+- the A–Z tabs (stay hidden)
+- saves (9)
+- the real book content (the designer)
+
+### Step 9a: Saves and touch input (D25, D28, D55)
+
+**Goal.** Progress survives a restart. The balance, the bought upgrades, the call queue's place and the career stats are saved and restored, with versioned migrations and a backup. A "New game" button in the main menu starts over. The cord code and the menu take touch. Everything here can be tested in the editor; the browser storage, the Web build and itch are Step 9b, because the Web Build Support module isn't installed yet. **Recommended effort:** high.
+
+**Playable result.**
+- **Reload keeps progress.** Earn money and buy `income_1` and `board_1`, stop Play, press Play again. The balance is the same to the cent, the shop offers the next entries, the board opens 4×4 with 3 caller slots before the first call rings, and extra cords bought are in the tray.
+- **Unfinished calls ring again** (D55). A call that was on a card when you stopped comes back first.
+- **New game.** In `MainMenu`, with a save, "New game" sits under Continue. It asks for confirmation; "Start over" deletes the save and starts a fresh game, "Cancel" goes back. Without a save the button is hidden.
+- **Touch.** In the Device Simulator (Window › General › Device Simulator), a tap closes the press-start panel, presses Continue, picks up a cord and plugs it.
+
+**Decisions** (lead, 2026-10-19; D25, D55):
+- **Saved** (Design 5.12):
+  - `version`
+  - the balance (`cents`) and its `fraction`
+  - the bought upgrade ids, the secret among them
+  - the queue position (below)
+  - career stats in their own `career` section, apart from the run data (5.10): lifetime earned cents, calls connected, fines paid in cents, seconds played
+- **Not saved:** live calls, cords and plugs, the call in hand, the shop shelf and the stats (both rebuilt from the ids). Each session starts with an empty board (D25). There are no settings or tutorial flags yet: Sergei's volume patch keeps its own PlayerPrefs key until 9b, and the tutorial is Step 10. `JsonUtility` keeps defaults for fields a file leaves out, so later steps can add fields without a migration.
+- **Queue resume (D55): replay unfinished calls.**
+  - The saved position is the pool index of the oldest live call (in arrival order) that came from the current pool. With no such call, it is the queue's own `Position`.
+  - On load the slots fill from there. A call finished out of order may play once more; that's accepted.
+  - A position outside the current pool (the designer shortened it) starts the pool at 0.
+  - Live calls from an older pool (still on cards after a board purchase) don't count.
+- **New game (D55):**
+  - A "New game" button in the main menu, under Continue and in the same style, visible only while a save exists.
+  - It opens a small confirm panel: "Start a new game? Your money and upgrades will be lost." with "Start over" and "Cancel".
+  - "Start over" deletes the save (main and backup) and loads the game the way Continue does.
+  - The dev panel gets the same "New game" (delete the save, reload `Final`), editor and development builds only.
+  - It deletes the career section too: a full fresh start.
+- **Storage keys:** one fixed main key and one backup key, `operator.save` and `operator.save.backup`. 9b keeps the same keys in `localStorage`; itch serves every HTML game from one shared domain, so the keys name the game.
+- **Ids.** Unknown ids are ignored; missing ids count as not bought.
+- **Restoring is silent.** Restoring the bought ids spends nothing and raises no `UpgradeBought`, so no popups and no "To be continued" panel. A loaded secret counts as bought (`GoalProgress.IsPurchased`), and neither `GoalAffordable` nor `GoalPurchased` fires for it.
+- **A save from a newer version** (an older cached build opened after a newer one wrote it) is read as far as it goes, with one warning. It isn't refused.
+
+**How it fits together** (Design 4.1: the save data model is Domain, storage is Game):
+- **Domain** (`Assets/Scripts/Domain/Save/`):
+  - `SaveData` and `CareerData`: `[Serializable]`, public fields, lists instead of dictionaries, `long` cents.
+  - `SaveMigrations`: step by step from the file's version to `SaveData.CurrentVersion` (1). The steps are passed in, so a test can add a fake v1→v2 step.
+  - `ISaveStorage`: `Read`, `Write` and `Delete` of a string by key.
+  - `CareerStats`: listens to the existing events (the fee and per-second pay, the first connection of a call, `FineApplied`'s taken amount) and counts ticked seconds. A call resumed from hold doesn't count twice.
+  - `GameSession` takes an optional `SaveData` and restores it while it builds the services, before anything binds: wallet cents and fraction, then the bought ids (`UpgradeService.Restore`), so stats, shelf and goal are built from them, then the queue position. `GameSession.CaptureSave()` returns a fresh `SaveData`.
+- **Content:** a `SaveFile` codec.
+  - It turns `SaveData` into JSON and back with `JsonUtility`, and runs the migrations.
+  - **Backup.** On save, if the main key holds a save that parses, copy it to the backup key, then write the new save to the main key. On load, try the main key, then the backup, then start a new game.
+  - Each fallback gives one plain message. Broken data isn't deleted on load.
+  - Tests use an in-memory `ISaveStorage` in `Assets/Tests/Domain/`.
+- **Game:**
+  - `PlayerPrefsStorage` (`PlayerPrefs.Save()` after each write), chosen by a small stateless factory. It is used everywhere in 9a; 9b switches Web builds to `BrowserStorage`.
+  - `GameInstaller` loads the save after the content and before it builds `GameSession` (Design 4.4, step 2), and logs one plain line when it used the backup or started fresh because of a broken save.
+  - **Autosave:** a small component, on `Game.prefab` or added at runtime like `FirstOrderGuide`. It saves:
+    - right after a purchase
+    - every 10 s of real time, if the captured JSON differs from the last one written
+    - on `OnApplicationFocus(false)` and `OnApplicationPause(true)`
+    - on `OnDestroy`
+
+    Capture only on these occasions, never per frame.
+  - `CordBridge.EnsureCords` and `OpenBoardLink` already read `StatSheet`, so restored wires and board sizes should need no extra code. Check it.
+  - **The New game button:** a Game component in `MainMenu.unity`. Sergei's `Menu` is in the `MenuTemplates` asmdef, which can't see the Game layer, so the button's logic is ours and is wired in the scene. Check that the menu font has every glyph of the new texts.
+- **Touch** (D28, Plan §8):
+  - `CableInputController.Update` reads `Pointer.current` (`position`, `press.wasPressedThisFrame`) instead of `Mouse.current`. A tap is a click; the click-to-pick, click-to-plug model stays. On a `Touchscreen`, hide the hand cursor and hover-only effects while no finger is down.
+  - Do the same in `VolumeCablePanel` and `MenuHandCursor` (the menu's volume patch).
+  - Add touch to `Menu.IsAnyInput`, so a tap closes the press-start panel.
+  - `BoardGoldLight` may stay on `Mouse.current` if it only reacts to hover; say so in the report.
+  - Remove the touch row from Plan §8 if it's done, or narrow it to what's left.
+
+**Files the step may change:**
+- `GameSession`, `Wallet`, `UpgradeService`, `CallQueue`, `GoalProgress`
+- `GameInstaller`, `DevPanel`, `Game.prefab`
+- `MainMenu.unity`, Sergei's `Menu.cs`, `CableInputController`, `VolumeCablePanel`, `MenuHandCursor`
+- new files under `Domain/Save/`, `Content/` and `Game/`, plus tests
+- `Docs/EconomyFile.md`: one line saying bought ids are saved, so ids must never be renamed
+
+**Tests** (EditMode):
+- **Round trip.** Capture, JSON, load gives back the same balance, fraction, ids, queue position and career.
+- **Versions.**
+  - A v1 test file (a JSON string in the test) loads.
+  - An injected v1→v2 step runs once, in order.
+  - A newer-version file loads what it can.
+- **Ids.** Unknown ids are ignored, missing ids are not bought, and restoring spends nothing and raises no events.
+- **Backup.**
   - A corrupt main save falls back to the backup.
+  - A corrupt main and backup start a new game.
+  - The backup holds the previous good save.
+- **Queue resume.**
+  - The oldest live call from the current pool wins.
+  - Calls from an old pool are ignored.
+  - No live calls gives `Position`.
+  - Out of range gives 0.
+- **Board.** A loaded `board_2` opens 5×5 and its slots before the first call rings; the first `Tick` deals from its `stagePool`. Its wires and income stats come back too.
+- **Goal.** A loaded secret is `IsPurchased`, and neither `GoalPurchased` nor `GoalAffordable` fires.
+- **`CareerStats`.** A connection counts once across hold and resume; fines count the amount taken.
+- **Empty storage** starts with `Economy.json`'s starting values.
+
+**Play Mode checks (agent):**
+- Earn with the dev panel, buy `income_1` and `board_1`, stop, and play again: the balance, the upgrades, the 4×4 board and the cords are restored, and the console is clean.
+- Play through `MainMenu` with and without a save: New game hidden and shown, Cancel, Start over.
+- **Delete the editor save at the end**, so the lead's playtest starts fresh, and say so in the report.
+
+**Playtest script:**
+1. **Fresh start.** Play in `Final`. Money, board and shop are as in a new game.
+2. **Earn and buy.** Use dev "+ $100", buy an income upgrade and the first board upgrade, wait 10 s, stop Play.
+3. **Reload.** Play again. The money is the same to the cent, and the upgrades are owned. The board is 4×4 with 3 slots before the first call. The shop offers the next entries.
+4. **Unfinished calls.** Take a call but don't connect it, then stop and play again. That call rings again.
+5. **New game.** Open `MainMenu` and play. "New game" shows under Continue. Cancel changes nothing. Start over gives a fresh game, and back in the menu the button is hidden.
+6. **Touch.** In the Device Simulator, tap the press-start screen, then Continue, then pick up a cord and plug two jacks.
+
+**Out of scope:**
+- the `.jslib`, `BrowserStorage`, the Build Web menu, Web player settings, itch and `Docs/WebBuild.md` (9b)
+- the volume patch's storage (9b)
+- tutorial flags (10)
+- offline earnings (D25)
+
+#### Step 9a, pass 2: pause menu and centred volume sockets (lead, 2026-10-19; D56)
+Asked at the 9a playtest and built before 9b, so the first Web build has it. **Recommended effort:** high.
+- **Centred volume sockets.** Each row's five sockets and their labels sit about 100 px right of the panel's centre (since the 9a fix: -300, -95, 110, 315, 520). Centre the row on the panel; for example -410, -205, 0, 205, 410, if the panel's centre is at 0. Change both `VolumeCablePanel.prefab` and `MasterVolumeCableSlider.prefab`, plus `VolumeCableSliderBuilder`. The cable's left anchor must not crowd the mute socket.
+- **Pause menu (D56):**
+  - **Opening it:** a small pause button (two bars drawn with UI images; no glyphs needed) in a free corner of the game screen, top-left above the caller column if it fits. It must be big enough for a finger and must not cover a jack, a card or the shop. Esc opens it too. If the book is open, Esc only closes the book; the next press pauses. Esc while paused resumes.
+  - **The panel** is modal, in the style of the "To be continued" dialog (`GameUI.prefab`, its own canvas above the book). It has the title "Paused" and three buttons:
+    - **Resume**
+    - **Options:** the same volume patch as the main menu, reusing `VolumeCablePanel.prefab`, with a "Back" button
+    - **Main Menu:** saves at once (`Autosave.SaveNow()`), then loads `MainMenu` (build index 0), where Continue picks the game up again
+  - **While paused:**
+    - Game time stops (`Time.timeScale` 0), so pay, call durations and emergency countdowns freeze. Restore the previous scale on resume, so the dev panel's ×5 survives. Always set 1 before loading the menu.
+    - Ringing and call sounds pause; the music and button clicks keep playing.
+    - The cord input is off, so clicks on the panel can't drop or plug a cord, and a held cord is still held after Resume.
+    - The pointer must stay visible and usable over the panel (the hand now uses native PNG cursors; only a held plug hides the native pointer).
+    - Pausing also saves.
+  - **The pause button keeps a held cord** (today any click off a jack drops it, Plan §8). If it's simple and safe, make every `Button` click keep a held cord, which closes that §8 item; otherwise only the pause button. Say which in the report.
+  - **The volume patch at timeScale 0:** check that its cable and plugs still move (unscaled time).
+- **Tests:**
+  - pause and resume restore the previous `timeScale`
+  - Esc with the book open closes only the book
+  - Main Menu saves before it loads
+  - a held cord survives pause and resume
+  - the socket positions are centred in both prefabs
+- **Screenshots:** the pause button in the game at 1920×1080 and 1280×720, the pause panel, and Options inside it.
+- **Playtest:**
+  1. Press the pause button during a call: everything freezes, and an emergency's countdown stops.
+  2. Resume: the call carries on, and a cord held before pausing is still in hand.
+  3. Esc with the book open closes the book; Esc again pauses; Esc again resumes.
+  4. Change the volume from the pause menu's Options, and hear the difference after Resume.
+  5. Main Menu, then Continue: the game is where you left it, apart from the calls on cards (D25, D55).
+  6. In Options in the main menu, the sockets sit centred in each row.
+
+### Step 9b: First Web build on itch.io (outline). The `MainMenu` is the start screen: it replaces our planned `Boot.unity` and its press-start panel is the tap that unlocks audio (D30, D33).
+- **Needs the Web Build Support module.** The lead adds it in Unity Hub (Installs › 6000.3.6f1 › Add modules › Web Build Support) and restarts Unity before the step.
+- **`BrowserStorage`:**
+  - A `.jslib` that reads and writes `localStorage` under 9a's keys, behind 9a's `ISaveStorage`.
+  - Wrap every access in try/catch: Safari's private mode and blocked site data throw. Then fall back to PlayerPrefs with one warning.
+  - The factory picks it in Web builds (`UNITY_WEBGL && !UNITY_EDITOR`).
+  - Sergei's volume patch (`AudioVolumeSettings`, key `Switchboard.AudioPatch.v1`) moves to the same storage, so it survives new uploads too.
+  - Optional: a `visibilitychange` (hidden) hook in the `.jslib` that asks the game to save, because phones kill hidden tabs.
+- **No `Boot.unity`:** `MainMenu` is the start screen (see the heading). The menu's Quit button is already hidden in Web builds (9a pass 3, `NewGameMenu.QuitAvailable`); `Application.Quit` does nothing there.
+- **From Step 9a:**
+  - `SaveStorage.Create()` is the single switch point for `BrowserStorage`.
+  - `Autosave.SaveNow()` is public, ready for a `visibilitychange` hook.
+  - `MainMenu` has no press-start panel (`Menu.pressStartPanel` is empty), so the first tap is a menu button; Unity resumes audio on it. Check that the menu music starts.
+  - The menu has both "Play Game" and "Continue", and both just load the game (lead to decide at the 9a playtest).
+- **Hosting (D26, lead 2026-10-19): itch.io.**
+  - Player Settings › Publishing Settings: Compression Format **Gzip**, **Decompression Fallback** on. itch can't send the compression headers, and Brotli unpacked in JavaScript is slower. Today the project has Brotli (0) and no fallback.
+  - The lead created the itch page (Draft) on 2026-10-19; an agent can't log in. The playtest runs from the Draft page first.
+  - itch page settings: "This file will be played in the browser", mobile friendly, landscape, fullscreen button on, no auto-start (the MainMenu's tap is the audio unlock).
+- **Build and upload (lead, 2026-10-19):** polishing goes on after Step 9, so every new version must be one menu click and one command.
+  - **`Tools/Switchboard/Build Web`:** an editor menu that builds the build list (`MainMenu`, `Final`) for Web into `Builds/Web/` (already git-ignored), with the D26 settings, and logs where the build went and how big it is. Building switches the editor's platform to Web the first time, which reimports assets and takes a while.
+  - **Uploading with itch's `butler`:**
+    - Installed on the lead's Mac (2026-10-19): `~/bin/butler` v15.32.0, the Apple-chip build (`darwin-arm64`), with `~/bin` on PATH in `~/.zprofile`. Homebrew's `butler` is an unrelated app. The lead is logged in (credentials in `~/Library/Application Support/itch/butler_creds`), so `butler push` works from an agent's shell too. `butler login` needs a real Terminal window; the `!` prefix has none.
+    - The page is `https://llazypixell.itch.io/operator` ("Operator!", Draft, created by the lead 2026-10-19; `butler status llazypixell/operator` reaches it, no uploads yet). Each upload is `butler push Builds/Web llazypixell/operator:html5`. The draft's secret preview link stays out of the repo.
+    - Page settings advised to the lead (check them after the first push): embed in page at 1280×720, mobile friendly (landscape), fullscreen button, no auto-start, no scrollbars, no SharedArrayBuffer.
+    - butler sends only the changed files and replaces the same upload, so the itch page settings are set once. On the first push, the lead ticks "This file will be played in the browser" for the `html5` upload.
+    - **The agent may push to the Draft page (D55)** once the build runs locally (for example from `python3 -m http.server` in `Builds/Web`). Pushing anywhere public still needs the lead.
+  - **Manual fallback:** zip the *contents* of `Builds/Web`, so `index.html` sits at the zip's root, and upload the zip on the itch page.
+  - **`Docs/WebBuild.md`** for the team: build, push, the itch page settings, and the manual fallback.
+- **Notes from earlier steps:**
+  - **Step 8:** the book has no state to save; it is rebuilt from `Book.json` at every start.
+  - **Step 6:** `GameSession.ResetUpgrades` (clears calls, returns cords from closing jacks) stays dev-only.
 - **Playtest (browser):**
-  - Earn and buy, then reload: progress (the balance and the bought upgrade ids) is restored.
+  - Earn and buy, then reload: the balance and the bought upgrades come back.
+  - Push a second build with butler and reload the itch page: progress survives the new upload.
   - Close and reopen the tab: progress is restored.
+  - Music starts after the press-start tap.
   - On a phone, tap to patch.
 
-### Step 7: Board growth and pacing (outline)
-- **Board growth (D42):**
-  - Start on a 3×3 board (rows A–C, columns 1–3). `extra_clients` entries in `Economy.json` set `boardSize {cols, rows}` and `clientSlots`.
-  - Exactly the people on open jacks are in the game, and the book lists only them. The designer chooses the starting group by placing people on A1–C3. The services move off A–C 1–3 (Fire Brigade is on C2 today), so emergencies come later.
-  - Closed jacks dimmed and not clickable, with their row and column labels dimmed (a change to the board code).
-  - Check the 6-slot caller panel against `clientSlots`.
-- **Pacing:**
-  - `PacingProfile` curves driven by progress (D19).
-  - Caller type weights, with emergencies appearing later.
-- **Tutorial:** scripted opening calls with hints such as "Click the ringing card", "Find them in the book" and "Connect the two jacks".
-- **Tests:**
-  - The spawner respects unlocked lines.
-  - Weights follow progress.
-  - The tutorial sequence.
-- **Playtest:** a 30-minute session ramps up noticeably.
+### Step 10: Tutorial (outline)
+- **Pacing is no longer part of this step:** since D51/D52 the designer sets the difficulty through the call queues in `Economy.json` (hand-written calls, one queue per board size), so the progress curves and type weights (D19, D37) are dropped.
+- **From Step 9a:** `FirstOrderGuide` runs on the first call of every session, a reloaded one too. A tutorial flag in the save (a new `SaveData` field; `JsonUtility` keeps the default for old saves) can stop it after the first time.
+- **Tutorial:** hints for the first calls, such as "Click the ringing card", "Find them in the book" and "Connect the two jacks". **Sergei's `FirstOrderGuide` (merged `e7acec5`, `6226ead`) already pulses the portrait, the book and the cords on the first call; build on it instead of adding a second guide**, and check with the lead and the designer what else is needed (the first calls of `startPool` are the tutorial calls).
+- **Tests:** the tutorial sequence.
+- **Playtest:** a new player gets through the first calls without help.
 
-### Step 8: Sound and feel (outline)
+### Step 11: Sound and feel (outline)
 - **From Step 3:** replace the placeholder `card-take-click.wav` (set on `UiClickSound` in `GameUI.prefab`) with a real sound, and fill `CallCardView.OnCharacterShown` with the callers' talking sound (lead request).
 - **Audio:** `AudioService`, `AudioCueLibrary` and `FeedbackDirector` (Design §5.11):
   - One ringing loop and one alarm loop.
-  - Coin ticks.
+  - Coin ticks. (Sergei's merge `e7acec5` added a cash-register sound and fee coins flying to the counter; build on them.)
   - Cues for paid, hung up, missed and fined.
 - **Animation:**
   - Cards: a ringing wobble, sliding in and out, and stamps.
@@ -1183,7 +1698,7 @@ No team-owned file changes. `Final.unity` and the prefabs shouldn't need to chan
 - **Depends on** the sound-effects open item (§8).
 - **Playtest:** it sounds and feels good without getting noisy.
 
-### Step 9: Mobile and Web polish (outline)
+### Step 12: Mobile and Web polish (outline)
 - **Layout:**
   - Aspect ratios 16:9, 19.5:9 and 4:3.
   - A portrait "rotate your device" screen (D24).
@@ -1194,7 +1709,7 @@ No team-owned file changes. `Final.unity` and the prefabs shouldn't need to chan
   - Set compression for the host, with Decompression Fallback if needed.
 - **Playtest:** on iOS Safari, Android Chrome and a desktop browser.
 
-### Step 10: Balance (outline)
+### Step 13: Balance (outline)
 - **Simulation:** a headless EditMode simulation with a bot operator.
   - Its skill (lookup time, error rate) is configurable.
   - It runs hours of game time in seconds.

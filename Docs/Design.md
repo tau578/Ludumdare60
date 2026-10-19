@@ -150,6 +150,7 @@ The whole project is worked on together (D48, lead 2026-10-18). There are no own
 - **The game has one screen,** in one scene (D38).
 
 ### 4.3 UI layering
+- **PNG cursors (2026-10-19):** `HandCursorGraphic` now selects the four 64x64 textures in `Assets/Sprites/Cursors/` through `Cursor.SetCursor`; it draws no canvas mesh. Pointing uses hotspot (20, 2), grab (29, 28), page left (42, 23), page right (22, 23). Game, menu and volume controls keep their existing hover conditions; a held plug still hides the native pointer. The default cursor is the pointing PNG. Original polygon geometry is archived under `Tools/Art/` for re-export only.
 - Our UI lives in `Assets/Prefabs/Game/GameUI.prefab`: a Screen Space Overlay canvas with sorting order 10. Its CanvasScaler matches the team's `SwitchboardCanvas` (Scale With Screen Size, 1920×1080, Expand), so positions line up.
 - **The right-hand column** (right of the board, about x 620–960 in the 1920×1080 reference with the canvas centre at 0) now holds the upgrade shop panel. Our money counter fills the `HeaderSlot` plaque at the top of the shop panel (Step 1c). It follows the plaque at runtime and auto-sizes from 28 to 64 pt, so "$99,999.99" fits. Anything else (ticket, live calls) must go in free space; check against the board's panels before placing it.
 - **Text glyphs.** Use only characters that exist in the static LiberationSans SDF atlas. "¢" and "—" are there; "→" is not. A missing glyph makes TextMeshPro write it into the fallback font asset at runtime, which dirties a file under `Assets/TextMesh Pro/`.

@@ -78,11 +78,12 @@ namespace Switchboard.UI
             hand.gameObject.SetActive(!heldNow && inside);
             if (!heldNow && inside)
             {
-                hand.transform.position = world;
                 hand.Grabbing = plug >= 0;
-                hand.transform.SetAsLastSibling();
+                hand.PageTurnDirection = 0;
+                hand.ApplyCursor();
             }
-            Cursor.visible = heldNow || inside ? false : originalCursorVisible;
+            if (heldNow) Cursor.visible = false;
+            else if (!showHand) Cursor.visible = originalCursorVisible;
         }
         private void Refresh(Vector3 pointer)
         {
@@ -102,6 +103,7 @@ namespace Switchboard.UI
                 foreach (var socket in row.Sockets) socket.SetHighlighted(false);
             }
             if (hand != null) hand.gameObject.SetActive(false);
+            if (hand != null) hand.RestoreDefaultCursor();
             Cursor.visible = originalCursorVisible;
         }
         private void OnApplicationFocus(bool focused) { if (!focused) OnDisable(); }

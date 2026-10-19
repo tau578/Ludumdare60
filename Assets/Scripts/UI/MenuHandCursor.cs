@@ -24,19 +24,20 @@ namespace Switchboard.UI
             var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
             bool inside = RectTransformUtility.RectangleContainsScreenPoint(area, position, camera);
             bool volumeOwnsPointer = volumePanel != null && volumePanel.OwnsPointerAt(position);
+            if (volumeOwnsPointer) hand.ReleaseCursor(false);
             hand.gameObject.SetActive(inside && !volumeOwnsPointer);
             if (hand.gameObject.activeSelf)
             {
-                RectTransformUtility.ScreenPointToWorldPointInRectangle(area, position, camera, out var world);
-                hand.transform.position = world;
                 hand.Grabbing = false;
+                hand.PageTurnDirection = 0;
+                hand.ApplyCursor();
             }
-            Cursor.visible = inside || volumeOwnsPointer ? false : originalVisible;
         }
         private void Hide()
         {
+            bool hadCursor = hand != null && hand.gameObject.activeSelf;
             if (hand != null) hand.gameObject.SetActive(false);
-            Cursor.visible = originalVisible;
+            if (hadCursor) Cursor.visible = originalVisible;
         }
         private void OnDisable() => Hide();
         private void OnApplicationFocus(bool focused) { if (!focused) Hide(); }
