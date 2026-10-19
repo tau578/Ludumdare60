@@ -197,7 +197,7 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 12 | Mobile and Web polish | Good on phones and desktop browsers |
 | 13 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–8 are built. Step 9 comes next; it needs D26 (hosting) settled first. Steps 9–13 are outlines; the orchestrator turns each one into a full brief before launching it.
+Steps 1–8 are built. Step 9 comes next (hosting: itch.io, D26). Steps 9–13 are outlines; the orchestrator turns each one into a full brief before launching it.
 
 > **Renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7, 7d → 8, 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11, 9 → 12, 10 → 13. The briefs of done steps, commit messages and older reports keep the numbers they were written with.
 
@@ -1499,9 +1499,21 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
   - `SaveData` with a version number and migrations; `SaveService`.
   - `PlayerPrefsStorage` and `BrowserStorage` (a `.jslib` writing `localStorage`, plus a backup key).
   - Autosave as described in Design §5.12.
-- **`Boot.unity`:** tap to start, then load `Game`.
-- **Web build** through `manage_build`, to `Builds/Web/` (git-ignored).
-- **Depends on** D26 (hosting). Includes the touch-input open item (§8).
+- **No `Boot.unity`:** `MainMenu` is the start screen, and its first tap unlocks audio (see the heading). The build goes through the `Build Web` menu below.
+- **Hosting (D26, lead 2026-10-19): itch.io.**
+  - Player Settings › Publishing Settings: Compression Format **Gzip**, **Decompression Fallback** on. itch can't send the compression headers, and Brotli unpacked in JavaScript is slower.
+  - The lead creates the itch page (Draft) once; an agent can't log in. The playtest runs from a Draft or Restricted page first.
+  - itch page settings: "This file will be played in the browser", mobile friendly, landscape, fullscreen button on, no auto-start (the MainMenu's tap is the audio unlock).
+- **Build and upload (lead, 2026-10-19):** polishing goes on after Step 9, so every new version must be one menu click and one command.
+  - **`Tools/Switchboard/Build Web`:** an editor menu that builds the build list (`MainMenu`, `Final`) for Web into `Builds/Web/` (already git-ignored), with the D26 settings, and logs where the build went and how big it is.
+  - **Uploading with itch's `butler`:**
+    - Installed on the lead's Mac (2026-10-19): `~/bin/butler` v15.32.0, the Apple-chip build (`darwin-arm64`), with `~/bin` on PATH in `~/.zprofile`. Homebrew's `butler` is an unrelated app. The lead is logged in (credentials in `~/Library/Application Support/itch/butler_creds`), so `butler push` works from an agent's shell too. `butler login` needs a real Terminal window; the `!` prefix has none.
+    - Each upload is then `butler push Builds/Web <user>/<game>:html5`. Ask the lead for the itch page's address when writing the brief.
+    - butler sends only the changed files and replaces the same upload, so the itch page settings are set once. On the first push, tick "This file will be played in the browser" for the `html5` upload.
+    - **Pushing publishes the game.** Agents run it only when the lead asks; the lead can also run it with `! butler push …`.
+  - **Manual fallback:** zip the *contents* of `Builds/Web`, so `index.html` sits at the zip's root, and upload the zip on the itch page.
+  - **`Docs/WebBuild.md`** for the team: build, push, the itch page settings, and the manual fallback.
+- Includes the touch-input open item (§8).
 - **From Step 7:** the save also needs the queue position: the index of the next call in the current pool (the pool itself follows from the bought upgrades). Live calls aren't saved; on load the slots fill from that position.
 - **From Step 8:** the book has no state to save; it is rebuilt from `Book.json` at every start.
 - **From Step 6:** the board size and caller slots are ordinary upgrade ids (`board_1`…), so a save restores them through `StatSheet` with no extra data; `OpenBoardLink` then reopens the jacks. Test that a loaded `board_2` opens 5×5 before the first call rings. `GameSession.ResetUpgrades` (clears calls, returns cords from closing jacks) is dev-only; a "new game" button would need the same care.
@@ -1512,6 +1524,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
   - A corrupt main save falls back to the backup.
 - **Playtest (browser):**
   - Earn and buy, then reload: progress (the balance and the bought upgrade ids) is restored.
+  - Push a second build with butler, then reload the itch page: progress survives the new upload.
   - Close and reopen the tab: progress is restored.
   - On a phone, tap to patch.
 

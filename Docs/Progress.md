@@ -2509,3 +2509,9 @@ Follow-ups:
   - prefab objects renamed
 - **Playtest (lead, 2026-10-19):** all good. The deviations listed above are accepted.
 - Committed and pushed on the lead's request, merged with tarbaev.d's `f393f72` ("Polish highlights": one shared hover colour for the jack halos and the guide glow; no overlap with Step 8). 445/445 green after the merge.
+
+### D26 decided: itch.io (lead, 2026-10-19)
+- **Hosting is itch.io**, chosen over the lead's own VPS for the jam audience and no setup.
+- **The build** uses Gzip with Decompression Fallback, so the same files also run on the VPS later.
+- **Saves** go to `localStorage` (Design 5.12), because itch gives every upload a new URL.
+- **Where it's recorded:** Design D26 and §8, the Plan's Step 9 outline, and CLAUDE.md.

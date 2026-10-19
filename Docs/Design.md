@@ -556,6 +556,7 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
 - **Audio unlock.** Browsers block audio until the player interacts, so the Boot scene has a tap-to-start screen [9].
 - **Input.** Nothing may depend on hover. The cord code needs `Pointer.current` instead of `Mouse.current` to work on touch (D28), before Step 9's phone check.
 - **Layout.** Landscape first. In portrait, show a "rotate your device" screen (D24) [12].
+- **Hosting (D26): itch.io.** Gzip with Decompression Fallback; `index.html` at the root of the uploaded zip; the itch page set to mobile friendly, landscape, with a fullscreen button [9].
 
 ## 9. Extensibility
 - **New call:** add a line to `Calls.json` and its id to a pool in `Economy.json` (D51, D52). The validator checks it. No code.
@@ -601,7 +602,7 @@ Statuses:
 | D23 | Book QoL: tapping an entry in the phone book notes its jack on the call in hand (since D46: on every accepted call that person is part of) (e.g. "Ada Moss (C3) / wants Basil Thorne (A5)"). Not built in from the start: it is sold in the shop as a cheap one-entry upgrade, `type` `notepad` in `Economy.json` (D40). The designer can drop it by deleting the entry. Sergei's book gets a tapped-entry event as a coordinated change by our agent (D44). | superseded by D54 | 5b |
 | D24 | Portrait on phones shows a "rotate your device" screen. | default | 12 |
 | D25 | Save progression only; no in-flight calls and no offline earnings. | default | 9 |
-| D26 | Hosting target (itch.io, own site, …). It affects storage and compression settings. | open | 9 |
+| D26 | Hosting on **itch.io** (lead, 2026-10-19): an HTML project page that plays the Web build in the browser, inside itch's frame. itch can't be set up to send compression headers, so the build uses Gzip with Unity's Decompression Fallback: the loader unpacks the files itself, and the same files also run on any other web server, such as the lead's VPS. Saves go to `localStorage` through `BrowserStorage` (5.12), not Unity's Web PlayerPrefs, because itch gives every upload a new URL. | decided (lead, 2026-10-19) | 9 |
 | D27 | Currency, number scale, and target time to the mystery upgrade. Placeholder numbers until then (D43). The designer tunes them in `Economy.json`. | open | 13 |
 | D28 | Touch input in the cord code (`Pointer.current`). Built by us like any other change (D48). | decided | 9 |
 | D30 | Division of work: Sergei builds the UI components (phone book, shop panel, main menu, visuals); our agents build the rules and data, and wire his components to them. Steps 3, 5 and 6 become wiring steps. | superseded by D48 (wiring steps still apply; the split of who builds what does not) | 1b |
