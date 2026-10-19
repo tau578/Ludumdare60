@@ -168,8 +168,11 @@ namespace Switchboard.Game.Tests
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Portrait));
             var pulse = card.PortraitRect.GetComponent<SlowGuidePulse>();
             Assert.That(pulse.IsShowing, Is.True);
-            var halo = card.PortraitRect.GetComponentInChildren<SocketHaloGraphic>();
+            var halo = Field<SocketHaloGraphic>(pulse, "portraitHalo");
             Assert.That(halo, Is.Not.Null);
+            Assert.That(halo.transform.parent, Is.EqualTo(card.PortraitRect.parent));
+            Assert.That(halo.transform.GetSiblingIndex(), Is.LessThan(card.PortraitRect.GetSiblingIndex()),
+                "the halo sits just before the portrait, so it draws underneath");
             Assert.That(halo.color.a, Is.EqualTo(1f), "A fresh hint starts at full brightness");
             Assert.That(halo.raycastTarget, Is.False);
             var elapsed = typeof(SlowGuidePulse).GetField("elapsed", BindingFlags.Instance | BindingFlags.NonPublic);

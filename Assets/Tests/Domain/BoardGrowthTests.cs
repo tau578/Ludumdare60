@@ -12,11 +12,14 @@ namespace Switchboard.Domain.Tests
 
         private static readonly BoardSize Small = new BoardSize(3, 3);
 
+        // The caller panel holds 4 (StatSheet.MaxClientSlots), so slots stop growing before the board does.
+        private static readonly int[] SlotsPerStep = { 3, 4, 4 };
+
         private static IUpgrade[] BoardShop() => new IUpgrade[]
         {
-            FakeUpgrade.BoardUpgrade("board_1", 1000, 4),
-            FakeUpgrade.BoardUpgrade("board_2", 2500, 5),
-            FakeUpgrade.BoardUpgrade("board_3", 6000, 6),
+            FakeUpgrade.BoardUpgrade("board_1", 1000, 4, clientSlots: SlotsPerStep[0]),
+            FakeUpgrade.BoardUpgrade("board_2", 2500, 5, clientSlots: SlotsPerStep[1]),
+            FakeUpgrade.BoardUpgrade("board_3", 6000, 6, clientSlots: SlotsPerStep[2]),
             new FakeUpgrade("secret", UpgradeKind.Secret, 25000)
         };
 
@@ -78,7 +81,7 @@ namespace Switchboard.Domain.Tests
             {
                 Assert.That(upgrades.TryBuy("board_" + (side - 3)), Is.True);
                 Assert.That(stats.Board, Is.EqualTo(new BoardSize(side, side)));
-                Assert.That(stats.ClientSlots, Is.EqualTo(side));
+                Assert.That(stats.ClientSlots, Is.EqualTo(SlotsPerStep[side - 4]));
             }
             Assert.That(changes, Is.EqualTo(3));
 
