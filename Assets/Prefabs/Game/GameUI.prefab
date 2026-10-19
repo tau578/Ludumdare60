@@ -6479,9 +6479,16 @@ MonoBehaviour:
   portraits:
   - {fileID: -3528310941345610784, guid: f1165ce58b3149e488092261ba6f7544, type: 3}
   - {fileID: 7311596053533559507, guid: 2a98d4e6e4b018a45959ce7f4cdd9262, type: 3}
+  - {fileID: 857694612022928217, guid: 04b22daf2f6329446993c63ce35d167d, type: 3}
   - {fileID: -5808178059254175914, guid: 6b870141e03d7834abb914d2740ce5f3, type: 3}
+  - {fileID: -410783322153876567, guid: 31fed2d6fe72c3647ac1df119e5d4479, type: 3}
   - {fileID: -2727679339154161135, guid: f9bea93fde571cf4eacd05fdef3f349a, type: 3}
+  - {fileID: 1708995243961246940, guid: 6337d8aa7b31239489a0b1500040a73a, type: 3}
   - {fileID: -6978862741892919532, guid: 4ef4322c4bef2c8498a05af4996e7ace, type: 3}
+  - {fileID: -1696921312614389593, guid: 00a1866ea753ef047a7ebe544af54fde, type: 3}
   - {fileID: -1611619509272709571, guid: ca07e545929aa7240abc5c1020e5adec, type: 3}
+  - {fileID: -2408728823523347239, guid: 8a7c5eac9ed6f9a41a541e9c488e53f2, type: 3}
+  - {fileID: -2047428064096240210, guid: fe37d0496dfd79a4dae1be6440153141, type: 3}
+  - {fileID: 6715957911979874120, guid: 8cb32b4f59e8544fc80cf734e1011286, type: 3}
   connectSound: {fileID: 8300000, guid: d040f6a55ee232045ab2dba06c8a5eea, type: 3}
   clickSound: {fileID: 8300000, guid: 7a8cca0cdd90ee7488b52f9a2431ae76, type: 3}
