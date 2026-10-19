@@ -215,7 +215,7 @@ namespace Switchboard.Editor
             var detailsLabel = Label("Details", template, "", Vector2.zero, Vector2.zero, 16, FontStyle.Normal, TextAnchor.UpperLeft);
             Stretch(detailsLabel.rectTransform, Vector2.zero, new Vector2(JackColumn, RowSplit), new Vector2(-6, 0));
             BestFit(detailsLabel, 10, 16);
-            detailsLabel.color = new Color32(78, 80, 70, 255);
+            detailsLabel.color = new Color32(92, 69, 53, 255);
             var jackLabel = Label("Jack", template, "", Vector2.zero, Vector2.zero, 22, FontStyle.Bold, TextAnchor.MiddleRight);
             Stretch(jackLabel.rectTransform, new Vector2(JackColumn, 0), Vector2.one, Vector2.zero);
             var row = template.gameObject.AddComponent<PhoneBookContactRow>();
@@ -271,7 +271,7 @@ namespace Switchboard.Editor
             label.fontSize = fontSize;
             label.fontStyle = FontStyle.Normal;
             label.alignment = alignment;
-            label.color = new Color32(44, 48, 42, 255);
+            label.color = new Color32(51, 36, 26, 255);
             label.horizontalOverflow = HorizontalWrapMode.Wrap;
             label.verticalOverflow = VerticalWrapMode.Truncate;
             label.supportRichText = false;
