@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Switchboard.Game
 {
-    /// <summary>Saves in PlayerPrefs, flushed after every change. Web builds move to the browser's storage in 9b.</summary>
+    /// <summary>Saves in PlayerPrefs, flushed after every change: the editor, desktop builds, and Web players whose browser blocks localStorage.</summary>
     public sealed class PlayerPrefsStorage : ISaveStorage
     {
         public string Read(string key) => PlayerPrefs.HasKey(key) ? PlayerPrefs.GetString(key) : null;

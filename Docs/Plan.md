@@ -118,6 +118,9 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Renaming an asset (8) | Rename or move it with `manage_asset` (Unity's `AssetDatabase.MoveAsset`), never in the file system: Unity keeps the GUID, so every prefab and asset that references it still finds it with no re-wiring (`PhoneBook.json` → `Book.json`). Git shows a delete plus a new file until both are staged. |
 | Saves in tests (9a) | EditMode tests run `GameInstaller.Start`, so anything that reads or writes PlayerPrefs there touches the lead's real save. `GameInstaller` opens the save only when `Application.isPlaying`; `SaveIsolationTests` guards it. Play Mode checks write `operator.save` and `operator.save.backup`: delete both at the end. |
 | Missing JSON fields (5c) | `JsonUtility.FromJson` keeps field initializers for fields the file leaves out, also inside nested objects in arrays. Use a marker initializer (NaN, or a named `Unset` constant) to tell "missing" from 0. |
+| Web cursor checks (9b fix) | To see what Unity sends to the page, serve a patched framework through CDP `Fetch` (for example, log every `_JS_Cursor_SetShow`), and watch the canvas `style` with a MutationObserver. Imitate itch's iframe with a host page on a second port. Restart `http.server` after every build, because the build deletes and recreates `Builds/Web`. |
+| Web builds (9b) | Run `Tools/Switchboard/Build Web` through `EditorApplication.delayCall` plus `EditorApplication.ExecuteMenuItem` from `execute_code`, so the MCP call returns at once; then watch `~/Library/Logs/Unity/Editor.log` for the "Build Web:" line. With Unity in the background the delayCall can start late. The first build switches the editor to Web (about 5 min of reimport); the editor stays on Web. Every build rewrites `Assets/Settings/UniversalRP.asset`, `Assets/UniversalRenderPipelineGlobalSettings.asset` and `preloadedAssets` in `ProjectSettings.asset`: discard them (`Docs/WebBuild.md`). |
+| Checking a Web build (9b) | No Chrome extension is connected, so drive headless Chrome (`--headless=new`, `--remote-debugging-port`, a throwaway `--user-data-dir`, SwiftShader if WebGL fails) with a dependency-free Node script over the DevTools protocol (Node 26 has `WebSocket`). Serve `Builds/Web` with `python3 -m http.server`. Call `Emulation.setDeviceMetricsOverride` in every CDP session (the real headless viewport is 1280×633). Clear `localStorage` from a same-origin static page, because reloading the running game saves again through `pagehide`. |
 
 ## 5. Definition of done (every step)
 - [ ] The project compiles. The console has no errors and no new warnings from our code.
@@ -160,19 +163,20 @@ Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs 
 
 | Item | Notes | Planned |
 |---|---|---|
-| Touch input: what's left after 9a | 9a moved the cord input, the volume patch and the menu hand to `Pointer.current` (a tap is a click; no hand or hover while no finger is down) and added touch to `Menu.IsAnyInput`. Agents can't drive real touches in the editor (the EventSystem and `Application.isFocused` ignore input while Unity is in the background), so a Device Simulator or phone check is still owed. `BoardGoldLight` stays on `Mouse.current` on purpose: it is a hover-only light. | lead's 9a playtest; phones in 9b/12 |
+| Touch input: what's left after 9a | 9a moved the cord input, the volume patch and the menu hand to `Pointer.current` (a tap is a click; no hand or hover while no finger is down) and added touch to `Menu.IsAnyInput`. Agents can't drive real touches in the editor (the EventSystem and `Application.isFocused` ignore input while Unity is in the background). 9b's headless browser check tapped New Game with emulated touch; a real phone check is still owed. `BoardGoldLight` stays on `Mouse.current` on purpose: it is a hover-only light. | lead's 9a playtest; phones in 9b/12 |
 | `CableInputController` references `Switchboard.Game.CallCardView` | The UI code depends on the Game layer. A small interface or marker component on the card would keep the layers apart. | cleanup, any step |
 | Stale paths in editor menus | `LevelBackgroundBuilder` and `GamePresentationBuilder` still name `Assets/Scenes/Level.unity` (now `Final.unity`, same GUID); `GamePresentationBuilder` opens it additively, so check what it does before changing the path. `PhoneBookBuilder.CreatePhoneBook`'s message still says "Open Level". (`PhoneBookBuilder`'s book path was fixed in Step 8.) | cleanup, any step |
 | A–Z tabs are hidden | `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab` (lead, 2026-10-18); the code, objects and tests stay. `Tools/Switchboard/Update Phone Book Tabs` rebuilds them active, so untick them again after running it. | |
 | Loose scene objects | `SwitchboardCanvas` and `EventSystem` are loose in `Final.unity`; making them prefabs would keep scene merges small. | optional |
 | Sound effects | Ring, alarm, coins, paid, fine, hang-up: find them or generate them. | before Step 11 |
-| Art imports | Mia has no Unity, so her re-exports keep the old slices: `caller-04`/`05` (5b) and `caller-06`/`07`/`08` (6) came back at 190×190 with 191×191 slices, and Unity dropped them silently (all fixed to 190×190 in the `.meta`). After every art merge, compare each changed PNG's size with its `.meta` sprite rect. `Assets/Sprites/board/caller.png` (229×190, slice 190×191) has no sprite for the same reason; nothing uses it yet. | check after art merges |
+| Art imports | Mia has no Unity, so her re-exports keep the old slices: `caller-04`/`05` (5b) and `caller-06`/`07`/`08` (6) came back at 190×190 with 191×191 slices, and Unity dropped them silently (all fixed to 190×190 in the `.meta`). After every art merge, compare each changed PNG's size with its `.meta` sprite rect. `Assets/Sprites/board/caller.png` (229×190, slice 190×191) has no sprite for the same reason; nothing uses it yet. `3ca8bc9` (9b fix): `caller-02` came back at 190×190 with a 191-high slice (fixed to 190×190). `police.png` is 191×191 with a 190×186 slice that cuts off the top 5 rows; full size or not is for the lead or Mia. | check after art merges |
 | Closed caller-slot covers (6) | Closed slots are hidden since Sergei's `041fb90` (Step 6's dark discs are gone). A cover-plate drawing from Mia could show them as closed. | when art exists |
 | Unused random helpers (7) | `IRandom`, `SeededRandom`, `RandomExtensions` and `FloatRange` in `Domain/Common` have no users since the spawner went. Delete them, or keep `IRandom` if a later step needs randomness. | cleanup, any step |
 | "New order!" stamp over the emergency badge (7) | While a call rings, the stamp hides half the EMERGENCY badge and most of the countdown ring. This predates Step 7. | Step 11 or 12 |
 | `PhoneBookContactRow.OnPointerDown` (8) | Rows have no raycast target since Step 8 dropped the tap image, so it can never be called. Harmless; remove it in a cleanup. | cleanup, any step |
-| Menu leftovers (9a fix) | The Options and Credits "Go back" buttons keep the old 24/20 label sizes (big, slightly low). The menu package's `Music_randomizer` (in `StartMenu.prefab` and `Music_randomizer.prefab`) points at two tracks never committed (`a84ac8ff…`, `e974b80e…`, since `3522d9a`), so it plays nothing. | Step 12, or with 9b |
+| Menu leftovers (9a fix) | The Options and Credits "Go back" buttons keep the old 24/20 label sizes (big, slightly low). The menu package's `Music_randomizer` (in `StartMenu.prefab` and `Music_randomizer.prefab`) points at two tracks never committed (`a84ac8ff…`, `e974b80e…`, since `3522d9a`), so it plays nothing; in the Web build it is the likely source of one "Trying to get length of sound which is not loaded yet" console line (9b). | Step 12, or with 9b |
 | `SlowGuidePulse` material in EditMode tests | The guide's hidden book-glow material is freed only in `OnDestroy`, which EditMode tests don't run, so each test run leaves 2 materials in editor memory. Free it in `OnDisable` too, or in the test teardown. | cleanup, any step |
+| Web build leftovers (9b) | Each build rewrites the URP asset, the URP global settings and `preloadedAssets` in `ProjectSettings.asset`; `WebBuild` could restore them itself. A "Build Web (Dev)" menu would put the dev panel in a phone build. | cleanup, Step 12 |
 
 Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `UpgradeShopPanel/HeaderSlot`, or update `GameInstaller` with the rename. `Book.json` keeps its format and `contactsPerPage`; the book sorts itself (D53), so the file's order doesn't matter.
 
@@ -199,7 +203,7 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 12 | Mobile and Web polish | Good on phones and desktop browsers |
 | 13 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–8 are built. Step 9 is split (D55): **9a** (saves, touch) has a full brief and comes next; **9b** (the Web build on itch.io, D26) waits for the Web Build Support module. Steps 9b–13 are outlines; the orchestrator turns each one into a full brief before launching it.
+Steps 1–8 and 9a are built. Step 9 is split (D55): **9a** (saves, touch) is done; **9b** (the Web build on itch.io, D26) has a full brief and comes next. Steps 10–13 are outlines; the orchestrator turns each one into a full brief before launching it.
 
 > **Renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7, 7d → 8, 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11, 9 → 12, 10 → 13. The briefs of done steps, commit messages and older reports keep the numbers they were written with.
 
@@ -1640,43 +1644,114 @@ Asked at the 9a playtest and built before 9b, so the first Web build has it. **R
   5. Main Menu, then Continue: the game is where you left it, apart from the calls on cards (D25, D55).
   6. In Options in the main menu, the sockets sit centred in each row.
 
-### Step 9b: First Web build on itch.io (outline). The `MainMenu` is the start screen: it replaces our planned `Boot.unity` and its press-start panel is the tap that unlocks audio (D30, D33).
-- **Needs the Web Build Support module.** The lead adds it in Unity Hub (Installs › 6000.3.6f1 › Add modules › Web Build Support) and restarts Unity before the step.
-- **`BrowserStorage`:**
-  - A `.jslib` that reads and writes `localStorage` under 9a's keys, behind 9a's `ISaveStorage`.
-  - Wrap every access in try/catch: Safari's private mode and blocked site data throw. Then fall back to PlayerPrefs with one warning.
-  - The factory picks it in Web builds (`UNITY_WEBGL && !UNITY_EDITOR`).
-  - Sergei's volume patch (`AudioVolumeSettings`, key `Switchboard.AudioPatch.v1`) moves to the same storage, so it survives new uploads too.
-  - Optional: a `visibilitychange` (hidden) hook in the `.jslib` that asks the game to save, because phones kill hidden tabs.
-- **No `Boot.unity`:** `MainMenu` is the start screen (see the heading). The menu's Quit button is already hidden in Web builds (9a pass 3, `NewGameMenu.QuitAvailable`); `Application.Quit` does nothing there.
-- **From Step 9a:**
-  - `SaveStorage.Create()` is the single switch point for `BrowserStorage`.
-  - `Autosave.SaveNow()` is public, ready for a `visibilitychange` hook.
-  - `MainMenu` has no press-start panel (`Menu.pressStartPanel` is empty), so the first tap is a menu button; Unity resumes audio on it. Check that the menu music starts.
-  - The menu has both "Play Game" and "Continue", and both just load the game (lead to decide at the 9a playtest).
-- **Hosting (D26, lead 2026-10-19): itch.io.**
-  - Player Settings › Publishing Settings: Compression Format **Gzip**, **Decompression Fallback** on. itch can't send the compression headers, and Brotli unpacked in JavaScript is slower. Today the project has Brotli (0) and no fallback.
-  - The lead created the itch page (Draft) on 2026-10-19; an agent can't log in. The playtest runs from the Draft page first.
-  - itch page settings: "This file will be played in the browser", mobile friendly, landscape, fullscreen button on, no auto-start (the MainMenu's tap is the audio unlock).
-- **Build and upload (lead, 2026-10-19):** polishing goes on after Step 9, so every new version must be one menu click and one command.
-  - **`Tools/Switchboard/Build Web`:** an editor menu that builds the build list (`MainMenu`, `Final`) for Web into `Builds/Web/` (already git-ignored), with the D26 settings, and logs where the build went and how big it is. Building switches the editor's platform to Web the first time, which reimports assets and takes a while.
-  - **Uploading with itch's `butler`:**
-    - Installed on the lead's Mac (2026-10-19): `~/bin/butler` v15.32.0, the Apple-chip build (`darwin-arm64`), with `~/bin` on PATH in `~/.zprofile`. Homebrew's `butler` is an unrelated app. The lead is logged in (credentials in `~/Library/Application Support/itch/butler_creds`), so `butler push` works from an agent's shell too. `butler login` needs a real Terminal window; the `!` prefix has none.
-    - The page is `https://llazypixell.itch.io/operator` ("Operator!", Draft, created by the lead 2026-10-19; `butler status llazypixell/operator` reaches it, no uploads yet). Each upload is `butler push Builds/Web llazypixell/operator:html5`. The draft's secret preview link stays out of the repo.
-    - Page settings advised to the lead (check them after the first push): embed in page at 1280×720, mobile friendly (landscape), fullscreen button, no auto-start, no scrollbars, no SharedArrayBuffer.
-    - butler sends only the changed files and replaces the same upload, so the itch page settings are set once. On the first push, the lead ticks "This file will be played in the browser" for the `html5` upload.
-    - **The agent may push to the Draft page (D55)** once the build runs locally (for example from `python3 -m http.server` in `Builds/Web`). Pushing anywhere public still needs the lead.
-  - **Manual fallback:** zip the *contents* of `Builds/Web`, so `index.html` sits at the zip's root, and upload the zip on the itch page.
-  - **`Docs/WebBuild.md`** for the team: build, push, the itch page settings, and the manual fallback.
-- **Notes from earlier steps:**
-  - **Step 8:** the book has no state to save; it is rebuilt from `Book.json` at every start.
-  - **Step 6:** `GameSession.ResetUpgrades` (clears calls, returns cords from closing jacks) stays dev-only.
-- **Playtest (browser):**
-  - Earn and buy, then reload: the balance and the bought upgrades come back.
-  - Push a second build with butler and reload the itch page: progress survives the new upload.
-  - Close and reopen the tab: progress is restored.
-  - Music starts after the press-start tap.
-  - On a phone, tap to patch.
+### Step 9b: First Web build on itch.io (D26, D55)
+
+> **Built 2026-10-19** (report in Progress.md) and pushed to the itch Draft page. Our two cursor fixes (builds #2162255, #2162638) were discarded; Sergei brings his hardware-cursor fix (`07678dc` on his branch) onto main. The lead's playtest goes on.
+
+**Goal.** The game plays in a browser from the itch Draft page. Saves and the volume patch live in the browser's `localStorage`, so they survive a reload, a closed tab and a new upload. Every new version is one menu click (`Tools/Switchboard/Build Web`) and one command (`butler push`). **Recommended effort:** high.
+
+**Playable result.**
+- `Tools/Switchboard/Build Web` builds `MainMenu` and `Final` into `Builds/Web/` with Gzip and Decompression Fallback, and logs where the build went and how big it is.
+- Served locally (`python3 -m http.server`), the build fills the browser window with no Unity footer, shows the menu (New Game, Options, Credits; no Quit), and plays.
+- In the browser, money and upgrades come back after a reload. The volume patch comes back too.
+- The build is on the itch Draft page as the `html5` channel.
+
+**Decisions** (lead, 2026-10-19, D26, D55; orchestrator's technical choices marked *):
+- **Hosting:** itch.io, the page `llazypixell/operator` ("Operator!", Draft). Gzip with Decompression Fallback (today: Brotli, no fallback). itch can't send compression headers; with the fallback Unity's loader unpacks the files itself, so the same files run on any server.
+- **Saves in `localStorage`, not Unity's Web PlayerPrefs.** Unity keeps Web PlayerPrefs in IndexedDB under a path tied to the page URL, and itch gives every upload a new URL. itch serves every HTML game from one shared domain, so the keys name the game: `operator.save` and `operator.save.backup` (as in 9a).
+- **The volume patch moves to the same storage** under its existing key `Switchboard.AudioPatch.v1`. The key stays, so the editor's saved patch isn't lost.
+- **The agent may push to the Draft page** (D55) once the build runs locally. Pushing anywhere public still needs the lead.
+- **\* A project Web template, `Operator`.** Unity's Default template draws a fixed 960×600 canvas with a footer (product name, Unity logo, fullscreen button), which leaves bars and scrollbars inside itch's 1280×720 frame. The new template:
+  - a canvas that fills the whole window and follows its size (desktop frame, itch's fullscreen, phones)
+  - no footer and no Unity logo; itch has its own fullscreen button
+  - a dark background, a plain loading bar, no scrollbars
+  - the page title "Operator!"
+  - Unity's error and warning banner kept, so problems are visible on a phone
+  - the mobile viewport meta tag, so phones don't zoom out
+  - Base it on Unity 6's own Default or Minimal template (in the editor's `PlaybackEngines/WebGLSupport/BuildTools/WebGLTemplates`), keeping its loader code and template variables.
+- **\* `productName` and `companyName` stay as they are** (`ludumdare-60`, `DefaultCompany`). On the Mac, the editor's PlayerPrefs file is named after them, so renaming would lose the lead's editor save and volume patch. The template sets the visible title.
+- **\* The editor stays on the Web platform after the first build.** Every switch reimports assets, and the editor plays and tests the same on Web. The platform is a local editor setting (`Library`), not a project file, so teammates aren't affected. Code that must not run in the editor uses `UNITY_WEBGL && !UNITY_EDITOR`, never `UNITY_WEBGL` alone.
+- **No press-start panel** (D30's audio unlock, Design 4.2 and §8): `MainMenu` shows its buttons at once, and Unity resumes browser audio on the first tap, which is a menu button. Add a panel only if the browser check shows audio staying silent after the first tap; say so in the report either way.
+- **No `Boot.unity`:** `MainMenu` is the start screen. Its Quit button is already hidden on Web (9a pass 3, `NewGameMenu.QuitAvailable`).
+- **Release builds only.** The dev panel exists in editor and development builds only, so it isn't on itch. A development-build menu item is a follow-up, not this step.
+
+**How it fits together:**
+- **`BrowserStorage`** (Game, `Assets/Scripts/Game/Save/`): an `ISaveStorage` over a `.jslib` (`BrowserStorage.jslib`, Web platform only in its importer) with `mergeInto(LibraryManager.library, { ... })`.
+  - `Read`, `Write` and `Delete` of a string by key, plus an availability probe (set and remove a test key).
+  - **Every `localStorage` access is in a JavaScript try/catch.** Blocked site data, blocked third-party storage (itch runs the game in an iframe) and some private modes throw. A failure returns a status instead of throwing into C#.
+  - A string returned to C# is allocated the way Unity 6's docs say (`_malloc` plus `stringToUTF8`, or `stringToNewUTF8`); arguments are read with `UTF8ToString`. Check the current API with `unity_docs` before writing it.
+  - The C# side declares the imports only under `UNITY_WEBGL && !UNITY_EDITOR`, so the editor and the tests never touch them.
+- **`SaveStorage.Create()` stays the single switch point.** In Web players it returns `BrowserStorage` when the probe works, and otherwise `PlayerPrefsStorage` with **one** warning per page load (keep that flag in the `.jslib`, or in one documented static; no other statics with state). In the editor and desktop builds it returns `PlayerPrefsStorage`, as today. A write that fails later (for example a full quota) logs one warning and doesn't crash.
+- **`AudioVolumeSettings`** (Sergei's, `Assets/Scripts/UI/`, Assembly-CSharp) reads and writes its patch through `SaveStorage.Create()` instead of `PlayerPrefs`, same key and same JSON. It reads at `SubsystemRegistration`, before any scene loads; check that the `.jslib` call works that early in a Web player, and otherwise read at the first use. Add a small seam (for example an internal `Load(ISaveStorage)` and `Save(ISaveStorage)`) so a test can use an in-memory storage.
+- **Saving when the page is hidden.** Phones kill hidden tabs, and a hidden tab runs no frames, so `Autosave`'s 10 s check and `OnApplicationFocus` may never run. The `.jslib` listens for `visibilitychange` (when the page becomes hidden) and `pagehide`, and calls `Autosave.SaveNow()` **synchronously inside the event**: a function-pointer callback (`makeDynCall` and a `[MonoPInvokeCallback]` static method) or Unity's `SendMessage`, whichever Unity 6's docs support best. `Autosave` registers when it binds a session and unregisters in `Stop` and `OnDestroy`. The one static the callback needs is the documented exception; say what you chose in the report.
+- **The template** lives at `Assets/WebGLTemplates/Operator/` (Unity's required place for templates). Player Settings' template is `PROJECT:Operator`.
+- **`Tools/Switchboard/Build Web`** (`Assets/Scripts/Game/Editor/`, next to `ContentValidatorMenu`):
+  - Applies the D26 settings before every build: Gzip, Decompression Fallback on, the `Operator` template. Once they're saved in `ProjectSettings` this changes nothing, but a teammate's accidental change can't ship a Brotli build. Leave every other Player setting as it is.
+  - Deletes `Builds/Web` first, so butler never uploads leftovers from an older build.
+  - Builds the enabled scenes of the build list (`MainMenu` 0, `Final` 1) for Web into `Builds/Web/` (already git-ignored) as a release build.
+  - Switches the editor to Web first if needed (the first time reimports assets and takes a while).
+  - Logs one plain line on success: the folder, the total size in MB and the next command (`butler push Builds/Web llazypixell/operator:html5`). On failure it logs the build's errors plainly.
+  - Running it from an agent: a long build blocks the editor and can outlast an MCP call. Start it with `EditorApplication.delayCall` from `execute_code`, so the call returns at once, then wait with `refresh_unity` (`wait_for_ready`) and follow `~/Library/Logs/Unity/Editor.log` until the build's line appears.
+- **`ProjectSettings/ProjectSettings.asset`:** Gzip (`webGLCompressionFormat: 1`), `webGLDecompressionFallback: 1`, `webGLTemplate: PROJECT:Operator`. The first platform switch may write other Web defaults into the file; keep them, and list them in the report. Discard format-only re-saves elsewhere as usual (Plan §4).
+- **`Docs/WebBuild.md`** for the team, in plain words:
+  - building (the menu, what it does, how long the first build takes, the editor staying on Web)
+  - pushing with butler (installing it, `butler login` in a real Terminal, `butler push Builds/Web llazypixell/operator:html5`, `butler status llazypixell/operator`)
+  - the itch page settings (below)
+  - testing locally (`python3 -m http.server` in `Builds/Web`, then `http://localhost:8000`)
+  - the manual fallback: zip the *contents* of `Builds/Web` so `index.html` is at the zip's root, and upload it on the itch page
+  - where saves live (`localStorage` keys) and how to clear them in the browser for a fresh start
+- **itch page settings** (the lead sets them after the first push; an agent can't log in):
+  - the `html5` upload: "This file will be played in the browser"
+  - Embed: in the page, viewport 1280×720
+  - mobile friendly, landscape orientation
+  - fullscreen button on; scrollbars off; "Automatically start on page load" off (the click on itch's "Run game" and the first menu tap unlock audio)
+  - SharedArrayBuffer support off (the build has no threads)
+
+**Files the step may change:**
+- new: `Assets/Scripts/Game/Save/BrowserStorage.cs`, `Assets/Scripts/Game/Save/BrowserStorage.jslib` (or one `.jslib` for storage and the page hooks), `Assets/Scripts/Game/Editor/WebBuild.cs`, `Assets/WebGLTemplates/Operator/` (with metas), tests, `Docs/WebBuild.md`
+- changed: `SaveStorage.cs`, `Autosave.cs`, `PlayerPrefsStorage.cs` and `ISaveStorage.cs` (their comments), `Assets/Scripts/UI/AudioVolumeSettings.cs`, `ProjectSettings/ProjectSettings.asset` (the settings above)
+- No scene or prefab changes are expected. If one turns out to be needed, say why in the report.
+
+**Tests** (EditMode):
+- **Storage choice.** In the editor, `SaveStorage.Create()` returns `PlayerPrefsStorage`. If the choice has a testable seam (for example "Web player, probe failed"), cover the fallback too.
+- **Volume patch storage.** The patch writes its JSON under `Switchboard.AudioPatch.v1` through an `ISaveStorage`, reads it back, and a broken or missing value gives the default patch.
+- **Web settings guard.** The committed Player settings have Gzip, Decompression Fallback and the `PROJECT:Operator` template; `Assets/WebGLTemplates/Operator/index.html` exists and contains the template variables the loader needs; the build list is `MainMenu`, `Final`.
+- **The `.jslib`** imports for Web only (`PluginImporter.GetCompatibleWithPlatform(BuildTarget.WebGL)`), and not for the editor.
+- All 503 existing tests still pass, also with the editor on the Web platform.
+
+**Checks (agent):**
+- **Editor:** compile, EditMode tests, and the usual 10 s Play Mode smoke run in `Final` and from `MainMenu` (Plan §5), with the editor on Web.
+- **Editor saves:** read `operator.save`, `operator.save.backup` and `Switchboard.AudioPatch.v1` from PlayerPrefs at the start, and write all three back exactly as found at the end (as 9a pass 3 did). Check them string for string.
+- **The build:** run `Tools/Switchboard/Build Web`. Report the build time, the total size and the biggest files.
+- **In a browser** (no Chrome extension is connected, so use headless Chrome):
+  - Serve `Builds/Web` with `python3 -m http.server 8000 --bind 127.0.0.1`, started in the background and stopped at the end. This server sends no compression headers, like itch, so it exercises the Decompression Fallback.
+  - Start Chrome (`/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`, v155) with `--headless=new`, `--remote-debugging-port` and a **throwaway `--user-data-dir` in the scratchpad**, never the lead's profile. If WebGL doesn't start headless, try `--use-angle=swiftshader --enable-unsafe-swiftshader`.
+  - Drive it with a small Node script (Node 26 is installed and has a built-in `WebSocket`, so no packages are needed) over the DevTools protocol: page console messages, `Runtime.evaluate` for `localStorage`, `Page.captureScreenshot`, and mouse or touch input. Put scripts and the profile in the scratchpad: `/private/tmp/claude-501/-Users-antonsplavnik-Documents-Programming-Unity-Projects-Ludumdare60/6bc3cb6f-8635-4cb2-a21b-1281c40e3288/scratchpad`.
+  - Check, with screenshots in `Temp/Captures/`:
+    1. The page loads at 1280×720 with no errors in the console, the canvas fills the window, and there's no footer or scrollbar (`step-09b-menu.png`). Without a save the menu shows New Game, Options, Credits.
+    2. New Game loads `Final`, and it runs (`step-09b-game.png`).
+    3. **Saves:** put a real save into `localStorage` (take the JSON from the editor's `operator.save`, or capture one), reload, press Continue: the money plaque shows that balance and the bought upgrades are owned (`step-09b-continue.png`). After 10 s, or after a hidden-page event, `operator.save` has changed and `operator.save.backup` holds the previous save.
+    4. **The hidden-page hook:** make the page hidden (for example by opening a second target, or `Page.setWebLifecycleState`; if the real state can't be changed headless, dispatch the event after overriding `document.visibilityState`) and check that a save was written synchronously.
+    5. **Volume patch:** a patch written to `localStorage` under `Switchboard.AudioPatch.v1` shows in Options after a reload (`step-09b-options.png`).
+    6. **Phone size:** 844×390 with touch emulation. The canvas fills the screen, and a tap on New Game works (`step-09b-phone.png`).
+  - Quit Chrome, stop the server and delete the throwaway profile at the end.
+- **Push** when the local checks pass: `~/bin/butler push Builds/Web llazypixell/operator:html5`, then `~/bin/butler status llazypixell/operator`. Put the build number in the report. butler is installed and logged in; `butler login` needs a real Terminal, so if the push says you're logged out, stop and report. Don't share or write down the Draft page's secret link.
+
+**Playtest script** (browser, after the lead set the itch page settings):
+1. **First run.** Open the Draft page and press "Run game". The game fills the frame, with no Unity footer. The menu shows New Game, Options, Credits. The first tap on a button makes its click sound.
+2. **Save and reload.** New Game, connect a few calls, buy something, then reload the page. Continue: the money and the upgrades are back.
+3. **Closed tab.** Close the tab, open the page again: Continue still has your progress.
+4. **New upload.** Ask the orchestrator to push a new build (or run `butler push Builds/Web llazypixell/operator:html5`), wait until itch shows it, and reload: your progress is still there.
+5. **Volume.** Change the volume patch in Options, reload: it's kept.
+6. **Fullscreen.** itch's fullscreen button fills the screen, and the game adapts.
+7. **Phone.** Open the page on a phone in landscape, tap Run game, then tap through the menu, pick up a cord and plug two jacks. Switch to another app for a minute, come back (or reload): the progress is kept.
+8. **Pause.** The pause button's Main Menu, then Continue, works as in the editor.
+
+**Out of scope:**
+- Mobile layout, aspect ratios, the "rotate your device" screen, texture compression and performance (Step 12)
+- the tutorial (10) and sound (11)
+- making the itch page public (the lead)
+- the menu leftovers in §8 (Step 12), unless the browser console shows errors from them
 
 ### Step 10: Tutorial (outline)
 - **Pacing is no longer part of this step:** since D51/D52 the designer sets the difficulty through the call queues in `Economy.json` (hand-written calls, one queue per board size), so the progress curves and type weights (D19, D37) are dropped.

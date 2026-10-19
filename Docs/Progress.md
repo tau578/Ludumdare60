@@ -17,7 +17,7 @@
 | 7. Hand-written calls and queues | done | ✅ 2026-10-18 (36 min) | ✅ 431/431 tests, scope clean | ✅ | 8e48320 |
 | 8. The new phone book | done | ✅ 2026-10-18 (20 min) | ✅ 445/445 tests, scope clean | ✅ | f82ed29 |
 | 9a. Saves, touch, menu, pause | done | ✅ 2026-10-19 (37 min + 21 min fix + 24 min pause + 15 min corner) | ✅ 503/503 tests, scope clean | ✅ | 580c610 |
-| 9b. First Web build on itch | not started | | | | |
+| 9b. First Web build on itch | playtesting | ✅ 2026-10-19 (37 min; cursor fixes discarded) | ✅ scope clean | | |
 | 10. Tutorial | not started | | | | |
 | 11. Sound and feel | not started | | | | |
 | 12. Mobile and Web polish | not started | | | | |
@@ -3037,3 +3037,501 @@ Follow-ups:
 - **Playtest (lead, 2026-10-19):** 9a is OK, including pass 3 (the pause button in the corner, Quit hidden on Web). Every deviation listed in the 9a reports and Design 5.12 is accepted. Step 9a is done.
 - **Web Build Support** for 6000.3.6f1 is installed (`PlaybackEngines/WebGLSupport`), and Unity was restarted. Step 9b is unblocked.
 
+### Step 9b prep (orchestrator, 2026-10-19)
+- **Pre-flight:**
+  - `git fetch`: up to date with origin (`e4002fe`); only the untracked `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta` (left alone, as in 9a).
+  - Unity connected (`Ludumdare60@67eac6d9bbf6b918`), idle, not in Play Mode, active scene `MainMenu`; console clean.
+  - EditMode 503/503 green; the run left no format-only re-saves.
+  - Web Build Support installed; the editor is still on the Mac platform. Player settings today: Brotli (0), no Decompression Fallback, the Default template, `productName` `ludumdare-60`.
+  - `~/bin/butler` v15.32.0 reaches `llazypixell/operator` (no channels yet).
+  - No Chrome extension is connected, so the agent checks the build in headless Chrome over the DevTools protocol with a throwaway profile (Node 26 has a built-in `WebSocket`).
+- **Brief:** the Plan's outline is now a full brief. The orchestrator's technical choices, for the lead to confirm at the playtest:
+  - a project Web template `Operator` (full-window canvas, no Unity footer, title "Operator!"), because the Default template's fixed 960×600 canvas and footer don't fit itch's frame
+  - `productName` and `companyName` unchanged, because the Mac editor's PlayerPrefs file is named after them
+  - the editor stays on the Web platform after the first build
+  - the volume patch keeps its key `Switchboard.AudioPatch.v1`
+  - a `visibilitychange`/`pagehide` hook that saves synchronously, because hidden tabs run no frames
+- **Launch:** one agent at high effort; it may push to the itch Draft page (D55).
+
+
+### Step 9b report: 2026-10-19
+Result: partial. The build, the browser saves and the local browser checks are done. **The itch push was refused:** "itch.io API error (400): Please verify your account's email address before uploading a build". The lead needs to verify the itch account's email (itch.io › Settings › Email addresses), then run `~/bin/butler push Builds/Web llazypixell/operator:html5` (the build in `Builds/Web` is ready) or ask for the push. `butler status llazypixell/operator` still shows no channel.
+
+Playable now: `Tools/Switchboard/Build Web` builds the game into `Builds/Web` (23.8 MB). Served locally, it fills the browser window with no Unity footer, shows New Game, Options, Credits (no Quit), and plays. In the browser, progress and the volume patch live in `localStorage`, so they survive a reload and a new upload, and the game saves the moment the page is hidden or closed.
+
+How to test (until the push works): build with the menu, then `cd Builds/Web && python3 -m http.server 8000` and open `http://localhost:8000`. After the push, use the Plan's playtest script. `Docs/WebBuild.md` explains building, butler, the itch page settings and where saves live.
+
+Created:
+- `Assets/Scripts/Game/Save/BrowserStorage.cs`, with two types:
+  - `BrowserStorage` (`ISaveStorage` over the `.jslib`). `IsAvailable()` probes `localStorage` by setting and removing a test key. A refused write or delete logs one warning per page load. Outside Web players it's inert: not available, reads null.
+  - `BrowserPageHidden`: `Register(Action)` and `Unregister(Action)`. It does nothing outside Web players.
+- `Assets/Scripts/Game/Save/BrowserStorage.jslib`:
+  - `localStorage` read, write and delete, and the probe, each in its own try/catch. A failure comes back as status 0.
+  - Returned strings use `_malloc` + `stringToUTF8`, as Unity 6's manual says; keys and values are read with `UTF8ToString`.
+  - `OperatorStorage_ClaimWarning(id)` keeps the "warn once per page load" flags in JavaScript.
+  - `OperatorPage_SetHiddenCallback`: listens for `visibilitychange` (only when the page becomes hidden) and `pagehide`, and calls the C# callback inside the event through `{{{ makeDynCall('v', 'cb') }}}`.
+  - Its importer is Web only: Unity's default for `.jslib`, so the `.meta` has no settings.
+- `Assets/Scripts/Game/Editor/WebBuild.cs`, the menu `Tools/Switchboard/Build Web`:
+  - applies the D26 settings (Gzip, Decompression Fallback, `PROJECT:Operator`)
+  - switches the editor to Web if needed
+  - deletes `Builds/Web` and builds the enabled build-list scenes as a release build
+  - logs one line with the time, the size and the butler command, or the build's errors
+- `Assets/WebGLTemplates/Operator/`, with metas:
+  - `index.html`, based on Unity 6's Default template, keeping its loader code, template variables and `#if` blocks
+  - `TemplateData/style.css`
+  - `TemplateData/webmemd-icon.png` (Unity's, used only by the diagnostics overlay)
+  - `thumbnail.png` (Unity's Minimal one)
+  - The template draws a canvas that fills the window and follows its size, with no footer, logo or fullscreen button.
+  - It has a dark background (`#15110d`), a plain cream-and-gold loading bar under the title "Operator!", no scrollbars, `touch-action: none` on the canvas, the viewport meta tag always on, the page title "Operator!", Unity's error and warning banner, and an empty favicon (no `/favicon.ico` 404 in the console).
+- `Assets/Tests/Game/Editor/WebBuildTests.cs` (14 tests, below).
+- `Docs/WebBuild.md`, the team guide.
+
+Changed:
+- `Assets/Scripts/Game/Save/SaveStorage.cs`: `Create()` returns `BrowserStorage` in Web players while the probe works. Otherwise it returns `PlayerPrefsStorage`, with one warning per page load. The editor and desktop builds always get `PlayerPrefsStorage`. The choice itself is the public seam `Choose(webPlayer, browserWorks, browser, warnFallback)`.
+- `Assets/Scripts/Game/Save/Autosave.cs`: `Bind` registers `SaveNow` with `BrowserPageHidden`; `Stop` (also called from `OnDestroy`) unregisters it. The summary comment now lists the hidden-page save.
+- `Assets/Scripts/Game/Save/PlayerPrefsStorage.cs`, `Assets/Scripts/Domain/Save/ISaveStorage.cs`: comments only.
+- `Assets/Scripts/UI/AudioVolumeSettings.cs`:
+  - It reads and writes its patch through `SaveStorage.Create()`, with the same key and the same JSON.
+  - New `Load(ISaveStorage)` returns a fresh `VolumePatchState`; new `Save(VolumePatchState, ISaveStorage)`.
+  - `SaveKey` is now public.
+  - It still reads at `SubsystemRegistration`. The browser check shows the `.jslib` works that early.
+- `ProjectSettings/ProjectSettings.asset`:
+  - `webGLTemplate` `APPLICATION:Default` → `PROJECT:Operator`
+  - `webGLCompressionFormat` 0 (Brotli) → 1 (Gzip)
+  - `webGLDecompressionFallback` 0 → 1
+  - `m_BuildTargetBatching` gained a WebGL entry (static and dynamic batching 0), which the platform switch wrote. Kept, as the brief says.
+  - `productName` and `companyName` are unchanged.
+
+Scene and prefab changes: none.
+
+Tests: 517/517 EditMode (503 before; 14 new in `WebBuildTests`), green both on the Mac platform and on Web:
+- `TheEditorSavesInPlayerPrefs`: `Create()` returns `PlayerPrefsStorage`, and `BrowserStorage.IsAvailable()` is false in the editor.
+- `Choose` cases:
+  - `DesktopNeverAsksTheBrowser`
+  - `AWebPlayerUsesTheBrowserWhileItsStorageWorks`
+  - `AWebPlayerWithBlockedStorageFallsBackToPlayerPrefsWithAWarning`
+- `TheVolumePatchIsStoredUnderItsKeyAndReadBack`: the exact JSON under `Switchboard.AudioPatch.v1`, then a round trip.
+- `AMissingOrBrokenPatchGivesTheDefault`, 5 cases: missing, empty, not JSON, version 2, two cables in one row.
+- `TheCommittedPlayerSettingsBuildGzipWithFallbackAndOurTemplate`, which also checks that threads are off.
+- `TheTemplateHasWhatTheLoaderNeeds`: the loader, data, framework and code variables, `createUnityInstance`, the banner, the viewport tag and the title, and no footer.
+- `TheBuildListIsMainMenuThenFinal`.
+- `TheBrowserPluginIsForWebPlayersOnly`: Web yes; editor, any platform, Mac and Windows no.
+
+Console: clean. The two Play Mode smoke runs logged only the engine's two "memoryless" lines. The console was cleared at the end.
+
+Screenshots (`Temp/Captures/`):
+- browser at 1280×720:
+  - `step-09b-menu.png`: New Game, Options, Credits
+  - `step-09b-game.png`: `Final` after New Game
+  - `step-09b-menu-with-save.png`: Continue, New Game, Options, Credits
+  - `step-09b-continue.png`: $71.00, the 4×4 board, and the shop offering `board_2` ($25) and `income_2` ($20)
+  - `step-09b-options.png`: the planted patch: Master 25, Music mute, SFX 100
+- browser at 844×390 with touch:
+  - `step-09b-phone-menu.png`
+  - `step-09b-phone.png`: the game after a tap on New Game
+- editor: `step-09b.png`, the smoke run in `Final` reached from `MainMenu`
+
+The build:
+- First run of the menu (2026-10-19, 15:10 to 15:20): about 10 minutes, about 5 of them the platform switch and reimport. Unity's own figure for the build itself is 5.0 min.
+- A second build, after a template change, took 0.3 min.
+- Total size 23.8 MB:
+  - `Build/Web.data.unityweb` 12.5 MB
+  - `Build/Web.wasm.unityweb` 12.4 MB
+  - `Build/Web.framework.js.unityweb` 90 KB
+  - `Build/Web.loader.js` 48 KB
+  - `index.html` 3 KB, `TemplateData` 3 KB
+
+Browser checks: headless Chrome 155 with SwiftShader WebGL, a throwaway profile in the scratchpad, and Node scripts over the DevTools protocol, against `python3 -m http.server 8000 --bind 127.0.0.1` (no compression headers, like itch). All six checks of the brief pass, rerun in full on the final build:
+1. **Loading.** The page loads in 1.3–2.4 s and the title is "Operator!". The canvas is 1280×720 at (0, 0), with a render size of 1280×720, a scroll size equal to the window, and no footer. The menu shows New Game, Options and Credits, without Quit.
+   - The canvas also follows a window resize: the real headless viewport of 1280×633 re-laid out the menu.
+2. **New Game** loads `Final`, and it runs.
+3. **Saves:**
+   - I planted a save in `localStorage` (`cents` 7100, `income_1` + `board_1`) and reloaded. The menu showed Continue first. Continue gave $71.00 and the 4×4 board, and the shop offered the next entries.
+   - 12 s later `operator.save` had changed (`secondsPlayed` 300 → 309.9), and `operator.save.backup` held the planted save string for string.
+4. **Hidden-page hook:**
+   - **Synthetic events.** I overrode `document.visibilityState` to "hidden" and dispatched `visibilitychange`. The save changed inside that same synchronous `Runtime.evaluate`, and the backup now held the previous save. A dispatched `pagehide` did the same. A `visibilitychange` while the page was visible didn't save.
+   - **Real hidden state.** Headless Chrome does hide the page when a second tab is opened in front (`Target.createTarget`): `document.visibilityState` became "hidden", a new save was written, and the backup held the previous one.
+   - Reloading a running game also writes a save, through `pagehide`.
+5. **Volume patch.** The patch `{"version":1,"rows":[0,1,2],"sockets":[0,4,3]}` was written to `localStorage`. After a reload, Options showed it. So the `.jslib` call at `SubsystemRegistration` works.
+6. **Phone size.** At 844×390 (mobile emulation, DPR 2, touch on), the canvas is 844×390 and renders at 1688×780, with no scroll. A touch tap (`Input.dispatchTouchEvent`) on New Game started the game.
+- **Browser console:**
+  - No errors or exceptions from our code.
+  - The remaining lines come from Unity itself:
+    - "You can reduce startup time if you configure your web server to add Content-Encoding: gzip": expected with the Decompression Fallback
+    - "ERROR: Shader Hidden/CoreSRP/CoreCopy" and "Hidden/Universal/HDRDebugView shader is not supported on this GPU", logged at log level, not as errors: URP's debug shaders on WebGL
+    - one "Trying to get length of sound which is not loaded yet", not from our scripts (see Follow-ups)
+    - Chrome's "GPU stall due to ReadPixels" performance notes from SwiftShader
+  - The first build's only console error, the browser's automatic `/favicon.ico` 404, is gone since the template's empty icon.
+- **Audio unlock:** no press-start panel was added. Unity logged "Audio context resumed after 0.303 seconds". Headless Chrome can't tell whether sound is heard, so the lead's step 1 (the first tap's click sound) is the real check.
+- Chrome and the server are stopped, and the profile is deleted. The scripts stay in the scratchpad.
+
+Housekeeping:
+- **PlayerPrefs:** at the start, `operator.save` and `operator.save.backup` were absent, and `Switchboard.AudioPatch.v1` was `{"version":1,"rows":[0,1,2],"sockets":[3,1,3]}`. All three were put back exactly as found (the save keys deleted, the patch rewritten) and checked string for string.
+- **Discarded build and format re-saves**, after each of the two builds:
+  - `Assets/Settings/UniversalRP.asset`: URP's shader-stripping prefilter fields, rewritten at build time
+  - `Assets/UniversalRenderPipelineGlobalSettings.asset`: `m_RuntimeSettings` filled at build time
+  - `ProjectSettings/TimeManager.asset`
+  - the two dynamic TMP fonts
+  - the `preloadedAssets` entry the Input System writes into `ProjectSettings.asset` during a build: the editor's in-memory list stays empty, so the file line is a leftover; it was put back to `[]`
+  - `SampleScene.unity` was untouched.
+- `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta` were left untouched.
+- **Editor:**
+  - on the Web platform (WebGL), as the brief decided
+  - not in Play Mode, `timeScale` 1
+  - no callbacks or SessionState keys left
+  - `Final.unity` open, active and not dirty
+  - console cleared
+- **Git:** nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+1. **The itch push didn't happen** (account email unverified, see the top). Everything before it is done.
+2. **The hidden-page callback** is a function pointer (`makeDynCall` plus a `[MonoPInvokeCallback]` static method), not `SendMessage`, so no GameObject name is involved. Its one static field, `BrowserPageHidden.handler` (the bound `Autosave.SaveNow`), is the documented exception. The "warn once" flags live in the `.jslib`, so C# has no other statics with state.
+3. **`BrowserStorage` compiles everywhere.** Its imports exist only under `UNITY_WEBGL && !UNITY_EDITOR`; elsewhere the same private methods return "unavailable". The editor compiles the class, and the tests can reference it.
+4. **Unity's Default template's fullscreen button and footer are gone,** as the brief says. Its `alert()` on a load failure is replaced by the error banner, which is readable on a phone and doesn't block.
+5. **Design 5.12's example key** `switchboard.save` isn't used. The keys stay `operator.save` and `operator.save.backup` (D55, as the brief says).
+
+Follow-ups:
+- **Lead:**
+  - verify the itch account's email, then push (or ask for the push)
+  - set the itch page settings in `Docs/WebBuild.md`
+  - run the Plan's playtest script, including the first-tap sound and a real phone
+- **Every build rewrites three files** (the URP asset, the URP global settings, and `preloadedAssets` in `ProjectSettings.asset`), and they have to be discarded before a commit (`Docs/WebBuild.md` says how). A later step could make `WebBuild` restore them itself, for example by re-saving `PlayerSettings` after the build.
+- **Plan §4 lessons:**
+  - Start a build from `execute_code` with `EditorApplication.delayCall` plus `ExecuteMenuItem`, and watch `~/Library/Logs/Unity/Editor.log` for "Build Web:". With Unity in the background, the second build's delayCall started late: about 7 minutes of wall time for a 0.3 min build.
+  - Headless Chrome needs `Emulation.setDeviceMetricsOverride` in every CDP session: the override ends when the session closes, and the real headless viewport is 1280×633.
+  - Clear `localStorage` from a same-origin static page (for example `/TemplateData/style.css`). Clearing it on the game page and reloading lets `pagehide` write a fresh save.
+  - In Play Mode with Unity in the background, the `Step()` callback runs only when the editor ticks. Have it write a file when done and wait on that file.
+- **"Trying to get length of sound which is not loaded yet"** appears once on the menu in the browser. It isn't from our scripts. The likely source is the menu package's `Music_randomizer`, whose two clips were never committed (Plan §8, "Menu leftovers").
+- At 844×390 the board scene shows its side margins (brown bars left and right). That's Step 12's layout work.
+
+#### Step 9b verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 517/517 green (503 before, 14 new), with the editor on the Web platform. Console clean. My run left no format-only re-saves.
+- **Scope:** every changed file was named in the brief: `SaveStorage`, `Autosave`, `AudioVolumeSettings`, two comment-only files, `ProjectSettings.asset`, plus the new `BrowserStorage` (`.cs` and `.jslib`), `WebBuild`, the `Operator` template, `WebBuildTests` and `Docs/WebBuild.md`. No scene or prefab changed, and nothing is staged.
+  - `ProjectSettings.asset`: Gzip, Decompression Fallback, `PROJECT:Operator`, and a WebGL batching entry written by the platform switch. `productName` is unchanged.
+- **Build:** `Builds/Web` holds `index.html`, `TemplateData/` and four files in `Build/`, 23.8 MB in all. The `.unityweb` names are what Unity gives Gzip files when the fallback is on.
+- **Screenshots checked:**
+  - `step-09b-menu.png`: the browser menu at 1280×720 fills the page: New Game, Options, Credits, and no footer.
+  - `step-09b-continue.png`: a save planted in `localStorage` came back as $71.00 on a 4×4 board.
+  - `step-09b-phone.png`: 844×390 with touch fills the screen. The brown side bars are Step 12's layout work.
+- **Code skim:**
+  - The `.jslib` wraps every `localStorage` call in try/catch and keeps its warn-once flags in JavaScript.
+  - The hidden-page hook calls `Autosave.SaveNow` inside the `visibilitychange` and `pagehide` events, through one static callback (the documented exception).
+  - `SaveStorage.Choose` is the tested seam.
+  - The volume patch keeps its key and JSON.
+- **Blocked:** itch refused the upload until the account's email address is verified. The lead does that, then runs the push or asks for it.
+- **Build re-saves:** every build rewrites the URP asset, the URP global settings and `preloadedAssets` in `ProjectSettings.asset`. `Docs/WebBuild.md` says to undo them before a commit.
+- **Pushed (orchestrator, on the lead's go-ahead after the email check):** `butler push Builds/Web llazypixell/operator:html5` uploaded 23.81 MiB. `butler status` shows the `html5` channel, upload #19875492, build #2162093, version 1, processed. The lead sets the itch page settings next.
+
+#### Step 9b playtest, round 1 (lead, 2026-10-19), fix requested
+- On itch it "works well so far". One problem: **the game's hand cursor and the system pointer show at the same time** in the browser.
+- **Orchestrator's notes for the fix:**
+  - Unity Web's `Cursor.visible` sets the canvas's inline `style.cursor` to `none` or `default` (`_JS_Cursor_SetShow` in the framework). The template's CSS sets no cursor, and the Player settings have no default cursor.
+  - Three components write `Cursor.visible`: `CableInputController` (every `Update`, and `HidePointers`), `MenuHandCursor` (every `LateUpdate`) and `VolumeCablePanel` (`LateUpdate`).
+- **Art merge before the fix:** merged Mia's `3ca8bc9` ("upd8 caller pngs", 13 caller PNGs, no metas). `caller-02.png` is now 190×190, but its slice is 190×191, so Unity drops the sprite (Plan §8). The other slices fit inside their PNGs; `police.png` is 191×191 with a 190×186 slice. Fixed in the same pass.
+- Sent to a fix agent; it may push the fixed build to the Draft page (D55).
+
+
+### Step 9b fix report: 2026-10-19
+Result: done. The fixed build is on the itch Draft page: `html5` build **#2162255** (version 2, processed).
+
+Playable now: in the browser the game's hand is the only pointer wherever it is drawn. When the mouse leaves the game (onto itch's page around the game frame), the hand disappears with it instead of staying frozen at the edge, and it comes back on the first move over the game. `caller-02` shows again.
+
+**The cause (measured in headless Chrome before changing code):**
+- I served the 9b build with the framework's `_JS_Cursor_SetShow` patched on the fly (CDP `Fetch`) to log every call, plus a MutationObserver on the canvas's `style`.
+- Inside the game everything was already right. On the menu, the board, over a stored cord, with a cord held and over the open book, the canvas cursor was `none` whenever the hand was drawn. It was `default` on the pause page, where no hand is drawn.
+- Unity only calls `_JS_Cursor_SetShow` when `Cursor.visible` changes. Writes in between don't reach the page, and that is harmless.
+- **The real cause: the browser sends no mouse moves once the pointer leaves the page.** itch shows the game in an iframe inside a bigger page. I rebuilt that locally: a host page on another port with the game in a 960×540 iframe.
+  - When the mouse left the frame, Unity kept the last position.
+  - `Application.isFocused` stayed true, because the iframe keeps focus after a click.
+  - So the hand stayed drawn at the frame's edge while the system pointer moved on over the page: both visible at once (`step-09b-fix-iframe-menu-left.png`, `step-09b-fix-iframe-game-left.png`).
+  - In the editor this can't happen, because the Game view keeps reporting positions outside its area.
+- Ruled out:
+  - **Focus differences:** Unity starts with `isFocused` true even before the iframe gets focus, and the hand already hid the pointer then.
+  - **Stale captures:** `cursorWasVisible` was `true` after MainMenu → Final, and the pause page showed the pointer.
+  - **Unity's cache:** it skips repeated values, but every change reached the canvas.
+  - **Chrome repaint:** never more than one value per frame reached the browser's style.
+- **A second, smaller finding:** in the pause menu's Options, `CableInputController` (suspended) and `VolumeCablePanel` both wrote `Cursor.visible` every frame, which flipped the canvas `default` → `none` about 60 times a second. The last writer won only because of the update order (Chrome showed `none`). In the other order, the volume hand and the system pointer would both show.
+
+**The fix (one rule):** a mouse that has left the page counts like a lifted finger (D28): no hover, so no hand. Only a held cord stays where it was last put. That's the same as touch between taps, and in the editor nothing changes.
+- **Who owns `Cursor.visible`:**
+  - unchanged: each component that draws a hand hides the system pointer while it draws, and gives it back when it stops
+  - new: while the pause menu is open, the cord input leaves the cursor alone, because it hid its hand once when pausing; the pause panel's volume patch owns the cursor
+
+Created:
+- `Assets/Scripts/UI/BrowserPointer.jslib`: `OperatorPointer_IsOverPage()`.
+  - On its first call it adds capture-phase, passive listeners on `window`: `mousemove` and `mouseover` set "over", and `mouseout` with no `relatedTarget` (leaving the page itself) sets "outside".
+  - The state lives on `Module.operatorPointer`. It starts "outside", so no hand is drawn at a stale position before the first move.
+  - Its importer is Web only (Unity's default for `.jslib`).
+- `Assets/Scripts/UI/BrowserPointer.cs` (`Switchboard.UI`, static, no state):
+  - `IsOverPage` calls the `.jslib` under `UNITY_WEBGL && !UNITY_EDITOR`; elsewhere it's always true.
+  - `Hovers(bool touch, bool fingerDown, bool overPage)` is the rule.
+  - `Hovers(Pointer)` is the shortcut that `MenuHandCursor` uses.
+
+Changed:
+- `Assets/Scripts/UI/MenuHandCursor.cs`: the touch-only "no finger, no hand" check is now `BrowserPointer.Hovers(pointer)`.
+- `Assets/Scripts/UI/VolumeCablePanel.cs`: `hover` comes from `BrowserPointer.Hovers(...)`.
+- `Assets/Scripts/UI/CableInputController.cs`:
+  - `Update` returns at once while suspended, instead of calling `HidePointers` every frame. The `Suspended` setter still hides everything once.
+  - `hover` comes from `BrowserPointer.Hovers(...)`.
+  - `ProcessPointer` (used by tests and checks) is unchanged.
+- `Assets/Sprites/callers/caller-02.png.meta`: the slice is now 190×190, from 190×191, to fit the PNG.
+  - All 13 sprites in `Assets/Sprites/callers/` now load with `AssetDatabase.LoadAssetAtPath<Sprite>`; `caller-02` was null before.
+  - The other slices already fit and weren't touched: `caller-01`, `-11` and `-12` are 190×191 in 191×191 or 190×191 PNGs.
+  - **`police.png`** is 191×191 with a 190×186 slice. It loads, but the slice starts at the bottom-left corner, so the top 5 pixel rows and the right column are cut off. Left as it is (the brief: don't change slices that fit); Mia or the lead can decide whether the slice should be the full 191×191.
+- `Assets/Tests/Game/Editor/WebBuildTests.cs`: 8 new tests, listed under Tests.
+
+Scene and prefab changes: none.
+
+Tests: 525/525 EditMode (517 before; new below).
+- `ThePointerHoversOnlyOverThePage`, 6 cases:
+  - `AMouseOverThePageHovers`
+  - `AMouseOverThePageHoversWhilePressed`
+  - `AMouseOffThePageDoesNotHover`
+  - `AMouseOffThePageDoesNotHoverWhilePressed`
+  - `AFingerDownHovers`
+  - `ALiftedFingerDoesNotHover`
+- `TheEditorPointerIsAlwaysOverTheGame`
+- `TheBrowserPluginIsForWebPlayersOnly` now runs for both `.jslib` files. That's one new case; it was one test before.
+
+Console: clean. The Play Mode smoke run (11 s of game time in `Final`, stepped) logged only the engine's two "memoryless" lines. The console was cleared at the end.
+
+Screenshot: `Temp/Captures/step-09b-fix.png`, the editor smoke run. Browser shots in `Temp/Captures/`:
+- before the fix, with the iframe host:
+  - `step-09b-fix-iframe-menu-left.png`
+  - `step-09b-fix-iframe-game-left.png`: the hand frozen in the game while the mouse is outside
+- after the fix, with the iframe host:
+  - `step-09b-fix-after-iframe-menu-left.png`, `-game-left.png`: no hand once the mouse is outside
+  - `-game-back.png`: the hand back
+  - `-held-left.png`: a held cord stays put
+- after the fix, at 1280×720:
+  - `step-09b-fix-menu.png`
+  - `-continue.png`: a planted save, $71.00, the 4×4 board
+  - `-callers.png`: portraits in the caller column
+  - `-held-cord.png`
+  - `-book.png`: the hand over the open book
+  - `-paused.png`
+  - `-pause-options.png`
+  - `-phone-menu.png`, `-phone.png`: 844×390 touch, a tap on New Game starts the game
+
+Build and browser checks (`Tools/Switchboard/Build Web`: 2.7 min, 23.8 MB; `_OperatorPointer_IsOverPage` is in the framework):
+- **Loading:** 1.3 s, title "Operator!". Browser console on load plus New Game:
+  - Unity's four "ERROR: Shader" log lines (URP debug shaders, as in 9b)
+  - Chrome's "The AudioContext was not allowed to start" warnings until the first click, then "Audio context resumed"
+  - No errors or exceptions from our code.
+- **Canvas cursor `none` wherever the hand shows** (call log after the fix):
+  - menu over Continue: `none`
+  - board: `none`
+  - over a stored cord: `none`
+  - holding a cord over the board (the plug is the pointer): `none`
+  - over the open book: `none`
+  - pause page, no hand: `default`
+  - pause Options, over the patch: `none`; outside the patch: `default`
+  - Now a single write per change; before the fix there were about 35 writes a second each way.
+- **iframe host after the fix:**
+  - mouse never in the game: `default`, no hand
+  - mouse over the menu: `none` plus the hand
+  - mouse out to the host page: no hand
+  - in the game the same; back inside, the hand returns on the first move
+  - with a cord held and the mouse out, the plug stays where it was, as with touch
+- **Planted save:** Continue showed $71.00, the 4×4 board and the shop's next offers.
+- **Caller portraits:** they show in the caller column.
+- **Phone, 844×390 with touch:** the canvas is 844×390 and renders at 1688×780; a tap on New Game starts the game.
+
+itch:
+- `~/bin/butler push Builds/Web llazypixell/operator:html5` uploaded 23.82 MiB as a patch from #2162093.
+- `butler status llazypixell/operator` shows `html5`, upload #19875492, **build #2162255 (version 2), processed (✓)**.
+- No push anywhere else.
+
+Housekeeping:
+- **PlayerPrefs:**
+  - at the start: `operator.save` and `operator.save.backup` absent, `Switchboard.AudioPatch.v1` = `{"version":1,"rows":[0,1,2],"sockets":[3,1,3]}`
+  - at the end, put back exactly as found and checked
+- **Discarded build and format re-saves:**
+  - `Assets/Settings/UniversalRP.asset` and `Assets/UniversalRenderPipelineGlobalSettings.asset`
+  - `ProjectSettings/TimeManager.asset`
+  - the two dynamic TMP fonts
+  - the build's `preloadedAssets` entry, put back to `[]`
+- **Kept as found:** the 9b `ProjectSettings.asset` changes (Gzip, fallback, `PROJECT:Operator`, the WebGL batching entry) and the other uncommitted 9b files. `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta` were left alone.
+- **Editor:**
+  - Web platform, idle, not in Play Mode, `timeScale` 1
+  - `Final.unity` active and not dirty
+  - no callbacks left
+  - console cleared
+- **Browser:**
+  - The server and Chrome are stopped, and the Chrome profile is deleted.
+  - The scripts stay in the scratchpad: `fix-probe.mjs`, which serves the logging framework; `fix-verify.mjs`; `fix-iframe*.mjs`; and `host/index.html`, the iframe host, served on port 8001.
+- **Git:** nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+- **The fix adds a small `.jslib` and C# pair, not just a change to who writes `Cursor.visible`.** The cause was missing mouse events outside the page, which no `Cursor.visible` ordering can fix.
+- **`CableInputController` no longer writes the cursor every frame while paused.** That's a small behaviour change: if the window loses focus while paused, the next `HidePointers` happens through `OnApplicationFocus`, as before.
+
+Follow-ups:
+- **Lead:** play the Draft page (build #2162255).
+  1. Move the mouse in and out of the game frame on the menu, the board and the open book: the hand should leave with the mouse.
+  2. Over the pause Options patch there should be one pointer.
+  3. `caller-02`'s portrait is back.
+- `police.png`'s 190×186 slice cuts the top 5 rows off the portrait. Decide whether to make it 191×191.
+- A held cord stays drawn where the mouse left the page, as with touch. If that looks odd on itch, a later step could hide the plug too while the mouse is outside.
+- Plan §4 lessons:
+  - To see what Unity sends to the page, serve a patched framework through CDP `Fetch.fulfillRequest`. Headless Chrome 155 exposes no `style.cursor` setter to hook.
+  - itch's iframe can be imitated with a host page on a second local port.
+  - `Builds/Web` is deleted and recreated by every build, so restart `python3 -m http.server` afterwards: its working folder is gone.
+
+#### Step 9b fix verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 525/525 green (517 before, 8 new). Console clean apart from one MCP bridge line. No re-saves are left.
+- **Scope:**
+  - new: `BrowserPointer.cs` and `BrowserPointer.jslib`
+  - changed: `CableInputController`, `MenuHandCursor`, `VolumeCablePanel` (hover goes through `BrowserPointer`; the cord input stops writing the cursor while paused)
+  - `caller-02.png.meta` (slice height 191 → 190), `WebBuildTests`
+  - No scene or prefab changed.
+- **Screenshots checked:**
+  - `step-09b-fix-iframe-game-left.png`: before the fix, with the mouse moved out of an itch-like frame, the hand stays frozen on the board.
+  - `step-09b-fix-after-iframe-game-left.png`: after the fix, the hand is gone, and the caller portraits show.
+- **The cause:** the hand was hidden correctly while the mouse was over the game. But a browser sends no mouse moves once the pointer leaves the page (itch's iframe), so the hand stayed drawn at the edge next to the system pointer. A mouse off the page now counts like a lifted finger (D28).
+- **On itch:** `html5` build #2162255 (version 2), processed.
+- **Open:** whether `police.png` (191×191) should use its full size instead of a 190×186 slice (lead or Mia).
+
+#### Step 9b playtest, round 2 (lead, 2026-10-19): the cursor still flickers in Arc
+- **The lead's report on build #2162255:** "nothing changed". In Arc (a Chromium browser on macOS), the system pointer flickers next to the game's hand all the time: in the menu, in Options and in the game. It shows and hides on every one-pixel move.
+- **No project setting hides the pointer.** Player Settings has only Default Cursor (an image the system pointer becomes) and Cursor Hotspot, both empty here.
+- **Measured in the lead's Arc** (`localhost:8000`, in the game, 10 s of mouse moves, with a console snippet that only watched):
+  - the canvas's `style.cursor` changed once, to `none`, and stayed `none`
+  - 653 `pointermove` events, all `mouse`, all on `unity-canvas`
+  - no mouse-out from the page, no blur, DPR 1
+- **Conclusion:** our scripts hold the pointer hidden steadily; the browser shows a hidden pointer anyway. Unity's framework writes the canvas cursor only in `_JS_Cursor_SetShow` and `_JS_Cursor_SetImage`.
+- **Next:** check Chrome and Safari, then decide. The orchestrator recommends making the system pointer the hand (Default Cursor and `Cursor.SetCursor`) instead of hiding it.
+- **Other browsers (lead):** Safari is fine; Chrome flickers like Arc. It's a Chromium-on-macOS problem with a hidden (`cursor: none`) pointer, so it must be fixed: Chrome is the most common browser.
+- **Before choosing a fix:** the lead tries a transparent 1×1 cursor image instead of `none` in Chrome's console, with no rebuild. If the flicker stops, the fix is to hide the pointer with a transparent `Cursor.SetCursor` image and keep the drawn hand; otherwise, option A (the system pointer becomes the hand).
+- **Test result (lead, Chrome):** with the canvas cursor set to a transparent 1×1 PNG (`url(data:image/png…) 0 0, auto`), the flicker stopped, and only the game's hand shows.
+- **Fix decided:** on Web, the system pointer is hidden with that transparent image instead of `Cursor.visible = false` (`cursor: none`). The drawn hand stays as it is. Sent to a fix agent (pass 2); it may push to the Draft page (D55).
+
+
+
+### Step 9b fix pass 2 report: 2026-10-19
+Result: done. The build is on the itch Draft page: `html5` build **#2162638** (version 3, processed).
+
+Playable now: in Web players the system pointer is hidden with a transparent 1×1 image (the CSS form the lead tested in Chrome) instead of Unity's `cursor: none`, so Chrome and Arc on macOS should show only the game's drawn hand. The hand's art and size are unchanged. **Headless Chrome can't show the OS pointer**, so the real look (no flicker in Chrome and Arc, Safari still fine) is the lead's check.
+
+How to test: open the Draft page in Chrome or Arc on the Mac and move the mouse slowly over the menu, Options, the board, the open book and the pause Options patch. Only the drawn hand should show, with no system arrow flashing next to it. On the pause page (no hand) the normal arrow shows. Moving the mouse out of the game frame shows the normal arrow outside, and the hand comes back on the first move inside.
+
+Changed:
+- `Assets/Scripts/UI/BrowserPointer.cs`: new `SystemPointerVisible` (get and set), the one switch for the system pointer.
+  - Web players: calls the `.jslib`.
+  - Editor and desktop builds: plain `Cursor.visible`, as before.
+  - It is the only file in `Assets/` that touches `Cursor.visible`. It doesn't use `Cursor.SetCursor`.
+- `Assets/Scripts/UI/BrowserPointer.jslib`: two new functions next to `OperatorPointer_IsOverPage`.
+  - `OperatorPointer_SetSystemShown(shown)`:
+    - hidden: the canvas `style.cursor` becomes exactly `url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=) 0 0, auto`
+    - shown: `default`, which is what Unity's own `Cursor.visible = true` writes
+    - It writes only when the value changes. It also rewrites if the canvas no longer holds what it last wrote, because Unity's player writes `default` twice while starting up (measured), and a stale cache would otherwise leave the arrow showing next to the hand.
+  - `OperatorPointer_IsSystemShown()`: the state last set (shown until the first hide).
+  - The file has no `"none"` value. Its importer is still Web only.
+- `Assets/Scripts/UI/CableInputController.cs`, `MenuHandCursor.cs`, `VolumeCablePanel.cs`: every show, hide and capture (`cursorWasVisible`, `originalVisible`, `originalCursorVisible`) goes through `BrowserPointer.SystemPointerVisible`.
+  - The logic is the same. Two lines are rewritten from `a || b ? false : original` to the equivalent `!a && !b && original`.
+  - The first fix's rules stay: a mouse off the page counts as no hover, and the cord input leaves the cursor alone while paused.
+- `Assets/Tests/Game/Editor/WebBuildTests.cs`: 6 new tests (below).
+- **Grep of `Assets/`** (the menu package under `Assets/Tools/` included): there are no other `Cursor.visible`, `Cursor.SetCursor` or `Cursor.lockState` writes. The only cursor-related hits are `m_CursorLockBehavior: 0` in `Final.unity` and the menu package's `Pause.prefab` and `StartMenu.prefab`. That is a serialized setting of the Input System's UI module (lock behaviour), not a visibility write, so it was left alone.
+
+Created: none (the scratchpad scripts below aside).
+
+Scene and prefab changes: none.
+
+Tests: 531/531 EditMode (525 before), with the editor on Web. New:
+- `OutsideWebPlayersTheSystemPointerIsCursorVisible`: setting it changes `Cursor.visible`, and reading it follows `Cursor.visible`.
+- `OnlyBrowserPointerTouchesCursorVisible`: no `.cs` under `Assets/` outside `BrowserPointer.cs` (tests excluded) contains `Cursor.visible`.
+- `TheHandsShowAndHideThePointerThroughBrowserPointer`, 3 cases (`CableInputController`, `MenuHandCursor`, `VolumeCablePanel`): each captures and sets the pointer through `BrowserPointer.SystemPointerVisible`, and none uses `Cursor.SetCursor`.
+- `TheBrowserHidesThePointerWithATransparentImage`: the `.jslib` holds the exact transparent-image value and `'default'`, and no `'none'` or `"none"`.
+- "The `.jslib` is for Web only" was already covered by `TheBrowserPluginIsForWebPlayersOnly` (both `.jslib` files) and still passes.
+
+Console: clean. The Play Mode smoke run (11 s of game time in `Final`, stepped) logged only the engine's two "memoryless" lines. The console was cleared at the end.
+
+Screenshot: `Temp/Captures/step-09b-fix2.png` (the editor smoke run). Browser shots, all in `Temp/Captures/`:
+- `step-09b-fix2-menu.png`, `-menu-options.png`
+- `-continue.png`: a planted save, $71.00, the 4×4 board
+- `-held-cord.png`, `-book.png`, `-paused.png`, `-pause-options.png`
+- `-iframe-game.png`: the game in an itch-like iframe
+
+The build: `Tools/Switchboard/Build Web` ran twice, at 2.0 min and 1.9 min, 23.8 MB each. The second build carries the "rewrite if overwritten" guard. `_OperatorPointer_SetSystemShown` is in the framework.
+
+Browser checks (headless Chrome 155, the second build, `python3 -m http.server`):
+- **Method:**
+  - At each spot the mouse settles, then moves 1 px at a time 120 times over about 2 s.
+  - A MutationObserver on the canvas `style` counts every change.
+  - The framework is served with `_JS_Cursor_SetShow` patched to log calls.
+- **Results** (`fix2-verify.mjs`, 12/12 OK):
+  - **Startup:** before any mouse move the canvas is `default`, from Unity's own two `_JS_Cursor_SetShow(1)` calls at startup. After that, Unity made no cursor calls at all.
+  - **Transparent image wherever the hand is drawn:**
+    - the menu over Continue and over Options, and the menu's empty area
+    - the menu's Options, over the patch and outside it (the menu hand covers both)
+    - the board, over a stored cord, holding a cord, and over the open book
+    - the pause Options patch
+  - **`default` where no hand is drawn:** the pause page, and the pause Options outside the patch.
+  - **No flips while moving:** 0 changes during the 120 moves at every spot, and `none` was never seen. Each change happened once, on arrival: the hide on the first move, the scene change, opening a panel.
+- **iframe host** (the game at 960×540 inside a page on a second port, like itch; `fix2-iframe.mjs`, 6/6 OK):
+  - `default` before the mouse enters
+  - the transparent image over the menu
+  - `default` once the mouse leaves to the host page
+  - the same in the game, and back to the transparent image on the first move inside
+- **Planted save:** Continue showed $71.00 and the 4×4 board, and the shop offered the next entries. After the run, `operator.save` had moved on (`secondsPlayed` 300 → 355; a $2 fine from a missed emergency).
+- **Browser console:**
+  - Unity's usual "ERROR: Shader" log lines (URP debug shaders), and Chrome's "AudioContext was not allowed to start" warnings before the first click. No errors or exceptions from the game.
+  - One `MutationObserver` TypeError and one `/favicon.ico` 404 came from the check itself: the probe's hook runs on the static `style.css` page used to clear `localStorage`, which has no canvas or icon. They are not in the game page.
+- **Not checkable headless:** whether the OS pointer is actually hidden on screen. The lead does the final look in Chrome, Arc and Safari.
+
+itch:
+- `~/bin/butler push Builds/Web llazypixell/operator:html5` uploaded 23.82 MiB as a patch from #2162255.
+- `butler status llazypixell/operator` shows `html5`, upload #19875492, **build #2162638 (version 3), processed (✓)**.
+- No push anywhere else.
+
+Housekeeping:
+- **PlayerPrefs:** at the start, `operator.save` and `operator.save.backup` were absent, and `Switchboard.AudioPatch.v1` = `{"version":1,"rows":[0,1,2],"sockets":[3,1,3]}`. At the end they were put back exactly as found and checked.
+- **Discarded after each build:**
+  - `Assets/Settings/UniversalRP.asset` and `Assets/UniversalRenderPipelineGlobalSettings.asset`
+  - `ProjectSettings/TimeManager.asset`
+  - the two dynamic TMP fonts
+  - the `preloadedAssets` entry, put back to `[]`
+- **Kept as found:** the 9b `ProjectSettings.asset` changes and the other uncommitted 9b and first-fix files. `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta` were left alone. `SampleScene.unity` was untouched.
+- **Editor:**
+  - Web platform, idle, not in Play Mode, `timeScale` 1
+  - `Final.unity` active and not dirty
+  - no callbacks left
+  - console cleared
+- **Browser:**
+  - The servers (8000, 8001) and Chrome are stopped, and the profile is deleted.
+  - The new scripts stay in the scratchpad: `fix2-verify.mjs`, `fix2-iframe.mjs` and `fix2-startup.mjs` (the startup and blur/focus probe).
+- **Git:** nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+- **The `.jslib` also rewrites when the canvas was overwritten,** not only when the requested state changes. Unity's player writes `default` twice while starting up, so a pure "on change" cache could leave the arrow showing until the next state change. It still never writes the same value twice in a row.
+
+Follow-ups:
+- **Lead:**
+  - Play build #2162638 in Chrome and Arc on macOS: only the drawn hand should show, with no flicker, on the menu, in Options, on the board, over the open book and over the pause Options patch.
+  - Check that Safari still behaves.
+- **Plan §4 lesson:** Unity Web's `Cursor.visible = false` writes `cursor: none`, which Chromium on macOS doesn't keep hidden. Hide the pointer through `BrowserPointer.SystemPointerVisible` (a transparent image) and never write `Cursor.visible` directly; `OnlyBrowserPointerTouchesCursorVisible` guards it.
+- Still open from the first fix: `police.png`'s 190×186 slice, and whether a held cord should hide while the mouse is outside the frame.
+
+#### Step 9b fix pass 2 verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 531/531 green (525 before, 6 new). Console clean, and no re-saves are left.
+- **Scope:** `BrowserPointer.cs`/`.jslib` (`SystemPointerVisible`, `OperatorPointer_SetSystemShown`), plus `CableInputController`, `MenuHandCursor`, `VolumeCablePanel` and `WebBuildTests`. No scene or prefab changed, and nothing is staged.
+- **Code skim:**
+  - `BrowserPointer` is the only file outside the tests that touches `Cursor.visible`.
+  - The `.jslib` hides the pointer with exactly the transparent PNG cursor the lead tested, and never writes `none`.
+  - It rewrites only on a change, or when Unity's startup has overwritten the canvas.
+- **On itch:** `html5` build #2162638 (version 3), processed.
+- **Lead's look still owed:** headless Chrome can't draw the OS pointer, so the lead checks Chrome, Arc and Safari by eye.
+
+#### Step 9b playtest, round 3 (lead, 2026-10-19): cursor fixes discarded
+- **On itch the flicker stayed with fix pass 2** (build #2162638), also in a private window, although the same build didn't flicker on `localhost:8000` or inside a cross-site frame on `localhost:8001`. The lead also sees the double pointer in the Unity editor.
+- **Sergei's fix** (`07678dc` "cursor fix" on `Sergei's_branch`):
+  - the system pointer becomes the hand: Player Settings › Default Cursor `cursor_pointing.png` (hotspot 20, 2)
+  - `Cursor.SetCursor` swaps grab and page-turn images, 64×64 PNGs in `Assets/Sprites/Cursors/`
+  - `HandCursorGraphic` no longer draws a mesh
+  - His branch starts from `6226ead`, before Steps 7–9a, so it can't be merged into main as it is. The lead asked him to bring it onto main.
+  - Still open in his approach: while a cord's plug is the pointer it hides the system pointer with `Cursor.visible = false` (`cursor: none`), which flickers in Chrome.
+- **Discarded on the lead's request** (orchestrator, directly):
+  - the two fix passes: `BrowserPointer.cs`/`.jslib` deleted
+  - `CableInputController`, `MenuHandCursor` and `VolumeCablePanel` back to `HEAD`
+  - the 14 cursor tests and the `BrowserPointer.jslib` case removed from `WebBuildTests`
+  - The Step 9b Web build work and the `caller-02` slice fix stay. The fix reports above stay as history.

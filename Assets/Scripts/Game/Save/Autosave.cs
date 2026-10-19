@@ -6,7 +6,8 @@ namespace Switchboard.Game
 {
     /// <summary>
     /// Saves the session (5.12): right after a purchase, every 10 s of real time when the save changed, when the
-    /// window loses focus or the app pauses, and when the game closes. It captures only then, never per frame.
+    /// window loses focus or the app pauses, when the browser page is hidden or closed (9b), and when the game closes.
+    /// It captures only then, never per frame.
     /// </summary>
     public sealed class Autosave : MonoBehaviour
     {
@@ -24,13 +25,19 @@ namespace Switchboard.Game
             file = saveFile;
             lastWritten = null;
             nextCheck = Time.unscaledTime + IntervalSeconds;
-            if (session != null) session.Upgrades.UpgradeBought += OnUpgradeBought;
+            if (session == null) return;
+            session.Upgrades.UpgradeBought += OnUpgradeBought;
+            BrowserPageHidden.Register(SaveNow);
         }
 
         /// <summary>No more saves from this session, e.g. after New game deleted the save.</summary>
         public void Stop()
         {
-            if (session != null) session.Upgrades.UpgradeBought -= OnUpgradeBought;
+            if (session != null)
+            {
+                session.Upgrades.UpgradeBought -= OnUpgradeBought;
+                BrowserPageHidden.Unregister(SaveNow);
+            }
             session = null;
         }
 

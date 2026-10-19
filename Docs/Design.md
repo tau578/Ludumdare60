@@ -28,6 +28,7 @@ Level art pass (2026-10-18, lead requested): `BackgroundPanel.prefab` groups `ma
 | Sergei's branch, part 2 | Merged (2026-10-18, `6226ead`, with `1c337e7`), playtest pending | Hover halos on jacks (`SocketHaloGraphic`: yellow with a cord in hand, red over a used jack, green for a connected call; a closed jack never shows one); page turning by clicking either half of the open book, with a page-turn hand cursor; close on Escape or an outside click; guide visuals (`Resources/GuideSilhouette.shader`, `SoftGuideOutline`, a portrait ring and a book glow); the cash register plays on a call's first connection. His first-name book order was replaced by surname order (D50). |
 | 7 | Done (2026-10-18, `8e48320`) | Hand-written calls and call queues (D51, D52, D54). The designer's `Assets/Configs/Calls.json` (44 placeholder calls; `CallsFileLoader`, `CallsCatalog`). `Economy.json` gains `startPool` and a `stagePool` on each `extra_clients`, starts with 2 caller slots (then 3, 4, 5), and loses `pacing`, `calls` and `notepad`. Domain `CallScript` and `CallQueue` (5.2); `CallRequest` wraps the script; `ConnectionRule` compares the call's own jacks; `PenaltyService` fines only a missed emergency. Deleted: `CallSpawner`, `CallFactory`, `PacingSettings`, `BusyTracker`, `CallbackScheduler`, `IdleGuard`, `Notepad`, `PhoneDirectory`, the call-type interfaces and records, `CallerTypeDefinition` and its two assets (card styles are now two `GameConfig` fields), `NotepadBookLink` and the book's tap chain. Cards show the caller's name on a plate under the pay badge, and the bubble types out the call's own `message`; no "Calling again". Dev panel: no "Call now" or "Emergency now". `PhoneBook.json` and `Final.unity` unchanged; the people loader no longer reads `portrait`, `type`, `rate` or `fee`. Accepted deviations: see 5.2, 5.4 and 6.5. |
 | 9a | Done (2026-10-19, `580c610`) | Saves (D25, D55). Domain `SaveData`/`CareerData`, `SaveMigrations`, `ISaveStorage`, `CareerStats`; `GameSession(content, switchboard, save)` restores the balance, bought ids (`UpgradeService.Restore`, silent) and queue position while it builds, and `CaptureSave()` takes a snapshot. Content `SaveFile`: JSON, migrations, keys `operator.save` + `operator.save.backup` (the previous good save). Game `PlayerPrefsStorage` behind `SaveStorage.Create()` (9b's switch point), `Autosave` (purchase, 10 s if changed, focus loss, pause, scene end), `NewGameMenu` in `MainMenu` (New game under Continue while a save exists, with a confirm panel), dev "New game". Touch: `CableInputController`, `VolumeCablePanel` and `MenuHandCursor` read `Pointer.current`; `Menu.IsAnyInput` counts a touch. Accepted deviations: see 5.12. |
+| 9b | Built (2026-10-19), on the itch Draft page, playtest pending; the double pointer waits for Sergei's cursor fix | The Web build (D26). `BrowserStorage` (`.cs` + `.jslib`) keeps saves and the volume patch in `localStorage`, every access in try/catch; `SaveStorage.Create()` picks it in Web players and falls back to PlayerPrefs with one warning. `BrowserPageHidden` saves inside `visibilitychange` (hidden) and `pagehide`. `AudioVolumeSettings` reads and writes through `SaveStorage` (same key). `Tools/Switchboard/Build Web` (`WebBuild`) applies Gzip, Decompression Fallback and the `Operator` template, cleans `Builds/Web` and makes a release build of the build list. The project template `Assets/WebGLTemplates/Operator/` fills the window, with no footer, and the title "Operator!". Team guide: `Docs/WebBuild.md`. |
 | 8 | Done (2026-10-19, `f82ed29`) | The new phone book (D53). The designer's `Assets/Configs/Book.json` (renamed from `PhoneBook.json`, same GUID; 39 placeholder entries, three households sharing a jack) is read once, by Content `BookFileLoader` into a `BookCatalog` of `BookEntry`s, which both `PhoneBookView` and `Validate Content` use. The book lists every entry from the start: services in file order, then names A–Z. Each row shows the name, a smaller "profession, address" line and the jack on the right (heading "Jack"). `GameConfig.bookFile`. Removed: `PhoneBookConfig`/`PhoneBookContact`, the people model (`PeopleFileLoader`, `PeopleFileData`, `PeopleCatalog`, `PersonRecord`, `DirectoryRecord`, `IPerson`, `PersonExtensions`, `IDirectoryEntry`), `SetVisibleSockets` and `OpenBoardLink`'s book part, and the rows' tap image. Accepted deviations: see 5.7. |
 
 What Step 1 built:
@@ -146,7 +147,7 @@ The whole project is worked on together (D48, lead 2026-10-18). There are no own
   - `Game.prefab` (`GameInstaller`, `GameLoopRunner`, `CordBridge`) and `GameUI.prefab`, at the root, with no overrides.
   - Prefer changing prefabs over scene overrides, so teammates' scene merges stay small. `GameInstaller` finds the views and the board's objects by type in its own scene at start.
   - `Game.unity` and the additive loading were removed (D38).
-- **No `Boot.unity` (Step 9).** `MainMenu`'s press-start panel is the tap that unlocks browser audio.
+- **No `Boot.unity` (Step 9).** `MainMenu` is the start screen. It has no press-start panel (9a, 9b): the first tap on a menu button unlocks browser audio.
 - **`SampleScene.unity`** is not in the build list.
 - **The game has one screen,** in one scene (D38).
 
@@ -444,13 +445,14 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
   - The version number drives step-by-step migrations.
 - **Storage.** `ISaveStorage` has two implementations:
   - `PlayerPrefsStorage` for the editor.
-  - `BrowserStorage` for the Web build: a `.jslib` that writes `localStorage` under a fixed key such as `switchboard.save`, with a backup key.
+  - `BrowserStorage` for the Web build (9b): a `.jslib` that writes `localStorage` under `operator.save` and `operator.save.backup`. Every access is in try/catch; if storage is blocked, Web players fall back to PlayerPrefs with one warning. The volume patch (`Switchboard.AudioPatch.v1`) uses the same storage.
 
   Unity's Web PlayerPrefs live in IndexedDB under a path tied to the page URL. Developers report that this loses saves when a host such as itch.io puts each upload at a new URL.
 - **When to save:**
   - right after a purchase
   - every ~10 s while something has changed
   - on `OnApplicationFocus(false)`
+  - in the browser, inside the `visibilitychange` (hidden) and `pagehide` events (9b), because a hidden tab runs no frames and phones kill hidden tabs
 
   Never rely on `OnApplicationQuit` in a browser.
 - **As built (9a), accepted deviations pending the lead's playtest:**
@@ -566,10 +568,10 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
 - **Single thread.** No threads, no `Task.Run`, no `async void`. All gameplay runs in the main loop.
 - **Game time only.** Gameplay timers use `Time.deltaTime`, clamped by `maximumDeltaTime`, never the system clock. Run In Background stays off, so timers pause in hidden tabs.
 - **Memory.** Pool cards, rows and popups. Avoid per-frame allocations and LINQ in per-frame code. Use sprite atlases and compressed textures [12].
-- **Audio unlock.** Browsers block audio until the player interacts, so `MainMenu`'s press-start panel is the first tap [9].
-- **Input.** Nothing may depend on hover. The cord code needs `Pointer.current` instead of `Mouse.current` to work on touch (D28), before Step 9's phone check.
+- **Audio unlock.** Browsers block audio until the player interacts. The first tap on a `MainMenu` button unlocks it; there is no press-start panel (9b).
+- **Input.** Nothing may depend on hover. Chromium on macOS (Chrome, Arc) shows a `cursor: none` pointer again on every mouse move, so hiding the system pointer next to a drawn hand flickers there (9b playtest). Sergei's fix makes the system pointer the hand (Player Settings › Default Cursor plus `Cursor.SetCursor` images). The cord code needs `Pointer.current` instead of `Mouse.current` to work on touch (D28), before Step 9's phone check.
 - **Layout.** Landscape first. In portrait, show a "rotate your device" screen (D24) [12].
-- **Hosting (D26): itch.io.** Gzip with Decompression Fallback; `index.html` at the root of the uploaded zip; the itch page set to mobile friendly, landscape, with a fullscreen button [9].
+- **Hosting (D26): itch.io.** Gzip with Decompression Fallback; `index.html` at the root of the upload; the itch page set to mobile friendly, landscape, with a fullscreen button. Built in 9b: `Tools/Switchboard/Build Web`, then `butler push Builds/Web llazypixell/operator:html5` (`Docs/WebBuild.md`). The project's `Operator` template fills the itch frame. `productName` stays `ludumdare-60`, because the Mac editor's PlayerPrefs file is named after it.
 
 ## 9. Extensibility
 - **New call:** add a line to `Calls.json` and its id to a pool in `Economy.json` (D51, D52). The validator checks it. No code.
