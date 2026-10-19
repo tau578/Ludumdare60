@@ -98,6 +98,7 @@ namespace Switchboard.Domain
                 int index = (Position + step) % count;
                 CallScript script = pool[index];
                 if (script == null || calls.IsLive(script) || HasLiveCaller(script.Name)) continue;
+                if (!stats.Board.Contains(script.From) || !stats.Board.Contains(script.To)) continue;
                 Position = (index + 1) % count;
                 return index;
             }

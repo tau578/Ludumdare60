@@ -13,7 +13,7 @@ namespace Switchboard.Game
         [SerializeField] private AudioClip incoming;
         [SerializeField] private AudioClip connected;
         [SerializeField] private AudioClip cashRegister;
-        [SerializeField, Range(0f, 2f)] private float cashRegisterGain = 2f;
+        [SerializeField, Range(0f, 2f)] private float cashRegisterGain = 1f;
         [SerializeField] private AudioClip hold;
         [SerializeField] private AudioClip finished;
         [SerializeField] private AudioClip wrongConnection;
@@ -51,7 +51,7 @@ namespace Switchboard.Game
             // One bell for this new order. No reminders while its card stays in the queue.
             ringSource.loop = false;
             ringSource.pitch = e.Call.HasResponseTime ? 1.18f : 1f;
-            ringSource.PlayOneShot(incoming);
+            ringSource.PlayOneShot(incoming, .65f);
         }
 
         private void OnChanged(CallStateChangedArgs e)

@@ -1,9 +1,9 @@
 {
   "contactsPerPage": 7,
   "entries": [
-    { "name": "Police station", "profession": "-", "address": "Station Rd. 5", "emergencyService": true, "jack": "D3" },
-    { "name": "Fire station", "profession": "-", "address": "Station Rd. 7", "emergencyService": true, "jack": "D4" },
-    { "name": "Hospital", "profession": "-", "address": "Church Ln. 2", "emergencyService": true, "jack": "A2" },
+    { "name": "Police station", "profession": "", "address": "Station Rd. 5", "emergencyService": true, "jack": "D3" },
+    { "name": "Fire station", "profession": "", "address": "Station Rd. 7", "emergencyService": true, "jack": "D4" },
+    { "name": "Hospital", "profession": "", "address": "Church Ln. 2", "emergencyService": true, "jack": "A2" },
     { "name": "Nora Ellis", "profession": "Librarian", "address": "High St. 6", "emergencyService": false, "jack": "A1" },
     { "name": "Dr Ravi Sharma", "profession": "Doctor", "address": "Church Ln. 2", "emergencyService": false, "jack": "B1" },
     { "name": "Agatha Higgins", "profession": "Retiree", "address": "Church Ln. 3", "emergencyService": false, "jack": "C4" },

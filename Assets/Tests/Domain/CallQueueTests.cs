@@ -41,6 +41,21 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
+        public void ClosedEndpointsAreSkippedWithoutBlockingAvailableCalls()
+        {
+            var session = Session(new[]
+            {
+                Scripts.Call("closed_target", "A1", "F2"),
+                Scripts.Call("closed_caller", "F2", "A1"),
+                Scripts.Call("available", "A1", "B2")
+            }, 3);
+            session.Tick(.01);
+            Assert.That(LiveIds(session), Is.EqualTo(new[] { "available" }));
+            session.Tick(.01);
+            Assert.That(LiveIds(session), Is.EqualTo(new[] { "available" }));
+        }
+
+        [Test]
         public void ConnectingTutorialImmediatelyOpensTheOtherSlots()
         {
             var session = new GameSession(new FakeContent
