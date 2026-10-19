@@ -17,7 +17,7 @@
 | 7. Hand-written calls and queues | done | ✅ 2026-10-18 (36 min) | ✅ 431/431 tests, scope clean | ✅ | 8e48320 |
 | 8. The new phone book | done | ✅ 2026-10-18 (20 min) | ✅ 445/445 tests, scope clean | ✅ | f82ed29 |
 | 9a. Saves, touch, menu, pause | done | ✅ 2026-10-19 (37 min + 21 min fix + 24 min pause + 15 min corner) | ✅ 503/503 tests, scope clean | ✅ | 580c610 |
-| 9b. First Web build on itch | playtesting | ✅ 2026-10-19 (37 min; cursor fixes discarded) | ✅ scope clean | | |
+| 9b. First Web build on itch | done | ✅ 2026-10-19 (37 min; cursor fixes discarded) | ✅ 517/517 tests, scope clean | ✅ | 709be9d |
 | 10. Tutorial | not started | | | | |
 | 11. Sound and feel | not started | | | | |
 | 12. Mobile and Web polish | not started | | | | |
@@ -3546,3 +3546,14 @@ Follow-ups:
 - Fixed the white options board: board_matte is a Single sprite, so its reference must use fileID 21300000, as in SwitchboardPanel; the previous stale multiple-sprite subasset ID did not resolve.
 - Moved the three wall anchors under the left frame. Wires now have their own layer beneath an aligned, RectMask2D-clipped copy of the left frame; row lamps and movable plugs stay above it. Reuses the original board artwork without creating another texture or changing patch rules.
 - Options heading now copies Operator's font colour exactly. Validated sprite/import references, local object and hierarchy links, aligned frame positions, hidden anchors, wire/frame/plug order, and title colour equality. Asset-only change; live Play Mode visual verification remains outstanding.
+
+#### Step 9b done (lead, 2026-10-19)
+- **Playtest OK:**
+  - The game plays in the browser from the itch Draft page.
+  - Progress survived reloads and today's re-uploads.
+  - It runs smoothly on the lead's iPhone.
+- **Accepted for later:**
+  - the black side strips on wide phones (Step 12)
+  - itch's fullscreen button on the iPhone (an Apple limit; Step 12 notes the embed option)
+- **Double pointer:** Sergei brought his cursor fix onto main (`d79421d`, entry below) while this was being committed. It still needs a check in a Web build in Chrome or Arc: holding a cord still hides the pointer with `Cursor.visible = false` (Plan §8).
+- **Commits:** `709be9d` (Step 9b) and `b4d39aa` (the metas for Mia's `RawArt`, matching Sergei's branch).

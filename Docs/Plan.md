@@ -163,7 +163,7 @@ Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs 
 
 | Item | Notes | Planned |
 |---|---|---|
-| Touch input: what's left after 9a | 9a moved the cord input, the volume patch and the menu hand to `Pointer.current` (a tap is a click; no hand or hover while no finger is down) and added touch to `Menu.IsAnyInput`. Agents can't drive real touches in the editor (the EventSystem and `Application.isFocused` ignore input while Unity is in the background). 9b's headless browser check tapped New Game with emulated touch; a real phone check is still owed. `BoardGoldLight` stays on `Mouse.current` on purpose: it is a hover-only light. | lead's 9a playtest; phones in 9b/12 |
+| Touch input: what's left after 9a | 9a moved the cord input, the volume patch and the menu hand to `Pointer.current` (a tap is a click; no hand or hover while no finger is down) and added touch to `Menu.IsAnyInput`. Agents can't drive real touches in the editor (the EventSystem and `Application.isFocused` ignore input while Unity is in the background). 9b's headless browser check tapped New Game with emulated touch. **The lead's iPhone check on itch (9b, 2026-10-19): taps, cords and calls all work smoothly.** Android is still unchecked. `BoardGoldLight` stays on `Mouse.current` on purpose: it is a hover-only light. | Android in 12 |
 | `CableInputController` references `Switchboard.Game.CallCardView` | The UI code depends on the Game layer. A small interface or marker component on the card would keep the layers apart. | cleanup, any step |
 | Stale paths in editor menus | `LevelBackgroundBuilder` and `GamePresentationBuilder` still name `Assets/Scenes/Level.unity` (now `Final.unity`, same GUID); `GamePresentationBuilder` opens it additively, so check what it does before changing the path. `PhoneBookBuilder.CreatePhoneBook`'s message still says "Open Level". (`PhoneBookBuilder`'s book path was fixed in Step 8.) | cleanup, any step |
 | A–Z tabs are hidden | `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab` (lead, 2026-10-18); the code, objects and tests stay. `Tools/Switchboard/Update Phone Book Tabs` rebuilds them active, so untick them again after running it. | |
@@ -175,6 +175,7 @@ Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs 
 | "New order!" stamp over the emergency badge (7) | While a call rings, the stamp hides half the EMERGENCY badge and most of the countdown ring. This predates Step 7. | Step 11 or 12 |
 | `PhoneBookContactRow.OnPointerDown` (8) | Rows have no raycast target since Step 8 dropped the tap image, so it can never be called. Harmless; remove it in a cleanup. | cleanup, any step |
 | Menu leftovers (9a fix) | The Options and Credits "Go back" buttons keep the old 24/20 label sizes (big, slightly low). The menu package's `Music_randomizer` (in `StartMenu.prefab` and `Music_randomizer.prefab`) points at two tracks never committed (`a84ac8ff…`, `e974b80e…`, since `3522d9a`), so it plays nothing; in the Web build it is the likely source of one "Trying to get length of sound which is not loaded yet" console line (9b). | Step 12, or with 9b |
+| Double pointer (9b) | The system pointer showed next to the drawn hand: in the Unity editor, and in Chrome and Arc on macOS, where a `cursor: none` pointer reappears on every mouse move. Safari is fine. **Sergei's fix is on main (`d79421d`):** the system pointer is the hand. Player Settings › Default Cursor is `cursor_pointing.png` (96×96, hotspot 30, 3), and `HandCursorGraphic` swaps the grab and page images with `Cursor.SetCursor`. Still to check in a Web build in Chrome or Arc: while a cord's plug is the pointer, the pointer is hidden with `Cursor.visible = false`, which may flicker there. A transparent 1×1 cursor image doesn't (the lead's test). | next Web build |
 | `SlowGuidePulse` material in EditMode tests | The guide's hidden book-glow material is freed only in `OnDestroy`, which EditMode tests don't run, so each test run leaves 2 materials in editor memory. Free it in `OnDisable` too, or in the test teardown. | cleanup, any step |
 | Web build leftovers (9b) | Each build rewrites the URP asset, the URP global settings and `preloadedAssets` in `ProjectSettings.asset`; `WebBuild` could restore them itself. A "Build Web (Dev)" menu would put the dev panel in a phone build. | cleanup, Step 12 |
 
@@ -203,7 +204,7 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 12 | Mobile and Web polish | Good on phones and desktop browsers |
 | 13 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–8 and 9a are built. Step 9 is split (D55): **9a** (saves, touch) is done; **9b** (the Web build on itch.io, D26) has a full brief and comes next. Steps 10–13 are outlines; the orchestrator turns each one into a full brief before launching it.
+Steps 1–9 are built (9a saves and touch; 9b the Web build on itch.io, D26). **Step 10 (tutorial) comes next.** Steps 10–13 are outlines; the orchestrator turns each one into a full brief before launching it.
 
 > **Renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7, 7d → 8, 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11, 9 → 12, 10 → 13. The briefs of done steps, commit messages and older reports keep the numbers they were written with.
 
@@ -1646,7 +1647,7 @@ Asked at the 9a playtest and built before 9b, so the first Web build has it. **R
 
 ### Step 9b: First Web build on itch.io (D26, D55)
 
-> **Built 2026-10-19** (report in Progress.md) and pushed to the itch Draft page. Our two cursor fixes (builds #2162255, #2162638) were discarded; Sergei brings his hardware-cursor fix (`07678dc` on his branch) onto main. The lead's playtest goes on.
+> **Done 2026-10-19** (`709be9d`; reports in Progress.md). Our two cursor fixes were discarded; Sergei brings his hardware-cursor fix onto main (§8).
 
 **Goal.** The game plays in a browser from the itch Draft page. Saves and the volume patch live in the browser's `localStorage`, so they survive a reload, a closed tab and a new upload. Every new version is one menu click (`Tools/Switchboard/Build Web`) and one command (`butler push`). **Recommended effort:** high.
 
@@ -1775,7 +1776,8 @@ Asked at the 9a playtest and built before 9b, so the first Web build has it. **R
 
 ### Step 12: Mobile and Web polish (outline)
 - **Layout:**
-  - Aspect ratios 16:9, 19.5:9 and 4:3.
+  - Aspect ratios 16:9, 19.5:9 and 4:3. **From the 9b iPhone playtest:** at 19.5:9 the art covers only the middle 16:9, and the sides show the camera's black background (the pause button sits in the black on the right). Extend or tint the sides.
+  - **Fullscreen on iPhone:** itch's fullscreen button does nothing there, because iPhone browsers don't allow page fullscreen, only video (iPad does). itch's "Click to launch in fullscreen" embed option opens the game over the whole page instead.
   - A portrait "rotate your device" screen (D24).
   - Touch target sizes.
 - **Performance:** nested canvases for the HUD and cards; a sprite atlas and texture compression.
@@ -1791,3 +1793,9 @@ Asked at the 9a playtest and built before 9b, so the first Web build has it. **R
   - It reports the time to reach the mystery, the income curve and the fines.
 - **Tuning:** adjust prices, rates and pacing in `Economy.json` toward the target in D27, with the designer.
 - **Playtest:** a full run from a new save feels right.
+
+#### Step 9b playtest, round 4 (lead, 2026-10-19): iPhone
+- **On the lead's iPhone, from the itch Draft page, everything runs smoothly:** taps pick up and plug cords, calls connect, and a bubble shows.
+- **Black borders:** the screen is wider than the 16:9 art, so the sides show the camera's black background. That's Step 12's aspect-ratio work (added to its outline).
+- **itch's fullscreen button does nothing on the iPhone.** iPhone browsers allow fullscreen only for video, so no page can go fullscreen there. On the itch page, the "Click to launch in fullscreen" embed option is the way to fill the screen; added to Step 12's outline.
+- Plan §8's touch row: the iPhone check is done; Android is left for Step 12.
