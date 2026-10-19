@@ -12,6 +12,7 @@ namespace Switchboard.UI
     {
         [SerializeField] private Button closedBook;
         [SerializeField] private Button openBook;
+        [SerializeField] private Button shortcutButton;
         [Header("Directory")]
         [SerializeField] private TextAsset contactsConfig;
         [SerializeField] private PhoneBookPageView leftPage;
@@ -25,7 +26,16 @@ namespace Switchboard.UI
 
         public bool IsOpen { get; private set; }
         /// <summary>Off while the game is paused (D56): keys and clicks leave the book as it is.</summary>
-        public bool InputEnabled { get; set; } = true;
+        private bool inputEnabled = true;
+        public bool InputEnabled
+        {
+            get => inputEnabled;
+            set
+            {
+                inputEnabled = value;
+                if (shortcutButton != null) shortcutButton.interactable = value;
+            }
+        }
         /// <summary>Off when the pause menu owns Esc: it closes an open book before it pauses (D56).</summary>
         public bool ClosesOnEscape { get; set; } = true;
         public event System.Action<bool> OpenChanged;
@@ -157,6 +167,7 @@ namespace Switchboard.UI
 
         public void OnPointerClick(PointerEventData eventData)
         {
+            if (!InputEnabled) return;
             if (eventData.button != PointerEventData.InputButton.Left) return;
             int direction = PageTurnDirectionAt(eventData.position, eventData.pressEventCamera);
             if (direction < 0) PreviousSpread();
@@ -167,6 +178,7 @@ namespace Switchboard.UI
         {
             SwitchboardUISorting.SetLayer(gameObject, SwitchboardUISorting.Book);
             closedBook.onClick.AddListener(Toggle);
+            if (shortcutButton != null) shortcutButton.onClick.AddListener(Toggle);
             ConfigurePageInput();
             foreach (var tab in tabs) if (tab != null) tab.Bind(this);
             ReloadContacts();
@@ -176,13 +188,20 @@ namespace Switchboard.UI
         private void OnDestroy()
         {
             if (closedBook != null) closedBook.onClick.RemoveListener(Toggle);
+            if (shortcutButton != null) shortcutButton.onClick.RemoveListener(Toggle);
             foreach (var tab in tabs) if (tab != null) tab.Unbind();
         }
 
         private void Update()
         {
-            if (!IsOpen || !InputEnabled) return;
+            if (!InputEnabled) return;
             var keyboard = Keyboard.current;
+            if (keyboard != null && keyboard.tabKey.wasPressedThisFrame && !IsEditingText())
+            {
+                Toggle();
+                return;
+            }
+            if (!IsOpen) return;
             if (keyboard != null)
             {
                 if (ClosesOnEscape && keyboard.escapeKey.wasPressedThisFrame) { SetOpen(false); return; }
@@ -197,7 +216,17 @@ namespace Switchboard.UI
             if (pointerHits.Count == 0 || !pointerHits[0].gameObject.transform.IsChildOf(transform)) SetOpen(false);
         }
 
-        public void Toggle() => SetOpen(!IsOpen);
+        private static bool IsEditingText()
+        {
+            var selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+            return selected != null && (selected.GetComponent<InputField>() != null ||
+                selected.GetComponent<TMPro.TMP_InputField>() != null);
+        }
+
+        public void Toggle()
+        {
+            if (InputEnabled) SetOpen(!IsOpen);
+        }
 
         public void SetOpen(bool value)
         {
