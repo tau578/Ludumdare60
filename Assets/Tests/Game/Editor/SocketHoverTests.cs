@@ -6,6 +6,42 @@ namespace Switchboard.Game.Tests
 {
     public sealed class SocketHoverTests
     {
+        [Test]
+        public void HeldCableReplacesConnectedCableAndReturnsBothOldEndsToTray()
+        {
+            var root = new GameObject("Cable replacement", typeof(RectTransform));
+            try
+            {
+                var input = root.AddComponent<CableInputController>();
+                var oldObject = new GameObject("Old cable"); oldObject.transform.SetParent(root.transform);
+                var newObject = new GameObject("New cable"); newObject.transform.SetParent(root.transform);
+                var oldCable = oldObject.AddComponent<CableController>();
+                var newCable = newObject.AddComponent<CableController>();
+                input.Configure((RectTransform)root.transform, new[] { oldCable, newCable }, null);
+                var sockets = new SocketView[4];
+                for (int i = 0; i < sockets.Length; i++)
+                {
+                    var go = new GameObject("Socket", typeof(RectTransform));
+                    go.transform.SetParent(root.transform);
+                    sockets[i] = go.AddComponent<SocketView>();
+                    sockets[i].Configure(0, i, (RectTransform)go.transform);
+                }
+                Assert.That(oldCable.TryPickUp() && oldCable.TryInsert(sockets[0]) && oldCable.TryInsert(sockets[1]), Is.True);
+                Assert.That(newCable.TryPickUp() && newCable.TryInsert(sockets[2]) && newCable.TryInsert(sockets[3]), Is.True);
+                input.HandleSocketClick(sockets[3]);
+                Assert.That(input.ActiveCable, Is.SameAs(newCable));
+                input.HandleSocketClick(sockets[0]);
+                Assert.That(oldCable.IsInTray, Is.True);
+                Assert.That(oldCable.FirstSocket, Is.Null);
+                Assert.That(oldCable.SecondSocket, Is.Null);
+                Assert.That(sockets[1].IsOccupied, Is.False);
+                Assert.That(sockets[0].OccupyingCable, Is.SameAs(newCable));
+                Assert.That(sockets[2].OccupyingCable, Is.SameAs(newCable));
+                Assert.That(input.ActiveCable, Is.Null);
+            }
+            finally { Object.DestroyImmediate(root); }
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void InactiveSocketsRequireHoverAndAHeldCord(bool occupied)

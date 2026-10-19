@@ -312,6 +312,8 @@ namespace Switchboard.Editor
             rect.anchoredPosition = position;
             var image = rect.gameObject.AddComponent<Image>();
             image.sprite = sprite;
+            image.color = new Color(.953f, .914f, .812f, 1f);
+            image.material = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/BookPaper.mat");
             image.raycastTarget = false;
             return rect;
         }

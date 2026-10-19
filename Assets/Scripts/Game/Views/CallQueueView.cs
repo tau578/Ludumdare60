@@ -217,7 +217,7 @@ namespace Switchboard.Game
             CallCardView card = FreeCard();
             card.ShowDuration = showDurations;
             CallCardStyle style = styleOf != null ? styleOf(call.Request.Script.IsEmergency) : default;
-            card.Show(call, portraitOf?.Invoke(call.Request.Script), cordColorOf, style);
+            card.Show(call, portraitOf?.Invoke(call.Request.Script), cordColorOf, style, earnings?.CurrentMultiplier ?? 1);
             shown.Add(card);
             SnapToSlot(card, shown.Count - 1);
             DrawUpperCardsOnTop();
@@ -312,6 +312,7 @@ namespace Switchboard.Game
             float blend = slideSpeed > 0 ? 1f - Mathf.Exp(-slideSpeed * Time.unscaledDeltaTime) : 1f;
             for (int i = 0; i < shown.Count; i++)
             {
+                shown[i].SetIncomeMultiplier(earnings?.CurrentMultiplier ?? 1);
                 var rect = (RectTransform)shown[i].transform;
                 Vector2 target = slotCentres[Mathf.Min(i, slots.Length - 1)];
                 if (moved) rect.sizeDelta = slotSize;

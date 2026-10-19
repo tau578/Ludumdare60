@@ -21,6 +21,7 @@ namespace Switchboard.Game
         [SerializeField, Tooltip("The caller's name under the portrait.")] private TMP_Text nameLabel;
         [SerializeField] private TMP_Text rateLabel;
         private TMP_Text connectionLabel;
+        private double shownMultiplier = double.NaN;
         [SerializeField] private GameObject stamp;
         [SerializeField] private TMP_Text stampLabel;
         [SerializeField] private Outline stampOutline;
@@ -104,7 +105,7 @@ namespace Switchboard.Game
         public bool IsGivingTask => IsSpeechBubbleVisible && (Call.State == CallState.Taken || Call.State == CallState.Connecting);
         public bool IsTaskTextComplete => IsGivingTask && !typing.IsTyping;
 
-        public void Show(Call call, Sprite callerPortrait, Func<CordId, Color> cordColorOf, CallCardStyle style)
+        public void Show(Call call, Sprite callerPortrait, Func<CordId, Color> cordColorOf, CallCardStyle style, double incomeMultiplier = 1)
         {
             gameObject.SetActive(true);
             Initialize();
@@ -112,12 +113,8 @@ namespace Switchboard.Game
             cordColors = cordColorOf;
             portrait.sprite = callerPortrait != null ? callerPortrait : defaultPortrait;
             if (nameLabel != null) nameLabel.text = call.Request.Script.Name;
-            if (connectionLabel != null)
-            {
-                connectionLabel.text = MoneyFormat.Cents(call.Request.ConnectionFeeCents);
-                rateLabel.text = MoneyFormat.Cents(call.Request.CentsPerSecond) + "/s";
-            }
-            else rateLabel.text = MoneyFormat.CardRate(call.Request.ConnectionFeeCents, call.Request.CentsPerSecond);
+            shownMultiplier = double.NaN;
+            SetIncomeMultiplier(incomeMultiplier);
             ApplyStyle(style);
             shownRingFill = -1;
             ringWasUrgent = false;
@@ -130,6 +127,20 @@ namespace Switchboard.Game
             finishedRaised = false;
             StopPress();
             Refresh();
+        }
+
+        public void SetIncomeMultiplier(double multiplier)
+        {
+            if (Call == null || shownMultiplier == multiplier) return;
+            shownMultiplier = multiplier;
+            string fee = MoneyFormat.Compact(Call.Request.ConnectionFeeCents * multiplier);
+            string rate = MoneyFormat.Compact(Call.Request.CentsPerSecond * multiplier) + "/s";
+            if (connectionLabel != null)
+            {
+                connectionLabel.text = fee;
+                rateLabel.text = rate;
+            }
+            else rateLabel.text = fee + " + " + rate;
         }
 
         public void Refresh()
@@ -153,7 +164,7 @@ namespace Switchboard.Game
             if (onCord)
             {
                 shownCents = (long)Math.Floor(Call.CentsEarned + 1e-9);
-                earningsLabel.text = MoneyFormat.Dollars(shownCents);
+                earningsLabel.text = MoneyFormat.Compact(shownCents);
             }
             cordRing.gameObject.SetActive(onCord);
             if (onCord && Call.Cord is CordId cord && cordColors != null) cordRing.color = Faded(cordColors(cord), onHold);
@@ -200,7 +211,7 @@ namespace Switchboard.Game
             stampLabel.color = stampOutline.effectColor = Ink(Call.EndReason);
         }
 
-        public void ShowConnectionFee(double cents) => feePopup.Show("+" + MoneyFormat.Cents(cents));
+        public void ShowConnectionFee(double cents) => feePopup.Show("+" + MoneyFormat.Compact(cents));
 
         public void SetDetailsVisible(bool visible)
         {
@@ -372,7 +383,7 @@ namespace Switchboard.Game
                 if (cents != shownCents)
                 {
                     shownCents = cents;
-                    earningsLabel.text = MoneyFormat.Dollars(cents);
+                    earningsLabel.text = MoneyFormat.Compact(cents);
                 }
             }
 

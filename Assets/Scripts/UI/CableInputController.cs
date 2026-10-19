@@ -250,9 +250,18 @@ namespace Switchboard.UI
             var owner = socket.OccupyingCable;
             if (owner != null)
             {
-                if (!Owns(owner) || (ActiveCable != null && heldCable != owner))
+                if (!Owns(owner))
                 {
                     ActiveCable?.PlayBlockedFeedback();
+                    return;
+                }
+                if (ActiveCable != null && heldCable != owner)
+                {
+                    if (socket.PlugAnchor == null) { heldCable.PlayBlockedFeedback(); return; }
+                    // Unplug both ends of the displaced cord before occupying its socket.
+                    if (!owner.TryRemove(socket) || !owner.TryReturnToTray()) return;
+                    if (heldCable.TryInsert(socket) && heldCable.Phase == CablePhase.Connected)
+                        heldCable = null;
                     return;
                 }
                 if (owner.TryRemove(socket)) heldCable = owner.IsInTray ? null : owner;

@@ -20,6 +20,8 @@ namespace Switchboard.Domain
 
         public event Action<ConnectionFeePaidArgs> ConnectionFeePaid;
 
+        public double CurrentMultiplier => multiplier();
+
         /// <summary>Every fee and per-second payment of this session, for the career stats.</summary>
         public double TotalPaidCents { get; private set; }
 
