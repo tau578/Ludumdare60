@@ -15,7 +15,7 @@
 | 5c. Calls and pacing into Economy.json | done | ✅ 2026-10-18 (17 min) | ✅ 388/388 tests, scope clean | ✅ | f70b7df |
 | 6. Board growth (built as 7a) | done | ✅ 2026-10-18 (25 min) | ✅ 439/439 tests, scope clean | ✅ | d166ffa |
 | 7. Hand-written calls and queues | done | ✅ 2026-10-18 (36 min) | ✅ 431/431 tests, scope clean | ✅ | 8e48320 |
-| 8. The new phone book | done | ✅ 2026-10-18 (20 min) | ✅ 445/445 tests, scope clean | ✅ | |
+| 8. The new phone book | done | ✅ 2026-10-18 (20 min) | ✅ 445/445 tests, scope clean | ✅ | f82ed29 |
 | 9. Saves, Boot, Web build | not started | | | | |
 | 10. Tutorial | not started | | | | |
 | 11. Sound and feel | not started | | | | |
@@ -2508,4 +2508,4 @@ Follow-ups:
   - an out-of-range `contactsPerPage` uses 6
   - prefab objects renamed
 - **Playtest (lead, 2026-10-19):** all good. The deviations listed above are accepted.
-- Committed and pushed on the lead's request, merged with tarbaev.d's `f393f72` ("Polish highlights": one shared hover colour for the jack halos and the guide glow; no overlap with Step 8).
+- Committed and pushed on the lead's request, merged with tarbaev.d's `f393f72` ("Polish highlights": one shared hover colour for the jack halos and the guide glow; no overlap with Step 8). 445/445 green after the merge.
