@@ -179,17 +179,17 @@ namespace Switchboard.Content
             return 0;
         }
 
-        // A session starts with 2 to 6 cords; the input inventory is trimmed before binding.
+        // A session starts with 1 to 6 cords; the input inventory is trimmed before binding.
         private static int CheckStartingCords(int cords, List<string> errors)
         {
             const int fallback = StatSheet.DefaultStartingCords;
             if (cords == EconomyFileData.Unset) return fallback;
-            if (cords < fallback)
-                errors.Add($"startingCords {cords} is below the {fallback} cords the tray is built with. " +
-                    $"Use {fallback} to {StatSheet.MaxCords}. The game starts with {fallback} for now.");
+            if (cords < 1)
+                errors.Add($"startingCords {cords} is below the minimum of 1 cord. " +
+                    $"Use 1 to {StatSheet.MaxCords}. The game starts with {fallback} for now.");
             else if (cords > StatSheet.MaxCords)
                 errors.Add($"startingCords {cords} is more than the tray holds. " +
-                    $"Use {fallback} to {StatSheet.MaxCords}. The game starts with {fallback} for now.");
+                    $"Use 1 to {StatSheet.MaxCords}. The game starts with {fallback} for now.");
             else return cords;
             return fallback;
         }

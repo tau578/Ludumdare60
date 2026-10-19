@@ -6,19 +6,22 @@ namespace Switchboard.Domain
     /// <summary>
     /// The call queue (D52). Calls play in pool order and loop; every free caller slot takes the next call at once.
     /// The pool follows StatSheet (the last bought extra_clients's stagePool, or the startPool), and a new pool
-    /// starts at its first call. A call still on a card is skipped, so no call shows twice.
+    /// starts at its first call. Live calls and other requests from the same caller are skipped.
     /// </summary>
     public sealed class CallQueue
     {
         private readonly CallService calls;
         private readonly StatSheet stats;
         private IReadOnlyList<CallScript> pool;
+        private bool waitingForFirstCall;
+        private Call tutorialCall;
 
-        public CallQueue(CallService calls, StatSheet stats)
+        public CallQueue(CallService calls, StatSheet stats, bool tutorial = false)
         {
             this.calls = calls ?? throw new ArgumentNullException(nameof(calls));
             this.stats = stats ?? throw new ArgumentNullException(nameof(stats));
             pool = stats.CallPool;
+            waitingForFirstCall = tutorial;
             stats.Changed += OnStatsChanged;
         }
 
@@ -37,6 +40,18 @@ namespace Switchboard.Domain
         /// <summary>Fills every free open slot, in order, at once.</summary>
         public void Tick()
         {
+            if (waitingForFirstCall)
+            {
+                if (tutorialCall == null)
+                {
+                    CallScript first = TakeNext();
+                    if (first == null) return;
+                    tutorialCall = calls.Add(new CallRequest(first));
+                }
+                if (!tutorialCall.ConnectionFeePaid && tutorialCall.State != CallState.Ended) return;
+                waitingForFirstCall = false;
+                tutorialCall = null;
+            }
             while (calls.Live.Count < stats.ClientSlots)
             {
                 CallScript next = TakeNext();
@@ -52,7 +67,7 @@ namespace Switchboard.Domain
             {
                 int index = (Position + step) % count;
                 CallScript script = pool[index];
-                if (script == null || calls.IsLive(script)) continue;
+                if (script == null || calls.IsLive(script) || HasLiveCaller(script.Name)) continue;
                 Position = (index + 1) % count;
                 return script;
             }
@@ -62,6 +77,15 @@ namespace Switchboard.Domain
         private void OnStatsChanged()
         {
             if (!ReferenceEquals(stats.CallPool, pool)) Restart();
+        }
+
+        private bool HasLiveCaller(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            foreach (Call call in calls.Live)
+                if (string.Equals(call.Request.Script.Name.Trim(), name.Trim(), StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
         }
     }
 }

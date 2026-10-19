@@ -7,7 +7,7 @@ namespace Switchboard.Domain
     {
         private readonly GameClock clock = new GameClock();
 
-        public GameSession(IGameContent content, ISwitchboard switchboard)
+        public GameSession(IGameContent content, ISwitchboard switchboard, bool tutorial = false)
         {
             if (content == null) throw new ArgumentNullException(nameof(content));
             if (switchboard == null) throw new ArgumentNullException(nameof(switchboard));
@@ -17,7 +17,7 @@ namespace Switchboard.Domain
             Stats = new StatSheet(Upgrades, content.StartingCords, content.StartingBoard, content.StartingClientSlots,
                 content.StartPool);
             Board = new OpenBoard(Stats);
-            Queue = new CallQueue(Calls, Stats);
+            Queue = new CallQueue(Calls, Stats, tutorial);
             Shelf = new ShopShelf(Upgrades);
             Goal = new GoalProgress(Upgrades, Wallet);
             Earnings = new EarningsService(Calls, Wallet, () => Stats.IncomeMultiplier);
