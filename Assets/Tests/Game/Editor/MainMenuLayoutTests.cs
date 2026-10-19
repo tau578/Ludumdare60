@@ -19,6 +19,32 @@ namespace Switchboard.Game.Tests
         private const string StartMenuPath = "Assets/Tools/rodrigo_menu_tools/Runtime/Prefabs/StartMenu.prefab";
 
         [Test]
+        public void ShopButtonSkinCoversSceneButtonsAndInactiveSubmenus()
+        {
+            WithMenu(menu =>
+            {
+                var root = menu.transform.root;
+                var skin = root.GetComponent<MenuButtonSkin>();
+                Assert.That(skin, Is.Not.Null);
+                // Scene-added buttons must be repaired too, even if an open scene retains an older white plate.
+                var continueButton = Panel(menu).Find("Continue_Button").GetComponent<Button>();
+                ((Image)continueButton.targetGraphic).sprite = null;
+                skin.Apply();
+                var buttons = root.GetComponentsInChildren<Button>(true);
+                Assert.That(buttons.Length, Is.EqualTo(9));
+                foreach (var button in buttons)
+                {
+                    var image = (Image)button.targetGraphic;
+                    Assert.That(AssetDatabase.GetAssetPath(image.sprite), Is.EqualTo("Assets/Sprites/store/buy_btn_neutral.png"), button.name);
+                    Assert.That(button.transition, Is.EqualTo(Selectable.Transition.ColorTint), button.name);
+                    Assert.That(button.colors.highlightedColor.r, Is.GreaterThan(button.colors.normalColor.r), button.name);
+                    Assert.That(button.colors.highlightedColor.r - button.colors.normalColor.r, Is.LessThanOrEqualTo(.12f), button.name);
+                    Assert.That(button.colors.pressedColor.r, Is.LessThan(button.colors.normalColor.r), button.name);
+                }
+            });
+        }
+
+        [Test]
         public void SlotsAreEvenlySpacedAroundTheCentre()
         {
             float[] five = Enumerable.Range(0, 5).Select(i => NewGameMenu.SlotY(i, 5, -50f, 122f)).ToArray();
