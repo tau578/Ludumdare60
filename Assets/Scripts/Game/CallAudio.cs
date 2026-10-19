@@ -6,6 +6,8 @@ namespace Switchboard.Game
     public sealed class CallAudio : MonoBehaviour
     {
         public event System.Action ConnectionSucceeded;
+        /// <summary>Raised by <see cref="SetPaused"/>, so call sounds elsewhere (the connection babble) pause too.</summary>
+        public event System.Action<bool> PausedChanged;
         [SerializeField] private AudioSource ringSource;
         [SerializeField] private AudioSource feedbackSource;
         [SerializeField] private AudioClip incoming;
@@ -17,6 +19,22 @@ namespace Switchboard.Game
         [SerializeField] private AudioClip wrongConnection;
         private CallService calls;
         private float nextFeedback;
+
+        public bool IsPaused { get; private set; }
+
+        /// <summary>The pause menu (D56): ringing and call sounds pause and resume where they were.</summary>
+        public void SetPaused(bool paused)
+        {
+            if (IsPaused == paused) return;
+            IsPaused = paused;
+            foreach (AudioSource source in new[] { ringSource, feedbackSource })
+            {
+                if (source == null) continue;
+                if (paused) source.Pause();
+                else source.UnPause();
+            }
+            PausedChanged?.Invoke(paused);
+        }
 
         public void Bind(CallService service)
         {

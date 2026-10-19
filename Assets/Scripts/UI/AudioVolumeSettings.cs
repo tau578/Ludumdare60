@@ -6,6 +6,7 @@ namespace Switchboard.UI
     public enum AudioVolumeChannel { Master, Music, Sfx }
     public static class AudioVolumeSettings
     {
+        // Saved patches store these indices, so mute stays index 4 although it is drawn leftmost (9a fix).
         private static readonly float[] Levels = { .25f, .5f, .75f, 1f, 0f };
         private const string SaveKey = "Switchboard.AudioPatch.v1";
         [Serializable]

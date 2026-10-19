@@ -50,7 +50,19 @@ namespace Switchboard.Game
                 if (callAudio == null) callAudio = root.GetComponentInChildren<CallAudio>(true);
             }
             if (book != null) { wasOpen = book.IsOpen; spread = book.CurrentSpreadIndex; }
-            if (callAudio != null) callAudio.ConnectionSucceeded += PlayConnectionBabble;
+            if (callAudio != null)
+            {
+                callAudio.ConnectionSucceeded += PlayConnectionBabble;
+                callAudio.PausedChanged += OnCallAudioPaused;
+            }
+        }
+
+        // The babble is a call sound: it pauses with the game (D56), while menu clicks keep playing.
+        private void OnCallAudioPaused(bool paused)
+        {
+            if (phoneBabble == null) return;
+            if (paused) phoneBabble.Pause();
+            else phoneBabble.UnPause();
         }
 
         private void LateUpdate()
@@ -89,7 +101,11 @@ namespace Switchboard.Game
             foreach (Button button in buttons) if (button != null) button.onClick.RemoveListener(PlayClick);
             buttons.Clear();
             book = null;
-            if (callAudio != null) callAudio.ConnectionSucceeded -= PlayConnectionBabble;
+            if (callAudio != null)
+            {
+                callAudio.ConnectionSucceeded -= PlayConnectionBabble;
+                callAudio.PausedChanged -= OnCallAudioPaused;
+            }
             callAudio = null;
             babbleUntil = 0;
             if (phoneBabble != null) phoneBabble.Stop();

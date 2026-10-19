@@ -2,7 +2,7 @@
 
 This document is the source of truth for how the game works and how the code is organized. Implementing agents follow it. If the code or a step brief disagrees with it, they stop and report instead of improvising. Changes are agreed with the project lead first, then written here.
 
-Last updated 2026-10-18 · Plan: [Plan.md](Plan.md) · Progress: [Progress.md](Progress.md)
+Last updated 2026-10-19 · Plan: [Plan.md](Plan.md) · Progress: [Progress.md](Progress.md)
 
 ## Implementation status
 
@@ -27,6 +27,7 @@ Level art pass (2026-10-18, lead requested): `BackgroundPanel.prefab` groups `ma
 | Sergei's branch | Merged (2026-10-18, `e7acec5`) | Sergei's work since `61dae7a`: a cash-register sound and `CallAudio.Bind(calls, earnings)`; fee coins flying to the money counter (`IncomeCoinsView`, `IncomeCoinGraphic`); jacks of a connected call glow green (`SocketGraphic`/`SocketView.SetCallConnected`, driven by `CordBridge`); the **first-order guide** (`FirstOrderGuide`, `FirstOrderGuideSequence`, `SlowGuidePulse`: on the first call the card, the book and the cords pulse in turn, and acting out of order cancels it); bigger socket and lamp art in the prefabs and `Final.unity`; `PhoneBook.json` names written "Surname, First". Merged with 7a: a closed jack's dimmed look wins over green; Sergei's `MergedSystemsTests` pick a call on open jacks. |
 | Sergei's branch, part 2 | Merged (2026-10-18, `6226ead`, with `1c337e7`), playtest pending | Hover halos on jacks (`SocketHaloGraphic`: yellow with a cord in hand, red over a used jack, green for a connected call; a closed jack never shows one); page turning by clicking either half of the open book, with a page-turn hand cursor; close on Escape or an outside click; guide visuals (`Resources/GuideSilhouette.shader`, `SoftGuideOutline`, a portrait ring and a book glow); the cash register plays on a call's first connection. His first-name book order was replaced by surname order (D50). |
 | 7 | Done (2026-10-18, `8e48320`) | Hand-written calls and call queues (D51, D52, D54). The designer's `Assets/Configs/Calls.json` (44 placeholder calls; `CallsFileLoader`, `CallsCatalog`). `Economy.json` gains `startPool` and a `stagePool` on each `extra_clients`, starts with 2 caller slots (then 3, 4, 5), and loses `pacing`, `calls` and `notepad`. Domain `CallScript` and `CallQueue` (5.2); `CallRequest` wraps the script; `ConnectionRule` compares the call's own jacks; `PenaltyService` fines only a missed emergency. Deleted: `CallSpawner`, `CallFactory`, `PacingSettings`, `BusyTracker`, `CallbackScheduler`, `IdleGuard`, `Notepad`, `PhoneDirectory`, the call-type interfaces and records, `CallerTypeDefinition` and its two assets (card styles are now two `GameConfig` fields), `NotepadBookLink` and the book's tap chain. Cards show the caller's name on a plate under the pay badge, and the bubble types out the call's own `message`; no "Calling again". Dev panel: no "Call now" or "Emergency now". `PhoneBook.json` and `Final.unity` unchanged; the people loader no longer reads `portrait`, `type`, `rate` or `fee`. Accepted deviations: see 5.2, 5.4 and 6.5. |
+| 9a | Built (2026-10-19), playtest pending | Saves (D25, D55). Domain `SaveData`/`CareerData`, `SaveMigrations`, `ISaveStorage`, `CareerStats`; `GameSession(content, switchboard, save)` restores the balance, bought ids (`UpgradeService.Restore`, silent) and queue position while it builds, and `CaptureSave()` takes a snapshot. Content `SaveFile`: JSON, migrations, keys `operator.save` + `operator.save.backup` (the previous good save). Game `PlayerPrefsStorage` behind `SaveStorage.Create()` (9b's switch point), `Autosave` (purchase, 10 s if changed, focus loss, pause, scene end), `NewGameMenu` in `MainMenu` (New game under Continue while a save exists, with a confirm panel), dev "New game". Touch: `CableInputController`, `VolumeCablePanel` and `MenuHandCursor` read `Pointer.current`; `Menu.IsAnyInput` counts a touch. Accepted deviations: see 5.12. |
 | 8 | Done (2026-10-19, `f82ed29`) | The new phone book (D53). The designer's `Assets/Configs/Book.json` (renamed from `PhoneBook.json`, same GUID; 39 placeholder entries, three households sharing a jack) is read once, by Content `BookFileLoader` into a `BookCatalog` of `BookEntry`s, which both `PhoneBookView` and `Validate Content` use. The book lists every entry from the start: services in file order, then names A–Z. Each row shows the name, a smaller "profession, address" line and the jack on the right (heading "Jack"). `GameConfig.bookFile`. Removed: `PhoneBookConfig`/`PhoneBookContact`, the people model (`PeopleFileLoader`, `PeopleFileData`, `PeopleCatalog`, `PersonRecord`, `DirectoryRecord`, `IPerson`, `PersonExtensions`, `IDirectoryEntry`), `SetVisibleSockets` and `OpenBoardLink`'s book part, and the rows' tap image. Accepted deviations: see 5.7. |
 
 What Step 1 built:
@@ -101,7 +102,8 @@ The whole project is worked on together (D48, lead 2026-10-18). There are no own
   - `Phase`, `FirstSocket`, `SecondSocket`, `IsInTray`, `CableColor`
   - `TryRemove(SocketView)`, `PlayBlockedFeedback()`
   - `InsertionRevision`, `LastInsertionAnchor`, `LastInsertionWasManual` (Sergei, `2fc3810`; read by `CordBridge` for the wrong-number anchor, D45)
-- `CableInputController` (5b): `AddCable(Color)`, `MaxCables`.
+- `CableInputController` (5b): `AddCable(Color)`, `MaxCables`; (9a) `ProcessPointer(position, pressed, hover)`, `Suspended` (pause; the press in the resuming frame is ignored). A click whose target has a `Selectable` parent keeps a held cord.
+- `PhoneBookView` (9a pass 2): `InputEnabled`, `ClosesOnEscape`. `CallAudio` (9a pass 2): `SetPaused`, `IsPaused`, `PausedChanged`.
 - `PhoneBookView`: `PageCount`, `ContactCount`, `ContactAt` (a `BookEntry` since 8); (Sergei) `OpenChanged`, `ClosedBookGraphic`. Step 6's `SetVisibleSockets` was removed in Step 8 (D53), the Notepad's `ContactTapped` and `ContactTapsEnabled` in Step 7 (D54).
 - Sergei's hooks (merged `6226ead`): `PhoneBookView.PageTurnDirectionAt(Vector2, Camera)` (used by `CableInputController`), `CableCursorMode.PageTurn`, `HandCursorGraphic.PageTurnDirection`, `PhoneBookContact.IsEmergencyService` (now `BookEntry.IsEmergencyService`, 8), `SocketHaloGraphic`, `SlowGuidePulse.UsePortraitHalo()`/`UseSilhouetteHalo()`, `SoftGuideOutline`; `CallAudio.Bind(CallService)` no longer takes `EarningsService`.
 - Sergei's hooks (merged `e7acec5`): `CableController.PickedUp`, `SocketView.SetCallConnected` / `SocketGraphic.SetCallConnected`, `CordBridge.CableAdded`, `CallQueueView.OrderShown` / `CardOpened`, `CallAudio.ConnectionSucceeded`. `FirstOrderGuide` uses them.
@@ -144,7 +146,7 @@ The whole project is worked on together (D48, lead 2026-10-18). There are no own
   - `Game.prefab` (`GameInstaller`, `GameLoopRunner`, `CordBridge`) and `GameUI.prefab`, at the root, with no overrides.
   - Prefer changing prefabs over scene overrides, so teammates' scene merges stay small. `GameInstaller` finds the views and the board's objects by type in its own scene at start.
   - `Game.unity` and the additive loading were removed (D38).
-- **`Boot.unity` (Step 9, then build index 0).** A tap-to-start screen, which unlocks browser audio, then loading.
+- **No `Boot.unity` (Step 9).** `MainMenu`'s press-start panel is the tap that unlocks browser audio.
 - **`SampleScene.unity`** is not in the build list.
 - **The game has one screen,** in one scene (D38).
 
@@ -154,6 +156,7 @@ The whole project is worked on together (D48, lead 2026-10-18). There are no own
 - **Text glyphs.** Use only characters that exist in the static LiberationSans SDF atlas. "¢" and "—" are there; "→" is not. A missing glyph makes TextMeshPro write it into the fallback font asset at runtime, which dirties a file under `Assets/TextMesh Pro/`.
 - **Turn off `raycastTarget` on anything that isn't meant to be clicked.** The cord input takes the topmost raycast hit across all canvases, so a stray raycast target over the board or tray blocks cords. Modal overlays (the open book, the shop) block clicks on purpose.
 - Call cards line up with the caller panel's slots by reading the slots' positions at runtime.
+- **The pause menu** (9a pass 2, D56) is the `Pause` object in `GameUI.prefab` with its own canvas at sorting order 16: above the book (10) and the Goal dialog (15), below the hand cursor (20). Its 72×72 button sits in the screen's top-right corner, anchored to it with a 6 px margin (lead, round 3, built in 9a pass 3; first built at 88×88 above the board's top-left corner). 88 px doesn't fit there at 16:9: the shop panel's art starts 86 px from the top. The dev panel's IMGUI "Dev" button sits just left of it and opens as a row going left along the top edge. The main menu's Quit shows only in Windows and Mac builds and the editor, not on Web (`NewGameMenu.QuitAvailable`). Placeholder look: LiberationSans, flat green buttons.
 - **Popups by the money counter** (5a): the fine popup sits under the counter; the neutral "-$X" spend popup sits to its left, over the board's frame (briefly covering the "6" column label, never a jack), so the two never collide.
 - **The "To be continued..." dialog** (5a) is the `Goal` object in `GameUI.prefab` with its own canvas at sorting order 15: above the open book (10), below the hand cursor and held plugs (20), so the pointer stays visible. Its backdrop blocks clicks while it is open (a deliberate modal); it is inactive otherwise.
 
@@ -161,7 +164,7 @@ The whole project is worked on together (D48, lead 2026-10-18). There are no own
 - **`GameSession`** (Domain, plain C#) creates every domain service in dependency order and owns the tick order. Tests and the balance simulator build it without Unity.
 - **`GameInstaller`** (Game, `[DefaultExecutionOrder(-100)]`) is the only entry point. It:
   1. loads content
-  2. loads the save (from Step 9)
+  2. loads the save (9a; only in Play Mode, so EditMode tests never touch the real save)
   3. finds the views and the board in its own scene, by type
   4. builds `CordBridge` and `GameSession`
   5. calls `Bind(...)` on the views
@@ -196,7 +199,7 @@ A call that ends gives its slot to the next queued call in the same tick. The id
   - `ReturnToTray(cord)`: call `TryRemove` on each plugged socket.
   - `Refuse(cord)`: `PlayBlockedFeedback()`, then return the cord to the tray.
 - **Adding cords (5b).** `EnsureCords(total)` calls `CableInputController.AddCable(color)` until the count is reached. It appends the new cable to its list, and records the cable's current state so the next `LateUpdate` reports nothing for it. New cords continue the index order (3, 4, 5). The spawner reads `CordCount` live.
-- **Touch input** in the cord controller (`Pointer.current`, D28) is still to do, before the Web build is played on phones.
+- **Touch input** (D28, 9a): the cord controller reads `Pointer.current`; a tap is a click, and on a touchscreen there's no hand or hover while no finger is down. `ProcessPointer(position, pressed, hover)` is the touch-aware overload; the two-argument call is unchanged.
 
 ## 5. Systems
 The step that introduces each part is shown in brackets.
@@ -410,7 +413,7 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
   - `Progress = clamp01(balance ÷ secret cost)` drives the savings fill on the secret's button (D14, D41).
   - `GoalAffordable` fires the first time progress reaches 1.
   - Buying the secret raises `GoalPurchased`. For now the Game layer shows a "To be continued" panel, and play goes on.
-- **`CareerStats`** [9]: lifetime earnings, calls connected, fines paid, time played.
+- **`CareerStats`** [9a]: lifetime earnings (`EarningsService.TotalPaidCents`, so dev money doesn't count), calls connected (once per call, not on resume), fines paid (the amount taken), seconds played. Owned by `GameSession.Career`, saved in the save's `career` section; nothing shows it yet.
 
 ### 5.11 Feedback: UI and audio [1 HUD, 11 full]
 - **Views:** `MoneyCounterView`, `ShopView` (drives Sergei's shop buttons, including the savings fill; D41), `FloatingTextPool` (+$ and −$ popups).
@@ -432,7 +435,9 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
   - settings and tutorial flags
 
   Career data is kept separate from run data, so a prestige reset or new-game-plus mode can reset one without the other.
-- **Not saved:** calls, cords, the queue and callbacks. Each session starts with an empty board (D25).
+- **Saved too (9a, D55):** the queue position, as the pool index of the oldest call still on a card, so unfinished calls ring again after a reload.
+- **Not saved:** calls, cords and the call in hand. Each session starts with an empty board (D25).
+- **New game (9a, D55):** a main-menu button, shown while a save exists, deletes the save after a confirmation.
 - **Format:**
   - `JsonUtility`, with lists instead of dictionaries.
   - Content is referenced only by stable string ids. Unknown ids are ignored, and missing ones count as not bought.
@@ -448,6 +453,14 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
   - on `OnApplicationFocus(false)`
 
   Never rely on `OnApplicationQuit` in a browser.
+- **As built (9a), accepted deviations pending the lead's playtest:**
+  1. A new game where nothing happened yet (no money moved, nothing bought, no call connected: `GameSession.HasProgress`) writes no save, so New game stays hidden right after Start over.
+  2. Saves are read and written only in Play Mode; EditMode tests that run `GameInstaller` never touch PlayerPrefs (`SaveIsolationTests`).
+  3. Unknown ids are dropped at the next save, not carried along.
+  4. Career earnings are rounded to the whole cent at each save.
+  5. The 10 s autosave writes almost every time while playing, because seconds played change.
+  6. Migrations run on `SaveData` objects, not raw JSON; load problems are warnings.
+  7. **Menu buttons (lead's 9a playtest).** "Play Game" is deleted from `StartMenu.prefab`. `NewGameMenu` shows Continue only while a save exists and re-spaces the visible buttons at run time: Continue, New Game, Options, Credits, Quit top to bottom, 122 apart, centred on y -50 under the title, so a hidden button leaves no gap. New Game starts at once without a save and asks first with one. Every menu label is centred: Center/Middle, stretched to its button, 18 pt maximum with a 3-unit bottom margin, so the mixed-case word sits in the middle and descenders stay on the plate.
 
 ## 6. Data
 
@@ -479,7 +492,7 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
 | Career stats | `CareerStats` | Yes |
 | Settings | Game layer | Yes |
 | Calls, queue, call in hand | `CallService` | No |
-| Queue pool and position | `CallQueue` | No (Step 9 decides) |
+| Queue pool and position | `CallQueue` | The position (9a, D55); the pool follows from the bought ids |
 | Cord state and jack occupancy | the team's cord code, mirrored by `CordBridge` | No |
 
 ### 6.3 Data rules
@@ -553,7 +566,7 @@ The designer's model (D39, D40) replaces the earlier plan of `UpgradeDefinition`
 - **Single thread.** No threads, no `Task.Run`, no `async void`. All gameplay runs in the main loop.
 - **Game time only.** Gameplay timers use `Time.deltaTime`, clamped by `maximumDeltaTime`, never the system clock. Run In Background stays off, so timers pause in hidden tabs.
 - **Memory.** Pool cards, rows and popups. Avoid per-frame allocations and LINQ in per-frame code. Use sprite atlases and compressed textures [12].
-- **Audio unlock.** Browsers block audio until the player interacts, so the Boot scene has a tap-to-start screen [9].
+- **Audio unlock.** Browsers block audio until the player interacts, so `MainMenu`'s press-start panel is the first tap [9].
 - **Input.** Nothing may depend on hover. The cord code needs `Pointer.current` instead of `Mouse.current` to work on touch (D28), before Step 9's phone check.
 - **Layout.** Landscape first. In portrait, show a "rotate your device" screen (D24) [12].
 - **Hosting (D26): itch.io.** Gzip with Decompression Fallback; `index.html` at the root of the uploaded zip; the itch page set to mobile friendly, landscape, with a fullscreen button [9].
@@ -630,6 +643,8 @@ Statuses:
 | D52 | Call queues (lead 2026-10-18). `Economy.json` has `startPool` (call ids for a new game) and a `stagePool` on each `extra_clients` entry; buying one replaces the queue and starts it at its first call. Calls play in order and loop; success or a wrong number doesn't change the order. Each open caller slot holds one call, and a free slot takes the next queued call at once (no timer). A call waiting on a busy line stays on its card. A call still on a card is skipped when the queue comes round to it (orchestrator rule, so no call shows twice). Caller slots start at 2 (`startingClientSlots`) and grow with the board upgrades (3, 4, 5 as placeholders). | decided (lead, 2026-10-18) | 7 |
 | D53 | The phone book is a lookup only (designer, lead 2026-10-18). A new `Assets/Configs/Book.json` replaces `PhoneBook.json`: each entry has `name` ("SURNAME, First"), `profession`, `address`, `emergencyService` and `jack` (shown as the last column); entries may share a jack. The book shows every entry from the start, services first, then names alphabetically (the real-directory order of D50); the rules don't read it. Supersedes D31 and the book part of D42. | decided (lead, 2026-10-18) | 8 |
 | D54 | The Notepad upgrade is dropped (designer, lead 2026-10-18). Supersedes D23, D43 and D46. | decided (lead, 2026-10-18) | 7 |
+| D55 | Step 9 details (lead, 2026-10-19). Step 9 is split: **9a** saves and touch input, testable in the editor; **9b** the Web build on itch.io, once the Web Build Support module is installed. On load the call queue **replays unfinished calls**: the saved position is the pool index of the oldest live call from the current pool, so calls on cards at the save ring again (one finished out of order may repeat). A **"New game"** button in the main menu, shown only while a save exists, asks for confirmation and deletes the whole save. **Menu order (lead's 9a playtest):** without a save, New Game comes first and starts at once with no question; with a save, Continue comes first and New Game second (with the confirmation); Continue is hidden without a save; "Play Game" (the same as Continue) is removed. Agents may push builds to the itch **Draft** page with butler. | decided (lead, 2026-10-19) | 9a, 9b |
+| D56 | Pause menu (lead, 2026-10-19, at the 9a playtest). A pause button and Esc open a modal panel: Resume, Options (the main menu's volume patch) and Main Menu (saves, then loads `MainMenu`). While paused, game time stops (`Time.timeScale` 0: pay, durations and emergency countdowns freeze), call sounds pause, and the cord input is off. Esc closes an open book before it pauses. The book and the shop still never pause the game (D20). Built in 9a pass 2 (`GamePauseMenu`); every `Button` click now keeps a held cord. | decided (lead, 2026-10-19); built | 9a pass 2 |
 | D29 | Merge into one scene. The `Game.unity` + `Level.unity` split is temporary; it keeps Sergei's actively edited scene conflict-free. Once his cord work settles, and with his agreement, move the `Game` object and the `GameUI` prefab into one scene, then remove `Game.unity` and the additive loading. Do it at the latest before the first Web build. **Done as D38 (2026-10-18).** | done | 9 |
 
 ## 11. Glossary

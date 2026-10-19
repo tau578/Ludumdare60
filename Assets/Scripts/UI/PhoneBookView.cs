@@ -24,6 +24,10 @@ namespace Switchboard.UI
         private readonly List<RaycastResult> pointerHits = new List<RaycastResult>();
 
         public bool IsOpen { get; private set; }
+        /// <summary>Off while the game is paused (D56): keys and clicks leave the book as it is.</summary>
+        public bool InputEnabled { get; set; } = true;
+        /// <summary>Off when the pause menu owns Esc: it closes an open book before it pauses (D56).</summary>
+        public bool ClosesOnEscape { get; set; } = true;
         public event System.Action<bool> OpenChanged;
         public Graphic ClosedBookGraphic => closedBook != null ? closedBook.targetGraphic : null;
         public int CurrentSpreadIndex { get; private set; }
@@ -176,11 +180,11 @@ namespace Switchboard.UI
 
         private void Update()
         {
-            if (!IsOpen) return;
+            if (!IsOpen || !InputEnabled) return;
             var keyboard = Keyboard.current;
             if (keyboard != null)
             {
-                if (keyboard.escapeKey.wasPressedThisFrame) { SetOpen(false); return; }
+                if (ClosesOnEscape && keyboard.escapeKey.wasPressedThisFrame) { SetOpen(false); return; }
                 if (keyboard.leftArrowKey.wasPressedThisFrame) PreviousSpread();
                 else if (keyboard.rightArrowKey.wasPressedThisFrame) NextSpread();
             }

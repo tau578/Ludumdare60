@@ -6,23 +6,32 @@ namespace Switchboard.Domain
     public sealed class GameSession
     {
         private readonly GameClock clock = new GameClock();
+        private readonly long startingCents;
 
-        public GameSession(IGameContent content, ISwitchboard switchboard)
+        /// <param name="save">A loaded save, restored while the services are built so nothing binds to a new game
+        /// first (5.12); null starts a new game with Economy.json's starting values.</param>
+        public GameSession(IGameContent content, ISwitchboard switchboard, SaveData save = null)
         {
             if (content == null) throw new ArgumentNullException(nameof(content));
             if (switchboard == null) throw new ArgumentNullException(nameof(switchboard));
-            Wallet = new Wallet(content.StartingCents);
+            startingCents = Math.Max(0, content.StartingCents);
+            Wallet = save != null ? new Wallet(save.cents, save.fraction) : new Wallet(content.StartingCents);
             Calls = new CallService();
             Upgrades = new UpgradeService(content.Upgrades, Wallet);
+            // Before the stats, shelf and goal are built, so they start from the bought ids with no second rebuild.
+            if (save != null) Upgrades.Restore(save.upgrades);
             Stats = new StatSheet(Upgrades, content.StartingCords, content.StartingBoard, content.StartingClientSlots,
                 content.StartPool);
             Board = new OpenBoard(Stats);
             Queue = new CallQueue(Calls, Stats);
+            if (save != null) Queue.Restore(save.queuePosition);
             Shelf = new ShopShelf(Upgrades);
             Goal = new GoalProgress(Upgrades, Wallet);
             Earnings = new EarningsService(Calls, Wallet, () => Stats.IncomeMultiplier);
             Penalties = new PenaltyService(Calls, Wallet);
             Desk = new OperatorDesk(Calls, new ConnectionRule(), switchboard);
+            Career = new CareerStats(Calls, Earnings, Penalties, save?.career);
+            IsRestored = save != null;
         }
 
         public IGameClock Clock => clock;
@@ -37,16 +46,39 @@ namespace Switchboard.Domain
         public EarningsService Earnings { get; }
         public PenaltyService Penalties { get; }
         public OperatorDesk Desk { get; }
+        public CareerStats Career { get; }
+
+        /// <summary>Whether this session was loaded from a save.</summary>
+        public bool IsRestored { get; }
+
+        /// <summary>
+        /// Whether a new game has anything worth saving yet: money moved, something bought, or a call connected.
+        /// A loaded session always has.
+        /// </summary>
+        public bool HasProgress => IsRestored || Upgrades.OwnsAny || Career.CallsConnected > 0 ||
+            Wallet.Cents != startingCents || Wallet.Fraction > 0;
 
         public void Tick(double dt)
         {
             if (!(dt > 0)) return;
             clock.Advance(dt);
+            Career.Tick(dt);
             Earnings.Tick(dt);
             Calls.Tick(dt);
             Queue.Tick();
             Goal.Tick();
         }
+
+        /// <summary>A fresh snapshot for the save (5.12): never the live lists, so later play can't change it.</summary>
+        public SaveData CaptureSave() => new SaveData
+        {
+            version = SaveData.CurrentVersion,
+            cents = Wallet.Cents,
+            fraction = Wallet.Fraction,
+            upgrades = Upgrades.OwnedIds(),
+            queuePosition = Queue.ResumePosition,
+            career = Career.Capture()
+        };
 
         /// <summary>
         /// A dev tool: forgets every purchase (no refund) and puts the shop back to its start. Cords already added

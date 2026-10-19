@@ -65,12 +65,14 @@ namespace Switchboard.Editor
                 var face = Box("Faceplate", root, new Vector2(1300, 310), Vector2.zero, new Color32(70, 76, 68, 255));
                 face.GetComponent<Image>().raycastTarget = true;
                 Label("Title", root, "MASTER", new Vector2(0, 120), 30, new Vector2(650, 45));
-                var fixedSocket = Socket("FixedSocket", root, new Vector2(-530, 8));
+                var fixedSocket = Socket("FixedSocket", root, new Vector2(-580, 8));
                 var choices = new SocketGraphic[5];
                 string[] labels = { "25", "50", "75", "100", "Mute" };
                 for (int i = 0; i < 5; i++)
                 {
-                    float x = -300 + i * 205;
+                    // Mute (index 4) sits leftmost; the indices keep their meaning for saved patches.
+                    // The row of five is centred on the panel (9a pass 2).
+                    float x = -410 + (i + 1) % 5 * 205;
                     choices[i] = Socket("Socket_" + labels[i], root, new Vector2(x, 8));
                     if (i < 4) Label("Label_" + labels[i], root, labels[i], new Vector2(x, 70), 32, new Vector2(110, 45));
                     else

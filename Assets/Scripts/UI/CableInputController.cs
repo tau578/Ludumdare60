@@ -31,8 +31,26 @@ namespace Switchboard.UI
         private StoredCableView hoveredStoredCable;
         private bool cursorWasVisible;
         private bool ownsCursor;
+        private bool suspended;
+        private int resumedFrame = -1;
         public CableController ActiveCable => Usable(heldCable) ? heldCable : null;
         public CableCursorMode CursorMode { get; private set; }
+
+        /// <summary>
+        /// While suspended (the pause menu, D56) clicks neither pick, plug nor drop, and a held cord stays held.
+        /// The press that resumes is ignored too, so the Resume button can't plug the jack beneath it.
+        /// </summary>
+        public bool Suspended
+        {
+            get => suspended;
+            set
+            {
+                if (suspended == value) return;
+                suspended = value;
+                if (value) HidePointers();
+                else resumedFrame = Time.frameCount;
+            }
+        }
         public int AvailableCableCount
         {
             get
@@ -147,15 +165,25 @@ namespace Switchboard.UI
             ownsCursor = true;
         }
 
+        // Mouse, touch and pen alike (D28): a tap is a click, so the click-to-pick, click-to-plug model stays.
         private void Update()
         {
-            if (Mouse.current == null || !Application.isFocused) { HidePointers(); return; }
-            ProcessPointer(Mouse.current.position.ReadValue(), Mouse.current.leftButton.wasPressedThisFrame);
+            Pointer pointer = Pointer.current;
+            if (pointer == null || !Application.isFocused || suspended) { HidePointers(); return; }
+            bool pressed = pointer.press.wasPressedThisFrame && Time.frameCount != resumedFrame;
+            // A finger leaves no hover behind: between taps only a held cord stays where it was last put.
+            bool hover = !(pointer is Touchscreen) || pressed || pointer.press.isPressed;
+            if (!hover && ActiveCable == null) { HidePointers(); return; }
+            ProcessPointer(pointer.position.ReadValue(), pressed, hover);
         }
 
         // Shared by real input and integration checks, including UI hit testing.
-        public void ProcessPointer(Vector2 position, bool leftPressed)
+        public void ProcessPointer(Vector2 position, bool leftPressed) => ProcessPointer(position, leftPressed, true);
+
+        /// <param name="hover">False for a touchscreen with no finger down: no hover halos, highlights or hand.</param>
+        public void ProcessPointer(Vector2 position, bool leftPressed, bool hover)
         {
+            if (suspended) { HidePointers(); return; }
             GameObject target = Raycast(position);
             SocketView hit = target != null ? target.GetComponentInParent<SocketView>() : null;
             // A closed socket (D42) is no target: it doesn't highlight, and a click there only bounces the held cord.
@@ -169,7 +197,9 @@ namespace Switchboard.UI
             {
                 if (socket != null) HandleSocketClick(socket);
                 else if (hit != null) ActiveCable?.PlayBlockedFeedback();
-                else if (ActiveCable != null && !overCall && hoveredBook == null)
+                // A button (the shop, the pause button) does its own thing and keeps a held cord in hand.
+                else if (ActiveCable != null && !overCall && hoveredBook == null &&
+                    (target == null || target.GetComponentInParent<Selectable>() == null))
                 {
                     if (heldCable.Phase == CablePhase.Held || overTray)
                     {
@@ -184,7 +214,8 @@ namespace Switchboard.UI
             var clickHandler = target != null ? ExecuteEvents.GetEventHandler<IPointerClickHandler>(target) : null;
             var book = clickHandler != null ? clickHandler.GetComponent<PhoneBookView>() : null;
             int pageTurn = book != null ? book.PageTurnDirectionAt(position, hits[0].module.eventCamera) : 0;
-            UpdatePointers(position, socket, stored, pageTurn, overOpenBook);
+            if (hover) UpdatePointers(position, socket, stored, pageTurn, overOpenBook, true);
+            else UpdatePointers(position, null, null, 0, overOpenBook, false);
         }
 
         private GameObject Raycast(Vector2 position)
@@ -224,7 +255,8 @@ namespace Switchboard.UI
                 heldCable = null;
         }
 
-        private void UpdatePointers(Vector2 position, SocketView socket, StoredCableView stored, int pageTurn, bool overOpenBook)
+        private void UpdatePointers(Vector2 position, SocketView socket, StoredCableView stored, int pageTurn, bool overOpenBook,
+            bool showHand)
         {
             var selected = ActiveCable;
             if (hoveredSocket != socket && hoveredSocket != null) hoveredSocket.SetPointerState(false, selected);
@@ -250,7 +282,8 @@ namespace Switchboard.UI
                 var area = (RectTransform)handCursor.transform.parent;
                 var canvas = area.GetComponentInParent<Canvas>();
                 var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-                handVisible = (selected == null || overOpenBook) && RectTransformUtility.RectangleContainsScreenPoint(area, position, camera);
+                handVisible = showHand && (selected == null || overOpenBook) &&
+                    RectTransformUtility.RectangleContainsScreenPoint(area, position, camera);
                 handCursor.gameObject.SetActive(handVisible);
                 if (handVisible)
                 {

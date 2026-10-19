@@ -95,6 +95,28 @@ namespace Switchboard.Domain
             return true;
         }
 
+        /// <summary>
+        /// Puts back the bought ids of a save (5.12) before the stats are built: nothing is spent and no
+        /// UpgradeBought is raised. Ids the file no longer has are ignored.
+        /// </summary>
+        public void Restore(IEnumerable<string> ids)
+        {
+            if (ids == null) return;
+            foreach (string id in ids)
+                if (id != null && byId.ContainsKey(id)) owned.Add(id);
+        }
+
+        /// <summary>The bought ids in file order, for a save.</summary>
+        public List<string> OwnedIds()
+        {
+            var ids = new List<string>(owned.Count);
+            foreach (IUpgrade upgrade in all)
+                if (owned.Contains(upgrade.Id)) ids.Add(upgrade.Id);
+            return ids;
+        }
+
+        public bool OwnsAny => owned.Count > 0;
+
         /// <summary>A dev tool: forgets every purchase without refunding it.</summary>
         public void ClearOwned() => owned.Clear();
 

@@ -105,7 +105,7 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Nested canvas sorting in a prefab (2b) | To give a child its own sorting order inside a prefab (e.g. the halo's order 9), set `m_OverrideSorting` through `SerializedObject`. `manage_prefabs` and the `overrideSorting` setter leave it off, because inside prefab contents the nested canvas counts as a root canvas. |
 | Game view size (3) | Set it with `PlayModeWindow.SetCustomRenderingResolution`, for example 1280×720 or 844×390, and set it back to 1920×1080 afterwards. Each new size stays in the Game view's size list as an editor preference, not a project file. |
 | Tests on Assembly-CSharp types (3) | `Assets/Tests/Editor/` (the cable tests' asmdef) can't see Assembly-CSharp types such as `PhoneBookView`. Put such tests in our `Assets/Tests/Game/Editor/`, which has no asmdef and compiles into Assembly-CSharp-Editor. |
-| Dev panel (2a) | F1 or the "Dev" button in the top-right corner: + $10, Call now, Emergency now (4), Speed ×5/×1, Show/Hide times, Clear calls. Editor and development builds only. Its IMGUI clicks also reach the cord input as "empty space" clicks. |
+| Dev panel (2a) | F1 or the "Dev" button, just left of the pause button in the top-right corner (since 9a pass 3 it opens as a row along the top edge): + $10, Call now, Emergency now (4), Speed ×5/×1, Show/Hide times, Clear calls. Editor and development builds only. Its IMGUI clicks also reach the cord input as "empty space" clicks. |
 | Format-only re-saves (4) | Test runs and Play Mode can re-save `ProjectSettings/TimeManager.asset` (as well as `SampleScene.unity`) with only format changes. Discard them with `git checkout -- <file>` and mention it in the report. |
 | Layout in prefab editing (5a) | Unity's layout groups don't run while a prefab is edited from code, so an editor menu that resizes children must set their `sizeDelta` directly (as `Update Upgrade Shop Buttons` does). |
 | Disabled buttons (5a) | Setting `Button.interactable = false` applies the button's grey, half-transparent disabled tint and changes the shop's look. To make a button inert, ignore the click in our view and dim it ourselves. |
@@ -116,6 +116,7 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Simulated hover vs. the real mouse (merge) | While Unity has focus, `CableInputController` reads the real mouse every frame and overrides a simulated hover. Disable the controller for the one captured frame. |
 | Deleting files (7) | Delete through MCP (`delete_script`, `manage_asset` `delete`) or a plain `rm` followed by `refresh_unity`. Never use `git rm`: it stages the deletion. |
 | Renaming an asset (8) | Rename or move it with `manage_asset` (Unity's `AssetDatabase.MoveAsset`), never in the file system: Unity keeps the GUID, so every prefab and asset that references it still finds it with no re-wiring (`PhoneBook.json` → `Book.json`). Git shows a delete plus a new file until both are staged. |
+| Saves in tests (9a) | EditMode tests run `GameInstaller.Start`, so anything that reads or writes PlayerPrefs there touches the lead's real save. `GameInstaller` opens the save only when `Application.isPlaying`; `SaveIsolationTests` guards it. Play Mode checks write `operator.save` and `operator.save.backup`: delete both at the end. |
 | Missing JSON fields (5c) | `JsonUtility.FromJson` keeps field initializers for fields the file leaves out, also inside nested objects in arrays. Use a marker initializer (NaN, or a named `Unset` constant) to tell "missing" from 0. |
 
 ## 5. Definition of done (every step)
@@ -159,8 +160,7 @@ Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs 
 
 | Item | Notes | Planned |
 |---|---|---|
-| Touch input in the cord code | Use `Pointer.current` instead of `Mouse.current` in `CableInputController.Update`, and hide the hand cursor on touch (D28). | Step 9 |
-| A held cord drops on button clicks | Any click off a jack counts as "empty space" and returns the held cord. A call-card click already keeps it (`2fc3810`). The lead prefers that buttons keep it too. Book rows no longer take clicks since Step 7 (D54). | any step; Step 12 at the latest |
+| Touch input: what's left after 9a | 9a moved the cord input, the volume patch and the menu hand to `Pointer.current` (a tap is a click; no hand or hover while no finger is down) and added touch to `Menu.IsAnyInput`. Agents can't drive real touches in the editor (the EventSystem and `Application.isFocused` ignore input while Unity is in the background), so a Device Simulator or phone check is still owed. `BoardGoldLight` stays on `Mouse.current` on purpose: it is a hover-only light. | lead's 9a playtest; phones in 9b/12 |
 | `CableInputController` references `Switchboard.Game.CallCardView` | The UI code depends on the Game layer. A small interface or marker component on the card would keep the layers apart. | cleanup, any step |
 | Stale paths in editor menus | `LevelBackgroundBuilder` and `GamePresentationBuilder` still name `Assets/Scenes/Level.unity` (now `Final.unity`, same GUID); `GamePresentationBuilder` opens it additively, so check what it does before changing the path. `PhoneBookBuilder.CreatePhoneBook`'s message still says "Open Level". (`PhoneBookBuilder`'s book path was fixed in Step 8.) | cleanup, any step |
 | A–Z tabs are hidden | `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab` (lead, 2026-10-18); the code, objects and tests stay. `Tools/Switchboard/Update Phone Book Tabs` rebuilds them active, so untick them again after running it. | |
@@ -171,6 +171,7 @@ Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs 
 | Unused random helpers (7) | `IRandom`, `SeededRandom`, `RandomExtensions` and `FloatRange` in `Domain/Common` have no users since the spawner went. Delete them, or keep `IRandom` if a later step needs randomness. | cleanup, any step |
 | "New order!" stamp over the emergency badge (7) | While a call rings, the stamp hides half the EMERGENCY badge and most of the countdown ring. This predates Step 7. | Step 11 or 12 |
 | `PhoneBookContactRow.OnPointerDown` (8) | Rows have no raycast target since Step 8 dropped the tap image, so it can never be called. Harmless; remove it in a cleanup. | cleanup, any step |
+| Menu leftovers (9a fix) | The Options and Credits "Go back" buttons keep the old 24/20 label sizes (big, slightly low). The menu package's `Music_randomizer` (in `StartMenu.prefab` and `Music_randomizer.prefab`) points at two tracks never committed (`a84ac8ff…`, `e974b80e…`, since `3522d9a`), so it plays nothing. | Step 12, or with 9b |
 | `SlowGuidePulse` material in EditMode tests | The guide's hidden book-glow material is freed only in `OnDestroy`, which EditMode tests don't run, so each test run leaves 2 materials in editor memory. Free it in `OnDisable` too, or in the test teardown. | cleanup, any step |
 
 Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `UpgradeShopPanel/HeaderSlot`, or update `GameInstaller` with the rename. `Book.json` keeps its format and `contactsPerPage`; the book sorts itself (D53), so the file's order doesn't matter.
@@ -191,13 +192,14 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 6 | Board growth (built as "7a") | Start on 3×3; buy 4×4, 5×5, 6×6 |
 | 7 | Hand-written calls | The designer's `Calls.json` and call queues replace random calls; 2 slots at the start |
 | 8 | The new phone book | `Book.json`: name, profession, address, jack; everyone listed from the start |
-| 9 | Saves, Boot scene, first Web build | Plays in a browser, and progress survives a reload |
+| 9a | Saves and touch input | Progress survives a restart; New game; taps work |
+| 9b | First Web build on itch.io | Plays in a browser, and progress survives a reload and a new upload |
 | 10 | Tutorial | A guided first call |
 | 11 | Sound and feel | Rings, alarms, coins and animations |
 | 12 | Mobile and Web polish | Good on phones and desktop browsers |
 | 13 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–8 are built. Step 9 comes next (hosting: itch.io, D26). Steps 9–13 are outlines; the orchestrator turns each one into a full brief before launching it.
+Steps 1–8 are built. Step 9 is split (D55): **9a** (saves, touch) has a full brief and comes next; **9b** (the Web build on itch.io, D26) waits for the Web Build Support module. Steps 9b–13 are outlines; the orchestrator turns each one into a full brief before launching it.
 
 > **Renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7, 7d → 8, 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11, 9 → 12, 10 → 13. The briefs of done steps, commit messages and older reports keep the numbers they were written with.
 
@@ -1494,43 +1496,191 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 - saves (9)
 - the real book content (the designer)
 
-### Step 9: Saves and first Web build (outline). The `MainMenu` is the start screen: it replaces our planned `Boot.unity` and doubles as the tap-to-start audio unlock (D30, D33).
-- **Saving:**
-  - `SaveData` with a version number and migrations; `SaveService`.
-  - `PlayerPrefsStorage` and `BrowserStorage` (a `.jslib` writing `localStorage`, plus a backup key).
-  - Autosave as described in Design §5.12.
-- **No `Boot.unity`:** `MainMenu` is the start screen, and its first tap unlocks audio (see the heading). The build goes through the `Build Web` menu below.
+### Step 9a: Saves and touch input (D25, D28, D55)
+
+**Goal.** Progress survives a restart. The balance, the bought upgrades, the call queue's place and the career stats are saved and restored, with versioned migrations and a backup. A "New game" button in the main menu starts over. The cord code and the menu take touch. Everything here can be tested in the editor; the browser storage, the Web build and itch are Step 9b, because the Web Build Support module isn't installed yet. **Recommended effort:** high.
+
+**Playable result.**
+- **Reload keeps progress.** Earn money and buy `income_1` and `board_1`, stop Play, press Play again. The balance is the same to the cent, the shop offers the next entries, the board opens 4×4 with 3 caller slots before the first call rings, and extra cords bought are in the tray.
+- **Unfinished calls ring again** (D55). A call that was on a card when you stopped comes back first.
+- **New game.** In `MainMenu`, with a save, "New game" sits under Continue. It asks for confirmation; "Start over" deletes the save and starts a fresh game, "Cancel" goes back. Without a save the button is hidden.
+- **Touch.** In the Device Simulator (Window › General › Device Simulator), a tap closes the press-start panel, presses Continue, picks up a cord and plugs it.
+
+**Decisions** (lead, 2026-10-19; D25, D55):
+- **Saved** (Design 5.12):
+  - `version`
+  - the balance (`cents`) and its `fraction`
+  - the bought upgrade ids, the secret among them
+  - the queue position (below)
+  - career stats in their own `career` section, apart from the run data (5.10): lifetime earned cents, calls connected, fines paid in cents, seconds played
+- **Not saved:** live calls, cords and plugs, the call in hand, the shop shelf and the stats (both rebuilt from the ids). Each session starts with an empty board (D25). There are no settings or tutorial flags yet: Sergei's volume patch keeps its own PlayerPrefs key until 9b, and the tutorial is Step 10. `JsonUtility` keeps defaults for fields a file leaves out, so later steps can add fields without a migration.
+- **Queue resume (D55): replay unfinished calls.**
+  - The saved position is the pool index of the oldest live call (in arrival order) that came from the current pool. With no such call, it is the queue's own `Position`.
+  - On load the slots fill from there. A call finished out of order may play once more; that's accepted.
+  - A position outside the current pool (the designer shortened it) starts the pool at 0.
+  - Live calls from an older pool (still on cards after a board purchase) don't count.
+- **New game (D55):**
+  - A "New game" button in the main menu, under Continue and in the same style, visible only while a save exists.
+  - It opens a small confirm panel: "Start a new game? Your money and upgrades will be lost." with "Start over" and "Cancel".
+  - "Start over" deletes the save (main and backup) and loads the game the way Continue does.
+  - The dev panel gets the same "New game" (delete the save, reload `Final`), editor and development builds only.
+  - It deletes the career section too: a full fresh start.
+- **Storage keys:** one fixed main key and one backup key, `operator.save` and `operator.save.backup`. 9b keeps the same keys in `localStorage`; itch serves every HTML game from one shared domain, so the keys name the game.
+- **Ids.** Unknown ids are ignored; missing ids count as not bought.
+- **Restoring is silent.** Restoring the bought ids spends nothing and raises no `UpgradeBought`, so no popups and no "To be continued" panel. A loaded secret counts as bought (`GoalProgress.IsPurchased`), and neither `GoalAffordable` nor `GoalPurchased` fires for it.
+- **A save from a newer version** (an older cached build opened after a newer one wrote it) is read as far as it goes, with one warning. It isn't refused.
+
+**How it fits together** (Design 4.1: the save data model is Domain, storage is Game):
+- **Domain** (`Assets/Scripts/Domain/Save/`):
+  - `SaveData` and `CareerData`: `[Serializable]`, public fields, lists instead of dictionaries, `long` cents.
+  - `SaveMigrations`: step by step from the file's version to `SaveData.CurrentVersion` (1). The steps are passed in, so a test can add a fake v1→v2 step.
+  - `ISaveStorage`: `Read`, `Write` and `Delete` of a string by key.
+  - `CareerStats`: listens to the existing events (the fee and per-second pay, the first connection of a call, `FineApplied`'s taken amount) and counts ticked seconds. A call resumed from hold doesn't count twice.
+  - `GameSession` takes an optional `SaveData` and restores it while it builds the services, before anything binds: wallet cents and fraction, then the bought ids (`UpgradeService.Restore`), so stats, shelf and goal are built from them, then the queue position. `GameSession.CaptureSave()` returns a fresh `SaveData`.
+- **Content:** a `SaveFile` codec.
+  - It turns `SaveData` into JSON and back with `JsonUtility`, and runs the migrations.
+  - **Backup.** On save, if the main key holds a save that parses, copy it to the backup key, then write the new save to the main key. On load, try the main key, then the backup, then start a new game.
+  - Each fallback gives one plain message. Broken data isn't deleted on load.
+  - Tests use an in-memory `ISaveStorage` in `Assets/Tests/Domain/`.
+- **Game:**
+  - `PlayerPrefsStorage` (`PlayerPrefs.Save()` after each write), chosen by a small stateless factory. It is used everywhere in 9a; 9b switches Web builds to `BrowserStorage`.
+  - `GameInstaller` loads the save after the content and before it builds `GameSession` (Design 4.4, step 2), and logs one plain line when it used the backup or started fresh because of a broken save.
+  - **Autosave:** a small component, on `Game.prefab` or added at runtime like `FirstOrderGuide`. It saves:
+    - right after a purchase
+    - every 10 s of real time, if the captured JSON differs from the last one written
+    - on `OnApplicationFocus(false)` and `OnApplicationPause(true)`
+    - on `OnDestroy`
+
+    Capture only on these occasions, never per frame.
+  - `CordBridge.EnsureCords` and `OpenBoardLink` already read `StatSheet`, so restored wires and board sizes should need no extra code. Check it.
+  - **The New game button:** a Game component in `MainMenu.unity`. Sergei's `Menu` is in the `MenuTemplates` asmdef, which can't see the Game layer, so the button's logic is ours and is wired in the scene. Check that the menu font has every glyph of the new texts.
+- **Touch** (D28, Plan §8):
+  - `CableInputController.Update` reads `Pointer.current` (`position`, `press.wasPressedThisFrame`) instead of `Mouse.current`. A tap is a click; the click-to-pick, click-to-plug model stays. On a `Touchscreen`, hide the hand cursor and hover-only effects while no finger is down.
+  - Do the same in `VolumeCablePanel` and `MenuHandCursor` (the menu's volume patch).
+  - Add touch to `Menu.IsAnyInput`, so a tap closes the press-start panel.
+  - `BoardGoldLight` may stay on `Mouse.current` if it only reacts to hover; say so in the report.
+  - Remove the touch row from Plan §8 if it's done, or narrow it to what's left.
+
+**Files the step may change:**
+- `GameSession`, `Wallet`, `UpgradeService`, `CallQueue`, `GoalProgress`
+- `GameInstaller`, `DevPanel`, `Game.prefab`
+- `MainMenu.unity`, Sergei's `Menu.cs`, `CableInputController`, `VolumeCablePanel`, `MenuHandCursor`
+- new files under `Domain/Save/`, `Content/` and `Game/`, plus tests
+- `Docs/EconomyFile.md`: one line saying bought ids are saved, so ids must never be renamed
+
+**Tests** (EditMode):
+- **Round trip.** Capture, JSON, load gives back the same balance, fraction, ids, queue position and career.
+- **Versions.**
+  - A v1 test file (a JSON string in the test) loads.
+  - An injected v1→v2 step runs once, in order.
+  - A newer-version file loads what it can.
+- **Ids.** Unknown ids are ignored, missing ids are not bought, and restoring spends nothing and raises no events.
+- **Backup.**
+  - A corrupt main save falls back to the backup.
+  - A corrupt main and backup start a new game.
+  - The backup holds the previous good save.
+- **Queue resume.**
+  - The oldest live call from the current pool wins.
+  - Calls from an old pool are ignored.
+  - No live calls gives `Position`.
+  - Out of range gives 0.
+- **Board.** A loaded `board_2` opens 5×5 and its slots before the first call rings; the first `Tick` deals from its `stagePool`. Its wires and income stats come back too.
+- **Goal.** A loaded secret is `IsPurchased`, and neither `GoalPurchased` nor `GoalAffordable` fires.
+- **`CareerStats`.** A connection counts once across hold and resume; fines count the amount taken.
+- **Empty storage** starts with `Economy.json`'s starting values.
+
+**Play Mode checks (agent):**
+- Earn with the dev panel, buy `income_1` and `board_1`, stop, and play again: the balance, the upgrades, the 4×4 board and the cords are restored, and the console is clean.
+- Play through `MainMenu` with and without a save: New game hidden and shown, Cancel, Start over.
+- **Delete the editor save at the end**, so the lead's playtest starts fresh, and say so in the report.
+
+**Playtest script:**
+1. **Fresh start.** Play in `Final`. Money, board and shop are as in a new game.
+2. **Earn and buy.** Use dev "+ $100", buy an income upgrade and the first board upgrade, wait 10 s, stop Play.
+3. **Reload.** Play again. The money is the same to the cent, and the upgrades are owned. The board is 4×4 with 3 slots before the first call. The shop offers the next entries.
+4. **Unfinished calls.** Take a call but don't connect it, then stop and play again. That call rings again.
+5. **New game.** Open `MainMenu` and play. "New game" shows under Continue. Cancel changes nothing. Start over gives a fresh game, and back in the menu the button is hidden.
+6. **Touch.** In the Device Simulator, tap the press-start screen, then Continue, then pick up a cord and plug two jacks.
+
+**Out of scope:**
+- the `.jslib`, `BrowserStorage`, the Build Web menu, Web player settings, itch and `Docs/WebBuild.md` (9b)
+- the volume patch's storage (9b)
+- tutorial flags (10)
+- offline earnings (D25)
+
+#### Step 9a, pass 2: pause menu and centred volume sockets (lead, 2026-10-19; D56)
+Asked at the 9a playtest and built before 9b, so the first Web build has it. **Recommended effort:** high.
+- **Centred volume sockets.** Each row's five sockets and their labels sit about 100 px right of the panel's centre (since the 9a fix: -300, -95, 110, 315, 520). Centre the row on the panel; for example -410, -205, 0, 205, 410, if the panel's centre is at 0. Change both `VolumeCablePanel.prefab` and `MasterVolumeCableSlider.prefab`, plus `VolumeCableSliderBuilder`. The cable's left anchor must not crowd the mute socket.
+- **Pause menu (D56):**
+  - **Opening it:** a small pause button (two bars drawn with UI images; no glyphs needed) in a free corner of the game screen, top-left above the caller column if it fits. It must be big enough for a finger and must not cover a jack, a card or the shop. Esc opens it too. If the book is open, Esc only closes the book; the next press pauses. Esc while paused resumes.
+  - **The panel** is modal, in the style of the "To be continued" dialog (`GameUI.prefab`, its own canvas above the book). It has the title "Paused" and three buttons:
+    - **Resume**
+    - **Options:** the same volume patch as the main menu, reusing `VolumeCablePanel.prefab`, with a "Back" button
+    - **Main Menu:** saves at once (`Autosave.SaveNow()`), then loads `MainMenu` (build index 0), where Continue picks the game up again
+  - **While paused:**
+    - Game time stops (`Time.timeScale` 0), so pay, call durations and emergency countdowns freeze. Restore the previous scale on resume, so the dev panel's ×5 survives. Always set 1 before loading the menu.
+    - Ringing and call sounds pause; the music and button clicks keep playing.
+    - The cord input is off, so clicks on the panel can't drop or plug a cord, and a held cord is still held after Resume.
+    - The pointer must stay visible and usable over the panel (the game draws its own hand cursor and hides the system one).
+    - Pausing also saves.
+  - **The pause button keeps a held cord** (today any click off a jack drops it, Plan §8). If it's simple and safe, make every `Button` click keep a held cord, which closes that §8 item; otherwise only the pause button. Say which in the report.
+  - **The volume patch at timeScale 0:** check that its cable and plugs still move (unscaled time).
+- **Tests:**
+  - pause and resume restore the previous `timeScale`
+  - Esc with the book open closes only the book
+  - Main Menu saves before it loads
+  - a held cord survives pause and resume
+  - the socket positions are centred in both prefabs
+- **Screenshots:** the pause button in the game at 1920×1080 and 1280×720, the pause panel, and Options inside it.
+- **Playtest:**
+  1. Press the pause button during a call: everything freezes, and an emergency's countdown stops.
+  2. Resume: the call carries on, and a cord held before pausing is still in hand.
+  3. Esc with the book open closes the book; Esc again pauses; Esc again resumes.
+  4. Change the volume from the pause menu's Options, and hear the difference after Resume.
+  5. Main Menu, then Continue: the game is where you left it, apart from the calls on cards (D25, D55).
+  6. In Options in the main menu, the sockets sit centred in each row.
+
+### Step 9b: First Web build on itch.io (outline). The `MainMenu` is the start screen: it replaces our planned `Boot.unity` and its press-start panel is the tap that unlocks audio (D30, D33).
+- **Needs the Web Build Support module.** The lead adds it in Unity Hub (Installs › 6000.3.6f1 › Add modules › Web Build Support) and restarts Unity before the step.
+- **`BrowserStorage`:**
+  - A `.jslib` that reads and writes `localStorage` under 9a's keys, behind 9a's `ISaveStorage`.
+  - Wrap every access in try/catch: Safari's private mode and blocked site data throw. Then fall back to PlayerPrefs with one warning.
+  - The factory picks it in Web builds (`UNITY_WEBGL && !UNITY_EDITOR`).
+  - Sergei's volume patch (`AudioVolumeSettings`, key `Switchboard.AudioPatch.v1`) moves to the same storage, so it survives new uploads too.
+  - Optional: a `visibilitychange` (hidden) hook in the `.jslib` that asks the game to save, because phones kill hidden tabs.
+- **No `Boot.unity`:** `MainMenu` is the start screen (see the heading). The menu's Quit button is already hidden in Web builds (9a pass 3, `NewGameMenu.QuitAvailable`); `Application.Quit` does nothing there.
+- **From Step 9a:**
+  - `SaveStorage.Create()` is the single switch point for `BrowserStorage`.
+  - `Autosave.SaveNow()` is public, ready for a `visibilitychange` hook.
+  - `MainMenu` has no press-start panel (`Menu.pressStartPanel` is empty), so the first tap is a menu button; Unity resumes audio on it. Check that the menu music starts.
+  - The menu has both "Play Game" and "Continue", and both just load the game (lead to decide at the 9a playtest).
 - **Hosting (D26, lead 2026-10-19): itch.io.**
-  - Player Settings › Publishing Settings: Compression Format **Gzip**, **Decompression Fallback** on. itch can't send the compression headers, and Brotli unpacked in JavaScript is slower.
-  - The lead creates the itch page (Draft) once; an agent can't log in. The playtest runs from a Draft or Restricted page first.
+  - Player Settings › Publishing Settings: Compression Format **Gzip**, **Decompression Fallback** on. itch can't send the compression headers, and Brotli unpacked in JavaScript is slower. Today the project has Brotli (0) and no fallback.
+  - The lead created the itch page (Draft) on 2026-10-19; an agent can't log in. The playtest runs from the Draft page first.
   - itch page settings: "This file will be played in the browser", mobile friendly, landscape, fullscreen button on, no auto-start (the MainMenu's tap is the audio unlock).
 - **Build and upload (lead, 2026-10-19):** polishing goes on after Step 9, so every new version must be one menu click and one command.
-  - **`Tools/Switchboard/Build Web`:** an editor menu that builds the build list (`MainMenu`, `Final`) for Web into `Builds/Web/` (already git-ignored), with the D26 settings, and logs where the build went and how big it is.
+  - **`Tools/Switchboard/Build Web`:** an editor menu that builds the build list (`MainMenu`, `Final`) for Web into `Builds/Web/` (already git-ignored), with the D26 settings, and logs where the build went and how big it is. Building switches the editor's platform to Web the first time, which reimports assets and takes a while.
   - **Uploading with itch's `butler`:**
     - Installed on the lead's Mac (2026-10-19): `~/bin/butler` v15.32.0, the Apple-chip build (`darwin-arm64`), with `~/bin` on PATH in `~/.zprofile`. Homebrew's `butler` is an unrelated app. The lead is logged in (credentials in `~/Library/Application Support/itch/butler_creds`), so `butler push` works from an agent's shell too. `butler login` needs a real Terminal window; the `!` prefix has none.
     - The page is `https://llazypixell.itch.io/operator` ("Operator!", Draft, created by the lead 2026-10-19; `butler status llazypixell/operator` reaches it, no uploads yet). Each upload is `butler push Builds/Web llazypixell/operator:html5`. The draft's secret preview link stays out of the repo.
     - Page settings advised to the lead (check them after the first push): embed in page at 1280×720, mobile friendly (landscape), fullscreen button, no auto-start, no scrollbars, no SharedArrayBuffer.
-    - butler sends only the changed files and replaces the same upload, so the itch page settings are set once. On the first push, tick "This file will be played in the browser" for the `html5` upload.
-    - **Pushing publishes the game.** Agents run it only when the lead asks; the lead can also run it with `! butler push …`.
+    - butler sends only the changed files and replaces the same upload, so the itch page settings are set once. On the first push, the lead ticks "This file will be played in the browser" for the `html5` upload.
+    - **The agent may push to the Draft page (D55)** once the build runs locally (for example from `python3 -m http.server` in `Builds/Web`). Pushing anywhere public still needs the lead.
   - **Manual fallback:** zip the *contents* of `Builds/Web`, so `index.html` sits at the zip's root, and upload the zip on the itch page.
   - **`Docs/WebBuild.md`** for the team: build, push, the itch page settings, and the manual fallback.
-- Includes the touch-input open item (§8).
-- **From Step 7:** the save also needs the queue position: the index of the next call in the current pool (the pool itself follows from the bought upgrades). Live calls aren't saved; on load the slots fill from that position.
-- **From Step 8:** the book has no state to save; it is rebuilt from `Book.json` at every start.
-- **From Step 6:** the board size and caller slots are ordinary upgrade ids (`board_1`…), so a save restores them through `StatSheet` with no extra data; `OpenBoardLink` then reopens the jacks. Test that a loaded `board_2` opens 5×5 before the first call rings. `GameSession.ResetUpgrades` (clears calls, returns cords from closing jacks) is dev-only; a "new game" button would need the same care.
-- **Tests:**
-  - Saving and loading gives back the same data.
-  - Migration from a v1 test file.
-  - Unknown ids are ignored.
-  - A corrupt main save falls back to the backup.
+- **Notes from earlier steps:**
+  - **Step 8:** the book has no state to save; it is rebuilt from `Book.json` at every start.
+  - **Step 6:** `GameSession.ResetUpgrades` (clears calls, returns cords from closing jacks) stays dev-only.
 - **Playtest (browser):**
-  - Earn and buy, then reload: progress (the balance and the bought upgrade ids) is restored.
-  - Push a second build with butler, then reload the itch page: progress survives the new upload.
+  - Earn and buy, then reload: the balance and the bought upgrades come back.
+  - Push a second build with butler and reload the itch page: progress survives the new upload.
   - Close and reopen the tab: progress is restored.
+  - Music starts after the press-start tap.
   - On a phone, tap to patch.
 
 ### Step 10: Tutorial (outline)
 - **Pacing is no longer part of this step:** since D51/D52 the designer sets the difficulty through the call queues in `Economy.json` (hand-written calls, one queue per board size), so the progress curves and type weights (D19, D37) are dropped.
+- **From Step 9a:** `FirstOrderGuide` runs on the first call of every session, a reloaded one too. A tutorial flag in the save (a new `SaveData` field; `JsonUtility` keeps the default for old saves) can stop it after the first time.
 - **Tutorial:** hints for the first calls, such as "Click the ringing card", "Find them in the book" and "Connect the two jacks". **Sergei's `FirstOrderGuide` (merged `e7acec5`, `6226ead`) already pulses the portrait, the book and the cords on the first call; build on it instead of adding a second guide**, and check with the lead and the designer what else is needed (the first calls of `startPool` are the tutorial calls).
 - **Tests:** the tutorial sequence.
 - **Playtest:** a new player gets through the first calls without help.

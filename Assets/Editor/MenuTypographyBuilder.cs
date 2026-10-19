@@ -43,8 +43,11 @@ namespace Switchboard.Editor
                     if (button)
                     {
                         text.enableAutoSizing = true;
-                        text.fontSizeMax = 24;
-                        text.fontSizeMin = 20;
+                        // Small enough that descenders stay inside the plate; the bottom margin centres the
+                        // mixed-case word rather than the ascender-to-descender box (9a menu fix).
+                        text.fontSizeMax = 18;
+                        text.fontSizeMin = 12;
+                        text.margin = new Vector4(0, 0, 0, 3);
                     }
                     EditorUtility.SetDirty(text);
                     PrefabUtility.RecordPrefabInstancePropertyModifications(text);

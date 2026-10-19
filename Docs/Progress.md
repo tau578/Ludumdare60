@@ -16,7 +16,8 @@
 | 6. Board growth (built as 7a) | done | ✅ 2026-10-18 (25 min) | ✅ 439/439 tests, scope clean | ✅ | d166ffa |
 | 7. Hand-written calls and queues | done | ✅ 2026-10-18 (36 min) | ✅ 431/431 tests, scope clean | ✅ | 8e48320 |
 | 8. The new phone book | done | ✅ 2026-10-18 (20 min) | ✅ 445/445 tests, scope clean | ✅ | f82ed29 |
-| 9. Saves, Boot, Web build | not started | | | | |
+| 9a. Saves, touch, menu, pause | playtesting | ✅ 2026-10-19 (37 min + 21 min fix + 24 min pause + 15 min corner) | ✅ 503/503 tests, scope clean | | |
+| 9b. First Web build on itch | not started (needs the Web module) | | | | |
 | 10. Tutorial | not started | | | | |
 | 11. Sound and feel | not started | | | | |
 | 12. Mobile and Web polish | not started | | | | |
@@ -2515,3 +2516,522 @@ Follow-ups:
 - **The build** uses Gzip with Decompression Fallback, so the same files also run on the VPS later.
 - **Saves** go to `localStorage` (Design 5.12), because itch gives every upload a new URL.
 - **Where it's recorded:** Design D26 and §8, the Plan's Step 9 outline, and CLAUDE.md.
+
+### Step 9a prep (orchestrator, 2026-10-19)
+- **Pre-flight:** up to date with origin (`5c85114`); 445/445 EditMode green; console clean; editor idle on `Final`; no format-only re-saves.
+- **Found:** Unity's **Web Build Support module is not installed** for 6000.3.6f1 (only `MacStandaloneSupport`). The Player Settings still have Brotli (0) and no Decompression Fallback.
+- **Decisions (lead, D55):**
+  - Step 9 is split into 9a (saves and touch, testable in the editor) and 9b (the Web build on itch). The lead installs the module before 9b.
+  - On load the queue replays unfinished calls.
+  - A "New game" button in the main menu.
+  - Agents may push to the itch Draft page.
+- **Brief notes:**
+  - Sergei's menu (`MenuTemplates` asmdef) checks only keyboard, mouse and gamepad on its press-start panel, so a phone couldn't get past it. 9a adds touch there and in the volume patch.
+  - His `AudioVolumeSettings` saves the volume patch in PlayerPrefs; 9b moves it to the browser storage.
+  - itch serves every HTML game from one shared domain, so the `localStorage` keys name the game (`operator.save`).
+
+
+### Step 9a report: 2026-10-19
+Result: done
+
+Playable now: progress survives a restart. Press Play in `Final`, earn and buy (for example dev "+ $100", then `income_1` and `board_1`), stop, and press Play again. The balance is the same to the cent, the upgrades are owned, the board opens 4x4 with 3 caller slots before the first call, the extra cords are in the tray, and the shop offers the next entries. Calls that were still on cards ring again first. In `MainMenu`, "New game" sits under Continue while a save exists; it asks "Start a new game? Your money and upgrades will be lost." and "Start over" deletes the save and starts a fresh game. The cord input, the volume patch and the menu hand now read `Pointer.current`, so taps work like clicks.
+
+How to test: the Plan's Step 9a script works, with these notes:
+1. **Script step 5:** after Start over, go back to the menu before connecting a call or buying anything. A new game with nothing done writes no save (deviation 1), so New game is hidden again. Once you connect a call, the game saves and New game shows.
+2. **Script step 6:** `MainMenu.unity` has no press-start panel. `Menu.pressStartPanel` is empty, so the menu opens straight away. The touch check in `Menu.IsAnyInput` is in place for when a panel is added (9b). In the Device Simulator, tap Continue, then tap a cord and two jacks.
+3. **Dev panel:** a new "New game" button at the bottom deletes the save, career included, and reloads `Final` as a new game.
+4. **A broken save** logs one plain warning at start. For example: "Save: the saved game couldn't be read (it isn't valid JSON), so the backup of the save before it was loaded."
+
+Created:
+- **Domain** (`Assets/Scripts/Domain/Save/`):
+  - `SaveData.cs`: `SaveData` (`version`, `cents`, `fraction`, `upgrades`, `queuePosition`, `career`) and `CareerData` (`earnedCents`, `callsConnected`, `finesPaidCents`, `secondsPlayed`). `CurrentVersion` is 1.
+  - `SaveMigrations.cs`: `SaveMigration(fromVersion, Action<SaveData>)`, and `SaveMigrations.Run(data, steps, targetVersion)`, which runs one version at a time. `SaveMigrations.All` is empty, because v1 is the first format.
+  - `ISaveStorage.cs`: `Read`, `Write` and `Delete` of a string by key.
+  - `CareerStats.cs`: starts from the saved career. It counts:
+    - a call's first connection (`CallStateChanged` to Connected, not from OnHold)
+    - `FineApplied.TakenCents`
+    - ticked seconds
+    - earnings, read from `EarningsService.TotalPaidCents`
+- **Content:** `SaveFile.cs`:
+  - the keys `operator.save` and `operator.save.backup`
+  - `ToJson`, `TryParse` (with a plain reason) and `Load()`, which returns a `SaveLoad`: the data, a `SaveSource` (New, Main or Backup) and plain messages
+  - `Write` (backup first), `Delete` and `HasSave`
+- **Game** (`Assets/Scripts/Game/Save/`):
+  - `PlayerPrefsStorage.cs`: `PlayerPrefs.Save()` after each write or delete.
+  - `SaveStorage.cs`: a stateless factory, `Create()` and `OpenFile()`. 9b switches Web builds here.
+  - `Autosave.cs`: added at runtime by `GameInstaller`, like `FirstOrderGuide`. It saves after a purchase, every 10 s of unscaled time if the JSON changed, on `OnApplicationFocus(false)` and `OnApplicationPause(true)`, and on `OnDestroy`. `Stop()` ends it.
+  - `NewGameMenu.cs`: the menu's New game. It shows the button only while `HasSave`, opens and closes the confirm panel, and Start over deletes the save and calls `Menu.onPlayButtonClick()`.
+- **Tests:**
+  - `Assets/Tests/Domain/SaveFileTests.cs` (18 cases)
+  - `Assets/Tests/Domain/SaveSessionTests.cs` (19 cases)
+  - `Assets/Tests/Game/Editor/SaveIsolationTests.cs` (1)
+  - all with `.meta`, plus the folder metas for `Domain/Save` and `Game/Save`
+
+Changed:
+- **Domain:**
+  - `GameSession`:
+    - The constructor takes an optional `SaveData`. It restores the wallet's cents and fraction, then `Upgrades.Restore(ids)` before `StatSheet` is built, and `Queue.Restore(position)` after the queue is built. `Career` comes last.
+    - New members: `CaptureSave()`, `Career`, `IsRestored` and `HasProgress`. `Career.Tick` runs in `Tick`, right after the clock.
+  - `UpgradeService`:
+    - `Restore(ids)`: known ids only, nothing spent, no event.
+    - `OwnedIds()` in file order, and `OwnsAny`.
+  - `CallQueue`:
+    - It keeps a small list of the live calls dealt from the current pool, with their pool index. The list is cleared on `Restart` and pruned on `CallEnded`.
+    - `ResumePosition` returns the oldest such live call's index, or `Position` when there is none.
+    - `Restore(position)`: a position outside the pool starts at 0. `TakeNext` now returns the index.
+  - `GoalProgress`: `affordableRaised` starts as `IsPurchased`, so a loaded secret fires neither event.
+  - `EarningsService`: `TotalPaidCents`, every fee and per-second payment of the session. This is the earnings hook: it adds one double, with no event and no allocation per frame. Dev money doesn't count.
+- **Game:**
+  - `GameInstaller`:
+    - It loads the save after the content and before the session, and logs each `SaveLoad` message as one warning.
+    - It binds `Autosave` and passes the dev panel a New game action.
+    - All of this happens **only in Play Mode** (deviation 2).
+  - `DevPanel`: `Bind(..., Action startNewGame)`, plus the "New game" button.
+- **UI (touch, D28):**
+  - `CableInputController.Update` reads `Pointer.current` (`position`, `press.wasPressedThisFrame`). On a `Touchscreen` with no finger down, it hides pointers entirely while no cord is held. While a cord is held, the cord stays where the finger lifted, with no hover halo, tray highlight or hand.
+  - New overload `ProcessPointer(position, pressed, hover)`. The old two-argument one calls it with `hover: true`, so the integration checks are unchanged. `UpdatePointers` takes `showHand`.
+  - `VolumeCablePanel`: the same change, including a `ProcessPointer(position, pressed, hover)` overload. With hover off, the socket highlights and the hand stay hidden.
+  - `MenuHandCursor`: reads `Pointer.current`. On a touchscreen the hand shows only while a finger is down.
+  - `Menu.IsAnyInput` (Sergei's `MenuTemplates`): `Touchscreen.current.primaryTouch.press.wasPressedThisFrame` counts as input.
+  - `BoardGoldLight` stays on `Mouse.current`. It only reacts to hover (a soft light that follows the cursor), so there is nothing to tap.
+- **Tests:** `Fakes.cs` gains `MemoryStorage`, an in-memory `ISaveStorage` that counts writes.
+- **Docs:**
+  - `Docs/EconomyFile.md`: the "Never rename an id" line now says that since Step 9a the game saves bought ids, so a renamed id counts as never bought and a deleted entry is forgotten.
+  - `Docs/Plan.md` §8: the touch row is narrowed to what's left.
+
+Scene and prefab changes:
+- `Assets/Scenes/MainMenu.unity`. Sergei's `StartMenu` prefab asset is untouched. Everything is a scene object or an override:
+  - **New scene objects:**
+    - `StartMenu/MainMenu/New_Game_Button` (with `New_Game_Text`): a copy of the scene-only `Continue_Button`, the same style and 3x scale, text "New game", and no persistent listener. `NewGameMenu` adds its listener.
+    - `StartMenu/NewGameMenu`: an active, full-stretch RectTransform holding the `NewGameMenu` component. Its references: `menu`, `newGameButton`, `confirmPanel`, `startOverButton` and `cancelButton`.
+    - `StartMenu/NewGameMenu/ConfirmPanel` (inactive): a full-screen backdrop (black at 60%, a raycast target on purpose, so it is modal) and a 1100×420 cream `Plate` with the UISprite.
+      - `Message`: "Start a new game? Your money and upgrades will be lost.", 44 pt Della Respira, no auto size, raycast off.
+      - `Start_Over_Button` at (-260, -100) and `Cancel_Button` at (260, -100), copies of the menu buttons.
+  - **Overrides:** the six menu buttons are re-spaced 110 apart so New game fits under Continue: Play Game 225, Continue 115, New game 5, Options -105, Credits -215, Quit -325. The old 122 spacing with 90 px tall buttons left no room (deviation 4).
+  - The rest of the diff is Unity reordering existing YAML blocks. I checked the counts of the existing objects and overrides; they are the same as before.
+  - Glyphs: `Della Respira SDF` (dynamic) has every character of the new texts (`HasCharacters` true, none missing).
+  - Our buttons sit under `Menu`, so `SceneUiAudio` gives them the click sound, and `Menu.Awake` turns off their navigation like the others.
+- `Final.unity`, `Game.prefab` and every other prefab are unchanged. `Autosave` is added at runtime.
+
+Tests: 483/483 EditMode (445 before; 38 new).
+- **`SaveFileTests`:**
+  - the key names
+  - round trip
+  - a 9,000,000,000,123¢ balance and a 1/3 fraction survive the JSON
+  - empty storage gives a quiet new game
+  - a v1 JSON string loads
+  - missing fields keep their defaults
+  - an injected v1→v2→v3 chain runs once, in order, and an up-to-date save runs nothing
+  - a v1 save needs no steps
+  - a v7 save with unknown fields loads what it can, with one "newer version" message
+  - the backup holds the previous good save
+  - the same save twice keeps the older backup
+  - a corrupt main (broken JSON, empty, `{}`, an array) falls back to the backup, with one message and the broken data kept
+  - corrupt main and backup give a new game with one message
+  - a broken main is never copied over the backup
+  - Delete removes both keys and keeps other keys
+- **`SaveSessionTests`:**
+  - capture, then JSON, then load gives the same balance, fraction, ids, stats, queue position and career, and unfinished calls ring again in order
+  - empty storage starts with `Economy.json`'s starting values (the real file)
+  - a loaded `board_1`+`board_2`+`wires_1`+`income_1` save (real file) opens 5×5 with 4 slots, 4 cords and ×1.5 before the first tick, and the first tick deals `call_201`–`call_204`
+  - unknown ids are ignored and missing ones are not bought
+  - restoring spends nothing and raises no `UpgradeBought`
+  - a loaded secret is `IsPurchased`, and neither goal event fires
+  - the oldest live call from the current pool wins
+  - calls from an older pool don't count
+  - no live calls gives `Position`
+  - out of range (5, 99, -1) gives 0
+  - a saved position deals from there
+  - a connection counts once across hold and resume
+  - the career counts fee and pay but not dev money, and ticked seconds
+  - fines count the amount taken (150 of a 200 fine)
+  - the career adds to the saved numbers
+  - `HasProgress` is false until something happens
+  - a capture is a snapshot
+- **`SaveIsolationTests`:** an EditMode game ignores a planted real save, adds no `Autosave` and leaves the key untouched. Without the Play Mode gate the first run failed 4 Game tests: their sessions autosaved into the real PlayerPrefs and leaked a `board_1` save between tests. I deleted those leaked keys.
+
+Console: clean. Only the known MCP "WebSocket is not initialised" and "TCS … already completed" lines and the engine's two "memoryless" lines around screenshots appeared.
+
+Screenshots (`Temp/Captures/`):
+- `step-09a.png`: the game after a reload with `board_1`, `income_1` and `wires_1` bought: $177.00, a 4×4 board, 4 cords, three cards (call_102–104, which were on cards at the stop), and the shop offering `wires_2`, `board_2` and `income_2`.
+- `step-09a-menu.png`: the menu with New game under Continue.
+- `step-09a-confirm.png`: the confirm panel over the dimmed menu.
+
+Checked in Play Mode (stepped frames):
+- **Fresh start:** $0, 3×3, 2 slots, 2 cords, no save written.
+- **Earn and buy:** dev money, then `income_1` and `board_1` saved at once, then `wires_1` (4 cords in the tray). "Clear calls" moved the queue to call_102–104, and I took call_103.
+- **Stop:** the save had `queuePosition` 1, and the backup held the previous save.
+- **Reload:**
+  - restored, $177.00 and 0.25¢
+  - 4×4 with 16 open jacks, 3 slots, 4 cords on the bridge, ×1.5
+  - the shelf showed `wires_2`, `board_2` and `income_2`
+  - call_102, 103 and 104 rang again (all Incoming)
+- **`MainMenu` with a save:**
+  - New game was shown.
+  - Clicking it (EventSystem raycast clicks) opened the confirm panel. Cancel closed it and kept both keys.
+  - Start over deleted both keys and loaded a fresh `Final`: not restored, $0, 3×3, 2 cords.
+- **`MainMenu` without a save:** New game was hidden. Continue loaded `Final`.
+- **Dev "New game":** buying `income_1` wrote a save. New game deleted both keys and reloaded `Final` fresh, and the old session did not re-save on destroy.
+- **Corrupt main plus good backup:** the backup loaded (4321¢, ×1.5) with the one plain warning above.
+- **Touch path:** taps through `ProcessPointer(pos, true, true)`, with `(pos, false, false)` for "finger up" in between:
+  - picked a cord (still held after the finger lifted, hand off)
+  - plugged C1 (OneEndConnected)
+  - plugged C3 (Connected C1–C3, no cord held), with no hand or hover between taps
+- **Real taps:** I tried a simulated `Touchscreen` device too. Its state reached the device, but the EventSystem and `Application.isFocused` ignore input while Unity is in the background, so a real tap can't be driven from an agent. For that test I set `InputSystem.settings.editorInputBehaviorInPlayMode` in memory and restored it straight away. It is the in-memory default settings object, not an asset, so no file changed. I removed the device.
+- **Smoke run:** about 24 s of game time at ×10 with no errors.
+
+Housekeeping:
+- **PlayerPrefs:** `operator.save` and `operator.save.backup` are deleted, so the lead's playtest starts fresh. `Switchboard.AudioPatch.v1` is untouched.
+- **Format-only re-saves:** the dynamic fonts `Della Respira SDF.asset` (glyphs added by the glyph check and Play) and `Boecklins Universe SDF.asset` (test run) were discarded with `git checkout`. `TimeManager.asset` and `SampleScene.unity` were not touched.
+- **Editor:** not in Play Mode and not paused, `timeScale` 1, no callbacks, SessionState keys or extra input devices left, the Game view at 1920×1080, and `Final.unity` active and not dirty.
+- **Git:** nothing staged or committed.
+
+Deviations from Design/Plan:
+1. **A new game with nothing done writes no save.** `GameSession.HasProgress` is true once money moved from the start, anything is owned or a call connected, and always for a loaded save. `Autosave` skips the write until then. Without this, the `OnDestroy` save on stop would write a save at once, and the playtest's "back in the menu the button is hidden" after Start over could never hold. Time played alone isn't progress.
+2. **Saves only in Play Mode.** `GameInstaller` uses the save and `Autosave` only when `Application.isPlaying`, because the Game EditMode tests build `Final` through `GameInstaller.Start` and were writing the player's real save. `SaveIsolationTests` guards this. The dev panel's New game is likewise only wired in Play Mode.
+3. **No press-start panel to close.** `MainMenu.unity`'s `Menu.pressStartPanel` is empty, so the menu shows at once. Touch was added to `IsAnyInput` as the brief asks, but in this scene there is nothing for it to close yet (9b's audio unlock needs one).
+4. **The menu buttons were moved** (overrides on Sergei's instance) to fit New game under Continue with even 110 spacing. The confirm panel's buttons keep the menu's 3x style.
+5. **Unknown ids are dropped on the next save.** They are ignored on load, as the brief says, and not carried along, so an entry the designer deletes and later restores is no longer owned.
+6. **Career earnings** are kept to the whole cent (rounded at each capture), so at most half a cent is lost per session. The wallet's own fraction is saved exactly.
+7. **The 10 s check writes almost every time** during play, because `secondsPlayed` changes. That's one small PlayerPrefs write every 10 s, never per frame.
+8. **Migrations work on `SaveData`, not raw JSON.** A later step that renames a field keeps the old field in `SaveData` for its migration to move. `JsonUtility` fills fields a file leaves out with their defaults.
+9. **Load messages are warnings** ("Save: ..."), one per fallback. A backup that is also from a newer version gives two.
+
+Follow-ups:
+- **"Play Game" and "Continue"** both load the game (`onPlayButtonClick`). With saves, Play Game now also continues, which may confuse players. The lead could drop it or decide what it means.
+- **Design.md (orchestrator):**
+  - 5.12: the key is `operator.save`, not `switchboard.save`; New game, `HasProgress` and the Play Mode gate.
+  - 4.4: step 2 is built.
+  - 5.10: `CareerStats` is built, earnings via `EarningsService.TotalPaidCents`.
+  - 6.2: the career is owned by `GameSession.Career`.
+  - 4.5's touch line is done.
+  - §3: the `ProcessPointer(position, pressed, hover)` overloads on `CableInputController` and `VolumeCablePanel`.
+- **9b:** `SaveStorage.Create()` is the single switch point for `BrowserStorage`. `Autosave.SaveNow()` is public, ready for a `.jslib` `visibilitychange` hook. A press-start panel in `MainMenu` would give the audio-unlock tap.
+- **Real touch checks** need the lead: the Device Simulator now, a phone in 9b/12. The menu buttons are 480×90 reference px, fine for fingers. The confirm buttons are the same size.
+
+#### Step 9a verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 483/483 green (445 before, 38 new). Console clean. My run left no format-only re-saves.
+- **Scope:** 13 tracked files changed plus the new Save folders, codec and tests. All of them were named in the brief or the launch notes; nothing is staged.
+  - `MainMenu.unity`: +1288/−151. The removed lines are Unity reordering existing blocks (the `LevelLoader` prefab instance moved); the new objects are `New_Game_Button` and `NewGameMenu`.
+  - `Final.unity` and every prefab are unchanged.
+- **Screenshots checked:**
+  - `step-09a.png`: a reloaded game at $177.00 on a 4×4 board with 4 cords and three unfinished calls back on cards.
+  - `step-09a-menu.png`: Play Game, Continue, New game, Options, Credits, Quit.
+  - `step-09a-confirm.png`: the confirm plate with Start over and Cancel.
+- **Code skim:**
+  - `GameSession` restores before `StatSheet`, `CallQueue` and the shelf are built.
+  - `CallQueue` remembers each dealt call's pool index, so `ResumePosition` is exact.
+  - `SaveFile.Write` copies the previous main save to the backup only when it still parses.
+  - `Autosave` captures only on its occasions.
+  - `GameInstaller` opens the save only in Play Mode.
+- **Docs updated:**
+  - `Design.md`: the 9a status row, 4.4, 4.5 touch, 5.10 `CareerStats`, and the 5.12 deviations.
+  - `Plan.md`: §4 (saves in tests), the Step 9b notes, and Step 10 (the guide on reload).
+  - `CLAUDE.md`: the next step.
+- **For the lead at the playtest:** the 5.12 deviations, plus the question of the menu's "Play Game" and "Continue" buttons, which now do the same thing.
+
+#### Step 9a playtest (lead, 2026-10-19), menu fix requested
+- The menu was confusing: "Play Game" and "Continue" did the same thing.
+- **The lead's new order** (D55 amended):
+  - **No save:** New Game first, then Options, Credits, Quit. Continue is hidden, and New Game starts at once with no question.
+  - **With a save:** Continue first, then New Game (with the confirmation), Options, Credits, Quit.
+- **Play Game is removed** from the menu prefab, not just hidden (lead).
+- Sent to a fix agent.
+
+
+### Step 9a fix report: 2026-10-19
+Result: done
+
+Playable now: the main menu follows the lead's new order. Without a save it shows New Game, Options, Credits, Quit Game; New Game goes straight into a fresh game. With a save it shows Continue, New Game, Options, Credits, Quit Game; Continue loads the game, and New Game opens the confirm panel. "Play Game" is gone. Every button label is centred in its plate. In Options the mute socket is now first on the left of each row: mute, 25, 50, 75, 100.
+
+How to test:
+1. **No save.** Delete the save (dev panel "New game", or start fresh), open `MainMenu` and press Play. You see four buttons, evenly spaced, with New Game first. Click New Game: `Final` loads as a new game with no question.
+2. **With a save.** Earn something in `Final` so the game saves, then go back to `MainMenu`. You see five buttons with Continue first. Continue loads your game. New Game opens the panel: Cancel closes it, and Start over deletes the save and starts fresh.
+3. **Labels.** Every label sits in the middle of its plate, including Start over and Cancel. Descenders (p, y, Q) no longer hang below the plate.
+4. **Volume.** Options: each row reads mute, 25, 50, 75, 100. Your saved patch comes back as it was (yours is Master 100, Music 25, SFX 100). Plugging into the leftmost socket mutes that channel.
+
+Created:
+- `Assets/Tests/Game/Editor/MainMenuLayoutTests.cs` (+ `.meta`): 8 tests.
+
+Changed:
+- `Assets/Scripts/Game/Save/NewGameMenu.cs`:
+  - new fields `continueButton`, `menuButtons` (top to bottom), `centreY` (-50) and `spacing` (122)
+  - `Apply(hasSave)` shows or hides Continue, closes the panel, and lays out the active buttons
+  - `OnNewGame()` starts at once without a save and asks with one
+  - `SlotY(index, count, centre, spacing)` is a static helper, so the layout can be tested
+- `Assets/Tools/rodrigo_menu_tools/Runtime/Prefabs/StartMenu.prefab` (Sergei's menu prefab):
+  - `Play_Game_Button` and its text are deleted
+  - the references to it are cleared: `Menu.MainMenuFirstButton` (no code reads it), `Options_Button`'s select-on-up, `Quit_Game_Button`'s select-on-down, and the prefab `EventSystem`'s first-selected (`Menu` clears the selection at run time anyway)
+  - labels `Options_Text`, `Credits_Text`, `Quit_Game_Text`: auto size 12–18, bottom margin 3, Center/Middle, stretched with zero offsets. `Credits_Text` lost a trailing line break ("Credits\n").
+- `Assets/Scenes/MainMenu.unity`:
+  - the 11 orphaned overrides on `Play_Game_Button`/`Play_Game_Text` are removed with `PrefabUtility.RemoveUnusedOverrides`
+  - the scene's font-size overrides (max 24, min 20, auto size) on the three prefab labels are reverted, so the prefab's values apply. The scene keeps its font override (Della Respira).
+  - `New_Game_Text` now reads "New Game"
+  - `Continue_Text`, `New_Game_Text`, `Start_Over_Text` and `Cancel_Text` get the same label settings
+  - `NewGameMenu` is wired to Continue and the five buttons
+  - the stored button positions are the "with a save" layout: 194, 72, -50, -172, -294
+- `Assets/Prefabs/UI/VolumeCablePanel.prefab` (the three rows in Options) and `Assets/Prefabs/UI/MasterVolumeCableSlider.prefab` (the old single row, inactive in the scene):
+  - sockets and labels moved: mute -300, 25 at -95, 50 at 110, 75 at 315, 100 at 520
+  - the resting plugs and wires were redrawn at the default socket
+  - re-saving also wrote default values for fields added to the socket, plug and cable graphics since these prefabs were last saved (`faceSprite`, `dimmedTint`, `heldSprite`, `insertedSprite`, `artworkTint`, `thicknessScale`). They are defaults, so nothing looks different.
+- `Assets/Scripts/UI/AudioVolumeSettings.cs`: one comment. The level table is unchanged.
+- `Assets/Editor/VolumeCableSliderBuilder.cs`: a rebuilt row puts mute first (`x = -300 + (i + 1) % 5 * 205`).
+- `Assets/Editor/MenuTypographyBuilder.cs`: button labels get 18/12 and the bottom margin, so re-running "Apply Main Menu Fonts" won't undo the centring. If re-run, it would also apply these values to the two "Go back" buttons, which this pass left alone.
+- `Docs/Design.md` 5.12: deviation 7 rewritten.
+
+How it works:
+- **Spacing:** the visible buttons are positioned from `NewGameMenu` (no layout group). Sergei's buttons are prefab children and the two new ones are scene objects, so they can't share a layout-group parent without changing the prefab's structure. The visible buttons sit 122 apart (the prefab's original spacing), centred on y -50, the same centre as the 9a column.
+- **Volume:** I moved the sockets on screen and kept their indices. Socket 4 is still mute and 0–3 are still 25–100, so every saved `Switchboard.AudioPatch.v1` keeps its meaning with no migration, and the default patch (all three rows at 50 %) is unchanged. The panel finds sockets by object, not by position, so no code had to change. The game scene (`Final`) has no volume patch; only `MainMenu` shows one.
+- **Labels:** the TMP alignment was already Center/Middle, and the rects were already stretched with zero offsets. Measured in Play Mode, the capitals were centred to within 0.3 units. The real cause was size: auto size filled the 30-unit plate at 21.9–24 pt, so lowercase-heavy words looked low, and descenders and the Q's tail hung below the plate. Della Respira's metrics at 90 pt: ascent 96.5, cap height 72, x-height 42, descent -26.7. At 18 pt with a 3-unit bottom margin (the text is raised 1.5 units), the mixed-case word is centred and the descenders stay on the plate.
+
+Tests: 491/491 EditMode (483 before; 8 new in `MainMenuLayoutTests`):
+- the slot maths (5 and 4 buttons)
+- without a save (preview scene of `MainMenu`): New Game, Options, Credits, Quit, evenly spaced and centred, with Continue hidden
+- with a save: Continue first, and New Game opens the panel, which Cancel closes
+- no `Play_Game` object is left in the prefab or the scene, and the menu, buttons, `NewGameMenu` and EventSystem have no missing references
+- all 7 labels are Center, stretched with zero offsets, 18 max and margin 3, with no stray whitespace. Every character is in Della Respira's source font, checked with `FontEngine.TryGetGlyphIndex` (the font is dynamic, so the saved atlas isn't the reference; the check does say "→" is missing).
+- the mute socket is drawn first in both volume prefabs, with each label over its socket
+- old socket indices keep their volumes (25 %, mute, 100 %), and the default patch stays at 50 %
+
+Console: clean. The only lines were the known MCP "WebSocket is not initialised" and the engine's two "memoryless" lines around screenshots.
+
+Screenshots (`Temp/Captures/`):
+- `step-09a-menu-nosave.png`: New Game, Options, Credits, Quit Game, centred labels
+- `step-09a-menu-save.png`: Continue, New Game, Options, Credits, Quit Game
+- `step-09a-confirm.png` (replaced): the confirm panel with centred Start over and Cancel
+- `step-09a-volume.png`: Options with mute first in all three rows, showing the lead's own patch
+
+Checked in Play Mode (stepped frames, EventSystem raycast clicks):
+- **No save:** Continue hidden, and New Game first at y 133 (4 slots). Clicking New Game loaded `Final` at once with no panel: not restored, $0, nothing owned.
+- **With a save** (a test save):
+  - Continue first at 194, and New Game at 72.
+  - New Game opened the panel. Cancel closed it and kept the save.
+  - New Game, then Start over, deleted both keys and loaded a fresh `Final`.
+- **Smoke run:** about 24 s of game time in `Final` at ×10, with no errors. Stopping wrote no save (nothing happened).
+- **Volume:** the lead's patch showed Music on the 25 socket (second from the left). Picking up the Music plug and plugging it into the leftmost socket gave socket 4 and volume 0.
+
+Housekeeping:
+- **PlayerPrefs:** `operator.save`, `operator.save.backup` and `Switchboard.AudioPatch.v1` were read at the start and written back exactly as found (the lead's $10.00 save with its backup, and the patch `[3,0,3]`). No other keys were touched.
+- **Format-only re-saves discarded** with `git checkout`: `Della Respira SDF.asset` and `Boecklins Universe SDF.asset`. `TimeManager.asset` and `SampleScene.unity` were not touched.
+- **Editor:** not in Play Mode and not paused, `timeScale` 1, no callbacks or SessionState keys left, the Game view at 1920×1080, `Final.unity` open, active and saved, and the console cleared.
+- **Git:** nothing staged or committed.
+
+Deviations from Design/Plan:
+1. The labels are smaller (18 pt maximum instead of 24). Centring them in the 30-unit plates meant the descenders had to fit.
+2. `Menu.MainMenuFirstButton` is cleared, not re-pointed: no code reads it, and the prefab can't reference the scene's Continue button.
+
+Follow-ups:
+- The two "Go back" buttons (Options, Credits) still use 24/20 auto size, so their labels look large and a little low, as the menu buttons did before. They weren't in the list; the same settings would fix them.
+- The quit label reads "Quit Game" (Sergei's text). The lead's list says "Quit"; I left the text alone.
+- **Missing music tracks.** `RandomMusicPlayer.tracks` in `StartMenu.prefab` and `Music_randomizer.prefab` points to two audio files (GUIDs `a84ac8ff…` and `e974b80e…`) that aren't in the repo at HEAD. So the menu music references are missing, in the scene too. This predates the fix, and the new missing-reference test skips that component.
+
+#### Step 9a fix verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 491/491 green. Console clean, and no format-only re-saves are left.
+- **Scope:** the fix touched `NewGameMenu`, `StartMenu.prefab` (Play Game deleted), `MainMenu.unity`, both volume prefabs, `AudioVolumeSettings` (a comment only), `VolumeCableSliderBuilder`, `MenuTypographyBuilder` and the new `MainMenuLayoutTests`. All of them follow from the lead's three items.
+- **Screenshots checked:**
+  - `step-09a-menu-save.png`: Continue, New Game, Options, Credits, Quit Game, evenly spaced, with the labels centred.
+  - `step-09a-volume.png`: mute first on every row. The lead's patch is restored (Master 100, Music 25, SFX 100).
+- **The volume sockets moved on screen and kept their numbers,** so saved patches need no conversion.
+- **Missing menu tracks:** the two missing audio GUIDs (`a84ac8ff…`, `e974b80e…`) belong to the menu package's `Music_randomizer` and have been missing since the package was added (`3522d9a`). They're in Plan §8 now.
+
+#### Step 9a playtest, round 2 (lead, 2026-10-19)
+- **Volume patch:** the sockets sit a bit right of each row's centre. Fix: centre them.
+- **No way back to the main menu.** The lead chose a pause menu (D56), built now with the socket fix as "Step 9a, pass 2" (Plan), before 9b.
+
+
+### Step 9a pass 2 report: 2026-10-19
+Result: done
+
+Playable now: the game has a pause menu. A small pause button (two bars) sits above the board's top-left corner; it and Esc open a modal "Paused" panel with Resume, Options and Main Menu. While paused, game time stops (pay, call durations and emergency countdowns freeze), the ring and call sounds pause, and the cord input is off, so a cord held before pausing is still in hand after Resume. Options shows the main menu's volume patch, with a Back button. Main Menu saves, then loads `MainMenu`, where Continue picks the game up again. Every button click now keeps a held cord. In both Options screens the five volume sockets sit centred in each row. The menu's quit button reads "Quit".
+
+How to test: the Plan's pass 2 playtest script works as written. Notes:
+1. **Esc** while paused resumes, also from the Options page (the brief's rule); Back returns from Options to the main page.
+2. **The pause button** is above the board, not above the caller column: there is only about 60 reference px above the column, too little for an 88 px button (deviation 1).
+3. **A held cord and buttons:** holding a cord, click the pause button, a shop button or the "Keep playing" button: the cord stays in hand. Clicks on empty space, the tray and closed jacks behave as before.
+
+Created:
+- `Assets/Scripts/Game/Views/GamePauseMenu.cs` (+ `.meta`): the pause menu. `Bind(saveNow, cordInput, book, callAudio, sceneLoader = null)`, `Pause()`, `Resume()`, `HandleEscape()`, `ShowOptions()`, `ShowMain()`, `GoToMainMenu()`, `IsPaused`, `OptionsOpen`. It reads Esc through `Keyboard.current`. Named `GamePauseMenu` because Sergei's menu package already has an unused global `PauseMenu` (`Pause.prefab`, in no scene).
+- `Assets/Tests/Game/Editor/GamePauseMenuTests.cs` (+ `.meta`): 6 tests.
+
+Changed:
+- `Assets/Scripts/UI/CableInputController.cs`:
+  - New `Suspended` property. While suspended, `Update` and `ProcessPointer` only hide the pointers: no pick, plug or drop, and `heldCable` is kept. The press in the frame that resumes is ignored, so the Resume click can't plug the jack under the button.
+  - **Every button keeps a held cord:** in the "empty space" branch, a click whose target has a `Selectable` in its parents no longer returns the cord. The only buttons on the board are the four shop slots, the book (already excluded) and "Keep playing"; the tray, sockets and cards have no `Selectable`, so their behaviour is unchanged. The check runs only on a press.
+- `Assets/Scripts/UI/PhoneBookView.cs`: `InputEnabled` (off while paused: keys and outside clicks leave the book as it is) and `ClosesOnEscape` (off once the pause menu is bound; the pause menu then closes the open book itself, so the Esc order between the two `Update`s doesn't matter).
+- `Assets/Scripts/Game/CallAudio.cs`: `SetPaused(bool)` pauses and resumes its ring and feedback sources, `IsPaused`, and a `PausedChanged` event.
+- `Assets/Scripts/Game/SceneUiAudio.cs`: listens to `CallAudio.PausedChanged` and pauses the phone babble (it lives on the `BackgroundMusic` prefab, which persists across scenes). Music and menu clicks keep playing.
+- `Assets/Scripts/Game/GameLoopRunner.cs`: no `Tick` when `Time.deltaTime` is 0, so not even a free caller slot deals a call while paused.
+- `Assets/Scripts/Game/GameInstaller.cs`: binds the scene's `GamePauseMenu` (if there is one) with `Autosave.SaveNow` (null outside Play Mode), the cord input, the book and `CallAudio`.
+- `Assets/Editor/VolumeCableSliderBuilder.cs`: sockets at `x = -410 + (i + 1) % 5 * 205`, the fixed socket at -580.
+- `Assets/Editor/VolumeOptionsBuilder.cs`: the fixed-socket line says -580 too (that socket is deleted by the wall-output conversion anyway).
+- `Assets/Tests/Game/Editor/MainMenuLayoutTests.cs`: a centred-row test (2 cases) and a "Quit" check in the label test.
+- `Docs/Plan.md` §8: the "A held cord drops on button clicks" row is removed; "the quit label reads Quit Game" is removed from "Menu leftovers".
+
+Scene and prefab changes:
+- `Assets/Prefabs/Game/GameUI.prefab`: a new `Pause` child (full stretch) with its own canvas (override sorting, order 16: above the book at 10 and the Goal dialog at 15, below the hand cursor and held plugs at 20), a `GraphicRaycaster` and `GamePauseMenu`.
+  - `PauseButton`: 88×88 at (-490, 490), the dark panel plate with the gold outline, two 14×42 cream bars (raycast off), a tinted `Button` with no navigation. It overlaps no jack, card, caller panel or shop (checked in Play Mode at 1920×1080).
+  - `Dialog` (inactive): `Blocker` (a copy of the Goal backdrop, black at 60 %, a raycast target on purpose), `Main` (600×470 plate: "Paused", Resume, Options, Main Menu, copies of "Keep playing") and `Options` (1240×900 plate, inactive: "Options", a nested `VolumeCablePanel.prefab` instance at 0.85 scale, Back).
+  - Wired: buttons, pages, `CardTakeSound`'s `UiClickSound` for the clicks, and `menuSceneIndex` 0.
+  - All labels are LiberationSans SDF (the static atlas has every glyph; the test checks it) with raycast off.
+  - The rest of the diff is Unity reordering YAML: the old prefab's 96 named objects are all still there.
+- `Assets/Prefabs/UI/VolumeCablePanel.prefab` and `Assets/Prefabs/UI/MasterVolumeCableSlider.prefab`: sockets, labels and the mute icon at mute -410, 25 at -205, 50 at 0, 75 at 205, 100 at 410; the resting plugs and wires redrawn at the 50 socket. In the single-row prefab, the fixed socket and plug moved from -530 to -580, so 70 px stay free between it and the mute socket. In the three-row panel, the cable starts at its wall anchor (-650), about 200 px from the mute socket. The socket indices are unchanged, so saved patches keep their meaning.
+- `Assets/Tools/rodrigo_menu_tools/Runtime/Prefabs/StartMenu.prefab`: `Quit_Game_Text` reads "Quit". `MainMenu.unity` has no override on that text, so nothing changed there. The label keeps the centred settings of the 9a fix.
+- `Final.unity` and `MainMenu.unity` are not changed by this pass. `Final` picks the pause menu up from `GameUI.prefab`.
+
+Tests: 499/499 EditMode (491 before; 8 new):
+- `GamePauseMenuTests` (on `Final` in a preview scene, the installer bound, then the menu re-bound with a logging save and scene loader):
+  - pause stops time, saves, shows the dialog, suspends the cords, the book and the call sounds; resume restores the previous ×5
+  - Esc with the book open closes only the book; Esc again pauses; again resumes
+  - Main Menu saves, then loads build index 0, and sets `timeScale` 1
+  - Options shows the volume patch; Back returns
+  - a held cord survives pause and resume: clicks while paused change nothing, and the same click after Resume works
+  - the panel is a modal between the book and the cursor, its labels have the glyphs, and the pause button is at least 88×88 with its bars raycast off
+- `MainMenuLayoutTests`: the sockets are at -410…410 in both prefabs with room left of the mute socket (2 cases); the quit label reads "Quit".
+
+Console: clean after clearing. During Play Mode checks the engine's two "memoryless" lines appeared around screenshots, and once "the PlayerLoop internal function has been called recursively": that came from loading a scene inside an `execute_code` call while frames were stepped with `EditorApplication.Step()`, not from game code.
+
+Screenshots (`Temp/Captures/`):
+- `step-09a2-button.png` (1920×1080) and `step-09a2-button-720.png` (1280×720): the pause button above the board's top-left corner
+- `step-09a2-paused.png`: the "Paused" panel over the dimmed game
+- `step-09a2-options.png`: Options inside the pause panel, the lead's patch (Master 100, Music 25, SFX 100), sockets centred
+- `step-09a2-volume.png`: the main menu's Options with the centred sockets
+- `step-09a2-menu.png`: the main menu with Continue, New Game, Options, Credits, Quit
+
+Checked in Play Mode (stepped frames, calls inside `Canvas.willRenderCanvases`):
+- **Held cord:** picked a cord from the tray (`ProcessPointer`), then pressed at the pause button and at a shop button: still held. Pause, Options, Back, Resume: still held (`Cable_04`, Held).
+- **Freeze:** paused for 30 frames: game time stayed at 0.86 s, the emergency `call_303` kept 29.14 s left, the money didn't move, and `CallAudio` was paused. After Resume the countdown moved on (29.06) and `timeScale` was 1.
+- **Volume patch at `timeScale` 0:** picked up the Master plug, moved the pointer 200 px and the plug followed, then plugged it back into 100 %.
+- **Saves:** pausing wrote the save. With the money changed after the pause, Main Menu wrote the new balance before `MainMenu` loaded, and `timeScale` was 1 there. Continue (build index 1) restored the game at $170.24.
+- **Smoke run:** about 28 s of game time at ×10 in `Final`, no errors.
+
+Housekeeping:
+- **PlayerPrefs:** `operator.save`, `operator.save.backup` and `Switchboard.AudioPatch.v1` were read at the start (the lead's $169.00 save with 7 upgrades, its backup, and the patch `[3,0,3]`) and written back exactly as found, checked string for string.
+- **Format-only re-saves:** none this time (`TimeManager.asset`, both dynamic TMP fonts and `SampleScene.unity` are untouched).
+- **Mia's `Assets/RawArt/art.png`:** Unity generated `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta`; both are left untracked and untouched.
+- **Editor:** not in Play Mode and not paused, `timeScale` 1, `AudioListener.pause` false, no callbacks or SessionState keys left, the Game view at 1920×1080, `Final.unity` open, active and not dirty, console cleared.
+- **Git:** nothing staged or committed.
+
+Deviations from Design/Plan:
+1. **The pause button sits above the board's top-left corner, not above the caller column.** The column reaches to about 60 reference px from the top edge, and an 88 px button doesn't fit there. The strip above the board is free at every 16:9 size and far from the book, the shop and the Dev button.
+2. **Esc in Options resumes** (as the brief says) instead of going back to the main page; Back does that.
+3. **Saving dedupes:** `Autosave.SaveNow()` skips a write when the JSON equals the last one it wrote, so Main Menu right after a pause writes nothing new (the pause already saved the same state).
+4. **Clicks keep a held cord on every `Selectable`**, not only the pause button, which closes the Plan §8 item. Clicks on non-button modal backdrops (the Goal dialog's blocker) and the dev panel's IMGUI buttons still count as empty space.
+5. **While paused the book keeps its state:** its keys and outside-click closing are off, so a book left open behind the pause panel is still open after Resume.
+
+Follow-ups:
+- **Design.md (orchestrator):** D56 is built; 4.3 gains the pause canvas at order 16; §3 gains `CableInputController.Suspended`, `PhoneBookView.InputEnabled` and `ClosesOnEscape`, and `CallAudio.SetPaused`.
+- **Touch:** the pause button is 88 reference px, about 32 pt on an 844×390 phone. Fine for a mouse, a bit small for a finger; Step 12 could enlarge it or add a hit margin.
+- **The dev panel's Speed button while paused** sets `timeScale` and so runs the game behind the panel. It's dev-only; ignore it or let it respect the pause.
+- **Sergei's unused `PauseMenu` and `Pause.prefab`** in the menu package could be deleted in a cleanup to avoid confusion with `GamePauseMenu`.
+
+#### Step 9a pass 2 verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 499/499 green. Console clean.
+- **Scope:** `GamePauseMenu` plus tests (new). Changed: `GameUI.prefab` (the `Pause` child), `CableInputController`, `PhoneBookView`, `CallAudio`, `SceneUiAudio`, `GameLoopRunner`, `GameInstaller`, the two volume prefabs and their builders, `StartMenu.prefab` (Quit) and `MainMenuLayoutTests`. `Final.unity` is unchanged.
+  - Mia's `Assets/RawArt/art.png` came in with `5b028d9` (fast-forward); Unity generated `Assets/RawArt.meta` and `art.png.meta`, untracked.
+- **Selectable check:** the tray, sockets and board prefabs have no `Selectable`, so clicking the tray still returns a held cord. Only buttons keep it.
+- **Screenshots checked:**
+  - `step-09a2-button.png`: the pause button above the board's top-left corner, clear of the cards.
+  - `step-09a2-paused.png`: the "Paused" panel.
+  - `step-09a2-options.png`: the volume patch inside it, centred.
+  - `step-09a2-volume.png`: the main menu's Options, centred, mute first.
+- **For the lead:** the pause panel and button have a placeholder look (LiberationSans, flat green), not the menu's serif style. Mia could draw them.
+
+#### Step 9a playtest, round 3 (lead, 2026-10-19)
+- **The pause button moves to the top-right corner** (lead's choice). It is anchored to the screen corner, and the editor-only Dev button moves aside.
+- **Quit only in Windows and Mac builds.** It is hidden in the Web build, where `Application.Quit` does nothing. This moves forward from the 9b outline.
+
+
+### Step 9a pass 3 report: 2026-10-19
+Result: done
+
+Playable now: the pause button sits in the screen's top-right corner. It is anchored to that corner, so it follows the real corner at every aspect ratio. The dev panel's "Dev" button sits just left of it. The main menu hides Quit in Web builds and closes the gap: with a save it shows Continue, New Game, Options, Credits; without one, New Game, Options, Credits. The editor and the Windows and Mac builds still show Quit.
+
+How to test:
+1. Play `Final` at 1920×1080, 1280×720 and 844×390. The pause button is in the top-right corner, above the shop panel and clear of the money plaque. "Dev" is left of it. Click Dev: its buttons open as a row going left along the top edge, above the board.
+2. The pause button works as before: the panel opens, and Resume brings the game back.
+3. In the editor, the main menu still shows Quit. The Web layout is covered by `MainMenuLayoutTests` and the screenshot `step-09a3-menu-web.png`; the real Web check comes with the 9b build.
+
+Created: none.
+
+Changed:
+- `Assets/Scripts/Game/Save/NewGameMenu.cs`:
+  - New `quitButton` field.
+  - `QuitAvailable` is false only in Web players (`UNITY_WEBGL && !UNITY_EDITOR`).
+  - `Apply(saveExists)` now calls the new `Apply(saveExists, quitVisible)`, which shows or hides Quit before the evenly spaced layout runs, so a hidden Quit leaves no gap.
+- `Assets/Scripts/Game/DevTools/DevPanel.cs`:
+  - "Dev" now sits left of the pause button: 6 px from the top, 84 px in from the right edge (the button's 6 px margin, its 72 px width and a 6 px gap).
+  - When open, its buttons form a row going left at the same height, not a column going down (deviation 2).
+- `Assets/Tests/Game/Editor/GamePauseMenuTests.cs`: the 88 px size check moved into a new corner test (below).
+- `Assets/Tests/Game/Editor/MainMenuLayoutTests.cs`: Web cases (below).
+- `Docs/Design.md` 4.3: the pause-menu line now gives the 72 px size, the corner anchor, the Dev button and `QuitAvailable`.
+- `Docs/Plan.md` 9b outline: the Quit item now says 9a pass 3 did it.
+
+Scene and prefab changes:
+- `Assets/Prefabs/Game/GameUI.prefab`, `Pause/PauseButton`:
+  - anchors and pivot moved to (1, 1), the top-right corner; position (-6, -6); size 72×72 (it was 88×88 at (-490, 490) from the centre)
+  - the two bars scaled down to match: 12×34 at ±10 (they were 14×42 at ±12)
+  - nothing else in the prefab changed
+- `Assets/Scenes/MainMenu.unity`: `NewGameMenu.quitButton` is wired to the `StartMenu` instance's `Quit_Game_Button`. That one field is the only change this pass made to the scene.
+- `Final.unity`: not changed.
+
+Tests: 503/503 EditMode (499 before; 4 new):
+- `GamePauseMenuTests.ThePauseButtonSitsInTheTopRightCorner`:
+  - anchors and pivot at (1, 1), at least 72×72, with a margin of 0 to 16 px
+  - its bottom edge at most 80 px from the top, so it stays above the shop
+  - the `Pause` parent stretches over the whole screen
+- `MainMenuLayoutTests.OnWebQuitIsHiddenAndTheRestStayEvenlySpaced` (two cases, with and without a save): the expected buttons in order, evenly spaced around the centre, and Quit inactive. Showing Quit again puts it back last.
+- `MainMenuLayoutTests.QuitShowsInTheEditorAndDesktopBuilds`: `QuitAvailable` is true in the editor, and `Apply(true)` shows Quit.
+
+Console: clean (cleared at the end). The engine's two "memoryless" lines appeared around screenshots in Play Mode.
+
+Screenshots (`Temp/Captures/`):
+- `step-09a3-corner.png` (1920×1080): the pause button in the corner with "Dev" left of it
+- `step-09a3-corner-phone.png` (844×390): the same on a wide phone, where the corner is well right of the shop
+- `step-09a3-dev-open.png` (1920×1080): the opened dev row along the top edge
+- `step-09a3-menu-web.png`: the main menu with `Apply(true, false)`: Continue, New Game, Options, Credits, evenly spaced
+- `step-09a3.png`: the smoke run
+
+Checked in Play Mode (stepped frames, checks inside `Canvas.willRenderCanvases`):
+- **Overlap check:** the pause button and all nine dev buttons were compared with every active raycast target and the shop panel and `HeaderSlot` rects, at 1920×1080, 1280×720 and 844×390. Nothing overlaps.
+
+  | Size | Pause button | Shop panel's top | Pause to shop's right edge |
+  |---|---|---|---|
+  | 1920×1080 | 6–78 px from the top | 86 px | (stacked: shop starts below) |
+  | 1280×720 | 4–52 px | 57 px | (stacked: shop starts below) |
+  | 844×390 | 2–28 px | 31 px | 56 px of free space |
+
+  The dev row spans x 1122–1836 at 1920×1080 and doesn't reach the board or the caller column.
+- An EventSystem raycast at the button's centre at 844×390 hits `PauseButton` first.
+- **Smoke run:** `MainMenu`, then `Final` via `LoadScene(1)`, about 80 s of game time at ×10. No errors or warnings from game code.
+
+Housekeeping:
+- **PlayerPrefs:** I read `operator.save`, `operator.save.backup` and `Switchboard.AudioPatch.v1` at the start: $71.00 with 5 upgrades, its backup, and the patch `[3,1,3]`. Play Mode rewrote the save, so I wrote all three back exactly as found and checked them string for string.
+- **Format-only re-saves discarded** with `git checkout --`: `ProjectSettings/TimeManager.asset`, `Assets/Fonts/BoecklinsUniverse/Boecklins Universe SDF.asset` and `Assets/Fonts/DellaRespira/Della Respira SDF.asset`. `SampleScene.unity` was untouched.
+- `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta` are left as they were.
+- **Editor:**
+  - not in Play Mode
+  - `timeScale` 1, `AudioListener.pause` false
+  - no callbacks or SessionState keys left
+  - the Game view at 1920×1080
+  - `Final.unity` open, active and not dirty
+  - console cleared
+- **Git:** nothing staged or committed.
+
+Deviations from Design/Plan:
+1. **The pause button is 72×72, not 88.** At 16:9 the shop panel's art starts 86 px from the top, right under the corner. An 88 px button with a margin would reach into it. On wider screens the corner moves right of the shop, but one fixed size keeps the layout simple.
+2. **The open dev panel is a row along the top edge, not a column.** A column below the pause button, or below a Dev button left of it, would hang over the shop slots. Each slot is a buy `Button` 390 px wide, and an IMGUI click there also clicks the slot under it. The old column already overlapped slot 1's right edge. The row keeps the same buttons in the same order, going left from "Close", and covers nothing clickable.
+
+Follow-ups:
+- Plan §4's "Dev panel (2a)" row still says the button is in the top-right corner. It is now just left of the pause button and opens as a row (orchestrator).
+- On an 844×390 phone the pause button is 26 physical px. That's fine for a mouse but small for a finger, so Step 12 could add a larger invisible hit area. There's room for one in the corner on wide phones.
+
+#### Step 9a pass 3 verification (orchestrator, 2026-10-19)
+- **EditMode re-run:** 503/503 green. Console clean, and no re-saves are left.
+- **Scope:** `NewGameMenu` (`quitButton`, `QuitAvailable`), `DevPanel` (the Dev button left of pause, the panel as a row), `GameUI.prefab` (`PauseButton` anchored top-right, 72×72), `MainMenu.unity` (one reference), and two test files.
+- **Screenshots checked:**
+  - `step-09a3-corner.png`: the pause button in the top-right corner above the shop, with Dev to its left.
+  - `step-09a3-menu-web.png`: Continue, New Game, Options, Credits, evenly spaced.
+- **For the lead:** the button is 72 px, not 88, so it clears the shop's top edge. On phones it may be small for a finger; Step 12 can add a bigger invisible hit area.
+- Committed and pushed on the lead's request (2026-10-19), with no teammate pushes since `5b028d9`. The lead's playtest of pass 3 isn't confirmed yet.
+- Left out of the commit: `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta`, which Unity generated for Mia's `art.png`.
+

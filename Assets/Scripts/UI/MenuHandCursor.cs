@@ -13,8 +13,11 @@ namespace Switchboard.UI
         private void OnEnable() { originalVisible = Cursor.visible; }
         private void LateUpdate()
         {
-            if (Mouse.current == null || !Application.isFocused) { Hide(); return; }
-            UpdatePointer(Mouse.current.position.ReadValue());
+            // Mouse and touch alike (D28); on a touchscreen the hand shows only while a finger is down.
+            var pointer = Pointer.current;
+            if (pointer == null || !Application.isFocused) { Hide(); return; }
+            if (pointer is Touchscreen && !pointer.press.isPressed && !pointer.press.wasPressedThisFrame) { Hide(); return; }
+            UpdatePointer(pointer.position.ReadValue());
         }
         public void UpdatePointer(Vector2 position)
         {
