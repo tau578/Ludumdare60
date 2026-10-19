@@ -27,28 +27,28 @@ MonoBehaviour:
   economyFile: {fileID: 4900000, guid: 40ca8933a2957462dbd79017f4f12b46, type: 3}
   portraits:
   - name: caller-01
-    sprite: {fileID: -3528310941345610784, guid: f1165ce58b3149e488092261ba6f7544, type: 3}
+    sprite: {fileID: -3528310941345610784, guid: 8afaa3cf73c24411974b53e315771bca, type: 3}
   - name: caller-02
-    sprite: {fileID: 7311596053533559507, guid: 2a98d4e6e4b018a45959ce7f4cdd9262, type: 3}
+    sprite: {fileID: 7311596053533559507, guid: e9ba28c248de481ebc506c4ba488a7fc, type: 3}
   - name: caller-03
-    sprite: {fileID: 857694612022928217, guid: 04b22daf2f6329446993c63ce35d167d, type: 3}
+    sprite: {fileID: 857694612022928217, guid: a5ea9f05cf4145e49093570f9efd501c, type: 3}
   - name: caller-04
-    sprite: {fileID: -5808178059254175914, guid: 6b870141e03d7834abb914d2740ce5f3, type: 3}
+    sprite: {fileID: -5808178059254175914, guid: 1829db6aa43041529abf2a5baee87eaf, type: 3}
   - name: caller-05
-    sprite: {fileID: -410783322153876567, guid: 31fed2d6fe72c3647ac1df119e5d4479, type: 3}
+    sprite: {fileID: -410783322153876567, guid: 1d2ad6ae956647fbbfc9d0b354e3337e, type: 3}
   - name: caller-06
-    sprite: {fileID: -2727679339154161135, guid: f9bea93fde571cf4eacd05fdef3f349a, type: 3}
+    sprite: {fileID: -2727679339154161135, guid: 67ccfff61631407a80b0f2653508c4f8, type: 3}
   - name: caller-07
-    sprite: {fileID: 1708995243961246940, guid: 6337d8aa7b31239489a0b1500040a73a, type: 3}
+    sprite: {fileID: 1708995243961246940, guid: 77116cac45be43ff830ec29c8db25b30, type: 3}
   - name: caller-08
-    sprite: {fileID: -6978862741892919532, guid: 4ef4322c4bef2c8498a05af4996e7ace, type: 3}
+    sprite: {fileID: -6978862741892919532, guid: 86fbf254444a4875826fbdc367a21d1f, type: 3}
   - name: caller-09
-    sprite: {fileID: -1696921312614389593, guid: 00a1866ea753ef047a7ebe544af54fde, type: 3}
+    sprite: {fileID: -1696921312614389593, guid: f6004978de524bd3bde5c6196838a7a4, type: 3}
   - name: caller-10
-    sprite: {fileID: -1611619509272709571, guid: ca07e545929aa7240abc5c1020e5adec, type: 3}
+    sprite: {fileID: -1611619509272709571, guid: fc8ed32b5bb64513bfb4f92e81b1b27a, type: 3}
   - name: caller-11
-    sprite: {fileID: -2408728823523347239, guid: 8a7c5eac9ed6f9a41a541e9c488e53f2, type: 3}
+    sprite: {fileID: -2408728823523347239, guid: 3d7be0714d294e1992c9296149acf94f, type: 3}
   - name: caller-12
-    sprite: {fileID: -2047428064096240210, guid: fe37d0496dfd79a4dae1be6440153141, type: 3}
+    sprite: {fileID: -2047428064096240210, guid: d488bcb0d89e4e84b7bcc2a4417aec0e, type: 3}
   - name: police
-    sprite: {fileID: 6715957911979874120, guid: 8cb32b4f59e8544fc80cf734e1011286, type: 3}
+    sprite: {fileID: 6715957911979874120, guid: 781e0a793da1455a9ee079d8c314003f, type: 3}
