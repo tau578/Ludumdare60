@@ -16,8 +16,8 @@
 | 6. Board growth (built as 7a) | done | ✅ 2026-10-18 (25 min) | ✅ 439/439 tests, scope clean | ✅ | d166ffa |
 | 7. Hand-written calls and queues | done | ✅ 2026-10-18 (36 min) | ✅ 431/431 tests, scope clean | ✅ | 8e48320 |
 | 8. The new phone book | done | ✅ 2026-10-18 (20 min) | ✅ 445/445 tests, scope clean | ✅ | f82ed29 |
-| 9a. Saves, touch, menu, pause | playtesting | ✅ 2026-10-19 (37 min + 21 min fix + 24 min pause + 15 min corner) | ✅ 503/503 tests, scope clean | | |
-| 9b. First Web build on itch | not started (needs the Web module) | | | | |
+| 9a. Saves, touch, menu, pause | done | ✅ 2026-10-19 (37 min + 21 min fix + 24 min pause + 15 min corner) | ✅ 503/503 tests, scope clean | ✅ | 580c610 |
+| 9b. First Web build on itch | not started | | | | |
 | 10. Tutorial | not started | | | | |
 | 11. Sound and feel | not started | | | | |
 | 12. Mobile and Web polish | not started | | | | |
@@ -3034,4 +3034,6 @@ Follow-ups:
 - **For the lead:** the button is 72 px, not 88, so it clears the shop's top edge. On phones it may be small for a finger; Step 12 can add a bigger invisible hit area.
 - Committed and pushed on the lead's request (2026-10-19), with no teammate pushes since `5b028d9`. The lead's playtest of pass 3 isn't confirmed yet.
 - Left out of the commit: `Assets/RawArt.meta` and `Assets/RawArt/art.png.meta`, which Unity generated for Mia's `art.png`.
+- **Playtest (lead, 2026-10-19):** 9a is OK, including pass 3 (the pause button in the corner, Quit hidden on Web). Every deviation listed in the 9a reports and Design 5.12 is accepted. Step 9a is done.
+- **Web Build Support** for 6000.3.6f1 is installed (`PlaybackEngines/WebGLSupport`), and Unity was restarted. Step 9b is unblocked.
 
