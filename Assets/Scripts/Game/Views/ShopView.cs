@@ -15,6 +15,7 @@ namespace Switchboard.Game
         public const int SlotCount = ShopShelf.SlotCount + 1;
         private const int SecretSlot = ShopShelf.SlotCount;
         private const string OwnedText = "Owned";
+        [SerializeField] private ShopAudio purchaseAudio;
 
         private enum SlotState { None, Empty, Affordable, TooExpensive, Owned }
 
@@ -93,9 +94,14 @@ namespace Switchboard.Game
             IUpgrade offer = OfferAt(slot);
             if (offer == null) return;
             PurchaseCheck check = upgrades.CanBuy(offer.Id);
-            if (check == PurchaseCheck.TooExpensive && moneyCounter != null) moneyCounter.ShowInsufficientFunds();
+            if (check == PurchaseCheck.TooExpensive)
+            {
+                if (moneyCounter != null) moneyCounter.ShowInsufficientFunds();
+                if (purchaseAudio != null) purchaseAudio.PlayInsufficientFunds();
+            }
             if (check != PurchaseCheck.Ok) return;
-            upgrades.TryBuy(offer.Id);
+            if (upgrades.TryBuy(offer.Id) && purchaseAudio != null)
+                purchaseAudio.PlayPurchased(offer.Kind == UpgradeKind.Secret);
         }
 
         private IUpgrade OfferAt(int slot)
