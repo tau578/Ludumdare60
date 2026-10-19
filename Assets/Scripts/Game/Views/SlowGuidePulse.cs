@@ -98,12 +98,22 @@ namespace Switchboard.Game
         private void Refresh()
         {
             float wave = .5f - .5f * Mathf.Cos(elapsed * Mathf.PI * 2 / 2.4f);
+            Color tint = SocketHaloGraphic.HoverColor;
             if (portraitHalo != null)
-                portraitHalo.color = new Color(1f, .83f, .20f, Mathf.Lerp(.45f, 1f, wave));
+            {
+                tint.a = Mathf.Lerp(.45f, 1f, wave);
+                portraitHalo.color = tint;
+            }
             else if (silhouetteHalo != null)
-                silhouetteMaterial.SetColor("_Color", new Color(1f, .83f, .20f, hovered ? 1f : Mathf.Lerp(.45f, 1f, wave)));
+            {
+                tint.a = hovered ? 1f : Mathf.Lerp(.45f, 1f, wave);
+                silhouetteMaterial.SetColor("_Color", tint);
+            }
             else if (outline != null)
-                outline.effectColor = new Color(1f, .83f, .20f, Mathf.Lerp(.22f, .85f, wave));
+            {
+                tint.a = Mathf.Lerp(.22f, .85f, wave);
+                outline.effectColor = tint;
+            }
         }
 
         private void OnDisable() { SetHovered(false); SetShowing(false); }
