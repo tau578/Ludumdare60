@@ -17,6 +17,8 @@ namespace Switchboard.UI
         [SerializeField] private Sprite bulbOn;
         [SerializeField] private Sprite labelOff;
         [SerializeField] private Sprite labelOn;
+        [SerializeField] private Graphic glow;
+        [SerializeField] private Color litTint = Color.white;
         [SerializeField] private SocketView[] sockets;
         [SerializeField] private SocketGraphic[] volumeSockets;
         [SerializeField, Tooltip("Show the lit state in Edit Mode to preview the artwork.")]
@@ -27,6 +29,13 @@ namespace Switchboard.UI
 
         public bool IsLit { get; private set; }
         public bool IsDimmed => dimmed;
+
+        public void ConfigureGlow(Graphic halo, Color tint)
+        {
+            glow = halo;
+            litTint = tint;
+            Refresh();
+        }
 
         public void Configure(Image bulbImage, Image labelImage, Sprite off, Sprite on,
             Sprite textOff, Sprite textOn, SocketView[] observedSockets)
@@ -63,14 +72,14 @@ namespace Switchboard.UI
                     open = true;
                     if (socket.IsHighlighted) lit = true;
                 }
-            SetLit(lit);
             SetDimmed(!open);
+            SetLit(lit && open);
         }
 
         private void OnDisable()
         {
-            SetLit(false);
             SetDimmed(false);
+            SetLit(false);
         }
 
         // The bulb, its glyph and any plain-text label are this object's graphics; their own colours are kept.
@@ -91,8 +100,13 @@ namespace Switchboard.UI
         private void SetLit(bool lit)
         {
             IsLit = lit;
-            if (bulb != null) bulb.sprite = lit ? bulbOn : bulbOff;
+            if (bulb != null)
+            {
+                bulb.sprite = lit ? bulbOn : bulbOff;
+                bulb.color = dimmed ? Color.clear : lit ? litTint : Color.white;
+            }
             if (label != null) label.sprite = lit ? labelOn : labelOff;
+            if (glow != null) glow.enabled = lit && !dimmed;
         }
     }
 }
