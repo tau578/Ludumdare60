@@ -41,6 +41,85 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
+        public void ConnectingTutorialImmediatelyOpensTheOtherSlots()
+        {
+            var session = new GameSession(new FakeContent
+            {
+                StartingBoard = Small, StartingClientSlots = 3, StartPool = Scripts.Pool(5, Small)
+            }, new FakeSwitchboard(), tutorial: true);
+            session.Tick(.01);
+            Call first = session.Calls.Live[0];
+            Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_1" }));
+            session.Calls.Take(first.Id);
+            session.Calls.Connect(first.Id);
+            session.Tick(.01);
+            Assert.That(first.State, Is.EqualTo(CallState.Connected));
+            Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_1", "call_2", "call_3" }));
+            session.Tick(first.SecondsLeft);
+            Assert.That(first.EndReason, Is.EqualTo(CallEndReason.Finished));
+            Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_2", "call_3", "call_4" }));
+        }
+
+        [TestCase(CallEndReason.WrongConnection)]
+        [TestCase(CallEndReason.DisconnectedEarly)]
+        [TestCase(CallEndReason.Missed)]
+        [TestCase(CallEndReason.Cleared)]
+        public void AnyTutorialFailureUnlocksNormalQueueWithoutRepeatingTutorial(CallEndReason reason)
+        {
+            var session = new GameSession(new FakeContent
+            {
+                StartingBoard = Small, StartingClientSlots = 3, StartPool = Scripts.Pool(5, Small)
+            }, new FakeSwitchboard(), tutorial: true);
+            session.Tick(.01);
+            Assert.That(session.Calls.Live.Count, Is.EqualTo(1));
+            session.Calls.End(session.Calls.Live[0].Id, reason);
+            session.Tick(.01);
+            Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_2", "call_3", "call_4" }));
+            session.ClearCalls();
+            session.Tick(.01);
+            Assert.That(session.Calls.Live.Count, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void DifferentRequestsFromTheSameCallerWaitUntilTheirLiveCallEnds()
+        {
+            var first = new CallScript("dorothy_1", "Dorothy Quinn", "caller-08", "First", new JackId("A1"), new JackId("A2"), 20, 10, 5);
+            var second = new CallScript("dorothy_2", " dorothy quinn ", "caller-08", "Second", new JackId("A1"), new JackId("B2"), 20, 10, 5);
+            var other = Scripts.Call("other", "C1", "C2");
+            GameSession session = Session(new[] { first, second, other }, 3);
+            session.Tick(.01);
+            Assert.That(LiveIds(session), Is.EqualTo(new[] { "dorothy_1", "other" }));
+            Call call = session.Calls.Live[0];
+            session.Calls.Take(call.Id);
+            session.Calls.Connect(call.Id);
+            session.Tick(.01);
+            Assert.That(session.Calls.Live.Count, Is.EqualTo(2));
+            session.Calls.Hold(call.Id);
+            session.Tick(.01);
+            Assert.That(session.Calls.Live.Count, Is.EqualTo(2));
+            session.Calls.End(call.Id, CallEndReason.DisconnectedEarly);
+            session.Tick(.01);
+            Assert.That(session.Calls.Live.Count, Is.EqualTo(2), "Only one Dorothy may return, even with a free third slot");
+        }
+
+        [Test]
+        public void NewBoardPoolSkipsCallerStillActiveFromPreviousPool()
+        {
+            var first = Scripts.Call("old", "A1", "A2");
+            var duplicate = new CallScript("new", first.Name, first.Icon, "Another request", first.From, new JackId("B2"), 20, 10, 5);
+            var other = Scripts.Call("other", "C1", "C2");
+            GameSession session = Session(new[] { first }, 1,
+                FakeUpgrade.BoardUpgrade("board_1", 1000, 4, new[] { duplicate, other }, 3));
+            session.Tick(.01);
+            session.Upgrades.TryBuy("board_1");
+            session.Tick(.01);
+            Assert.That(LiveIds(session), Is.EqualTo(new[] { "old", "other" }));
+            session.Calls.End(session.Calls.Live[0].Id, CallEndReason.WrongConnection);
+            session.Tick(.01);
+            Assert.That(LiveIds(session), Is.EqualTo(new[] { "other", "new" }));
+        }
+
+        [Test]
         public void NothingRingsBeforeTheFirstTick()
         {
             GameSession session = Session(Scripts.Pool(4, Small), 2);

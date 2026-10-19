@@ -647,6 +647,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 786369c905c71c34a8c5995c59e83aa1, type: 3}
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::Switchboard.UI.UpgradeShopSkin
+  goldLightMaterial: {fileID: 2100000, guid: f64e7551803e6d94a8ae3acf34565d0a, type: 2}
   store: {fileID: 3046817259674528574, guid: 7bc8de3b8428a1a44b3754e8c66ee045, type: 3}
   neutral: {fileID: -2685616445599167871, guid: 0eff5eab467df4362b2f7d5f120b41b5, type: 3}
   pressed: {fileID: -1118201841435962604, guid: d619bc9e62c924d338fc467df5086708, type: 3}

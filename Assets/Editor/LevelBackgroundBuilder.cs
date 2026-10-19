@@ -72,6 +72,11 @@ namespace Switchboard.Editor
                 {
                     var badge = (RectTransform)labels.GetChild(i);
                     DisableGraphics(badge);
+                    var glow = Rect("LampGlow", badge, Vector2.zero, new Vector2(140, 140))
+                        .gameObject.AddComponent<LampGlowGraphic>();
+                    glow.color = new Color(1f, .88f, .62f, .42f);
+                    glow.raycastTarget = false;
+                    glow.enabled = false;
                     RectTransform lamp = Rect("Lamp_" + (row ? ((char)('A' + i)).ToString() : (i + 1).ToString()),
                         badge, Vector2.zero, new Vector2(96, 96));
                     Image glass = lamp.gameObject.AddComponent<Image>();
@@ -112,8 +117,10 @@ namespace Switchboard.Editor
                         }
                     }
                     int index = i;
-                    lamp.gameObject.AddComponent<SwitchboardLampView>().Configure(glass, glyph, off, on, textOff, textOn,
+                    var lampView = lamp.gameObject.AddComponent<SwitchboardLampView>();
+                    lampView.Configure(glass, glyph, off, on, textOff, textOn,
                         sockets.Where(socket => row ? socket.Row == index : socket.Column == index).ToArray());
+                    lampView.ConfigureGlow(glow, new Color(1f, .94f, .8f, 1f));
                 }
             }
 
