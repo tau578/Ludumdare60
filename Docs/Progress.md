@@ -3557,3 +3557,29 @@ Follow-ups:
   - itch's fullscreen button on the iPhone (an Apple limit; Step 12 notes the embed option)
 - **Double pointer:** Sergei brought his cursor fix onto main (`d79421d`, entry below) while this was being committed. It still needs a check in a Web build in Chrome or Arc: holding a cord still hides the pointer with `Cursor.visible = false` (Plan §8).
 - **Commits:** `709be9d` (Step 9b) and `b4d39aa` (the metas for Mia's `RawArt`, matching Sergei's branch).
+
+#### Pointer follow-up (orchestrator, directly; lead 2026-10-19)
+- **The lead's report:** Sergei's PNG cursors flickered in the Unity editor too.
+- **The cause:** `HandCursorGraphic.ApplyCursor` called `Cursor.SetCursor` on every frame, and `CableInputController` wrote `Cursor.visible = true` on every frame. Each write puts Unity's arrow back.
+- **The fix:**
+  - The image changes only when it differs.
+  - `HandCursorGraphic.SetSystemPointerVisible` writes visibility only on a change, and puts the image back after showing the pointer again.
+  - `CableInputController`, `MenuHandCursor` and `VolumeCablePanel` go through it.
+  - Its cache is reset at each Play (`SubsystemRegistration`).
+  - 517/517 EditMode tests green.
+- **Measured in Chrome** (`localhost:8000`, a fresh build): 0 canvas cursor changes in 10 s and 1,663 mouse moves; the cursor stayed Unity's 96×96 `.cur` hand.
+- **It depends on the monitor:** on the MacBook's built-in screen the hand is steady in Chrome and in the editor. On the lead's external display (120–140 Hz), Chrome flickers the pointer by itself, and the editor shows the hand only while a button is held. Not pursued further. Step 12 checks other machines.
+- **Cross-check (lead):** itch build #2162638 (fix pass 2: the drawn hand with a transparent-image pointer) is steady on the built-in screen too. Every approach tried today works on a normal screen; only the lead's external display flickers.
+- **Cursor size (lead):** Sergei's 96×96 hands were too big, and 64×64 (the old hand at full 1080p) still looked big in the lead's 0.75× Game view, because a system pointer doesn't shrink with the view. They were re-exported at **48×48** with his `Tools/Art/export_hand_cursors.py` (`ICON_SCALE` 0.75). `HandCursorGraphic.IconScale` is 0.75, and the Default Cursor hotspot is (15, 1.5). The metas and GUIDs are unchanged. 517/517 green.
+
+#### Back to the drawn hand (lead, 2026-10-19; orchestrator, directly)
+- **Why:** Sergei's PNG pointer has one pixel size and doesn't resize with the window (the 96, 64 and 48 px exports tried). The lead chose the drawn hand, which scales with the game everywhere.
+- **Changed:**
+  - `HandCursorGraphic`, `CableInputController`, `MenuHandCursor` and `VolumeCablePanel` are back to their `709be9d` versions (the drawn hand, from before `d79421d`).
+  - Every pointer show and hide now goes through the new `SystemPointer` (`.cs` + Web-only `.jslib`). It writes only on a change. In browsers it hides with a transparent 1×1 image and re-hides if Unity rewrites the canvas cursor while starting up.
+  - The cord input leaves the pointer alone while paused (as in fix pass 1).
+  - Player Settings › Default Cursor is cleared (hotspot 0, 0).
+  - Sergei's `Assets/Sprites/Cursors` images and `Tools/Art` exporter stay as he pushed them, unused. The scenes still hold his texture fields on `HandCursorGraphic`; Unity drops them at the next save.
+- **Tests:** `WebBuildTests` gained `OnlySystemPointerTouchesCursorVisible`, `TheBrowserHidesThePointerWithATransparentImage`, and the `SystemPointer.jslib` case of the Web-only plugin test. 521/521 green.
+- **On itch:** pushed as `html5` build #2163273 (version 4) on the lead's request, for the lead's online test.
+

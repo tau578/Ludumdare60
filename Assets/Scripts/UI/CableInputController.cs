@@ -161,15 +161,17 @@ namespace Switchboard.UI
             heldCable = null;
             foreach (var cable in cables)
                 if (Usable(cable) && (cable.Phase == CablePhase.Held || cable.Phase == CablePhase.OneEndConnected)) { heldCable = cable; break; }
-            cursorWasVisible = Cursor.visible;
+            cursorWasVisible = SystemPointer.Visible;
             ownsCursor = true;
         }
 
         // Mouse, touch and pen alike (D28): a tap is a click, so the click-to-pick, click-to-plug model stays.
         private void Update()
         {
+            // Pausing hid the pointers once; while paused the pause panel's volume patch owns the system pointer.
+            if (suspended) return;
             Pointer pointer = Pointer.current;
-            if (pointer == null || !Application.isFocused || suspended) { HidePointers(); return; }
+            if (pointer == null || !Application.isFocused) { HidePointers(); return; }
             bool pressed = pointer.press.wasPressedThisFrame && Time.frameCount != resumedFrame;
             // A finger leaves no hover behind: between taps only a held cord stays where it was last put.
             bool hover = !(pointer is Touchscreen) || pressed || pointer.press.isPressed;
@@ -258,11 +260,6 @@ namespace Switchboard.UI
         private void UpdatePointers(Vector2 position, SocketView socket, StoredCableView stored, int pageTurn, bool overOpenBook,
             bool showHand)
         {
-            if (Application.isPlaying && !ownsCursor)
-            {
-                cursorWasVisible = Cursor.visible;
-                ownsCursor = true;
-            }
             var selected = ActiveCable;
             if (hoveredSocket != socket && hoveredSocket != null) hoveredSocket.SetPointerState(false, selected);
             hoveredSocket = socket;
@@ -292,12 +289,15 @@ namespace Switchboard.UI
                 handCursor.gameObject.SetActive(handVisible);
                 if (handVisible)
                 {
+                    SwitchboardUISorting.SetLayer(handCursor.gameObject, SwitchboardUISorting.Cursor);
+                    RectTransformUtility.ScreenPointToLocalPointInRectangle(area, position, camera, out var local);
+                    handCursor.rectTransform.anchoredPosition = local;
                     handCursor.Grabbing = CursorMode == CableCursorMode.Grab;
                     handCursor.PageTurnDirection = CursorMode == CableCursorMode.PageTurn ? pageTurn : 0;
-                    handCursor.ApplyCursor();
+                    handCursor.transform.SetAsLastSibling();
                 }
             }
-            if (ownsCursor) Cursor.visible = handVisible || selected == null || !selected.IsPointerVisible;
+            if (ownsCursor) SystemPointer.Visible = !handVisible && (selected == null || !selected.IsPointerVisible);
         }
 
         private bool Owns(CableController owner)
@@ -315,8 +315,7 @@ namespace Switchboard.UI
             hoveredStoredCable = null;
             foreach (var cable in cables) if (cable != null) cable.HidePointer();
             if (handCursor != null) handCursor.gameObject.SetActive(false);
-            if (ownsCursor) Cursor.visible = cursorWasVisible;
-            ownsCursor = false;
+            if (ownsCursor) SystemPointer.Visible = cursorWasVisible;
         }
         private void OnApplicationFocus(bool focused) { if (!focused) HidePointers(); }
         private void OnDisable() { HidePointers(); ownsCursor = false; heldCable = null; }
