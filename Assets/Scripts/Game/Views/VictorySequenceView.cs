@@ -26,7 +26,6 @@ namespace Switchboard.Game
         private readonly List<CableGraphic> wires = new List<CableGraphic>();
         private readonly List<RectTransform> tips = new List<RectTransform>();
         private readonly List<LampGlowGraphic> glows = new List<LampGlowGraphic>();
-        private Material clothMaterial, frameMaterial;
         private AudioSource audioSource;
         private Action continueGame, mainMenu;
         private float elapsed;
@@ -102,7 +101,7 @@ namespace Switchboard.Game
             float timeline = elapsed * PlaybackSpeed;
             float enter = Smooth(timeline/.65f);
             panelGroup.alpha = enter;
-            panel.localScale = Vector3.one * Mathf.Lerp(.93f,1,enter);
+            panel.localScale = Vector3.one;
             float camera = Smooth((timeline-.8f)/24.4f);
             town.localScale = Vector3.one * Mathf.Lerp(1.04f,.94f,camera);
             town.anchoredPosition = new Vector2(0,Mathf.Lerp(-180,-195,camera));
@@ -147,21 +146,16 @@ namespace Switchboard.Game
             overlay.AddComponent<GraphicRaycaster>();
             audioSource=overlay.AddComponent<AudioSource>();audioSource.playOnAwake=false;audioSource.spatialBlend=0;
             overlay.AddComponent<AudioChannelSource>().Configure(AudioVolumeChannel.Sfx,.4f);
-            var blocker=Image("Backdrop",root,Vector2.zero,new Vector2(4000,3000),null,new Color(.05f,.06f,.05f,.88f));
+            var blocker=Image("Backdrop",root,Vector2.zero,Vector2.zero,null,new Color(.05f,.06f,.05f,1));
+            Stretch(blocker.rectTransform);
             blocker.raycastTarget=true;
-            panel=Rect("Panel",root,Vector2.zero,new Vector2(1900,1040));panelGroup=panel.gameObject.AddComponent<CanvasGroup>();
-            // Separate the cloth and trim at render time, preserving the original painted edges.
-            // The cloth image writes a stencil mask; the city fills it and the trim sits in front.
-            var layerShader = Resources.Load<Shader>("VictoryPanelLayers");
-            clothMaterial = new Material(layerShader) { name = "Victory cloth mask" };
-            clothMaterial.SetFloat("_FrameLayer", 0);
-            frameMaterial = new Material(layerShader) { name = "Victory frame" };
-            frameMaterial.SetFloat("_FrameLayer", 1);
-            var cloth = Image("Cloth mask",panel,Vector2.zero,panel.sizeDelta,frameSprite,Color.white);
-            cloth.material = clothMaterial;
-            cloth.gameObject.AddComponent<Mask>().showMaskGraphic = false;
-            var viewport=Rect("City viewport",cloth.transform,Vector2.zero,panel.sizeDelta);
-            Art("Sky",viewport,Vector2.zero,viewport.sizeDelta,VictoryTownGraphic.Shape.Sky,Color.white);
+            panel=Rect("Panel",root,Vector2.zero,Vector2.zero);
+            Stretch(panel);
+            panelGroup=panel.gameObject.AddComponent<CanvasGroup>();
+            var viewport=Rect("City viewport",panel,Vector2.zero,Vector2.zero);
+            Stretch(viewport);
+            var sky=Art("Sky",viewport,Vector2.zero,Vector2.zero,VictoryTownGraphic.Shape.Sky,Color.white);
+            Stretch(sky.rectTransform);
             var sun=Rect("Sunlight",viewport,new Vector2(570,160),new Vector2(230,230));
             sun.gameObject.AddComponent<LampGlowGraphic>().color=new Color(1,.81f,.43f,.45f);
             Circle("Sun",viewport,new Vector2(570,160),100,new Color(1,.87f,.61f,.9f));
@@ -195,8 +189,7 @@ namespace Switchboard.Game
                 wire.raycastTarget=false;wire.InsulationColor=colors[i%3];wire.ThicknessScale=.65f;wire.MaximumSag=55+(i*17%65);wires.Add(wire);
                 tips.Add(Circle("Plug "+i,wireRoot,Vector2.zero,12,new Color(.94f,.77f,.4f)).rectTransform);
             }
-            Image("Frame",panel,Vector2.zero,panel.sizeDelta,frameSprite,Color.white).material = frameMaterial;
-            var title=Label("Thank you",panel,new Vector2(0,366),new Vector2(900,175),"thank you for\nconnecting us!",64,titleFont);
+            var title=Label("Thank you",panel,new Vector2(0,366),new Vector2(900,175),"Thank you for\nconnecting us!",72,titleFont);
             title.color=new Color(1,.9f,.61f);titleGroup=title.gameObject.AddComponent<CanvasGroup>();
             var shadow=title.gameObject.AddComponent<Shadow>();shadow.effectDistance=new Vector2(2,-3);shadow.effectColor=new Color(.18f,.16f,.11f,.65f);
             var actions=Rect("Final actions",panel,new Vector2(0,-434),new Vector2(750,72));controls=actions.gameObject.AddComponent<CanvasGroup>();
@@ -252,10 +245,11 @@ namespace Switchboard.Game
             label.textWrappingMode=TextWrappingModes.NoWrap;return label;
         }
         private void OnDisable() => Hide();
-        private void OnDestroy()
+        private static void Stretch(RectTransform rect)
         {
-            if (clothMaterial != null) Destroy(clothMaterial);
-            if (frameMaterial != null) Destroy(frameMaterial);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
         }
     }
 }

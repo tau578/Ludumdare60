@@ -75,6 +75,27 @@ namespace Switchboard.Game
             backButton.onClick.AddListener(ShowMain);
             listening = true;
             dialog.SetActive(false);
+            EnsureMenuCursor();
+        }
+
+        private void EnsureMenuCursor()
+        {
+            if (dialog.GetComponentInChildren<MenuHandCursor>(true) != null) return;
+            var overlay = new GameObject("PauseCursor", typeof(RectTransform), typeof(Canvas));
+            overlay.layer = dialog.layer;
+            var rect = (RectTransform)overlay.transform;
+            rect.SetParent(dialog.transform, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            SwitchboardUISorting.SetLayer(overlay, SwitchboardUISorting.Cursor);
+            var hand = new GameObject("PointingHand", typeof(RectTransform)).AddComponent<HandCursorGraphic>();
+            hand.gameObject.layer = overlay.layer;
+            hand.transform.SetParent(rect, false);
+            hand.rectTransform.sizeDelta = new Vector2(64, 64);
+            hand.raycastTarget = false;
+            hand.gameObject.SetActive(false);
+            overlay.AddComponent<MenuHandCursor>().Configure(hand, dialog.GetComponentInChildren<VolumeCablePanel>(true));
         }
 
         public void Pause()
