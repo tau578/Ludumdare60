@@ -3583,3 +3583,7 @@ Follow-ups:
 - **Tests:** `WebBuildTests` gained `OnlySystemPointerTouchesCursorVisible`, `TheBrowserHidesThePointerWithATransparentImage`, and the `SystemPointer.jslib` case of the Web-only plugin test. 521/521 green.
 - **On itch:** pushed as `html5` build #2163273 (version 4) on the lead's request, for the lead's online test.
 
+#### Speech bubble and text colour (lead, 2026-10-19; orchestrator, directly)
+- **The bubble shape is Sergei's** (`64da110`, `SpeechBubbleGraphic`): one procedurally drawn outline around the body and the tail, with 18 px corners, a light rim and a dark outline. Its settings are in the Inspector. Our sprite version (images in `Assets/Content/UI`) was built at the same time and set aside by the lead; it stays only on the local branch `bubble-ours`.
+- **Text colour (ours):** very dark brown `#33241A` for the bubble's label (it was navy) and the book's text (it was `#2C302A`). The book's detail line is `#5C4535` (it was `#4E5046`). Contrast on the page: 14.0:1 and 8.4:1 (it was 12.6 and 7.7). `PhoneBookBuilder` uses the same colours.
+
