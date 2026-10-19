@@ -28,7 +28,7 @@ namespace Switchboard.UI
         private void OnEnable()
         {
             if (!Application.isPlaying || rows == null) return;
-            originalCursorVisible = Cursor.visible;
+            originalCursorVisible = SystemPointer.Visible;
             Refresh(Vector3.zero);
         }
         // Mouse and touch alike (D28); a finger leaves no hover behind.
@@ -84,12 +84,11 @@ namespace Switchboard.UI
             hand.gameObject.SetActive(showHand);
             if (showHand)
             {
+                hand.transform.position = world;
                 hand.Grabbing = plug >= 0;
-                hand.PageTurnDirection = 0;
-                hand.ApplyCursor();
+                hand.transform.SetAsLastSibling();
             }
-            if (heldNow) Cursor.visible = false;
-            else if (!showHand) Cursor.visible = originalCursorVisible;
+            SystemPointer.Visible = heldNow || inside ? false : originalCursorVisible;
         }
         private void Refresh(Vector3 pointer)
         {
@@ -109,8 +108,7 @@ namespace Switchboard.UI
                 foreach (var socket in row.Sockets) socket.SetHighlighted(false);
             }
             if (hand != null) hand.gameObject.SetActive(false);
-            if (hand != null) hand.RestoreDefaultCursor();
-            Cursor.visible = originalCursorVisible;
+            SystemPointer.Visible = originalCursorVisible;
         }
         private void OnApplicationFocus(bool focused) { if (!focused) OnDisable(); }
     }

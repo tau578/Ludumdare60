@@ -14,6 +14,8 @@ namespace Switchboard.Game.Tests
     {
         private const string TemplateIndex = "Assets/WebGLTemplates/Operator/index.html";
         private const string Jslib = "Assets/Scripts/Game/Save/BrowserStorage.jslib";
+        private const string PointerJslib = "Assets/Scripts/UI/SystemPointer.jslib";
+        private const string PointerScript = "Assets/Scripts/UI/SystemPointer.cs";
 
         private sealed class MemoryStorage : ISaveStorage
         {
@@ -126,6 +128,7 @@ namespace Switchboard.Game.Tests
         }
 
         [TestCase(Jslib)]
+        [TestCase(PointerJslib)]
         public void TheBrowserPluginIsForWebPlayersOnly(string path)
         {
             var importer = (PluginImporter)AssetImporter.GetAtPath(path);
@@ -135,6 +138,27 @@ namespace Switchboard.Game.Tests
             Assert.That(importer.GetCompatibleWithAnyPlatform(), Is.False);
             Assert.That(importer.GetCompatibleWithPlatform(BuildTarget.StandaloneOSX), Is.False);
             Assert.That(importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64), Is.False);
+        }
+
+        // 9b: Chrome on some Mac displays shows a cursor: none pointer again on every mouse move, so the browser hides it
+        // with a transparent image, and only SystemPointer may touch Cursor.visible.
+        [Test]
+        public void OnlySystemPointerTouchesCursorVisible()
+        {
+            foreach (string file in Directory.GetFiles("Assets", "*.cs", SearchOption.AllDirectories))
+            {
+                string path = file.Replace('\\', '/');
+                if (path == PointerScript || path.StartsWith("Assets/Tests/")) continue;
+                Assert.That(File.ReadAllText(path), Does.Not.Contain("Cursor.visible"), path + " must use SystemPointer.Visible");
+            }
+        }
+
+        [Test]
+        public void TheBrowserHidesThePointerWithATransparentImage()
+        {
+            string js = File.ReadAllText(PointerJslib);
+            Assert.That(js, Does.Contain("url(data:image/png;base64,"));
+            Assert.That(js, Does.Not.Contain("'none'").And.Not.Contain("\"none\""));
         }
     }
 }
