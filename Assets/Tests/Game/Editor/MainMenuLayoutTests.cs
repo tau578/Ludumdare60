@@ -12,7 +12,7 @@ using UnityEngine.UI;
 
 namespace Switchboard.Game.Tests
 {
-    /// <summary>The main menu after the lead's 9a playtest (D55): save-aware buttons, centred labels, mute first.</summary>
+    /// <summary>Main menu layout (D55), volume labels and saved socket compatibility.</summary>
     public sealed class MainMenuLayoutTests
     {
         private const string ScenePath = "Assets/Scenes/MainMenu.unity";
@@ -129,34 +129,44 @@ namespace Switchboard.Game.Tests
 
         [TestCase("Assets/Prefabs/UI/VolumeCablePanel.prefab", 3)]
         [TestCase("Assets/Prefabs/UI/MasterVolumeCableSlider.prefab", 1)]
-        public void TheMuteSocketIsDrawnFirst(string path, int rowCount)
+        public void SocketOrderMatchesTheVisibleLabels(string path, int rowCount)
         {
-            VolumeCableSlider[] rows = AssetDatabase.LoadAssetAtPath<GameObject>(path).GetComponentsInChildren<VolumeCableSlider>(true);
+            var panel = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            VolumeCableSlider[] rows = panel.GetComponentsInChildren<VolumeCableSlider>(true);
             Assert.That(rows.Length, Is.EqualTo(rowCount));
             string[] labels = { "Label_25", "Label_50", "Label_75", "Label_100", "MuteIcon" };
+            string[] lamps = { "ColumnLamp_25", "ColumnLamp_50", "ColumnLamp_75", "ColumnLamp_100", "ColumnLamp_mute" };
             foreach (VolumeCableSlider row in rows)
             {
                 float[] x = row.Sockets.Select(s => s.rectTransform.anchoredPosition.x).ToArray();
-                Assert.That(new[] { x[4], x[0], x[1], x[2], x[3] }, Is.Ordered, row.name);
+                Assert.That(rowCount == 3 ? x : new[] { x[4], x[0], x[1], x[2], x[3] }, Is.Ordered, row.name);
                 for (int i = 0; i < 5; i++)
-                    Assert.That(((RectTransform)row.transform.Find(labels[i])).anchoredPosition.x, Is.EqualTo(x[i]), row.name + " " + labels[i]);
+                {
+                    var label = (RectTransform)(rowCount == 3 ? panel.transform.Find(lamps[i]) : row.transform.Find(labels[i]));
+                    Assert.That(label.anchoredPosition.x, Is.EqualTo(x[i]), row.name + " " + labels[i]);
+                }
             }
         }
 
-        // 9a pass 2: the five sockets sit centred on the panel, mute first, and the cable's left end keeps its distance.
+        // The shared board reserves its left strip for row lamps; the standalone legacy row keeps mute first.
         [TestCase("Assets/Prefabs/UI/VolumeCablePanel.prefab")]
         [TestCase("Assets/Prefabs/UI/MasterVolumeCableSlider.prefab")]
-        public void TheSocketRowIsCentredOnThePanel(string path)
+        public void SocketRowsFitTheirLayoutAndClearTheCableAnchor(string path)
         {
-            foreach (VolumeCableSlider row in AssetDatabase.LoadAssetAtPath<GameObject>(path).GetComponentsInChildren<VolumeCableSlider>(true))
+            var panel = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            bool board = panel.transform.Find("BoardArtwork") != null;
+            foreach (VolumeCableSlider row in panel.GetComponentsInChildren<VolumeCableSlider>(true))
             {
                 float[] x = row.Sockets.Select(s => s.rectTransform.anchoredPosition.x).ToArray();
-                Assert.That(new[] { x[4], x[0], x[1], x[2], x[3] }, Is.EqualTo(new[] { -410f, -205f, 0f, 205f, 410f }), row.name);
+                Assert.That(x.OrderBy(value => value).ToArray(), Is.EqualTo(board
+                    ? new[] { -365f, -145f, 75f, 295f, 515f }
+                    : new[] { -410f, -205f, 0f, 205f, 410f }), row.name);
                 Assert.That(((RectTransform)row.transform).rect.center.x, Is.EqualTo(0f), row.name);
                 float anchor = row.WallAnchor != null ? row.WallAnchor.anchoredPosition.x : row.FixedSocket.rectTransform.anchoredPosition.x;
-                float muteLeft = x[4] - row.Sockets[4].rectTransform.sizeDelta.x / 2;
+                int first = board ? 0 : 4;
+                float socketLeft = x[first] - row.Sockets[first].rectTransform.sizeDelta.x / 2;
                 float anchorRight = anchor + (row.FixedSocket != null ? row.FixedSocket.rectTransform.sizeDelta.x / 2 : 0);
-                Assert.That(muteLeft - anchorRight, Is.GreaterThanOrEqualTo(60f), row.name + ": the cable's left end crowds the mute socket");
+                Assert.That(socketLeft - anchorRight, Is.GreaterThanOrEqualTo(60f), row.name + ": the cable's left end crowds the first socket");
             }
         }
 

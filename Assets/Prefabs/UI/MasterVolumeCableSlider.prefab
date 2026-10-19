@@ -66,8 +66,8 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   sleeveColor: {r: 0.9019608, g: 0.7372549, b: 0.28235295, a: 1}
-  heldSprite: {fileID: 0}
-  insertedSprite: {fileID: 0}
+  heldSprite: {fileID: -7898041412995760802, guid: 7de3aa4495fb04432813bcc42ff4d4f0, type: 3}
+  insertedSprite: {fileID: -987549461902839776, guid: e51c92ddc67ca4c728a0fb29b641c038, type: 3}
   artworkTint: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &926875464412875812
 GameObject:
@@ -274,7 +274,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  faceSprite: {fileID: 0}
+  faceSprite: {fileID: 577195655271376678, guid: ba2171a54d90fab48b723ea54688e36b, type: 3}
   hitRadiusScale: 1
   dimmedTint: {r: 0.38, g: 0.38, b: 0.38, a: 0.75}
 --- !u!1 &3079101051224703205
@@ -342,7 +342,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  faceSprite: {fileID: 0}
+  faceSprite: {fileID: 577195655271376678, guid: ba2171a54d90fab48b723ea54688e36b, type: 3}
   hitRadiusScale: 1
   dimmedTint: {r: 0.38, g: 0.38, b: 0.38, a: 0.75}
 --- !u!1 &3965700580812989838
@@ -410,7 +410,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  faceSprite: {fileID: 0}
+  faceSprite: {fileID: 577195655271376678, guid: ba2171a54d90fab48b723ea54688e36b, type: 3}
   hitRadiusScale: 1
   dimmedTint: {r: 0.38, g: 0.38, b: 0.38, a: 0.75}
 --- !u!1 &4049188617545749755
@@ -478,9 +478,9 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  insulationColor: {r: 0.9019608, g: 0.7372549, b: 0.28235295, a: 1}
+  insulationColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   maximumSag: 155
-  thicknessScale: 1
+  thicknessScale: 1.5
 --- !u!1 &4207757216185756624
 GameObject:
   m_ObjectHideFlags: 0
@@ -881,6 +881,7 @@ MonoBehaviour:
   audioSource: {fileID: 4068571005010405190}
   insertSound: {fileID: 8300000, guid: d62cbd4ee2f386042ba40e3cb5be364f, type: 3}
   removeSound: {fileID: 8300000, guid: 9d6a47065b57f364fa4f6684a682a686, type: 3}
+  artwork: {fileID: 11400000, guid: f21f33c86e8e58f47a00590f4e306aa7, type: 2}
 --- !u!1 &5663941670612599531
 GameObject:
   m_ObjectHideFlags: 0
@@ -946,7 +947,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  faceSprite: {fileID: 0}
+  faceSprite: {fileID: 577195655271376678, guid: ba2171a54d90fab48b723ea54688e36b, type: 3}
   hitRadiusScale: 1
   dimmedTint: {r: 0.38, g: 0.38, b: 0.38, a: 0.75}
 --- !u!1 &5893899349618496607
@@ -1014,7 +1015,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  faceSprite: {fileID: 0}
+  faceSprite: {fileID: 577195655271376678, guid: ba2171a54d90fab48b723ea54688e36b, type: 3}
   hitRadiusScale: 1
   dimmedTint: {r: 0.38, g: 0.38, b: 0.38, a: 0.75}
 --- !u!1 &6094859080950645942
@@ -1161,7 +1162,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  faceSprite: {fileID: 0}
+  faceSprite: {fileID: 577195655271376678, guid: ba2171a54d90fab48b723ea54688e36b, type: 3}
   hitRadiusScale: 1
   dimmedTint: {r: 0.38, g: 0.38, b: 0.38, a: 0.75}
 --- !u!1 &8080085115575583739
@@ -1230,8 +1231,8 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   sleeveColor: {r: 0.9019608, g: 0.7372549, b: 0.28235295, a: 1}
-  heldSprite: {fileID: 0}
-  insertedSprite: {fileID: 0}
+  heldSprite: {fileID: -7898041412995760802, guid: 7de3aa4495fb04432813bcc42ff4d4f0, type: 3}
+  insertedSprite: {fileID: -987549461902839776, guid: e51c92ddc67ca4c728a0fb29b641c038, type: 3}
   artworkTint: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &8187368114848218287
 GameObject:

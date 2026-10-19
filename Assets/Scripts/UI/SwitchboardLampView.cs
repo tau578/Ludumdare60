@@ -18,6 +18,7 @@ namespace Switchboard.UI
         [SerializeField] private Sprite labelOff;
         [SerializeField] private Sprite labelOn;
         [SerializeField] private SocketView[] sockets;
+        [SerializeField] private SocketGraphic[] volumeSockets;
         [SerializeField, Tooltip("Show the lit state in Edit Mode to preview the artwork.")]
         private bool previewLit;
         private Graphic[] graphics;
@@ -54,6 +55,13 @@ namespace Switchboard.UI
                     if (socket == null) continue;
                     if (socket.IsOpen) open = true;
                     if (socket.IsNavigationHighlighted) lit = true;
+                }
+            if (volumeSockets != null)
+                foreach (SocketGraphic socket in volumeSockets)
+                {
+                    if (socket == null) continue;
+                    open = true;
+                    if (socket.IsHighlighted) lit = true;
                 }
             SetLit(lit);
             SetDimmed(!open);
