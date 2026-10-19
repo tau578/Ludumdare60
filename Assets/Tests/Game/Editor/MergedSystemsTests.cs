@@ -57,6 +57,21 @@ namespace Switchboard.Game.Tests
             if (scene.IsValid()) EditorSceneManager.ClosePreviewScene(scene);
         }
 
+        private EconomyCatalog Economy() =>
+            AssetDatabase.LoadAssetAtPath<GameConfig>("Assets/Content/GameConfig.asset").LoadEconomy();
+
+        private CableController[] ActiveCables() => All<CableController>().Where(c => c.gameObject.activeInHierarchy).ToArray();
+
+        // Buys the first extra cord and returns the cable it added; Economy.json sets how many cords that is.
+        private CableController BuyFirstCord()
+        {
+            CableController[] before = ActiveCables();
+            IUpgrade first = session.Upgrades.ChainOf(UpgradeKind.ExtraWires)[0];
+            Assert.That(session.Upgrades.TryBuy(first.Id), Is.True, first.Id);
+            Assert.That(bridge.CordCount, Is.EqualTo(first.Wires));
+            return ActiveCables().Except(before).Last();
+        }
+
         private CallCardView AcceptOrder()
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>("Assets/Content/GameConfig.asset");
@@ -95,42 +110,52 @@ namespace Switchboard.Game.Tests
             Assert.That(pulse.IsShowing, Is.False, "Later cord upgrades must not repeat the tutorial");
         }
 
+        // Economy.json sets the starting board, slots and cords and every upgrade (the designer balances it at any
+        // time), so the expected counts come from the file.
         [Test]
         public void FreshGameHidesLockedPlacesAndShopPurchasesRevealThem()
         {
-            Assert.That(session.Stats.Cords, Is.EqualTo(2));
-            Assert.That(bridge.CordCount, Is.EqualTo(2));
-            Assert.That(All<CableController>().Count(c => c.gameObject.activeInHierarchy), Is.EqualTo(2));
-            Assert.That(All<CableController>().Where(c => c.gameObject.activeInHierarchy)
-                .All(c => c.TrayView.Artwork != null && c.TrayView.Artwork.enabled), Is.True);
+            EconomyCatalog economy = Economy();
+            Assert.That(session.Stats.Cords, Is.EqualTo(economy.StartingCords));
+            Assert.That(bridge.CordCount, Is.EqualTo(economy.StartingCords));
+            Assert.That(ActiveCables().Length, Is.EqualTo(economy.StartingCords));
+            Assert.That(ActiveCables().All(c => c.TrayView.Artwork != null && c.TrayView.Artwork.enabled), Is.True);
             var sockets = All<SocketView>();
-            Assert.That(sockets.Count(s => s.GetComponent<SocketGraphic>().enabled), Is.EqualTo(9));
+            BoardSize start = economy.StartingBoard;
+            Assert.That(sockets.Count(s => s.GetComponent<SocketGraphic>().enabled), Is.EqualTo(start.Cols * start.Rows));
             Assert.That(sockets.Where(s => !s.IsOpen).All(s => !s.GetComponent<SocketGraphic>().raycastTarget), Is.True);
             var callerSlots = Field<RectTransform[]>(queue, "slots");
-            Assert.That(callerSlots.Count(s => s.GetComponent<CanvasGroup>().alpha > 0), Is.EqualTo(2), "D52: two slots at the start");
+            Assert.That(callerSlots.Count(s => s.GetComponent<CanvasGroup>().alpha > 0), Is.EqualTo(economy.StartingClientSlots),
+                "D52: the start's caller slots");
             var shop = All<ShopView>().Single();
-            session.Wallet.Earn(10000);
+            session.Wallet.Earn(session.Upgrades.All.Sum(u => u.CostCents));
             Invoke(shop, "LateUpdate");
             var slots = All<UpgradeSlotView>().OrderByDescending(s => s.transform.position.y).ToArray();
-            Assert.That(Field<TMPro.TMP_Text>(slots[0], "title").text, Is.EqualTo("More Cables"));
-            Assert.That(Field<TMPro.TMP_Text>(slots[1], "title").text, Is.EqualTo("More Clients"));
-            Assert.That(Field<Image>(slots[1], "background").sprite.name, Does.Contain("buy_btn"));
+            int cordSlot = Enumerable.Range(0, ShopShelf.SlotCount).Single(i => session.Shelf.OfferAt(i)?.Kind == UpgradeKind.ExtraWires);
+            int boardSlot = Enumerable.Range(0, ShopShelf.SlotCount).Single(i => session.Shelf.OfferAt(i)?.Kind == UpgradeKind.ExtraClients);
+            Assert.That(Field<TMPro.TMP_Text>(slots[cordSlot], "title").text, Is.EqualTo("More Cables"));
+            Assert.That(Field<TMPro.TMP_Text>(slots[boardSlot], "title").text, Is.EqualTo("More Clients"));
+            Assert.That(Field<Image>(slots[boardSlot], "background").sprite.name, Does.Contain("buy_btn"));
+            IUpgrade board = session.Shelf.OfferAt(boardSlot);
             long before = session.Wallet.Cents;
-            Field<Button>(slots[1], "button").onClick.Invoke();
-            Assert.That(session.Wallet.Cents, Is.EqualTo(before - 1000));
-            Assert.That(sockets.Count(s => s.GetComponent<SocketGraphic>().enabled), Is.EqualTo(16));
-            Assert.That(callerSlots.Count(s => s.GetComponent<CanvasGroup>().alpha > 0), Is.EqualTo(3));
-            Field<Button>(slots[0], "button").onClick.Invoke();
-            Assert.That(bridge.CordCount, Is.EqualTo(4));
+            Field<Button>(slots[boardSlot], "button").onClick.Invoke();
+            Assert.That(session.Wallet.Cents, Is.EqualTo(before - board.CostCents));
+            Assert.That(sockets.Count(s => s.GetComponent<SocketGraphic>().enabled), Is.EqualTo(board.BoardSize.Cols * board.BoardSize.Rows));
+            Assert.That(callerSlots.Count(s => s.GetComponent<CanvasGroup>().alpha > 0), Is.EqualTo(board.ClientSlots));
+            IUpgrade cord = session.Shelf.OfferAt(cordSlot);
+            Field<Button>(slots[cordSlot], "button").onClick.Invoke();
+            Assert.That(bridge.CordCount, Is.EqualTo(cord.Wires));
             var card = AcceptOrder();
             Assert.That(Field<TMPro.TMP_Text>(card, "speechLabel").text, Is.EqualTo(card.Call.Request.Script.Message),
                 "D51: the bubble says the call's own message");
             var name = Field<TMPro.TMP_Text>(card, "nameLabel");
             Assert.That(name.text, Is.EqualTo(card.Call.Request.Script.Name), "the caller's name under the portrait");
             Assert.That(name.raycastTarget, Is.False);
-            Assert.That(session.Upgrades.TryBuy("wires_2") && session.Upgrades.TryBuy("wires_3"), Is.True);
-            Assert.That(All<CableController>().Where(c => c.gameObject.activeInHierarchy)
-                .Select(c => c.CableColor).Distinct().Count(), Is.EqualTo(6), "Buying the removed third cord restores its colour before the extra colours");
+            foreach (IUpgrade more in session.Upgrades.ChainOf(UpgradeKind.ExtraWires).Skip(1))
+                Assert.That(session.Upgrades.TryBuy(more.Id), Is.True, more.Id);
+            Assert.That(ActiveCables().Length, Is.EqualTo(session.Stats.Cords));
+            Assert.That(ActiveCables().Select(c => c.CableColor).Distinct().Count(), Is.EqualTo(session.Stats.Cords),
+                "every cord has its own colour: removed tray cords come back with theirs before the extra colours");
         }
 
         [Test]
@@ -198,10 +223,8 @@ namespace Switchboard.Game.Tests
             book.SetOpen(true);
             book.SetOpen(false);
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Cables));
-            session.Wallet.Earn(10000);
-            Assert.That(session.Upgrades.TryBuy("wires_1"), Is.True);
-            Assert.That(bridge.CordCount, Is.EqualTo(4));
-            var bought = All<CableController>().Single(c => c.name == "Cable_04");
+            session.Wallet.Earn(session.Upgrades.All.Sum(u => u.CostCents));
+            var bought = BuyFirstCord();
             var hints = bought.TrayView.GetComponentsInChildren<SlowGuidePulse>();
             Assert.That(hints.Length, Is.EqualTo(1), "The complete coiled-cord sprite is highlighted");
             Assert.That(hints.All(p => p.IsShowing), Is.True, "Cloned and newly registered hints must work together");
@@ -209,7 +232,8 @@ namespace Switchboard.Game.Tests
             Assert.That(bought.TryPickUp(), Is.True);
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Complete));
             Assert.That(All<SlowGuidePulse>().Any(p => p.IsShowing), Is.False);
-            Assert.That(session.Upgrades.TryBuy("wires_2"), Is.True);
+            IUpgrade second = session.Upgrades.NextInChain(UpgradeKind.ExtraWires);
+            if (second != null) Assert.That(session.Upgrades.TryBuy(second.Id), Is.True, second.Id);
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Complete), "Purchase must not restart hints");
             Assert.That(All<SlowGuidePulse>().Any(p => p.IsShowing), Is.False);
         }
@@ -218,12 +242,11 @@ namespace Switchboard.Game.Tests
         public void NewCordKeepsConnectionHighlightsCoinsAndAudio()
         {
             var card = AcceptOrder();
-            session.Wallet.Earn(10000);
+            session.Wallet.Earn(session.Upgrades.All.Sum(u => u.CostCents));
             var call = card.Call;
             var first = call.Request.From;
             var second = call.Request.To;
-            Assert.That(session.Upgrades.TryBuy("wires_1"), Is.True);
-            var cable = All<CableController>().Single(c => c.name == "Cable_04");
+            var cable = BuyFirstCord();
             var a = All<SocketView>().Single(s => new JackId(s.Address) == first);
             var b = All<SocketView>().Single(s => new JackId(s.Address) == second);
             int audioCues = 0;

@@ -46,6 +46,7 @@ namespace Switchboard.Game.Tests
         private Text Label(string side, int row, string label) =>
             Page(side).Find($"Entries/Contact_{row:00}/{label}").GetComponent<Text>();
 
+        // Book.json is the designer's (he balances it at any time), so the expected rows come from the loader.
         [Test]
         public void TheRealBookShowsEveryEntryInTheLoadersOrder()
         {
@@ -53,33 +54,38 @@ namespace Switchboard.Game.Tests
             PhoneBookView book = RealBook();
 
             Assert.That(book.ContactCount, Is.EqualTo(expected.Entries.Count));
-            Assert.That(book.ContactCount, Is.EqualTo(39));
+            Assert.That(book.ContactCount, Is.GreaterThan(0));
             for (int i = 0; i < expected.Entries.Count; i++)
             {
                 Assert.That(book.ContactAt(i).Name, Is.EqualTo(expected.Entries[i].Name), $"entry {i + 1}");
                 Assert.That(book.ContactAt(i).Jack, Is.EqualTo(expected.Entries[i].Jack), $"entry {i + 1}");
             }
-            Assert.That(book.ContactAt(0).Name, Is.EqualTo("Police"));
-            Assert.That(book.PageCount, Is.EqualTo(7), "39 entries, 6 per page");
+            Assert.That(book.PageCount, Is.EqualTo((expected.Entries.Count + expected.ContactsPerPage - 1) / expected.ContactsPerPage),
+                "contactsPerPage entries per page");
         }
 
         [Test]
         public void ARowShowsTheNameThenProfessionAndAddressAndTheJackLast()
         {
+            BookCatalog expected = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath).LoadBook();
             RealBook();
 
-            Assert.That(Label("Left", 1, "Name").text, Is.EqualTo("Police"));
-            Assert.That(Label("Left", 1, "Details").text, Is.EqualTo("Police station, High St. 1"));
-            Assert.That(Label("Left", 1, "Jack").text, Is.EqualTo("B6"));
-            Assert.That(Label("Left", 4, "Name").text, Is.EqualTo("ABBOTT, Florence"));
-            Assert.That(Label("Left", 4, "Jack").text, Is.EqualTo("F6"));
-            Assert.That(Label("Right", 1, "Name").text, Is.EqualTo("COBBOLD, Doris"));
-            Assert.That(Label("Right", 1, "Details").text, Is.EqualTo("Baker, Bridge St. 5"));
-            Assert.That(Label("Right", 1, "Jack").text, Is.EqualTo("D1"));
+            // The first rows of the left page, and the first row of the right page when the book reaches it.
+            for (int row = 1; row <= System.Math.Min(4, System.Math.Min(expected.ContactsPerPage, expected.Entries.Count)); row++)
+                AssertRow("Left", row, expected.Entries[row - 1]);
+            if (expected.Entries.Count > expected.ContactsPerPage)
+                AssertRow("Right", 1, expected.Entries[expected.ContactsPerPage]);
             Assert.That(Page("Left").Find("JackHeading").GetComponent<Text>().text, Is.EqualTo("Jack"));
             var jack = Label("Left", 1, "Jack").rectTransform;
             var name = Label("Left", 1, "Name").rectTransform;
             Assert.That(jack.anchorMin.x, Is.GreaterThanOrEqualTo(name.anchorMax.x), "the jack is the last column");
+        }
+
+        private void AssertRow(string side, int row, BookEntry entry)
+        {
+            Assert.That(Label(side, row, "Name").text, Is.EqualTo(entry.Name), $"{side} row {row}");
+            Assert.That(Label(side, row, "Details").text, Is.EqualTo(PhoneBookContactRow.Details(entry)), $"{side} row {row}");
+            Assert.That(Label(side, row, "Jack").text, Is.EqualTo(entry.Jack), $"{side} row {row}");
         }
 
         [Test]
@@ -129,8 +135,11 @@ namespace Switchboard.Game.Tests
         }
 
         [Test]
-        public void AFreshGameOnTheThreeByThreeBoardListsEveryone()
+        public void AFreshGameOnTheStartingBoardListsEveryone()
         {
+            var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
+            BoardSize start = config.LoadEconomy().StartingBoard;
+            BookCatalog expected = config.LoadBook();
             var scene = EditorSceneManager.OpenPreviewScene("Assets/Scenes/Final.unity");
             try
             {
@@ -143,9 +152,11 @@ namespace Switchboard.Game.Tests
                 var installer = all.SelectMany(g => g.GetComponentsInChildren<GameInstaller>(true)).Single();
                 typeof(GameInstaller).GetMethod("Start", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(installer, null);
 
-                Assert.That(installer.Session.Stats.Board, Is.EqualTo(new BoardSize(3, 3)));
-                Assert.That(book.ContactCount, Is.EqualTo(39), "closed jacks are still listed");
-                Assert.That(book.HasLetter('Z'), Is.True, "ZOUCH, Albert on F5");
+                Assert.That(installer.Session.Stats.Board, Is.EqualTo(start));
+                Assert.That(book.ContactCount, Is.EqualTo(expected.Entries.Count), "closed jacks are still listed");
+                BookEntry closed = expected.Entries.FirstOrDefault(e => !start.Contains(e.Jack));
+                if (closed != null)
+                    Assert.That(book.HasLetter(closed.Name[0]), Is.True, $"{closed.Name} on the closed jack {closed.Jack}");
             }
             finally
             {

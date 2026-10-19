@@ -32,6 +32,26 @@ namespace Switchboard.Game
         private Action<int> loadScene;
         private float scaleBeforePause = 1f;
         private bool listening;
+        private float scaleBeforePresentation;
+        public bool PresentationOpen { get; private set; }
+
+        public void BeginPresentation()
+        {
+            if (PresentationOpen) return;
+            PresentationOpen = true;
+            scaleBeforePresentation = Time.timeScale;
+            Time.timeScale = 0;
+            SetGameInput(false);
+            save?.Invoke();
+        }
+
+        public void EndPresentation()
+        {
+            if (!PresentationOpen) return;
+            PresentationOpen = false;
+            Time.timeScale = scaleBeforePresentation;
+            SetGameInput(!IsPaused);
+        }
 
         public bool IsPaused { get; private set; }
         public bool OptionsOpen => IsPaused && optionsPage != null && optionsPage.activeSelf;
@@ -59,7 +79,7 @@ namespace Switchboard.Game
 
         public void Pause()
         {
-            if (IsPaused) return;
+            if (IsPaused || PresentationOpen) return;
             IsPaused = true;
             scaleBeforePause = Time.timeScale;
             Time.timeScale = 0f;
@@ -71,7 +91,7 @@ namespace Switchboard.Game
 
         public void Resume()
         {
-            if (!IsPaused) return;
+            if (!IsPaused || PresentationOpen) return;
             IsPaused = false;
             dialog.SetActive(false);
             // The dev panel's x5 survives a pause.
@@ -82,6 +102,7 @@ namespace Switchboard.Game
         /// <summary>Esc: resume while paused, else close an open book, else pause.</summary>
         public void HandleEscape()
         {
+            if (PresentationOpen) return;
             if (IsPaused) Resume();
             else if (book != null && book.IsOpen) book.SetOpen(false);
             else Pause();
@@ -104,6 +125,7 @@ namespace Switchboard.Game
         {
             Click();
             save?.Invoke();
+            PresentationOpen = false;
             IsPaused = false;
             Time.timeScale = 1f;
             loadScene(menuSceneIndex);
@@ -149,7 +171,8 @@ namespace Switchboard.Game
         private void OnDestroy()
         {
             // Leaving the scene while paused (dev New game) must not leave the clock stopped.
-            if (IsPaused) Time.timeScale = 1f;
+            if (IsPaused || PresentationOpen) Time.timeScale = 1f;
+            PresentationOpen = false;
             IsPaused = false;
             Unbind();
         }
