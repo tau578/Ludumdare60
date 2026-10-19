@@ -43,7 +43,17 @@ namespace Switchboard.UI
                 button.transition = Selectable.Transition.ColorTint;
 
                 foreach (var label in button.GetComponentsInChildren<TMP_Text>(true))
+                {
                     label.color = new Color(1, .98f, .91f, 1);
+                    // Match the Options Go back label: centred vertically, with no vertical inset.
+                    label.verticalAlignment = VerticalAlignmentOptions.Middle;
+                    var margin = label.margin;
+                    margin.y = margin.w = 0;
+                    label.margin = margin;
+                    var position = label.rectTransform.anchoredPosition;
+                    position.y = 3.3f;
+                    label.rectTransform.anchoredPosition = position;
+                }
             }
         }
     }

@@ -43,11 +43,14 @@ namespace Switchboard.Editor
                     if (button)
                     {
                         text.enableAutoSizing = true;
-                        // Small enough that descenders stay inside the plate; the bottom margin centres the
-                        // mixed-case word rather than the ascender-to-descender box (9a menu fix).
+                        // Keep the established size; use the Options Go back button's vertical placement.
                         text.fontSizeMax = 18;
                         text.fontSizeMin = 12;
-                        text.margin = new Vector4(0, 0, 0, 3);
+                        text.margin = Vector4.zero;
+                        var position = text.rectTransform.anchoredPosition;
+                        position.y = 3.3f;
+                        text.rectTransform.anchoredPosition = position;
+                        PrefabUtility.RecordPrefabInstancePropertyModifications(text.rectTransform);
                     }
                     EditorUtility.SetDirty(text);
                     PrefabUtility.RecordPrefabInstancePropertyModifications(text);

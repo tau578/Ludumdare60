@@ -138,10 +138,10 @@ namespace Switchboard.Game.Tests
                     Assert.That(label.alignment, Is.EqualTo(TextAlignmentOptions.Center), button.name);
                     Assert.That(rect.anchorMin, Is.EqualTo(Vector2.zero), button.name);
                     Assert.That(rect.anchorMax, Is.EqualTo(Vector2.one), button.name);
-                    Assert.That(rect.offsetMin, Is.EqualTo(Vector2.zero), button.name);
-                    Assert.That(rect.offsetMax, Is.EqualTo(Vector2.zero), button.name);
+                    Assert.That(rect.offsetMin, Is.EqualTo(new Vector2(0, 3.3f)), button.name);
+                    Assert.That(rect.offsetMax, Is.EqualTo(new Vector2(0, 3.3f)), button.name);
                     Assert.That(label.fontSizeMax, Is.EqualTo(18f), button.name);
-                    Assert.That(label.margin, Is.EqualTo(new Vector4(0, 0, 0, 3)), button.name);
+                    Assert.That(label.margin, Is.EqualTo(Vector4.zero), button.name);
                     Assert.That(label.text, Is.EqualTo(label.text.Trim()), button.name);
                     // The menu font is dynamic, so its glyphs come from the source file, not the saved atlas.
                     Assert.That(FontEngine.LoadFontFace(label.font.sourceFontFile), Is.EqualTo(FontEngineError.Success), button.name);
