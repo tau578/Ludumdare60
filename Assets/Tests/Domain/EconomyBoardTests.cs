@@ -70,7 +70,7 @@ namespace Switchboard.Domain.Tests
         [Test]
         public void ABoardChainLoads()
         {
-            EconomyCatalog catalog = Load(Board("board_1", 4, 3, 3), Board("board_2", 4, 4, 4), Board("board_3", 6, 6, 6));
+            EconomyCatalog catalog = Load(Board("board_1", 4, 3, 3), Board("board_2", 4, 4, 4), Board("board_3", 6, 6, 4));
             Assert.That(catalog.Errors, Is.Empty, "one side may grow alone, and slots may stay the same");
             Assert.That(catalog.Upgrades[0].BoardSize, Is.EqualTo(new BoardSize(4, 3)));
             Assert.That(catalog.Upgrades[0].ClientSlots, Is.EqualTo(3));
@@ -82,9 +82,9 @@ namespace Switchboard.Domain.Tests
         {
             EconomyCatalog catalog = LoadWithStart("", Board("board_1", 4, 4, 4));
             Assert.That(catalog.StartingBoard, Is.EqualTo(BoardSize.Full));
-            Assert.That(catalog.StartingClientSlots, Is.EqualTo(6));
+            Assert.That(catalog.StartingClientSlots, Is.EqualTo(StatSheet.MaxClientSlots));
             Assert.That(catalog.Errors[0], Does.Contain("startingBoard is missing").And.Contain("full 6x6 board"));
-            Assert.That(catalog.Errors[1], Does.Contain("startingClientSlots is missing").And.Contain("all 6"));
+            Assert.That(catalog.Errors[1], Does.Contain("startingClientSlots is missing").And.Contain($"all {StatSheet.MaxClientSlots}"));
         }
 
         [TestCase("'startingBoard': { 'cols': 3 }, 'startingClientSlots': 3", "needs both cols and rows")]
@@ -92,18 +92,18 @@ namespace Switchboard.Domain.Tests
         [TestCase("'startingBoard': { 'cols': 3, 'rows': 7 }, 'startingClientSlots': 3", "startingBoard 3x7 is outside the board")]
         public void ABadStartingBoardFallsBackToTheFullBoard(string start, string message)
         {
-            EconomyCatalog catalog = LoadWithStart(start, Board("board_1", 6, 6, 6));
+            EconomyCatalog catalog = LoadWithStart(start, Board("board_1", 6, 6, 4));
             Assert.That(catalog.StartingBoard, Is.EqualTo(BoardSize.Full));
             Assert.That(catalog.Errors[0], Does.Contain(message).And.Contain("full 6x6 board"));
         }
 
         [TestCase(0)]
         [TestCase(7)]
-        public void StartingClientSlotsOutsideOneToSixOpenEverySlot(int slots)
+        public void StartingClientSlotsOutsideThePanelOpenEverySlot(int slots)
         {
-            EconomyCatalog catalog = LoadWithStart($"'startingBoard': {{ 'cols': 3, 'rows': 3 }}, 'startingClientSlots': {slots}", Board("board_1", 4, 4, 6));
-            AssertSingleError(catalog, $"startingClientSlots {slots} is outside 1 to 6", "caller panel");
-            Assert.That(catalog.StartingClientSlots, Is.EqualTo(6));
+            EconomyCatalog catalog = LoadWithStart($"'startingBoard': {{ 'cols': 3, 'rows': 3 }}, 'startingClientSlots': {slots}", Board("board_1", 4, 4, 4));
+            AssertSingleError(catalog, $"startingClientSlots {slots} is outside 1 to {StatSheet.MaxClientSlots}", "caller panel");
+            Assert.That(catalog.StartingClientSlots, Is.EqualTo(StatSheet.MaxClientSlots));
         }
 
         [Test]
@@ -118,7 +118,7 @@ namespace Switchboard.Domain.Tests
 
         [Test]
         public void ReportsABoardSizeOutsideTheBoard() =>
-            AssertSingleError(Load(Board("board_1", 7, 7, 6)), "\"board_1\": boardSize 7x7 is outside the board", "1 to 6");
+            AssertSingleError(Load(Board("board_1", 7, 7, 4)), "\"board_1\": boardSize 7x7 is outside the board", "1 to 6");
 
         [Test]
         public void ReportsMissingClientSlots() =>
@@ -127,7 +127,7 @@ namespace Switchboard.Domain.Tests
 
         [Test]
         public void ReportsClientSlotsAboveTheCallerPanel() =>
-            AssertSingleError(Load(Board("board_1", 4, 4, 7)), "\"board_1\": clientSlots 7 is outside 1 to 6");
+            AssertSingleError(Load(Board("board_1", 4, 4, 7)), $"\"board_1\": clientSlots 7 is outside 1 to {StatSheet.MaxClientSlots}");
 
         [Test]
         public void TheFirstEntryMustBeBiggerThanTheStart() =>
@@ -136,13 +136,13 @@ namespace Switchboard.Domain.Tests
 
         [Test]
         public void TheBoardMustGrowAlongTheChain() =>
-            AssertSingleError(Load(Board("board_1", 4, 4, 4), Board("board_2", 4, 4, 5)),
+            AssertSingleError(Load(Board("board_1", 4, 4, 4), Board("board_2", 4, 4, 4)),
                 "Upgrade 2 \"board_2\": boardSize 4x4 is the same as board_1's 4x4", "The board must grow");
 
         [Test]
         public void NeitherSideMayShrink()
         {
-            AssertSingleError(Load(Board("board_1", 5, 5, 5), Board("board_2", 6, 4, 6)),
+            AssertSingleError(Load(Board("board_1", 5, 5, 4), Board("board_2", 6, 4, 4)),
                 "\"board_2\": boardSize 6x4 is smaller than board_1's 5x5", "can only grow");
             AssertSingleError(Load(Board("board_1", 2, 4, 4)), "boardSize 2x4 is smaller than the startingBoard 3x3");
         }
@@ -150,8 +150,8 @@ namespace Switchboard.Domain.Tests
         [Test]
         public void ClientSlotsNeverShrink()
         {
-            AssertSingleError(Load(Board("board_1", 4, 4, 5), Board("board_2", 5, 5, 4)),
-                "\"board_2\": clientSlots 4 is fewer than board_1's 5", "only grow");
+            AssertSingleError(Load(Board("board_1", 4, 4, 4), Board("board_2", 5, 5, 3)),
+                "\"board_2\": clientSlots 3 is fewer than board_1's 4", "only grow");
             AssertSingleError(Load(Board("board_1", 4, 4, 2)), "clientSlots 2 is fewer than startingClientSlots 3");
         }
 

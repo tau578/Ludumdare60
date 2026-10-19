@@ -122,7 +122,7 @@ The designer's draft wrote `start_pool` and `stage_pool`; the file uses `startPo
 | Field | Meaning | If left out or wrong |
 |---|---|---|
 | `startingBoard` | The part of the board a new game opens. `cols` are the columns 1 to 6, `rows` the rows A to F; each is **1 to 6**. The open part is always the top-left corner: `{ "cols": 3, "rows": 3 }` opens rows A to C and columns 1 to 3 (9 jacks). | The full 6x6 board, with a message |
-| `startingClientSlots` | How many caller slots, from the top, take calls in a new game: **1 to 6**. The others are hidden. | All 6, with a message |
+| `startingClientSlots` | How many caller slots, from the top, take calls in a new game: **1 to 4**. The others are hidden. | All 4, with a message |
 
 - Closed jacks are dimmed and can't take a plug. The board in Unity has 6 by 6 jacks and 6 caller slots; those are the only fixed limits.
 
@@ -178,7 +178,7 @@ Every upgrade is bought **once**. An entry looks like this:
 (The shipped pools are longer: 10, 12 and 14 calls.)
 
 - `boardSize` is the **whole** open part after buying, written like `startingBoard`, not the jacks added.
-- `clientSlots` is the **total** number of open caller slots after buying, 1 to 6. It may stay the same but never goes down, starting from `startingClientSlots`.
+- `clientSlots` is the **total** number of open caller slots after buying, 1 to 4. It may stay the same but never goes down, starting from `startingClientSlots`.
 - Along the chain, starting from `startingBoard`, the board must **grow**: neither `cols` nor `rows` may go down, and at least one must go up.
 - `stagePool` is the queue once this board is bought; see "Call queues". If it's missing or empty, the board can still be bought and the queue stays as it was, with a message.
 - Each new ring of the shipped board brings one emergency service: the Doctor (D4) at 4x4, the Fire Brigade (E5) at 5x5 and the Police (B6) at 6x6. Their emergency calls are in that board's `stagePool`.
