@@ -17,7 +17,7 @@
 | 7. Hand-written calls and queues | done | ✅ 2026-10-18 (36 min) | ✅ 431/431 tests, scope clean | ✅ | 8e48320 |
 | 8. The new phone book | done | ✅ 2026-10-18 (20 min) | ✅ 445/445 tests, scope clean | ✅ | f82ed29 |
 | 9a. Saves, touch, menu, pause | done | ✅ 2026-10-19 (37 min + 21 min fix + 24 min pause + 15 min corner) | ✅ 503/503 tests, scope clean | ✅ | 580c610 |
-| 9b. First Web build on itch | playtesting | ✅ 2026-10-19 (37 min; cursor fixes discarded) | ✅ scope clean | | |
+| 9b. First Web build on itch | done | ✅ 2026-10-19 (37 min; cursor fixes discarded) | ✅ 517/517 tests, scope clean | ✅ | 709be9d |
 | 10. Tutorial | not started | | | | |
 | 11. Sound and feel | not started | | | | |
 | 12. Mobile and Web polish | not started | | | | |
@@ -3535,3 +3535,14 @@ Follow-ups:
   - `CableInputController`, `MenuHandCursor` and `VolumeCablePanel` back to `HEAD`
   - the 14 cursor tests and the `BrowserPointer.jslib` case removed from `WebBuildTests`
   - The Step 9b Web build work and the `caller-02` slice fix stay. The fix reports above stay as history.
+
+#### Step 9b done (lead, 2026-10-19)
+- **Playtest OK:**
+  - The game plays in the browser from the itch Draft page.
+  - Progress survived reloads and today's re-uploads.
+  - It runs smoothly on the lead's iPhone.
+- **Accepted for later:**
+  - the black side strips on wide phones (Step 12)
+  - itch's fullscreen button on the iPhone (an Apple limit; Step 12 notes the embed option)
+- **Still open:** the double pointer, which waits for Sergei's cursor fix (Plan §8).
+- **Commits:** `709be9d` (Step 9b) and `b4d39aa` (the metas for Mia's `RawArt`, matching Sergei's branch).
