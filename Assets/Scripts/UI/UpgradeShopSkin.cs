@@ -10,6 +10,7 @@ namespace Switchboard.UI
     {
         [SerializeField] private Sprite store, neutral, pressed, dark;
         [SerializeField] private TMP_FontAsset font;
+        [SerializeField] private Material goldLightMaterial;
         private bool applied;
         private Sprite blank, cable, income, secret;
 
@@ -30,6 +31,11 @@ namespace Switchboard.UI
             foreach (var graphic in GetComponentsInChildren<Graphic>(true)) graphic.enabled = false;
             foreach (var layout in GetComponentsInChildren<LayoutGroup>(true)) layout.enabled = false;
             var art = Picture("Store artwork", root, 0, 0, 469, 1004, store);
+            if (goldLightMaterial != null)
+            {
+                art.material = goldLightMaterial;
+                art.gameObject.AddComponent<BoardGoldLight>();
+            }
             art.transform.SetAsFirstSibling();
             var header = (RectTransform)transform.Find("HeaderSlot");
             // Six numeric reels, each 45 artwork pixels wide, after the painted dollar sign.
