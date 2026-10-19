@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Switchboard.Content;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -20,18 +21,21 @@ namespace Switchboard.UI
             emptyMessage = empty;
         }
 
-        public void Render(PhoneBookConfig config, int pageIndex, string message = null)
+        public void Render(BookCatalog book, int pageIndex, string message = null)
         {
-            int start = pageIndex * config.contactsPerPage;
-            int count = Mathf.Clamp(config.contacts.Length - start, 0, config.contactsPerPage);
+            IReadOnlyList<BookEntry> contacts = book.Entries;
+            int perPage = book.ContactsPerPage;
+            int start = pageIndex * perPage;
+            int count = Mathf.Clamp(contacts.Count - start, 0, perPage);
             while (rows.Count < count)
             {
                 var row = Instantiate(rowTemplate, entries);
                 row.name = $"Contact_{rows.Count + 1:00}";
                 rows.Add(row);
             }
-            float spacing = entries.rect.height / config.contactsPerPage;
-            int fontSize = config.contactsPerPage > 8 ? 18 : 22;
+            float spacing = entries.rect.height / perPage;
+            // Two lines per row: the name, then profession and address.
+            int fontSize = Mathf.Clamp(Mathf.RoundToInt(spacing * .41f), 10, 22);
             for (int i = 0; i < rows.Count; i++)
             {
                 rows[i].gameObject.SetActive(i < count);
@@ -41,11 +45,11 @@ namespace Switchboard.UI
                 rect.pivot = new Vector2(.5f, 1);
                 rect.sizeDelta = new Vector2(entries.rect.width, spacing);
                 rect.anchoredPosition = new Vector2(0, -i * spacing);
-                rows[i].Show(config.contacts[start + i], fontSize);
+                rows[i].Show(contacts[start + i], fontSize);
             }
             pageNumber.text = (pageIndex + 1).ToString();
             emptyMessage.text = message ?? "No contacts";
-            emptyMessage.gameObject.SetActive(pageIndex == 0 && config.contacts.Length == 0);
+            emptyMessage.gameObject.SetActive(pageIndex == 0 && contacts.Count == 0);
         }
     }
 }

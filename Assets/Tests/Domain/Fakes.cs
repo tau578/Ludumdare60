@@ -3,36 +3,6 @@ using System.Collections.Generic;
 
 namespace Switchboard.Domain.Tests
 {
-    internal sealed class FakePerson : IPerson
-    {
-        public FakePerson(string firstName, string lastName, params string[] tags)
-        {
-            FirstName = firstName;
-            LastName = lastName;
-            Tags = tags ?? Array.Empty<string>();
-            Id = string.IsNullOrEmpty(firstName)
-                ? $"person.{lastName.ToLowerInvariant().Replace(' ', '-')}"
-                : $"person.{firstName.ToLowerInvariant()}-{lastName.ToLowerInvariant()}";
-        }
-
-        public string Id { get; }
-        public string FirstName { get; }
-        public string LastName { get; }
-        public IReadOnlyList<string> Tags { get; }
-    }
-
-    internal sealed class FakeDirectoryEntry : IDirectoryEntry
-    {
-        public FakeDirectoryEntry(IPerson person, string jackLabel)
-        {
-            Person = person;
-            JackLabel = jackLabel;
-        }
-
-        public IPerson Person { get; }
-        public string JackLabel { get; }
-    }
-
     /// <summary>Hand-written calls for tests (D51).</summary>
     internal static class Scripts
     {

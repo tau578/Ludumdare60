@@ -1,5 +1,5 @@
-using System;
 using System.Collections.Generic;
+using Switchboard.Content;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -19,23 +19,21 @@ namespace Switchboard.UI
         [SerializeField] private Button previousSpread;
         [SerializeField] private Button nextSpread;
         [SerializeField] private PhoneBookTab[] tabs = new PhoneBookTab[0];
-        private PhoneBookConfig allContacts = new PhoneBookConfig();
-        private PhoneBookConfig directory = new PhoneBookConfig();
-        private Predicate<string> isVisibleSocket;
-        private string configError;
+        private BookCatalog directory = BookCatalog.Empty;
+        private string pageMessage;
         private readonly List<RaycastResult> pointerHits = new List<RaycastResult>();
 
         public bool IsOpen { get; private set; }
         public event System.Action<bool> OpenChanged;
         public Graphic ClosedBookGraphic => closedBook != null ? closedBook.targetGraphic : null;
         public int CurrentSpreadIndex { get; private set; }
-        /// <summary>The contacts the book shows, after the socket filter.</summary>
-        public int ContactCount => directory.contacts.Length;
-        public int PageCount => Mathf.Max(1, Mathf.CeilToInt(ContactCount / (float)directory.contactsPerPage));
-        public PhoneBookContact ContactAt(int index) => directory.contacts[index];
+        /// <summary>Every entry of Book.json the loader kept, whatever the board size (D53).</summary>
+        public int ContactCount => directory.Entries.Count;
+        public int PageCount => Mathf.Max(1, Mathf.CeilToInt(ContactCount / (float)directory.ContactsPerPage));
+        public BookEntry ContactAt(int index) => directory.Entries[index];
         public bool CanGoBack => CurrentSpreadIndex > 0;
-        public bool CanGoForward => (CurrentSpreadIndex + 1) * 2 * directory.contactsPerPage < ContactCount;
-        private int ContactsPerSpread => 2 * directory.contactsPerPage;
+        public bool CanGoForward => (CurrentSpreadIndex + 1) * 2 * directory.ContactsPerPage < ContactCount;
+        private int ContactsPerSpread => 2 * directory.ContactsPerPage;
 
         public void ConfigureDirectory(TextAsset config, PhoneBookPageView left, PhoneBookPageView right, Button previous, Button next)
         {
@@ -49,73 +47,36 @@ namespace Switchboard.UI
 
         public void ConfigureTabs(PhoneBookTab[] letterTabs) => tabs = letterTabs;
 
+        public bool HasLetter(char letter) => FirstContactWithLetter(letter) >= 0;
+
         /// <summary>
-        /// Shows only the contacts whose socket passes the filter (D42: the open board), in the loaded order, so the
-        /// services stay first and the people keep their sort. Null shows everyone. Pages and tabs follow the filter.
+        /// Opens the spread with the first name starting with the letter. Names are "SURNAME, First" and sorted, so this
+        /// is the surname; a service goes by its whole name.
         /// </summary>
-        public void SetVisibleSockets(Predicate<string> isVisible)
-        {
-            isVisibleSocket = isVisible;
-            ApplyFilter();
-            int lastSpread = Mathf.Max(0, (ContactCount - 1) / ContactsPerSpread);
-            if (CurrentSpreadIndex > lastSpread) CurrentSpreadIndex = lastSpread;
-            RefreshPages();
-        }
-
-        private void ApplyFilter()
-        {
-            if (isVisibleSocket == null)
-            {
-                directory = allContacts;
-                return;
-            }
-            var visible = new List<PhoneBookContact>(allContacts.contacts.Length);
-            foreach (PhoneBookContact contact in allContacts.contacts)
-                if (isVisibleSocket(contact.socket)) visible.Add(contact);
-            directory = new PhoneBookConfig { contactsPerPage = allContacts.contactsPerPage, contacts = visible.ToArray() };
-        }
-
-        public bool HasLetter(char letter) => FirstContactWithSurname(letter) >= 0;
-
-        /// <summary>Opens the spread with the first surname starting with the letter; the contacts are sorted by surname.</summary>
         public bool ShowLetter(char letter)
         {
-            int index = FirstContactWithSurname(letter);
+            int index = FirstContactWithLetter(letter);
             if (index < 0) return false;
             CurrentSpreadIndex = index / ContactsPerSpread;
             RefreshPages();
             return true;
         }
 
-        private int FirstContactWithSurname(char letter)
+        private int FirstContactWithLetter(char letter)
         {
             letter = char.ToUpperInvariant(letter);
-            for (int i = 0; i < directory.contacts.Length; i++)
-            {
-                var contact = directory.contacts[i];
-                string name = contact.name;
-                int initial = contact.IsEmergencyService || name.IndexOf(',') >= 0 ? 0 : name.LastIndexOf(' ') + 1;
-                if (char.ToUpperInvariant(name[initial]) == letter) return i;
-            }
+            IReadOnlyList<BookEntry> entries = directory.Entries;
+            for (int i = 0; i < entries.Count; i++)
+                if (char.ToUpperInvariant(entries[i].Name[0]) == letter) return i;
             return -1;
         }
 
         [ContextMenu("Reload Contacts")]
         public void ReloadContacts()
         {
-            allContacts = new PhoneBookConfig();
-            configError = null;
-            try
-            {
-                if (contactsConfig == null) throw new System.ArgumentException("Phone book config is not assigned.");
-                allContacts = PhoneBookConfig.Parse(contactsConfig.text);
-            }
-            catch (System.ArgumentException ex)
-            {
-                configError = "Configuration error";
-                Debug.LogWarning($"Phone book: {ex.Message}", this);
-            }
-            ApplyFilter();
+            // GameInstaller logs the file's messages once at start; an empty book shows its first one on the page.
+            directory = BookFileLoader.Load(contactsConfig != null ? contactsConfig.text : null);
+            pageMessage = directory.Entries.Count == 0 && directory.Errors.Count > 0 ? directory.Errors[0] : null;
             CurrentSpreadIndex = 0;
             RefreshPages();
         }
@@ -136,14 +97,14 @@ namespace Switchboard.UI
 
         private void RefreshPages()
         {
-            if (leftPage != null) leftPage.Render(directory, CurrentSpreadIndex * 2, configError);
+            if (leftPage != null) leftPage.Render(directory, CurrentSpreadIndex * 2, pageMessage);
             if (rightPage != null) rightPage.Render(directory, CurrentSpreadIndex * 2 + 1);
             if (previousSpread != null) previousSpread.gameObject.SetActive(CanGoBack);
             if (nextSpread != null) nextSpread.gameObject.SetActive(CanGoForward);
             foreach (var tab in tabs)
             {
                 if (tab == null) continue;
-                int index = FirstContactWithSurname(tab.Letter);
+                int index = FirstContactWithLetter(tab.Letter);
                 tab.Show(index >= 0, index >= 0 && index / ContactsPerSpread == CurrentSpreadIndex);
             }
         }

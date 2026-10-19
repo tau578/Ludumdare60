@@ -1,38 +1,42 @@
+using Switchboard.Content;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace Switchboard.UI
 {
+    /// <summary>One book entry (D53): the name, a smaller line with profession and address under it, and the jack last.</summary>
     public sealed class PhoneBookContactRow : MonoBehaviour, IPointerDownHandler
     {
         [SerializeField] private Text contactName;
-        [SerializeField] private Text socketAddress;
-        [SerializeField, Tooltip("A transparent full-row image, left over from the Notepad (D54). It never takes raycasts, " +
-            "so clicks fall through to page turning.")]
-        private Image tapArea;
+        [SerializeField] private Text details;
+        [SerializeField, FormerlySerializedAs("socketAddress")] private Text jack;
 
-        public void Configure(Text nameLabel, Text addressLabel, Image hitArea = null)
+        public void Configure(Text nameLabel, Text detailsLabel, Text jackLabel)
         {
             contactName = nameLabel;
-            socketAddress = addressLabel;
-            tapArea = hitArea;
-            if (tapArea != null) tapArea.raycastTarget = false;
+            details = detailsLabel;
+            jack = jackLabel;
         }
 
-        public void Show(PhoneBookContact contact, int fontSize)
+        public void Show(BookEntry entry, int fontSize)
         {
-            contactName.text = contact.name;
-            socketAddress.text = contact.socket;
-            contactName.fontSize = socketAddress.fontSize = fontSize;
+            contactName.text = entry.Name;
+            jack.text = entry.Jack;
+            contactName.resizeTextMaxSize = jack.fontSize = fontSize;
+            if (details == null) return;
+            details.text = Details(entry);
+            details.resizeTextMaxSize = Mathf.Max(8, Mathf.RoundToInt(fontSize * .75f));
+        }
+
+        public static string Details(BookEntry entry)
+        {
+            if (entry.Profession.Length == 0) return entry.Address;
+            return entry.Address.Length == 0 ? entry.Profession : entry.Profession + ", " + entry.Address;
         }
 
         // Taking the press keeps the open book from flashing its pressed tint under the row.
         public void OnPointerDown(PointerEventData eventData) { }
-
-        private void Awake()
-        {
-            if (tapArea != null) tapArea.raycastTarget = false;
-        }
     }
 }

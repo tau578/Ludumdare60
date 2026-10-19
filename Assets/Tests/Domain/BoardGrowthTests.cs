@@ -179,17 +179,17 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void TheRealPeopleFileHasOneServicePerNewRing()
+        public void TheRealBookHasOneServicePerNewRing()
         {
             var config = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
-            PeopleCatalog people = config.LoadPeople(ContentValidator.BoardJacks());
+            BookCatalog book = config.LoadBook();
             var jacks = new Dictionary<string, string>();
-            foreach (IDirectoryEntry entry in people.Directory) jacks[entry.Person.FullName()] = entry.JackLabel;
+            foreach (BookEntry entry in book.Entries) jacks[entry.Name] = entry.Jack;
 
             Assert.That(jacks["Doctor"], Is.EqualTo("D4"));
             Assert.That(jacks["Fire Brigade"], Is.EqualTo("E5"));
             Assert.That(jacks["Police"], Is.EqualTo("B6"));
-            Assert.That(jacks["Reginald Underhill"], Is.EqualTo("C2"));
+            Assert.That(jacks["UNDERHILL, Reginald"], Is.EqualTo("C2"));
 
             // Each bigger board brings exactly one service.
             int[] services = { 0, 1, 2, 3 };
@@ -197,8 +197,8 @@ namespace Switchboard.Domain.Tests
             {
                 var size = new BoardSize(side, side);
                 int count = 0;
-                foreach (IDirectoryEntry entry in people.Directory)
-                    if (entry.Person.Tags.Count > 0 && size.Contains(entry.JackLabel)) count++;
+                foreach (BookEntry entry in book.Entries)
+                    if (entry.IsEmergencyService && size.Contains(entry.Jack)) count++;
                 Assert.That(count, Is.EqualTo(services[side - 3]), size.ToString());
             }
         }

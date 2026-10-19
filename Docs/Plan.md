@@ -115,6 +115,7 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Dynamic TMP fonts (merge) | Test and Play runs fill glyphs into Sergei's dynamic font assets (`Boecklins Universe SDF.asset`, `Della Respira SDF.asset`): thousands of changed lines. Discard them with `git checkout -- <file>` like `TimeManager.asset`, and mention it. |
 | Simulated hover vs. the real mouse (merge) | While Unity has focus, `CableInputController` reads the real mouse every frame and overrides a simulated hover. Disable the controller for the one captured frame. |
 | Deleting files (7) | Delete through MCP (`delete_script`, `manage_asset` `delete`) or a plain `rm` followed by `refresh_unity`. Never use `git rm`: it stages the deletion. |
+| Renaming an asset (8) | Rename or move it with `manage_asset` (Unity's `AssetDatabase.MoveAsset`), never in the file system: Unity keeps the GUID, so every prefab and asset that references it still finds it with no re-wiring (`PhoneBook.json` → `Book.json`). Git shows a delete plus a new file until both are staged. |
 | Missing JSON fields (5c) | `JsonUtility.FromJson` keeps field initializers for fields the file leaves out, also inside nested objects in arrays. Use a marker initializer (NaN, or a named `Unset` constant) to tell "missing" from 0. |
 
 ## 5. Definition of done (every step)
@@ -161,7 +162,7 @@ Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs 
 | Touch input in the cord code | Use `Pointer.current` instead of `Mouse.current` in `CableInputController.Update`, and hide the hand cursor on touch (D28). | Step 9 |
 | A held cord drops on button clicks | Any click off a jack counts as "empty space" and returns the held cord. A call-card click already keeps it (`2fc3810`). The lead prefers that buttons keep it too. Book rows no longer take clicks since Step 7 (D54). | any step; Step 12 at the latest |
 | `CableInputController` references `Switchboard.Game.CallCardView` | The UI code depends on the Game layer. A small interface or marker component on the card would keep the layers apart. | cleanup, any step |
-| Stale paths in editor menus | `LevelBackgroundBuilder` and `GamePresentationBuilder` still name `Assets/Scenes/Level.unity` (now `Final.unity`, same GUID). `PhoneBookBuilder` points at a missing `Assets/Settings/PhoneBook.json` (the file is `Assets/Configs/PhoneBook.json`). | cleanup, any step |
+| Stale paths in editor menus | `LevelBackgroundBuilder` and `GamePresentationBuilder` still name `Assets/Scenes/Level.unity` (now `Final.unity`, same GUID); `GamePresentationBuilder` opens it additively, so check what it does before changing the path. `PhoneBookBuilder.CreatePhoneBook`'s message still says "Open Level". (`PhoneBookBuilder`'s book path was fixed in Step 8.) | cleanup, any step |
 | A–Z tabs are hidden | `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab` (lead, 2026-10-18); the code, objects and tests stay. `Tools/Switchboard/Update Phone Book Tabs` rebuilds them active, so untick them again after running it. | |
 | Loose scene objects | `SwitchboardCanvas` and `EventSystem` are loose in `Final.unity`; making them prefabs would keep scene merges small. | optional |
 | Sound effects | Ring, alarm, coins, paid, fine, hang-up: find them or generate them. | before Step 11 |
@@ -169,9 +170,10 @@ Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs 
 | Closed caller-slot covers (6) | Closed slots are hidden since Sergei's `041fb90` (Step 6's dark discs are gone). A cover-plate drawing from Mia could show them as closed. | when art exists |
 | Unused random helpers (7) | `IRandom`, `SeededRandom`, `RandomExtensions` and `FloatRange` in `Domain/Common` have no users since the spawner went. Delete them, or keep `IRandom` if a later step needs randomness. | cleanup, any step |
 | "New order!" stamp over the emergency badge (7) | While a call rings, the stamp hides half the EMERGENCY badge and most of the countdown ring. This predates Step 7. | Step 11 or 12 |
+| `PhoneBookContactRow.OnPointerDown` (8) | Rows have no raycast target since Step 8 dropped the tap image, so it can never be called. Harmless; remove it in a cleanup. | cleanup, any step |
 | `SlowGuidePulse` material in EditMode tests | The guide's hidden book-glow material is freed only in `OnDestroy`, which EditMode tests don't run, so each test run leaves 2 materials in editor memory. Free it in `OnDisable` too, or in the test teardown. | cleanup, any step |
 
-Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `UpgradeShopPanel/HeaderSlot`, or update `GameInstaller` with the rename. `PhoneBook.json` keeps the book's format, `contactsPerPage` and the surname order.
+Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `UpgradeShopPanel/HeaderSlot`, or update `GameInstaller` with the rename. `Book.json` keeps its format and `contactsPerPage`; the book sorts itself (D53), so the file's order doesn't matter.
 
 ## 9. Steps
 
@@ -195,7 +197,7 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 12 | Mobile and Web polish | Good on phones and desktop browsers |
 | 13 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–7 are built. Step 8 is fully specified and comes next. Steps 9–13 are outlines; the orchestrator turns each one into a full brief before launching it.
+Steps 1–8 are built. Step 9 comes next; it needs D26 (hosting) settled first. Steps 9–13 are outlines; the orchestrator turns each one into a full brief before launching it.
 
 > **Renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7, 7d → 8, 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11, 9 → 12, 10 → 13. The briefs of done steps, commit messages and older reports keep the numbers they were written with.
 
@@ -1501,6 +1503,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 - **Web build** through `manage_build`, to `Builds/Web/` (git-ignored).
 - **Depends on** D26 (hosting). Includes the touch-input open item (§8).
 - **From Step 7:** the save also needs the queue position: the index of the next call in the current pool (the pool itself follows from the bought upgrades). Live calls aren't saved; on load the slots fill from that position.
+- **From Step 8:** the book has no state to save; it is rebuilt from `Book.json` at every start.
 - **From Step 6:** the board size and caller slots are ordinary upgrade ids (`board_1`…), so a save restores them through `StatSheet` with no extra data; `OpenBoardLink` then reopens the jacks. Test that a loaded `board_2` opens 5×5 before the first call rings. `GameSession.ResetUpgrades` (clears calls, returns cords from closing jacks) is dev-only; a "new game" button would need the same care.
 - **Tests:**
   - Saving and loading gives back the same data.

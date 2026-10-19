@@ -43,9 +43,9 @@ namespace Switchboard.Game
             EconomyCatalog economy = config.LoadEconomy(calls);
             foreach (string error in economy.Errors) Debug.LogError($"Economy file: {error}", config);
             List<SocketView> sockets = LevelScene.FindAll<SocketView>(scene);
-            PeopleCatalog people = config.LoadPeople(BoardJacks(sockets));
-            foreach (string error in people.Errors) Debug.LogError($"People file: {error}", config);
-            foreach (string error in ContentValidator.ValidateCallJacks(calls.Calls, people.Directory))
+            BookCatalog book = config.LoadBook(BoardJacks(sockets));
+            foreach (string error in book.Errors) Debug.LogError($"Book file: {error}", config);
+            foreach (string error in ContentValidator.ValidateCallJacks(calls.Calls, book.Entries))
                 Debug.LogError($"Calls file: {error}", config);
 
             // Trim unused prefab cords before binding; missing starting cords are added below.
@@ -63,15 +63,15 @@ namespace Switchboard.Game
                     "(startingClientSlots or an extra_clients clientSlots). Lower the file's values or add slots to the panel.", config);
             callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, Session.Penalties, callerSlots, PortraitOf,
                 cordBridge.ColorOf, config.CardStyleFor, syncBoard: cordBridge.Synchronize, counter: moneyCounter);
-            PhoneBookView book = FindSingle<PhoneBookView>(scene);
-            boardLink = new OpenBoardLink(sockets, book, callQueue, Session.Stats, Session.Board);
+            PhoneBookView bookView = FindSingle<PhoneBookView>(scene);
+            boardLink = new OpenBoardLink(sockets, callQueue, Session.Stats, Session.Board);
             shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene), moneyCounter);
             goalPanel.Bind(Session.Goal);
             loopRunner.Bind(Session);
             if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls);
             var guide = GetComponent<FirstOrderGuide>();
             if (guide == null) guide = gameObject.AddComponent<FirstOrderGuide>();
-            guide.Bind(callQueue, Session.Calls, book,
+            guide.Bind(callQueue, Session.Calls, bookView,
                 LevelScene.FindAll<CableController>(scene).ToArray(), cordBridge);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             // Added at runtime so no scene or prefab references a type that release builds leave out.

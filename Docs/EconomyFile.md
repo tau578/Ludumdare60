@@ -5,6 +5,8 @@ Two files are yours. You edit them by hand, and the game reads them every time i
 - `Assets/Configs/Calls.json`: every call in the game, written out one by one.
 - `Assets/Configs/Economy.json`: the starting money and cords, the board, **which calls play in which order** (the call queues), and everything the shop sells.
 
+The phone book, `Assets/Configs/Book.json`, is yours too; it has its own guide: [BookFile.md](BookFile.md).
+
 Keep both readable: one entry per line, in the order you want the player to meet them.
 
 **Cents and seconds.** Every money value is in **cents**: 500 is $5.00, 25 is 25¢. Every time value is in **seconds**. The field names say which: `...Cents`, `...Seconds`, `centsPerSecond`.
@@ -49,7 +51,7 @@ Every call is one line in `calls`:
 - A wrong patch ends the call with "Wrong number!". There is **no fine**, and the next call in the queue takes the slot. The same call comes back when the queue comes round to it.
 - An emergency that isn't connected within `responseTimeSeconds` ends as "Missed" and takes `penaltyCents` (never multiplied; money never drops below $0.00). A wrong patch or a cut-off emergency is **not** fined.
 
-**The phone book is only for looking things up.** The calls carry their own jacks; the book (`PhoneBook.json`, and from Step 8 `Book.json`) just has to list someone on every jack a call uses, or the player can't find it. The validator checks that.
+**The phone book is only for looking things up.** The calls carry their own jacks; the book (`Book.json`, see [BookFile.md](BookFile.md)) just has to list someone on every jack a call uses, or the player can't find it. The validator checks that.
 
 ## Economy.json
 
@@ -197,7 +199,7 @@ Entries of the same type form a **chain**, in the order they appear in the file.
 
 ## Checking the files
 
-In Unity, choose **Tools > Switchboard > Validate Content**. The Console then shows either "Validate Content: no problems found." or one plain message per problem, naming the file, the entry and the fix. For example:
+In Unity, choose **Tools > Switchboard > Validate Content**. It checks `Calls.json`, `Economy.json` and `Book.json` together. The Console then shows either "Validate Content: no problems found." or one plain message per problem, naming the file, the entry and the fix. For example:
 
 ```
 Economy file: startPool: call_014 uses E5, but the startingBoard opens only 3x3. The player could never connect it, so it is left out. Move it to the pool of a bigger board, or give it jacks on this one.
@@ -212,7 +214,7 @@ Economy file: startPool: call_014 uses E5, but the startingBoard opens only 3x3.
 - an empty `from` or `to`, a jack that isn't on the 6x6 board, or `from` and `to` the same
 - an emergency without a `responseTimeSeconds` above 0, or without `penaltyCents`
 - a note when a regular call has `responseTimeSeconds` or `penaltyCents` (only used for emergencies; the call still plays)
-- a jack a call uses that nobody is listed on in the phone book
+- a jack a call uses that has no entry in the phone book (`Book.json`)
 
 A call with a problem is left out; the others still play.
 
@@ -240,7 +242,7 @@ Calls file: Call 3 "call_003": durationSeconds is missing. Add how many seconds 
 Calls file: Call 7 "call_007": to "G2" is not a jack on the board. Use a row letter A to F, then a column 1 to 6, such as "C3".
 Calls file: Call 9 "call_103": an emergency needs responseTimeSeconds, the seconds the player has to connect it, such as "responseTimeSeconds": 30.
 Calls file: Call 2 "call_002": responseTimeSeconds and penaltyCents are only used for emergencies. Add "emergency": true, or remove them.
-Calls file: call_201 uses A5, but nobody is listed on A5 in PhoneBook.json, so the player can't look it up. Put someone on that jack in the book, or give the call another jack.
+Calls file: call_201 uses A5, but no entry in Book.json is on A5, so the player can't look it up. Add an entry with that jack to the book, or give the call another jack.
 Economy file: startPool: call_099 is not in Calls.json. Check the spelling, or add the call to Calls.json.
 Economy file: Upgrade "board_1": stagePool: call_014 uses E5, but board_1 opens only 4x4. The player could never connect it, so it is left out. Move it to the pool of a bigger board, or give it jacks on this one.
 Economy file: Upgrade "board_2": stagePool has 3 different calls for 4 caller slots (board_2's clientSlots), so 1 slot would stay empty. A note only: add more calls if you want every slot busy.

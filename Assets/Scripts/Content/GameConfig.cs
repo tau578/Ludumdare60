@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Switchboard.Content
 {
     /// <summary>
-    /// The one asset GameInstaller references: the calls, economy and people files, plus what stays in Unity because
+    /// The one asset GameInstaller references: the calls, economy and book files, plus what stays in Unity because
     /// it is presentation (card styles, portraits, cord colours).
     /// </summary>
     [CreateAssetMenu(menuName = "Switchboard/GameConfig")]
@@ -23,8 +24,8 @@ namespace Switchboard.Content
         private CallCardStyle emergencyCards = new CallCardStyle { badgeText = "EMERGENCY", accent = new Color(0.78f, 0.13f, 0.13f, 1) };
         [SerializeField, Tooltip("Assets/Configs/Calls.json, the designer's hand-written calls (D51).")]
         private TextAsset callsFile;
-        [SerializeField, Tooltip("Assets/Configs/PhoneBook.json, shared with the team's phone book (D31).")]
-        private TextAsset peopleFile;
+        [SerializeField, FormerlySerializedAs("peopleFile"), Tooltip("Assets/Configs/Book.json, the designer's phone book (D53).")]
+        private TextAsset bookFile;
         [SerializeField, Tooltip("Assets/Configs/Economy.json, the designer's economy file (D39).")]
         private TextAsset economyFile;
         [SerializeField] private PortraitEntry[] portraits = new PortraitEntry[0];
@@ -33,7 +34,7 @@ namespace Switchboard.Content
 
         public string CallsFileText => callsFile != null ? callsFile.text : null;
 
-        public string PeopleFileText => peopleFile != null ? peopleFile.text : null;
+        public string BookFileText => bookFile != null ? bookFile.text : null;
 
         public string EconomyFileText => economyFile != null ? economyFile.text : null;
 
@@ -42,7 +43,8 @@ namespace Switchboard.Content
         /// <param name="calls">The pools refer to Calls.json; null loads it here.</param>
         public EconomyCatalog LoadEconomy(CallsCatalog calls = null) => EconomyFileLoader.Load(EconomyFileText, calls ?? LoadCalls());
 
-        public PeopleCatalog LoadPeople(IEnumerable<string> boardJacks) => PeopleFileLoader.Load(PeopleFileText, boardJacks);
+        /// <param name="boardJacks">The jack labels on the board; null means the full 6x6 board.</param>
+        public BookCatalog LoadBook(IEnumerable<string> boardJacks = null) => BookFileLoader.Load(BookFileText, boardJacks);
 
         /// <summary>Every file's messages, plus the checks across files, as Tools/Switchboard/Validate Content shows them.</summary>
         public List<string> Validate()
@@ -51,9 +53,9 @@ namespace Switchboard.Content
             CallsCatalog calls = LoadCalls();
             foreach (string error in calls.Errors) errors.Add("Calls file: " + error);
             foreach (string error in LoadEconomy(calls).Errors) errors.Add("Economy file: " + error);
-            List<string> board = ContentValidator.BoardJacks();
-            foreach (string error in ContentValidator.Validate(PeopleFileText, board)) errors.Add("People file: " + error);
-            foreach (string error in ContentValidator.ValidateCallJacks(calls.Calls, LoadPeople(board).Directory))
+            BookCatalog book = LoadBook();
+            foreach (string error in book.Errors) errors.Add("Book file: " + error);
+            foreach (string error in ContentValidator.ValidateCallJacks(calls.Calls, book.Entries))
                 errors.Add("Calls file: " + error);
             return errors;
         }

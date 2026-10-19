@@ -16,7 +16,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), open items (§8) and the step briefs (§9).
 3. `Docs/Design.md`: the source of truth for game rules, architecture and decisions D01–D54. If the code or a brief disagrees with it, stop and ask; don't improvise.
 
-**Next step:** see the first row in `Docs/Progress.md` that isn't "done". As of 2026-10-18, Step 5 is split (D39–D44): **5a** (the designer's `Economy.json`, the shop panel, income upgrades, the secret goal), **5b** (extra wires up to 6 cords, the Notepad) and **5c** (calls, pacing, starting money and cords in `Economy.json`, D47) are done, and so is **7a** (board growth from a 3×3 start, D49). Step 6 (board growth, built as "7a") is done too. Step 7 (hand-written calls and call queues, D51, D52, D54) is done too. **Step 8 (the lookup-only phone book, D53) comes next**, then Step 9 (saves, Web build; still an outline, needs D26, hosting), 10 (tutorial), 11 (sound), 12 (mobile and Web polish), 13 (balance). Steps were renumbered on 2026-10-18 to follow the build order; older reports and commits use the old numbers.
+**Next step:** see the first row in `Docs/Progress.md` that isn't "done". As of 2026-10-18, Step 5 is split (D39–D44): **5a** (the designer's `Economy.json`, the shop panel, income upgrades, the secret goal), **5b** (extra wires up to 6 cords, the Notepad) and **5c** (calls, pacing, starting money and cords in `Economy.json`, D47) are done, and so is **7a** (board growth from a 3×3 start, D49). Step 6 (board growth, built as "7a") is done too. Step 7 (hand-written calls and call queues, D51, D52, D54) is done too. Step 8 (the lookup-only phone book, `Book.json`, D53) is done too. **Step 9 (saves, Web build) comes next**; it is still an outline and needs D26 (hosting) first. Then 10 (tutorial), 11 (sound), 12 (mobile and Web polish), 13 (balance). Steps were renumbered on 2026-10-18 to follow the build order; older reports and commits use the old numbers.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).
@@ -63,14 +63,14 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 
 Teammates still push to `main`, so pre-flight always merges first (see the git rules).
 
-- **The designer** edits `Assets/Configs/Economy.json` (D39; one entry per line, guide in `Docs/EconomyFile.md`) and `Assets/Configs/PhoneBook.json` (D31) by hand. Keep both human-readable, keep validator messages plain, and keep the book's format, `contactsPerPage` and the surname sort order.
+- **The designer** edits `Assets/Configs/Economy.json` (D39; one entry per line, guide in `Docs/EconomyFile.md`) and `Assets/Configs/Book.json` (D53; guide in `Docs/BookFile.md`) by hand. Keep both human-readable, keep validator messages plain, and keep the book's format and `contactsPerPage`. The book sorts itself (services first, then names A–Z), so the file's order doesn't matter.
 - **Mia** makes the art (`Assets/Sprites/`, `Assets/Fonts/`).
 
 ## Architecture in brief (details in Design.md §4–§7)
 - **Scene flow (D38).** `MainMenu` → `Final`. The menu loads the next build index. `Final.unity` (formerly `Level.unity`, same GUID) is the one game scene: the board prefabs plus `Game.prefab` and `GameUI.prefab` instances.
 - **Assemblies:**
   - `Switchboard.Domain` (`noEngineReferences`): all rules, plain C#, ticked by `GameSession.Tick(dt)` in a fixed order. Time only comes from ticks, randomness only from a seeded `IRandom`, and money is a `long` of cents plus a carried fraction.
-  - `Switchboard.Content`: ScriptableObjects (`GameConfig`, `CallerTypeDefinition`) plus the `PhoneBook.json` loader and validator.
+  - `Switchboard.Content`: the `GameConfig` ScriptableObject plus the loaders and validator for `Calls.json`, `Economy.json` and `Book.json`.
   - The Game layer (`Assets/Scripts/Game/`) is in **Assembly-CSharp on purpose**: asmdefs can't reference Assembly-CSharp, where the cord, board and UI code lives.
   - Tests: `Switchboard.Domain.Tests` (EditMode).
 - **Integration with the cord code:**
@@ -82,7 +82,7 @@ Teammates still push to `main`, so pre-flight always merges first (see the git r
   - Our `GameUI.prefab` is a Screen Space Overlay canvas (sorting order 10, 1920×1080 Expand), laid over the board's `SwitchboardCanvas`.
   - Anything not meant to be clicked has `raycastTarget` off, because his cord input takes the topmost hit. His book is also at sorting order 10, so nothing of ours may overlap it.
   - The money counter fills `HeaderSlot`. The call in hand shows as a speech bubble left of the caller column. Cards sit over the caller slots.
-- **Data:** every call (caller name, portrait, message, jacks, pay) is hand-written in the designer's `Assets/Configs/Calls.json` (D51) and played from the queues in `Economy.json` (D52). The book reads `PhoneBook.json` until Step 8 replaces it with `Book.json` (D53). Names are English.
+- **Data:** every call (caller name, portrait, message, jacks, pay) is hand-written in the designer's `Assets/Configs/Calls.json` (D51) and played from the queues in `Economy.json` (D52). The book reads `Book.json` (D53): name, profession, address and jack, every entry from the start; the rules never read it. Names are English.
 
 ## Code conventions
 - Match the existing style:
@@ -121,6 +121,6 @@ Known issues and to-dos, such as touch input in the cord code, held cords droppi
 - D26: hosting target.
 - D27: currency scale and target playtime.
 
-**Designer:** edits `Assets/Configs/PhoneBook.json` and `Assets/Configs/Economy.json` by hand. Keep it human-readable and keep validator messages plain.
+**Designer:** edits `Assets/Configs/Calls.json`, `Assets/Configs/Economy.json` and `Assets/Configs/Book.json` by hand. Keep it human-readable and keep validator messages plain.
 
 Don't assume answers to these; ask the lead when a step needs them.

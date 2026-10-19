@@ -83,7 +83,8 @@ namespace Switchboard.Game.Tests
         public void TabsKeepPriorityAndRowsLetClicksThroughToPageTurning()
         {
             var row = opened.GetComponentInChildren<PhoneBookContactRow>();
-            Assert.That(row.GetComponent<Image>().raycastTarget, Is.False, "rows never take clicks since the Notepad went (D54)");
+            Assert.That(row.GetComponentsInChildren<Graphic>(true).Any(g => g.raycastTarget), Is.False,
+                "rows never take clicks since the Notepad went (D54)");
             Assert.That(ExecuteEvents.GetEventHandler<IPointerClickHandler>(row.gameObject), Is.EqualTo(root),
                 "a click on a row reaches the book");
             ExecuteEvents.ExecuteHierarchy(row.gameObject, new PointerEventData(null)
@@ -98,30 +99,29 @@ namespace Switchboard.Game.Tests
             Assert.That(book.CurrentSpreadIndex, Is.EqualTo(1));
         }
 
+        // D53: every entry shows from the start, so the pages turn through the whole book.
         [Test]
-        public void PageTurningFollowsTheOpenBoardFilter()
+        public void PageTurningGoesThroughTheWholeBook()
         {
-            book.SetVisibleSockets(socket => new Switchboard.Domain.BoardSize(3, 3).Contains(socket));
-            Assert.That(book.ContactCount, Is.EqualTo(9));
-            Assert.That(book.CanGoForward || book.CanGoBack, Is.False, "nine contacts fit on one spread");
-            Assert.That(book.PageTurnDirectionAt(Position(200), null), Is.Zero);
+            int spreads = (book.ContactCount + 11) / 12;
+            Assert.That(book.ContactCount, Is.GreaterThan(24), "the whole book, not only the starting board");
             Assert.That(book.PageTurnDirectionAt(Position(-200), null), Is.Zero);
-            Click(200);
-            Assert.That(book.CurrentSpreadIndex, Is.Zero);
-            Assert.That(book.IsOpen, Is.True);
-
-            book.SetVisibleSockets(socket => new Switchboard.Domain.BoardSize(4, 4).Contains(socket));
-            Assert.That(book.ContactCount, Is.EqualTo(16));
-            Assert.That(book.PageTurnDirectionAt(Position(200), null), Is.EqualTo(1));
-            Click(200);
-            Assert.That(book.CurrentSpreadIndex, Is.EqualTo(1));
-            Assert.That(book.CanGoForward, Is.False, "16 contacts make two spreads");
+            for (int spread = 1; spread < spreads; spread++)
+            {
+                Assert.That(book.PageTurnDirectionAt(Position(200), null), Is.EqualTo(1));
+                Click(200);
+                Assert.That(book.CurrentSpreadIndex, Is.EqualTo(spread));
+            }
+            Assert.That(book.CanGoForward, Is.False);
             Assert.That(book.PageTurnDirectionAt(Position(200), null), Is.Zero);
             Click(200);
-            Assert.That(book.CurrentSpreadIndex, Is.EqualTo(1));
-
-            book.SetVisibleSockets(socket => new Switchboard.Domain.BoardSize(3, 3).Contains(socket));
-            Assert.That(book.CurrentSpreadIndex, Is.Zero, "a shrinking book comes back to a shown spread");
+            Assert.That(book.CurrentSpreadIndex, Is.EqualTo(spreads - 1));
+            Assert.That(book.IsOpen, Is.True);
+            for (int spread = spreads - 2; spread >= 0; spread--)
+            {
+                Click(-200);
+                Assert.That(book.CurrentSpreadIndex, Is.EqualTo(spread));
+            }
             Assert.That(book.PageTurnDirectionAt(Position(-200), null), Is.Zero);
         }
 

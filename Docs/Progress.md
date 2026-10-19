@@ -15,7 +15,7 @@
 | 5c. Calls and pacing into Economy.json | done | ✅ 2026-10-18 (17 min) | ✅ 388/388 tests, scope clean | ✅ | f70b7df |
 | 6. Board growth (built as 7a) | done | ✅ 2026-10-18 (25 min) | ✅ 439/439 tests, scope clean | ✅ | d166ffa |
 | 7. Hand-written calls and queues | done | ✅ 2026-10-18 (36 min) | ✅ 431/431 tests, scope clean | ✅ | 8e48320 |
-| 8. The new phone book | not started | | | | |
+| 8. The new phone book | done | ✅ 2026-10-18 (20 min) | ✅ 445/445 tests, scope clean | ✅ | |
 | 9. Saves, Boot, Web build | not started | | | | |
 | 10. Tutorial | not started | | | | |
 | 11. Sound and feel | not started | | | | |
@@ -2295,3 +2295,217 @@ Follow-ups:
   - whole-cent fees and fines, and a required `penaltyCents`
 - Committed and pushed on the lead's request (2026-10-18), before the playtest, merged with `f4bdae2` (red bounce on the money counter when an upgrade is too expensive).
 - **Playtest (lead, 2026-10-18):** all good. The deviations listed above are accepted.
+
+### Step 8 report: 2026-10-18
+Result: done
+
+Playable now: press Play in `Final.unity` and open the book. From the first minute, on the 3x3 start, it lists all 39 entries of the new `Assets/Configs/Book.json`: Police, Fire Brigade and Doctor first, then everyone A-Z ("ABBOTT, Florence", "BRAMBLE, Otis" ...). Each row shows the name, a smaller second line with profession and address ("Seamstress, Oak St. 4"), and the jack as the right-hand column under the heading "Jack". Three households share a line (DUNMORE A2, MOSS C3, ROOK B3). Looking up a call works as before: "Connect me with Mabel Dunmore" means finding "DUNMORE, Mabel" and patching A2. Page turning, the hand cursor and the guide's book glow are unchanged.
+
+How to test: the Plan's Step 8 playtest script works as written. Notes:
+1. The book now has 7 pages (4 spreads).
+2. Script step 4: change a profession in `Book.json`, press Play, and the new text shows.
+3. Script step 5: for example, delete "COBBOLD, Doris" (the only entry on D1) and run Validate Content. You get three messages like "Calls file: call_101 uses D1, but no entry in Book.json is on D1, so the player can't look it up. ...", one each for call_101, call_107 and call_209.
+4. A broken entry (say `"jack": "G9"`) is left out, the rest of the book still shows, and the Console has one "Book file: Entry N ...: jack G9 is not on the board ..." line at start.
+
+Created:
+- `Assets/Configs/Book.json`. It is `PhoneBook.json` renamed through Unity, so it keeps GUID `2b056d57ca6ba034fba544a4e3f87de2`, and then rewritten. Contents:
+  - the 36 converted entries ("SURNAME, First", placeholder professions and addresses in period style; the three services keep D4, E5 and B6)
+  - 3 household members on existing jacks: "DUNMORE, Frederick" A2, "MOSS, Harriet" C3, "ROOK, Wilfred" B3
+  - plain ASCII only, and every jack A1 to F6 has at least one entry
+- Content:
+  - `BookFileData.cs`: the file format, with an `Unset` marker for `contactsPerPage` and the old `contacts`/`socket` names, which are read only to give a hint.
+  - `BookEntry.cs`: name, profession, address, `IsEmergencyService`, jack.
+  - `BookCatalog.cs`: `ContactsPerPage`, the sorted `Entries`, `Errors`, and `Empty`.
+  - `BookFileLoader.cs`: `Load(json, boardJacks = null)`. This is the one parser, checker and sorter, used by both the book and Validate Content.
+- Tests: `Assets/Tests/Domain/BookFileTests.cs`, `Assets/Tests/Game/Editor/PhoneBookEntriesTests.cs` (each with `.meta`).
+- Docs: `Docs/BookFile.md`, the designer's guide to `Book.json` (format, order, messages), linked from `EconomyFile.md`.
+
+Changed:
+- **Content:**
+  - `ContentValidator`:
+    - `ValidateBook(json, boardJacks)` replaces `Validate(peopleJson, boardJacks)`.
+    - `ValidateCallJacks(calls, IReadOnlyList<BookEntry>)` now says "no entry in Book.json is on X".
+    - Removed: the services-first, unique-surname and sorted-file checks, `TryParse` and `CheckPageSize`. The page-size rule moved into the loader.
+    - `MaxContactsPerPage` moved to `BookFileLoader`.
+  - `GameConfig`:
+    - `bookFile` with `[FormerlySerializedAs("peopleFile")]`, `BookFileText`, and `LoadBook(boardJacks = null)` replace `peopleFile`, `PeopleFileText` and `LoadPeople`.
+    - `Validate()` adds "Book file: ..." messages and runs the cross-file check against `book.Entries`.
+- **UI (book):**
+  - `PhoneBookView`:
+    - It reads its `contactsConfig` through `BookFileLoader.Load` and keeps a `BookCatalog`. `ContactAt` returns a `BookEntry`.
+    - `SetVisibleSockets`, `ApplyFilter` and the filtered copy are removed.
+    - `HasLetter`/`ShowLetter` go by the first letter of `name`.
+    - It no longer logs, and "Configuration error" is gone. An empty book shows its first file message on page 1 instead.
+  - `PhoneBookPageView.Render(BookCatalog, page, message)`: the name font size follows the row height (22 at 6 per page).
+  - `PhoneBookContactRow`:
+    - It has three labels: `contactName`, `details` (new) and `jack` (`[FormerlySerializedAs("socketAddress")]`).
+    - `Show(BookEntry, size)` sets the details line at 0.75 of the name's size.
+    - The static `Details(entry)` joins profession and address and skips an empty part.
+    - The `tapArea` field and its `Awake` are gone.
+- **Game layer:**
+  - `OpenBoardLink` loses the book, its constructor parameter and the socket predicate; the sockets and caller slots stay.
+  - `GameInstaller` loads the book through `config.LoadBook(BoardJacks(sockets))` and logs "Book file: ..." once. It runs the cross-file check against `book.Entries`. `FirstOrderGuide` still gets the `PhoneBookView` (local renamed `bookView`).
+- **Editor:** `PhoneBookBuilder`:
+  - `ConfigureDirectory` points at `Assets/Configs/Book.json`.
+  - The row builder makes the new row: Name above, Details below, Jack right, no tap image, template 326×54.
+  - The heading is "JackHeading"/"Jack", and EmptyMessage is 300×260 with best fit.
+  - Small `Stretch`/`BestFit` helpers.
+  - I edited the prefab directly; neither menu was run.
+- **Assets:** `GameConfig.asset` re-saved: `peopleFile:` → `bookFile:`, same GUID, nothing else.
+- **Docs:** `Docs/EconomyFile.md`:
+  - the intro links `BookFile.md`
+  - line 52 now names `Book.json`
+  - the validator list and the example message (old line 243) use the new "no entry in Book.json is on A5" wording
+  - "Checking the files" says it covers all three files
+
+Deleted (with `.meta`, by plain `rm` + refresh; nothing staged):
+- `Assets/Configs/PhoneBook.json` (moved to `Book.json`)
+- `Scripts/UI/PhoneBookConfig.cs`: `PhoneBookConfig` and `PhoneBookContact`; the view uses Content's `BookEntry`, which keeps `IsEmergencyService`
+- `Scripts/Content/PeopleFileLoader.cs`, `PeopleFileData.cs`, `PeopleCatalog.cs`, `PersonRecord.cs`, `DirectoryRecord.cs`
+- `Scripts/Domain/Definitions/IPerson.cs`, `PersonExtensions.cs`, `IDirectoryEntry.cs`
+
+Nothing else used any of these; I checked with grep before deleting.
+
+Scene and prefab changes:
+- `Assets/Prefabs/UI/PhoneBook.prefab`, both `LeftDirectoryPage` and `RightDirectoryPage`:
+  - `SocketHeading` → `JackHeading`, text "Jack".
+  - `ContactTemplate`: 326×54, its transparent tap `Image` and `CanvasRenderer` removed.
+  - `Name` sits on the top 56% of the row: lower-left aligned, best fit 12–22, ending 6 px before the jack column at 84%.
+  - New `Details` label: a copy of Name on the bottom 44%, upper-left aligned, best fit 10–16, colour (78, 80, 70), raycast off.
+  - `Socket` → `Jack`, filling the right 16% of the row.
+  - The row's serialized fields were re-wired.
+  - `EmptyMessage` is 300×260, centred, best fit 12–22.
+- `PhoneBook.prefab` still references `Book.json` by the same GUID, so no re-wiring was needed.
+- `Final.unity`, `MainMenu.unity` and every other prefab are unchanged. Final's book overrides only touch the root.
+
+Tests: 445/445 EditMode (431 before).
+- New `BookFileTests` (27 cases):
+  - the designer's sample with tidying
+  - `contactsPerPage` missing → 6; 0, 13 and -2 → message and 6
+  - `emergencyService` missing → false
+  - profession and address empty or missing allowed
+  - a missing, blank or null file, unreadable JSON, and no entries (each gives an empty book and one message)
+  - a missing name, a missing jack, and jacks off the board (G1, A7, A0, C33, 33), each left out
+  - duplicate names ignoring case and spaces (the first stays)
+  - families sharing a surname and a jack
+  - one bad entry leaves the rest
+  - old-format hints for `contacts` and `socket`
+  - services first in file order, then names ignoring case ("abbott" < "Bellamy" < "MOSS, Ada" < "MOSS, Harriet" < "MOSSOP"), and the same order whatever the file's order
+  - the real file: no errors, 39 entries, services first, sorted, every entry filled in, 36 jacks covered, C3 shared, ASCII only, capital surnames
+- New `PhoneBookEntriesTests` (8):
+  - the real book shows all 39 entries in the loader's order on 7 pages
+  - a row's Name, Details and Jack texts, the "Jack" heading, and the jack as the last column
+  - the details line skips an empty part
+  - the page count with `contactsPerPage` 4
+  - a bad entry is left out and the rest shows with no message
+  - a missing or unreadable file shows its message on page 1 (2 cases)
+  - a fresh `Final` game on 3x3 lists all 39 entries, Z included
+- New in `ContentValidatorTests`: `ValidateBookUsesTheBookLoadersChecks`, `ASharedJackCountsForEveryCallOnIt`, `AnEmptyBookReportsBothJacksOfACall`.
+
+Tests deleted or rewritten (orchestrator note 7):
+- **Deleted `PeopleFileTests`** (9 cases): `RealFileHasThirtyThreePeopleAndThreeServicesOnEveryJack`, `RealFileListsServicesFirstThenPeopleBySurname`, `SurnameFirstNamesKeepTheirOriginalIdentityAndNameParts`, `RealFileKeepsThePhoneBookFormat`, `ParsesNamesAndJacksAndIgnoresTheOldCallFields`, `InvalidEntriesAreReportedAndLeftOut`, `AServiceIsListedByItsWholeName`, `UnreadableFileIsReported` ×2. `BookFileTests` replaces them.
+- **Deleted `PhoneBookFilterTests`** (the Step 6 book filter, 4 tests): `TheBookKeepsTheRealFileNamesAndOrder`, `AThreeByThreeBoardShowsTheStartingNineOnTwoPages`, `BiggerBoardsAddPeopleWithTheServicesFirst`, `ShrinkingTheFilterBringsTheBookBackToAShownSpread`. They are replaced by the "all entries show" tests in `PhoneBookEntriesTests`.
+- **`ContentValidatorTests`:**
+  - Deleted: `AValidFilePasses`, `ReportsADuplicateSocket`, `ReportsAnUnknownJack`, `PortraitsTypesAndRatesInTheBookAreNoLongerRead`, `ReportsADuplicateSurname`, `ReportsAFileNotSortedBySurname`, `ReportsAPageSizeTheBookRejects`, `ServicesAtTheTopPassWithoutPortraitsOrTypes`, `ReportsAServiceBelowThePeople`, `ServiceNamesDoNotCountAsSurnames`, `ReportsAPersonOutOfOrderBelowTheServices`. Their still-valid rules (jack off the board, page size) are covered in `BookFileTests`.
+  - Rewritten: the cross-file test is now `EveryJackACallUsesNeedsAnEntryInTheBook` (`BookEntry` list, Book.json wording).
+  - Kept: `RealContentHasNoProblems`, `BoardHasThirtySixJacks`.
+- **`BoardGrowthTests`:** `TheRealPeopleFileHasOneServicePerNewRing` is now `TheRealBookHasOneServicePerNewRing`. It checks Doctor D4, Fire Brigade E5, Police B6 and "UNDERHILL, Reginald" C2, and one service per new ring.
+- **`PhoneBookTabTests`:** new format, with sorted "AAA, Ann"-style names on cycling jacks.
+  - `ParseKeepsTheFileNamesOrderAndSockets` → `TheBookListsServicesFirstThenNamesAlphabetically`
+  - `ServicesUseTheirWholeNameAndPeopleTheirSurname` → `LettersGoByTheFirstLetterOfTheName`
+  - `UsesTheLastWordOfTheNameAsTheSurname` → `ANameWithoutACommaGoesByItsFirstLetter`. The old last-word rule is gone, because lookup now goes by the name's first letter.
+  - The other 4 are unchanged apart from the helper.
+- **`PhoneBookPageTurnTests`:**
+  - `PageTurningFollowsTheOpenBoardFilter` → `PageTurningGoesThroughTheWholeBook`.
+  - One assertion in `TabsKeepPriorityAndRowsLetClicksThroughToPageTurning` changed. `row.GetComponent<Image>().raycastTarget` would throw now that the tap image is gone, so it checks that no graphic in the row is a raycast target.
+  - The other 6 tests are unchanged.
+- **`Fakes.cs`:** `FakePerson` and `FakeDirectoryEntry` removed (no other users).
+- `MergedSystemsTests` and `FirstOrderGuideTests` are unchanged and pass. The guide's book glow test is in `MergedSystemsTests`.
+
+Console: clean. Only the known MCP "WebSocket is not initialised" line after recompiles and the engine's two "memoryless" lines around screenshots.
+
+Screenshots (`Temp/Captures/`), all with the book open in Play Mode on the 3x3 start:
+- `step-08.png`: 1920×1080, the first spread. Services, then ABBOTT … FAIRWEATHER, with the two DUNMOREs on A2.
+- `step-08-720.png`: 1280×720, the same spread. Names are about 15 px and the details line about 11 px, still legible.
+- `step-08-spread3.png`: 1920×1080, the third spread: ORMSBY … VICKERY, with both ROOKs on B3.
+
+The Game view is set back to 1920×1080.
+
+Checked in Play Mode (stepped frames):
+- The book had 39 entries on a 3x3 board.
+- About 24 s of game time at ×10 gave no errors.
+- Loading build index 0 (MainMenu) and then 1 started a fresh `Final` with the book at 39 entries and the session bound, with no errors.
+- `Tools/Switchboard/Validate Content`: "no problems found".
+- Removing D1's only entry gave the plain cross-file messages above.
+
+Housekeeping:
+- `ProjectSettings/TimeManager.asset` and `Assets/Fonts/DellaRespira/Della Respira SDF.asset` were format-only or dynamic-glyph re-saves; I discarded them with `git checkout`. `SampleScene.unity` and the Boecklins font were not touched.
+- 10 leaked `GuideSilhouette` materials destroyed (the known `SlowGuidePulse` leak).
+- The editor is not in Play Mode and not paused. `timeScale` is 1, no callbacks or SessionState keys are left, and `Final.unity` is active and not dirty.
+- Nothing staged or committed.
+
+Deviations from Design/Plan:
+1. **The two-line fallback layout, not four columns.** At 1920×1080 a row is 326 px wide. "PENNINGTON, Edgar" alone takes about 270 px at the book's 22 px (measured in the screenshot), so four readable columns cannot fit. As the brief allows: the name is on line 1, profession and address are smaller on line 2 ("Seamstress, Oak St. 4"), and the jack is the right column under the heading "Jack" instead of "Socket".
+2. **`PhoneBookConfig`/`PhoneBookContact` deleted.** The view and its rows use Content's `BookCatalog`/`BookEntry` directly, which was the smaller change. So `PhoneBookView.ContactAt` returns a `BookEntry` (`Name`, `Jack`, `IsEmergencyService`). Design §3's hook list names `PhoneBookContact.IsEmergencyService` and `SetVisibleSockets`; both are gone.
+3. **Names in capitals.** The shipped file writes surnames in capitals, as in the designer's sample ("MOSS, Ada"), not "Moss, Ada" as in `PhoneBook.json`. The cards still say "Ada Moss" (from `Calls.json`, unchanged).
+4. **Duplicate names** are compared trimmed, ignoring case, and with runs of spaces counted as one. The first entry stays; later ones are left out.
+5. **An old-format file gives an empty book** with a "rename contacts to entries, socket to jack" message. It isn't read in a compatibility mode. An old-style `socket` on a single entry gets the rename hint in place of "the jack is missing".
+6. **`contactsPerPage` outside 1–12 counts as a validator message** ("... Using 6."), and the game still uses 6.
+7. **Row details:**
+   - The second line's maximum size is 0.75 of the name's size: 16 at 6 per page, best fit down to 10.
+   - At 12 per page the rows get small (name about 11 px), so the guide suggests keeping 6.
+   - `EmptyMessage` grew to 300×260 with best fit so a whole file message fits on page 1.
+8. **Prefab object names:** `SocketHeading` → `JackHeading`, row label `Socket` → `Jack`, plus a new `Details`. Nothing looked these names up.
+
+Follow-ups:
+- **Design.md (orchestrator):**
+  - §3 (book hooks: no `SetVisibleSockets` or `PhoneBookContact`; `ContactAt` returns `BookEntry`)
+  - §5.7 (Book.json, the order, the two-line row, no filter, letter lookup by the first letter)
+  - §6.1 (`GameConfig.bookFile`)
+  - §6.3 ("Surnames are unique" no longer holds: families share them; "every jack a call uses has an entry in Book.json")
+  - D31, D35, D36, D42 and D50 statuses (superseded by D53 where they talk about the book)
+- **CLAUDE.md:** the lines that name `PhoneBook.json` (team/designer, architecture "Data", Plan §8 note on `PhoneBook.json`'s format).
+- **Plan §8:**
+  - The `PhoneBookBuilder` part of "Stale paths in editor menus" is fixed. `LevelBackgroundBuilder` and `GamePresentationBuilder` still name `Level.unity` (left alone as instructed).
+  - "A–Z tabs are hidden" still applies. `Update Phone Book Tabs` was not run.
+- `PhoneBookContactRow.OnPointerDown` is now unreachable, because the row has no raycast target. It is harmless and could go in a cleanup.
+- `PhoneBookBuilder.CreatePhoneBook` still says "Open Level in Edit Mode first" in its message (cosmetic).
+
+#### Verification (orchestrator, 2026-10-18)
+- **Pre-flight and brief check:**
+  - Up to date with origin (`ee51403`, no teammate pushes since Step 7); 431/431 green; console clean.
+  - Gaps settled in the launch notes:
+    - one parser in Content, which the book view and the validator both use
+    - a bad entry is left out instead of breaking the whole book
+    - the old surname, file-order, services-first and one-entry-per-jack checks go
+    - the file is renamed through Unity to keep its GUID
+    - layout facts for the 326 px page
+    - the extra tests that used the filter or the people model
+    - 2–3 household entries sharing a jack
+    - `PhoneBookBuilder`'s path. `LevelBackgroundBuilder` and `GamePresentationBuilder` were left alone, because the latter opens the scene additively.
+- **EditMode re-run:** 445/445 green. Console: only the known MCP WebSocket line. My run left no format-only re-saves.
+- **Scope:**
+  - 41 tracked files plus the new ones, all named in the brief or the launch notes. Nothing is staged.
+  - `Book.json.meta` keeps GUID `2b056d57…`. `GameConfig.asset` only changed `peopleFile` → `bookFile`.
+  - `Final.unity`, `Calls.json` and `Economy.json` are unchanged.
+  - Git shows `PhoneBook.json` as deleted and `Book.json` as new until both are staged; it then reads as a rename.
+- **Screenshots checked:**
+  - `step-08.png` (1920×1080): services first, then ABBOTT … FAIRWEATHER, each with a details line and the jack on the right; the DUNMORE household shares A2.
+  - `step-08-720.png`: the same spread; the details line is small but legible.
+- **Code skim:**
+  - `BookFileLoader`: one pass; bad entries left out with plain messages; services in file order, then an ordinal ignore-case sort with the file index as tie-break.
+  - `PhoneBookView` no longer filters or logs.
+  - `OpenBoardLink` no longer touches the book.
+- **Docs updated:**
+  - `Design.md`: the status row, §3 hooks, §5 note, §5.7 (rewritten, with the deviations), §5.9 checks line, §6.1, §6.3, the new §6.6 (`Book.json`), and the statuses of D31, D35, D36, D42 and D50.
+  - `Plan.md`: §4 (renaming an asset), §8 (stale paths narrowed, `OnPointerDown` cleanup), the §9 note, and Step 9 ("From Step 8").
+  - `CLAUDE.md`: the book lines and the next step.
+- **Deviations for the lead to accept at the playtest** (Design 5.7):
+  - the two-line row
+  - `PhoneBookConfig` deleted
+  - duplicate names ignore extra spaces
+  - an old-format file gives an empty book with a hint
+  - an out-of-range `contactsPerPage` uses 6
+  - prefab objects renamed
+- **Playtest (lead, 2026-10-19):** all good. The deviations listed above are accepted.
+- Committed and pushed on the lead's request, merged with tarbaev.d's `f393f72` ("Polish highlights": one shared hover colour for the jack halos and the guide glow; no overlap with Step 8).

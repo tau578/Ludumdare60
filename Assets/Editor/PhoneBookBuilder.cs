@@ -16,6 +16,8 @@ namespace Switchboard.Editor
         private const int TabsPerEdge = 13;
         private const float TabX = 420, TabTop = 216, TabStep = 36, TabNudge = 8;
         private static readonly Vector2 TabSize = new Vector2(52, 34);
+        // A book row: the name line above RowSplit, the details line below; the jack right of JackColumn.
+        private const float RowSplit = .44f, JackColumn = .84f;
 
         [MenuItem("Tools/Switchboard/Update Phone Book Directory")]
         public static void UpdateDirectory()
@@ -134,8 +136,8 @@ namespace Switchboard.Editor
                     if (fold.GetComponent<CanvasRenderer>() == null) fold.gameObject.AddComponent<CanvasRenderer>();
                 return;
             }
-            var config = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Settings/PhoneBook.json");
-            if (config == null) throw new InvalidOperationException("PhoneBook.json was not found.");
+            var config = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Configs/Book.json");
+            if (config == null) throw new InvalidOperationException("Assets/Configs/Book.json was not found.");
             // Text is separate from the mirrored artwork on LeftPage.
             var content = Rect("Directory", opened, new Vector2(800, 492));
             var left = DirectoryPage("LeftDirectoryPage", content, -200);
@@ -202,34 +204,46 @@ namespace Switchboard.Editor
             root.anchoredPosition = new Vector2(x, 0);
             Label("Heading", root, "CONTACTS", new Vector2(0, 211), new Vector2(330, 34), 24, FontStyle.Bold, TextAnchor.MiddleCenter);
             Label("NameHeading", root, "Name", new Vector2(-42, 162), new Vector2(242, 28), 18, FontStyle.Italic, TextAnchor.MiddleLeft);
-            Label("SocketHeading", root, "Socket", new Vector2(125, 162), new Vector2(76, 28), 18, FontStyle.Italic, TextAnchor.MiddleRight);
+            Label("JackHeading", root, "Jack", new Vector2(125, 162), new Vector2(76, 28), 18, FontStyle.Italic, TextAnchor.MiddleRight);
             var entries = Rect("Entries", root, new Vector2(326, 326));
             entries.anchoredPosition = new Vector2(0, -30);
-            var template = Rect("ContactTemplate", entries, new Vector2(326, 50));
-            var nameLabel = Label("Name", template, "", Vector2.zero, Vector2.zero, 22, FontStyle.Normal, TextAnchor.MiddleLeft);
-            nameLabel.rectTransform.anchorMin = Vector2.zero;
-            nameLabel.rectTransform.anchorMax = new Vector2(.76f, 1);
-            nameLabel.rectTransform.offsetMin = Vector2.zero;
-            nameLabel.rectTransform.offsetMax = new Vector2(-8, 0);
-            nameLabel.resizeTextForBestFit = true;
-            nameLabel.resizeTextMinSize = 12;
-            nameLabel.resizeTextMaxSize = 22;
-            var addressLabel = Label("Socket", template, "", Vector2.zero, Vector2.zero, 22, FontStyle.Bold, TextAnchor.MiddleRight);
-            addressLabel.rectTransform.anchorMin = new Vector2(.76f, 0);
-            addressLabel.rectTransform.anchorMax = Vector2.one;
-            addressLabel.rectTransform.offsetMin = addressLabel.rectTransform.offsetMax = Vector2.zero;
-            var tapArea = template.gameObject.AddComponent<Image>();
-            tapArea.color = Color.clear;
-            tapArea.raycastTarget = false;
+            var template = Rect("ContactTemplate", entries, new Vector2(326, 54));
+            // D53: the name on top, profession and address smaller under it, the jack as the last column.
+            var nameLabel = Label("Name", template, "", Vector2.zero, Vector2.zero, 22, FontStyle.Normal, TextAnchor.LowerLeft);
+            Stretch(nameLabel.rectTransform, new Vector2(0, RowSplit), new Vector2(JackColumn, 1), new Vector2(-6, 0));
+            BestFit(nameLabel, 12, 22);
+            var detailsLabel = Label("Details", template, "", Vector2.zero, Vector2.zero, 16, FontStyle.Normal, TextAnchor.UpperLeft);
+            Stretch(detailsLabel.rectTransform, Vector2.zero, new Vector2(JackColumn, RowSplit), new Vector2(-6, 0));
+            BestFit(detailsLabel, 10, 16);
+            detailsLabel.color = new Color32(78, 80, 70, 255);
+            var jackLabel = Label("Jack", template, "", Vector2.zero, Vector2.zero, 22, FontStyle.Bold, TextAnchor.MiddleRight);
+            Stretch(jackLabel.rectTransform, new Vector2(JackColumn, 0), Vector2.one, Vector2.zero);
             var row = template.gameObject.AddComponent<PhoneBookContactRow>();
-            row.Configure(nameLabel, addressLabel, tapArea);
+            row.Configure(nameLabel, detailsLabel, jackLabel);
             template.gameObject.SetActive(false);
             var number = Label("PageNumber", root, "", new Vector2(0, -223), new Vector2(80, 26), 18, FontStyle.Normal, TextAnchor.MiddleCenter);
-            var empty = Label("EmptyMessage", root, "No contacts", new Vector2(0, 50), new Vector2(300, 50), 22, FontStyle.Italic, TextAnchor.MiddleCenter);
+            // Big enough for a book-file message when nothing could be listed.
+            var empty = Label("EmptyMessage", root, "No contacts", new Vector2(0, 0), new Vector2(300, 260), 22, FontStyle.Italic, TextAnchor.MiddleCenter);
+            BestFit(empty, 12, 22);
             empty.gameObject.SetActive(false);
             var page = root.gameObject.AddComponent<PhoneBookPageView>();
             page.Configure(entries, row, number, empty);
             return page;
+        }
+
+        private static void Stretch(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMax)
+        {
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = offsetMax;
+        }
+
+        private static void BestFit(Text label, int min, int max)
+        {
+            label.resizeTextForBestFit = true;
+            label.resizeTextMinSize = min;
+            label.resizeTextMaxSize = max;
         }
 
         private static Button PageCorner(string name, Transform parent, bool left)

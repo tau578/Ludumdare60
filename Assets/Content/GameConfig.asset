@@ -23,7 +23,7 @@ MonoBehaviour:
     badgeText: EMERGENCY
     accent: {r: 0.78, g: 0.13, b: 0.13, a: 1}
   callsFile: {fileID: 4900000, guid: f0f694142c8d14e8d8e03ab9e6ddfc8f, type: 3}
-  peopleFile: {fileID: 4900000, guid: 2b056d57ca6ba034fba544a4e3f87de2, type: 3}
+  bookFile: {fileID: 4900000, guid: 2b056d57ca6ba034fba544a4e3f87de2, type: 3}
   economyFile: {fileID: 4900000, guid: 40ca8933a2957462dbd79017f4f12b46, type: 3}
   portraits:
   - name: caller-01
