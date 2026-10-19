@@ -1508,7 +1508,8 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
   - **`Tools/Switchboard/Build Web`:** an editor menu that builds the build list (`MainMenu`, `Final`) for Web into `Builds/Web/` (already git-ignored), with the D26 settings, and logs where the build went and how big it is.
   - **Uploading with itch's `butler`:**
     - Installed on the lead's Mac (2026-10-19): `~/bin/butler` v15.32.0, the Apple-chip build (`darwin-arm64`), with `~/bin` on PATH in `~/.zprofile`. Homebrew's `butler` is an unrelated app. The lead is logged in (credentials in `~/Library/Application Support/itch/butler_creds`), so `butler push` works from an agent's shell too. `butler login` needs a real Terminal window; the `!` prefix has none.
-    - Each upload is then `butler push Builds/Web <user>/<game>:html5`. Ask the lead for the itch page's address when writing the brief.
+    - The page is `https://llazypixell.itch.io/operator` ("Operator!", Draft, created by the lead 2026-10-19; `butler status llazypixell/operator` reaches it, no uploads yet). Each upload is `butler push Builds/Web llazypixell/operator:html5`. The draft's secret preview link stays out of the repo.
+    - Page settings advised to the lead (check them after the first push): embed in page at 1280×720, mobile friendly (landscape), fullscreen button, no auto-start, no scrollbars, no SharedArrayBuffer.
     - butler sends only the changed files and replaces the same upload, so the itch page settings are set once. On the first push, tick "This file will be played in the browser" for the `html5` upload.
     - **Pushing publishes the game.** Agents run it only when the lead asks; the lead can also run it with `! butler push …`.
   - **Manual fallback:** zip the *contents* of `Builds/Web`, so `index.html` sits at the zip's root, and upload the zip on the itch page.
