@@ -21,7 +21,6 @@ namespace Switchboard.UI
         [SerializeField] private PhoneBookTab[] tabs = new PhoneBookTab[0];
         private BookCatalog directory = BookCatalog.Empty;
         private string pageMessage;
-        private readonly List<RaycastResult> pointerHits = new List<RaycastResult>();
 
         public bool IsOpen { get; private set; }
         /// <summary>Off while the game is paused (D56): keys and clicks leave the book as it is.</summary>
@@ -146,21 +145,24 @@ namespace Switchboard.UI
 
         public int PageTurnDirectionAt(Vector2 position, Camera camera)
         {
-            if (!IsOpen || openBook == null) return 0;
-            var rect = (RectTransform)openBook.transform;
-            if (!RectTransformUtility.RectangleContainsScreenPoint(rect, position, camera) ||
-                !RectTransformUtility.ScreenPointToLocalPointInRectangle(rect, position, camera, out var local)) return 0;
-            return local.x < rect.rect.center.x ? (CanGoBack ? -1 : 0) : (CanGoForward ? 1 : 0);
+            if (!IsOpen || !InputEnabled) return 0;
+            if (CanGoBack && previousSpread != null && RectTransformUtility.RectangleContainsScreenPoint(
+                    (RectTransform)previousSpread.transform, position, camera)) return -1;
+            if (CanGoForward && nextSpread != null && RectTransformUtility.RectangleContainsScreenPoint(
+                    (RectTransform)nextSpread.transform, position, camera)) return 1;
+            return 0;
         }
 
         public void OnPointerDown(PointerEventData eventData) { }
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (!IsOpen || !InputEnabled || openBook == null || eventData.button != PointerEventData.InputButton.Left) return;
             int direction = PageTurnDirectionAt(eventData.position, eventData.pressEventCamera);
             if (direction < 0) PreviousSpread();
             else if (direction > 0) NextSpread();
+            else if (RectTransformUtility.RectangleContainsScreenPoint((RectTransform)openBook.transform,
+                         eventData.position, eventData.pressEventCamera)) SetOpen(false);
         }
 
         private void Awake()
@@ -189,12 +191,6 @@ namespace Switchboard.UI
                 if (keyboard.leftArrowKey.wasPressedThisFrame) PreviousSpread();
                 else if (keyboard.rightArrowKey.wasPressedThisFrame) NextSpread();
             }
-            var pointer = Pointer.current;
-            if (pointer == null || !pointer.press.wasPressedThisFrame || EventSystem.current == null) return;
-            pointerHits.Clear();
-            EventSystem.current.RaycastAll(new PointerEventData(EventSystem.current)
-                { position = pointer.position.ReadValue() }, pointerHits);
-            if (pointerHits.Count == 0 || !pointerHits[0].gameObject.transform.IsChildOf(transform)) SetOpen(false);
         }
 
         public void Toggle() => SetOpen(!IsOpen);

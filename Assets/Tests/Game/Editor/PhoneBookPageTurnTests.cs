@@ -31,7 +31,15 @@ namespace Switchboard.Game.Tests
         [TearDown]
         public void TearDown() { if (root != null) Object.DestroyImmediate(root); }
 
-        private Vector2 Position(float x, float y = 0) => opened.TransformPoint(opened.rect.center + new Vector2(x, y));
+        private Vector2 Position(float x, float y = 0)
+        {
+            if (x == 200 || x == -200)
+            {
+                var fold = (RectTransform)opened.Find(x > 0 ? "Directory/NextSpread" : "Directory/PreviousSpread");
+                return fold.TransformPoint(fold.rect.center);
+            }
+            return opened.TransformPoint(opened.rect.center + new Vector2(x, y));
+        }
         private void Click(float x, float y = 0, PointerEventData.InputButton button = PointerEventData.InputButton.Left)
         {
             ExecuteEvents.ExecuteHierarchy(opened.gameObject, new PointerEventData(null)
@@ -39,10 +47,10 @@ namespace Switchboard.Game.Tests
         }
 
         [Test]
-        public void WholeHalvesTurnAndBookStaysOpenAtBothEnds()
+        public void CornersTurnPagesAndOutsideClickKeepsBookOpen()
         {
             Assert.That(book.PageTurnDirectionAt(Position(-200), null), Is.Zero);
-            Click(-200);
+            Click(900);
             Assert.That(book.CurrentSpreadIndex, Is.Zero);
             Assert.That(book.IsOpen, Is.True);
             Assert.That(book.PageTurnDirectionAt(Position(200), null), Is.EqualTo(1));
@@ -54,7 +62,7 @@ namespace Switchboard.Game.Tests
             while (book.CanGoForward) Click(200);
             int last = book.CurrentSpreadIndex;
             Assert.That(book.PageTurnDirectionAt(Position(200), null), Is.Zero);
-            Click(200);
+            Click(900);
             Assert.That(book.CurrentSpreadIndex, Is.EqualTo(last));
             Assert.That(book.IsOpen, Is.True);
             Assert.That(book.PageTurnDirectionAt(Position(900), null), Is.Zero);
@@ -80,7 +88,7 @@ namespace Switchboard.Game.Tests
         }
 
         [Test]
-        public void TabsKeepPriorityAndRowsLetClicksThroughToPageTurning()
+        public void TabsKeepPriorityAndRowsLetClicksThroughToCloseBook()
         {
             var row = opened.GetComponentInChildren<PhoneBookContactRow>();
             Assert.That(row.GetComponentsInChildren<Graphic>(true).Any(g => g.raycastTarget), Is.False,
@@ -88,9 +96,9 @@ namespace Switchboard.Game.Tests
             Assert.That(ExecuteEvents.GetEventHandler<IPointerClickHandler>(row.gameObject), Is.EqualTo(root),
                 "a click on a row reaches the book");
             ExecuteEvents.ExecuteHierarchy(row.gameObject, new PointerEventData(null)
-                { position = Position(200), button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
-            Assert.That(book.CurrentSpreadIndex, Is.EqualTo(1), "a row click on the right half turns the page");
-            book.PreviousSpread();
+                { position = Position(0), button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
+            Assert.That(book.IsOpen, Is.False, "a row click closes the book");
+            book.SetOpen(true);
             var tab = opened.GetComponentInChildren<PhoneBookTab>(true);
             for (Transform parent = tab.transform; parent != opened; parent = parent.parent) parent.gameObject.SetActive(true);
             Assert.That(ExecuteEvents.GetEventHandler<IPointerClickHandler>(tab.gameObject), Is.EqualTo(tab.gameObject));
@@ -103,8 +111,7 @@ namespace Switchboard.Game.Tests
         [Test]
         public void PageTurningGoesThroughTheWholeBook()
         {
-            int spreads = (book.ContactCount + 11) / 12;
-            Assert.That(book.ContactCount, Is.GreaterThan(24), "the whole book, not only the starting board");
+            int spreads = (book.PageCount + 1) / 2;
             Assert.That(book.PageTurnDirectionAt(Position(-200), null), Is.Zero);
             for (int spread = 1; spread < spreads; spread++)
             {
@@ -114,7 +121,7 @@ namespace Switchboard.Game.Tests
             }
             Assert.That(book.CanGoForward, Is.False);
             Assert.That(book.PageTurnDirectionAt(Position(200), null), Is.Zero);
-            Click(200);
+            Click(900);
             Assert.That(book.CurrentSpreadIndex, Is.EqualTo(spreads - 1));
             Assert.That(book.IsOpen, Is.True);
             for (int spread = spreads - 2; spread >= 0; spread--)

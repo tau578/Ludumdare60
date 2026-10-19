@@ -12,6 +12,39 @@ namespace Switchboard.Domain.Tests
     {
         private const string CallsFilePath = "Assets/Configs/Calls.json";
 
+        [Test]
+        public void ShippedCallersAndEmergencyFlagsMatchThePhoneBook()
+        {
+            var book = JsonUtility.FromJson<BookFileData>(AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Configs/Book.json").text);
+            var calls = JsonUtility.FromJson<CallsFileData>(AssetDatabase.LoadAssetAtPath<TextAsset>(CallsFilePath).text);
+            foreach (var call in calls.calls)
+            {
+                var caller = Array.Find(book.entries, entry => entry.name == call.name);
+                Assert.That(caller, Is.Not.Null, call.id);
+                Assert.That(call.from, Is.EqualTo(caller.jack), call.id + " caller jack");
+                var recipient = Array.Find(book.entries, entry => entry.jack == call.to);
+                Assert.That(recipient, Is.Not.Null, call.id);
+                bool emergency = recipient.emergencyService || recipient.profession == "Constable";
+                Assert.That(call.emergency, Is.EqualTo(emergency), call.id + " to " + recipient.name);
+                if (!emergency) continue;
+                Assert.That(call.responseTimeSeconds, Is.GreaterThan(0), call.id);
+                Assert.That(call.penaltyCents, Is.GreaterThanOrEqualTo(0), call.id);
+            }
+        }
+
+        [TestCase("call_004", "Police station")]
+        [TestCase("call_103", "PC Percy Plodwell")]
+        public void AgathasPoliceCallsUseTheRequestedBookEntry(string id, string recipientName)
+        {
+            var book = JsonUtility.FromJson<BookFileData>(AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Configs/Book.json").text);
+            var calls = JsonUtility.FromJson<CallsFileData>(AssetDatabase.LoadAssetAtPath<TextAsset>(CallsFilePath).text);
+            var call = Array.Find(calls.calls, entry => entry.id == id);
+            var recipient = Array.Find(book.entries, entry => entry.name == recipientName);
+            Assert.That(call.name, Is.EqualTo("Agatha Higgins"));
+            Assert.That(call.to, Is.EqualTo(recipient.jack));
+            Assert.That(call.emergency, Is.True);
+        }
+
         private const string Sample = @"{
           'calls': [
             { 'id': 'call_001', 'icon': 'caller-01', 'name': 'Ada Moss', 'message': 'Connect me with Mabel Dunmore, please.', 'from': 'C3', 'to': 'A2', 'durationSeconds': 20, 'connectCents': 10, 'centsPerSecond': 5 },
