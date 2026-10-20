@@ -3850,3 +3850,66 @@ The lead's playtest put Master at Music/100, SFX at Master/100 and Music at Musi
   - The lead had played since pass 1, so the saved values were new: `Switchboard.AudioPatch.v1` = `{"version":1,"rows":[1,1,0],"sockets":[3,1,3],"order":[2,0,1]}`, plus `operator.save` and `operator.save.backup`. They were kept in `SessionState` and restored exactly (string compare), and the keys were erased.
   - The font assets were cleared in memory. No font, ProjectSettings or scene files changed.
   - `Final.unity` is active and not dirty. Nothing was committed.
+
+### Board cords: wires over other jacks (2026-10-20)
+Result: done
+Playable now: on the main switchboard, cords stack like in the Options volume patch. Every plugged-in jack lies under every wire, so a wire that crosses another cord's jack lies over it. Between wires, the cord you moved last lies on top. A held plug is above everything, the book included, as before. A jack under another cord's wire can still be picked up by clicking it.
+How to test:
+1. Start or continue a game. Take a cord from the tray and plug it into A2 and A4: its wire sags across B3.
+2. Plug a second cord into B3 and E3: the first cord's wire lies over the B3 jack.
+3. Plug a third cord into B1 and B5: its wire crosses the second cord's wire and lies on top of it.
+4. Click the B3 jack (under the first wire): it comes up in your hand. Click B3 again to put it back: its wire now lies over the third cord's wire, and the first wire still lies over the B3 jack.
+5. Pick up the A2 end and put it back: the A2–A4 wire is still over the B3 jack, and it is now the top wire.
+6. Pick up the B1 end and carry it over the other cords: the plug is drawn over everything. Click an empty spot: it goes back, and its wire is now the top wire.
+7. Open the book while holding a cord: the book still covers all wires; the held plug and the hand stay above it.
+
+How it works (option (a) of the brief):
+- Resting plugs stay where they were: in `SwitchboardCanvas` at order 0 (`SwitchboardUISorting.Cable`).
+- Each wire gets its own nested canvas with override sorting at `SwitchboardUISorting.Wire` (1) + its rank, oldest first: 1–6 for six cords. That is above every resting plug and below the book (10), `GameUI` (10) and held plugs and the hand (20).
+- The rank comes from the cords' sibling order under `CableInteraction`, which already meant "moved last is last". `CableInputController.RaiseToTop` moves the selected cord to the last sibling and marks the stack dirty only when the top cord changes; `Restack` then re-applies the ranks. A bought cord (`AddCable`), `Configure` and `OnEnable` also mark it dirty, and `LateUpdate` restacks only when dirty. `CableController.SetStackRank` writes the wire canvas's `sortingOrder` only when the value changed. Nothing allocates per frame, and the old per-frame `SetAsLastSibling` is gone.
+- Why not option (b): the plugs are children of each cable object, and `AddCable` copies a cable with its plugs. Moving the plugs into a shared container would have broken that copy and the cable prefab structure. Nothing else in `SwitchboardCanvas` draws after the cords (`CableInteraction` is `WorkArea`'s last child, and the only nested canvases are the book at 10 and the hand at 20), so the new wire layers cover nothing that used to sit above the cords. A test now guards this.
+- Clicks: wires and plugs have `raycastTarget` off, and the wire canvases have no `GraphicRaycaster`, so the top hit over a jack is still its socket, as before.
+- A wire meets its own jack at the jack's tail tip, coming from below, as in the volume patch (`board-stack-own-tail.png`). One visible change: when a cord's other end is straight above (B3 to E3), its wire now runs down over its own lower jack (E3) to that jack's tail, instead of under it. This follows from the rule "every wire over every resting jack".
+- The stack isn't saved: a loaded game starts with every cord in the tray.
+- Volume patch code is untouched; the two systems stay separate.
+
+Created:
+- `Assets/Tests/Game/Editor/BoardCordStackTests.cs` (+ `.meta`)
+Changed:
+- `Assets/Scripts/UI/SwitchboardUISorting.cs`: new `Wire = 1`; the summary describes the new layer order.
+- `Assets/Scripts/UI/CableController.cs`: the wire's canvas (`SetStackRank`, `WireSortingOrder`, `ApplyWireLayer`). The plug and wire layers are now added to any scene object (`gameObject.scene.IsValid()`) instead of only in Play Mode, so EditMode tests in preview scenes see them. Prefab assets never get them.
+- `Assets/Scripts/UI/CableInputController.cs`: `topCable`, `stackDirty`, `RaiseToTop`, `Restack`, `LateUpdate`. These replace the per-frame `selected.transform.SetAsLastSibling()`.
+- `Docs/Design.md` (4.3: the board's stacking rule, matching 5.12 item 8), `Docs/Progress.md` (this report)
+Scene and prefab changes: none. The wire canvases are added at runtime, as the plug canvases already were.
+Tests: 595/595 EditMode (was 591). New in `BoardCordStackTests` (4), on a test board with two cords where one wire sags across the other cord's jack, driven through `CableInputController.ProcessPointer` and real EventSystem raycasts:
+- `RestingPlugsLieUnderEveryWireAndTheWireMovedLastIsOnTop`: at the start, after replugging the crossing cord, and after replugging the crossed one.
+- `AHeldPlugIsOnTheCursorLayerAndItsWireOverEveryOtherWire`: also checks that an empty-spot click puts the plug back to the resting layer, with its wire still on top.
+- `AJackUnderAnotherCordsWireStillTakesTheClick`: the top raycast hit over the crossed jack is its socket, no wire or plug is hit, and a click picks the jack up.
+- `WireLayersFitBetweenTheBoardAndTheBookAndNothingInTheGameSitsThere`: the wire range stays below the book. In `Final.unity` (preview scene), no canvas sits between the board and the book, and `CableInteraction` is drawn last in its canvas.
+
+No old test asserted the old order. `CableConnectionTests`, `MergedSystemsTests` (including `NewCordKeepsConnectionHighlightsCoinsAndAudio` and `PurchasedCordJoinsCurrentGuideAndPickupClearsEveryPulse`), `PhoneBookPageTurnTests`, `ClosedSocketTests` and `SocketHoverTests` pass unchanged.
+Console: clean (only Unity's own "Ignoring depth surface ... memoryless" lines during Play Mode).
+Play Mode check (`Final.unity`, the lead's save with 4 cords on a 6×6 board, clicks through `CableInputController.ProcessPointer` in a `Canvas.willRenderCanvases` handler, frames driven with `EditorApplication.Step`):
+- Red A2–A4, blue B3–E3, yellow B1–B5. Wire orders: red 2, blue 3, yellow 4 (the unused tray cord 1). The red wire lies over the blue B3 jack, and yellow lies over blue where they cross.
+- Replugging blue at B3 (crossed cord; the click on the jack under the red wire picked it up): blue becomes 4 and lies over yellow. Red still lies over the B3 jack.
+- Replugging red at A2 (crossing cord): red becomes 4 and stays over the B3 jack.
+- Holding yellow's B1 end: plug canvas at override order 20, yellow wire on top. The plug is drawn over the red wire next to the blue jack. An empty-spot click put it back on B1, with yellow still the top wire.
+
+Screenshots in `Temp/Captures/`:
+- `board-stack-1.png`: red over the blue jack, yellow over blue
+- `board-stack-2.png`: after replugging blue, blue over yellow and red still over the blue jack
+- `board-stack-3.png`: after replugging red
+- `board-stack-held.png`: the held yellow plug over everything
+- `board-stack-own-tail.png`: 2× close-up of wires meeting their own jacks' tails, and red crossing the blue jack
+
+Test note: as in the volume pass, a held plug's screenshot needs the simulated pointer re-applied, and the wire meshes rebuilt, inside the handler. This affects only the check.
+Housekeeping:
+- The lead's `operator.save`, `operator.save.backup` and `Switchboard.AudioPatch.v1` were kept in editor `SessionState` before Play Mode. Afterwards they were restored and compared by exact string: the game save had been rewritten during the check and is back, and the audio patch was untouched. The SessionState keys and the handler were then removed.
+- The dynamic font atlases and "SDF Static" materials were cleared in memory, so no font files were written.
+- `ProjectSettings.asset` untouched. `Final.unity` is active and not dirty. Nothing staged, committed or pushed.
+- While this pass ran, the lead committed the two volume-patch passes (`6667a4a`), so `git status` now shows only this pass's files.
+
+Deviations from Design/Plan: none.
+Follow-ups:
+- Design 5.4 still describes the removed `RingingPulse` halo (nested canvas at order 9). It no longer exists in the code; the line could go.
+- If the lead doesn't like a vertical cord's wire running over its own lower jack (B3–E3 above), the fix would be per-cord: draw that cord's lower jack above its own wire only. It's a design question, so it was left alone.

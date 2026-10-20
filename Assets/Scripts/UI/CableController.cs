@@ -33,6 +33,8 @@ namespace Switchboard.UI
         private bool pointerInside;
         private Canvas firstPlugCanvas;
         private Canvas secondPlugCanvas;
+        private Canvas wireCanvas;
+        private int wireOrder = SwitchboardUISorting.Wire;
         public uint InsertionRevision { get; private set; }
         public SocketView LastInsertionAnchor { get; private set; }
         public bool LastInsertionWasManual { get; private set; }
@@ -45,6 +47,9 @@ namespace Switchboard.UI
         public Color CableColor => cableColor;
         public StoredCableView TrayView => trayCableView;
         public bool IsPointerVisible => pointerInside && Phase != CablePhase.Connected;
+        public int WireSortingOrder => wireOrder;
+        // Layers are canvases, so they are only added in scene objects, never in prefab assets.
+        private bool Layered => gameObject.scene.IsValid();
         private CableConnection<SocketView> Connection => connection ??
             (connection = new CableConnection<SocketView>(preventSameSocketConnection));
 
@@ -175,6 +180,20 @@ namespace Switchboard.UI
 
         public void PlayBlockedFeedback() => PlaySound(blockedSound, 1f, 0.18f);
 
+        /// <summary>Rank 0 is the oldest wire; every wire lies over every resting plug (lead, 2026-10-20).</summary>
+        public void SetStackRank(int rank)
+        {
+            wireOrder = SwitchboardUISorting.Wire + Mathf.Clamp(rank, 0, SwitchboardUISorting.Book - SwitchboardUISorting.Wire - 1);
+            ApplyWireLayer();
+        }
+
+        private void ApplyWireLayer()
+        {
+            if (wire == null || !Layered) return;
+            if (wireCanvas == null) wireCanvas = SwitchboardUISorting.SetLayer(wire.gameObject, wireOrder);
+            else if (wireCanvas.sortingOrder != wireOrder) wireCanvas.sortingOrder = wireOrder;
+        }
+
         private void RefreshVisuals()
         {
             RefreshTrayImage();
@@ -187,13 +206,14 @@ namespace Switchboard.UI
             bool showSecond = secondAttached || (firstAttached && !secondAttached && pointerInside);
             firstPlug.gameObject.SetActive(showFirst);
             secondPlug.gameObject.SetActive(showSecond);
-            if (Application.isPlaying)
+            if (Layered)
             {
+                if (wireCanvas == null) ApplyWireLayer();
                 if (firstPlugCanvas == null) firstPlugCanvas = SwitchboardUISorting.SetLayer(firstPlug.gameObject, SwitchboardUISorting.Cable);
                 if (secondPlugCanvas == null) secondPlugCanvas = SwitchboardUISorting.SetLayer(secondPlug.gameObject, SwitchboardUISorting.Cable);
                 firstPlugCanvas.sortingOrder = firstAttached ? SwitchboardUISorting.Cable : SwitchboardUISorting.Cursor;
                 secondPlugCanvas.sortingOrder = secondAttached ? SwitchboardUISorting.Cable : SwitchboardUISorting.Cursor;
-                // Attached plugs inherit the cable's position in the main Canvas hierarchy.
+                // Attached plugs stay in the main canvas, under every wire's own canvas.
                 firstPlugCanvas.overrideSorting = !firstAttached;
                 secondPlugCanvas.overrideSorting = !secondAttached;
             }

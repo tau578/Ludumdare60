@@ -27,6 +27,8 @@ namespace Switchboard.UI
         private PointerEventData pointerEvent;
         private EventSystem eventSystem;
         private CableController heldCable;
+        private CableController topCable;
+        private bool stackDirty = true;
         private SocketView hoveredSocket;
         private StoredCableView hoveredStoredCable;
         private bool cursorWasVisible;
@@ -66,6 +68,7 @@ namespace Switchboard.UI
             tray = cableTray;
             cables = inventory;
             handCursor = cursor;
+            stackDirty = true;
         }
 
         /// <summary>Called before session binding; only unused tray cords may be removed.</summary>
@@ -120,6 +123,7 @@ namespace Switchboard.UI
             cables.CopyTo(inventory, 0);
             inventory[cables.Length] = cable;
             cables = inventory;
+            stackDirty = true;
             LayoutTray();
             return cable;
         }
@@ -167,6 +171,34 @@ namespace Switchboard.UI
                 if (Usable(cable) && (cable.Phase == CablePhase.Held || cable.Phase == CablePhase.OneEndConnected)) { heldCable = cable; break; }
             cursorWasVisible = SystemPointer.Visible;
             ownsCursor = true;
+            stackDirty = true;
+        }
+
+        private void LateUpdate()
+        {
+            if (stackDirty) Restack();
+        }
+
+        // The cord picked up last is the cord moved last: its wire goes over all the others (lead, 2026-10-20).
+        private void RaiseToTop(CableController cable)
+        {
+            if (cable == topCable) return;
+            topCable = cable;
+            cable.transform.SetAsLastSibling();
+            stackDirty = true;
+        }
+
+        private void Restack()
+        {
+            stackDirty = false;
+            foreach (var cable in cables)
+            {
+                if (cable == null) continue;
+                int rank = 0, index = cable.transform.GetSiblingIndex();
+                foreach (var other in cables)
+                    if (other != null && other != cable && other.transform.GetSiblingIndex() < index) rank++;
+                cable.SetStackRank(rank);
+            }
         }
 
         // Mouse, touch and pen alike (D28): a tap is a click, so the click-to-pick, click-to-plug model stays.
@@ -285,7 +317,8 @@ namespace Switchboard.UI
             if (hoveredStoredCable != highlightedStock && hoveredStoredCable != null) hoveredStoredCable.SetHighlighted(false);
             hoveredStoredCable = highlightedStock;
             if (hoveredStoredCable != null) hoveredStoredCable.SetHighlighted(true);
-            if (selected != null) selected.transform.SetAsLastSibling();
+            if (selected != null) RaiseToTop(selected);
+            if (stackDirty) Restack();
             foreach (var cable in cables)
             {
                 if (!Usable(cable)) continue;
