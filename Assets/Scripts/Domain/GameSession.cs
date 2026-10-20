@@ -24,6 +24,7 @@ namespace Switchboard.Domain
                 content.StartPool);
             Board = new OpenBoard(Stats);
             IsTutorial = tutorial && save == null;
+            ShopHintsDone = save != null ? HintsFromSave(save.shopHintsDone) : IsTutorial ? ShopHints.None : ShopHints.All;
             Queue = new CallQueue(Calls, Stats, IsTutorial);
             if (save != null) Queue.Restore(save.queuePosition);
             Shelf = new ShopShelf(Upgrades);
@@ -50,10 +51,22 @@ namespace Switchboard.Domain
         public CareerStats Career { get; }
 
         /// <summary>
-        /// Whether this is a new game that gets the tutorial (D57): the one-call start, the first-call guide and the
-        /// shop's first-cord pulse. Never for a loaded save.
+        /// Whether this is a new game that gets the tutorial (D57): the one-call start and the first-call guide.
+        /// Never for a loaded save, which gets only the shop hints it hasn't seen (<see cref="ShopHintsPending"/>).
         /// </summary>
         public bool IsTutorial { get; }
+
+        /// <summary>
+        /// The tutorial's shop hints already shown (D57, fix 2): none on a new game; saved, so Continue shows only the
+        /// rest; every one for a save from before they were saved, and for a session without the tutorial.
+        /// </summary>
+        public ShopHints ShopHintsDone { get; private set; }
+        public ShopHints ShopHintsPending => ShopHints.All & ~ShopHintsDone;
+
+        public void MarkShopHintsDone(ShopHints hints) => ShopHintsDone |= hints & ShopHints.All;
+
+        private static ShopHints HintsFromSave(int saved) =>
+            saved < 0 ? ShopHints.All : (ShopHints)saved & ShopHints.All;
 
         /// <summary>The first-call guide is over (done or skipped): the guided call may run out again like any other.</summary>
         public void EndTutorial() => Queue.ReleaseTutorialCall();
@@ -87,6 +100,7 @@ namespace Switchboard.Domain
             fraction = Wallet.Fraction,
             upgrades = Upgrades.OwnedIds(),
             queuePosition = Queue.ResumePosition,
+            shopHintsDone = (int)ShopHintsDone,
             career = Career.Capture()
         };
 

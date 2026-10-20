@@ -82,18 +82,20 @@ namespace Switchboard.Game
             goalPanel.Bind(Session.Goal);
             loopRunner.Bind(Session);
             if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls);
-            // The tutorial (D57) runs only on a new game; the session decides, so the one-call start agrees.
+            // The first-call guide (D57) runs only on a new game; the session decides, so the one-call start agrees.
+            // The shop hints the save hasn't shown yet come on Continue too (fix 2).
             List<TutorialSpotlight> spotlights = LevelScene.FindAll<TutorialSpotlight>(scene);
             foreach (TutorialSpotlight spotlight in spotlights) spotlight.gameObject.SetActive(false);
-            if (Session.IsTutorial)
+            if (Session.IsTutorial || Session.ShopHintsPending != ShopHints.None)
             {
                 if (spotlights.Count != 1)
                     Debug.LogWarning($"The tutorial needs one TutorialSpotlight in GameUI, but found {spotlights.Count}.", this);
                 var guide = GetComponent<FirstOrderGuide>();
                 if (guide == null) guide = gameObject.AddComponent<FirstOrderGuide>();
                 guide.Bind(callQueue, Session.Calls, bookView, LevelScene.FindAll<CableController>(scene).ToArray(), cordBridge,
-                    spotlights.Count == 1 ? spotlights[0] : null, sockets, shopHeader, Session.EndTutorial);
-                guide.BindShop(shop, Session.Upgrades);
+                    spotlights.Count == 1 ? spotlights[0] : null, sockets, shopHeader,
+                    Session.IsTutorial ? Session.EndTutorial : (System.Action)null, guideFirstCall: Session.IsTutorial);
+                guide.BindShop(shop, Session.Upgrades, Session.ShopHintsDone, Session.MarkShopHintsDone);
             }
             if (saveFile != null)
             {

@@ -97,6 +97,22 @@ namespace Switchboard.Game.Tests
             Invoke(guide, "LateUpdate");
         }
 
+        // The advancing click: the dark layer swallows it and only reports the press (fix 2).
+        private void PressDim()
+        {
+            input.ProcessTarget(spotlight.Dim.gameObject, null, new Vector2(5, 5), true);
+            spotlight.Dim.OnPointerDown(null);
+        }
+
+        private void ReadMessage(CallCardView card)
+        {
+            FinishTyping(card);
+            Sequence.Tick(FirstOrderGuideSequence.ReadClickDelay);
+            PressDim();
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Book), "setup");
+        }
+
         private FirstOrderGuideSequence Sequence => Field<FirstOrderGuideSequence>(guide, "sequence");
         private CableController TrayCord() => All<CableController>().First(c => c.gameObject.activeInHierarchy && c.IsInTray);
         private SocketView Socket(JackId jack) => All<SocketView>().Single(s => s.Address == jack.Label);
@@ -157,6 +173,7 @@ namespace Switchboard.Game.Tests
         {
             Open();
             Assert.That(session.IsTutorial, Is.True);
+            Assert.That(session.ShopHintsDone, Is.EqualTo(ShopHints.None), "a new game has seen no shop hint");
             Assert.That(spotlight.gameObject.activeSelf, Is.False, "nothing shows before the first call rings");
             TutorialTexts texts = spotlight.Texts;
             var card = FirstCard();
@@ -177,8 +194,24 @@ namespace Switchboard.Game.Tests
             AssertStep(FirstOrderGuideStage.TaskText, texts.readMessage, card.SpeechBubbleRect);
             AssertBlockedEverywhereBut(call, card);
             Assert.That(Blocked(card.SpeechBubbleRect), Is.True, "nothing takes clicks while the message types");
+            PressDim();
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.TaskText), "a click while it types does nothing");
 
+            // Fix 2: once typed, the message waits for a click, so there is time to read it.
             FinishTyping(card);
+            AssertStep(FirstOrderGuideStage.TaskText, texts.readMessageDone, card.SpeechBubbleRect);
+            AssertBlockedEverywhereBut(call, card);
+            CallState before = call.State;
+            PressDim();
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.TaskText), "a click right after the text is a stray one");
+            Sequence.Tick(FirstOrderGuideSequence.ReadClickDelay);
+            PressDim();
+            Invoke(guide, "LateUpdate");
+            Assert.That(call.State, Is.EqualTo(before), "the advancing click does nothing else");
+            Assert.That(session.Calls.Live.Count, Is.EqualTo(1));
+            Assert.That(book.IsOpen, Is.False);
+            Assert.That(cable.IsInTray, Is.True);
             AssertStep(FirstOrderGuideStage.Book, texts.openBook, book.ClosedBookGraphic.transform);
             AssertBlockedEverywhereBut(call, card, book.ClosedBookGraphic.transform);
             Click(cable.TrayView.transform);
@@ -290,16 +323,152 @@ namespace Switchboard.Game.Tests
             Assert.That(Blocked(secret), Is.True, "any click only dismisses step 9");
 
             Sequence.Tick(FirstOrderGuideSequence.ConnectedClickDelay);
-            Sequence.AnyClick();
+            PressDim();
             Invoke(guide, "LateUpdate");
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Complete));
-            Assert.That(guide.enabled, Is.False, "nothing runs once the guide is done");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.WaitingForShop), "More Profit and More Clients may follow");
+            Assert.That(session.ShopHintsDone, Is.EqualTo(ShopHints.Cord | ShopHints.Mystery), "the save remembers steps 8-9");
             Assert.That(spotlight.Dim.Blocking, Is.False);
             spotlight.Advance(1);
             Assert.That(spotlight.gameObject.activeSelf, Is.False);
-            session.Wallet.Earn(100000);
+        }
+
+        [Test]
+        public void MoreProfitThenMoreClientsFollowTheCordStepsOnceEachEvenWithMoneyFromTheStart()
+        {
+            Open();
+            // The dev panel's money during step 1: every hint is affordable, but they wait for the first call and the cord.
+            session.Wallet.Earn(1000000);
+            Call call = ConnectTheFirstCall();
+            Sequence.Tick(FirstOrderGuideSequence.ConnectedSeconds);
+            Invoke(guide, "LateUpdate");
+            IUpgrade cord = session.Upgrades.ChainOf(UpgradeKind.ExtraWires)[0];
+            IUpgrade profit = session.Upgrades.ChainOf(UpgradeKind.ExtraIncome)[0];
+            IUpgrade clients = session.Upgrades.ChainOf(UpgradeKind.ExtraClients)[0];
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.BuyCord), "steps 8-9 first");
+            Invoke(shop.ButtonFor(cord).GetComponent<UpgradeSlotView>(), "OnClick");
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(shop.Secret != null ? FirstOrderGuideStage.Mystery : FirstOrderGuideStage.WaitingForShop));
+            Sequence.Tick(FirstOrderGuideSequence.MysterySeconds);
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.WaitingForShop), "a short gap after step 9");
+
+            Sequence.Tick(FirstOrderGuideSequence.ShopHintGapSeconds);
+            Invoke(guide, "LateUpdate");
+            RectTransform profitButton = shop.ButtonFor(profit);
+            Assert.That(profitButton, Is.Not.Null);
+            AssertStep(FirstOrderGuideStage.Profit, spotlight.Texts.buyProfit, profitButton);
+            var card = All<CallCardView>().First(c => c.Call == call);
+            AssertBlockedEverywhereBut(call, card, profitButton);
+            PressDim();
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Profit), "a click as it appears doesn't dismiss it");
+            Sequence.Tick(FirstOrderGuideSequence.ConnectedClickDelay);
+            PressDim();
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.WaitingForShop), "any click elsewhere dismisses it");
+            Assert.That(session.Upgrades.IsOwned(profit.Id), Is.False, "the dismissing click buys nothing");
+            Assert.That(session.ShopHintsDone & ShopHints.Profit, Is.EqualTo(ShopHints.Profit));
+            Assert.That(spotlight.Dim.Blocking, Is.False);
+
+            Sequence.Tick(FirstOrderGuideSequence.ShopHintGapSeconds);
+            Invoke(guide, "LateUpdate");
+            RectTransform clientsButton = shop.ButtonFor(clients);
+            AssertStep(FirstOrderGuideStage.Clients, spotlight.Texts.buyClients, clientsButton);
+            Assert.That(Blocked(clientsButton), Is.False, "the lit button buys as usual");
+            Invoke(clientsButton.GetComponent<UpgradeSlotView>(), "OnClick");
+            Assert.That(session.Upgrades.IsOwned(clients.Id), Is.True);
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Complete));
+            Assert.That(guide.enabled, Is.False, "nothing runs once the guide is done");
+            Assert.That(session.ShopHintsDone, Is.EqualTo(ShopHints.All));
+            spotlight.Advance(1);
+            Assert.That(spotlight.gameObject.activeSelf, Is.False);
+            session.Wallet.Earn(1000000);
             Invoke(shop, "LateUpdate");
-            Assert.That(spotlight.gameObject.activeSelf, Is.False, "later cords get no guide");
+            Assert.That(spotlight.gameObject.activeSelf, Is.False, "never again");
+        }
+
+        private static SaveData SaveWithHints(ShopHints done, long cents = 0) =>
+            new SaveData { version = SaveData.CurrentVersion, cents = cents, shopHintsDone = (int)done };
+
+        [Test]
+        public void ContinueShowsAPendingHintOnlyWithTheBookShutNoCordInHandAndNotPaused()
+        {
+            Open(SaveWithHints(ShopHints.Cord | ShopHints.Mystery));
+            Assert.That(session.IsTutorial, Is.False);
+            Assert.That(guide != null && guide.enabled, Is.True, "a pending shop hint binds the guide");
+            session.Tick(3);
+            Assert.That(session.Calls.Live.Count, Is.GreaterThan(1), "no one-call start");
+            Assert.That(session.Calls.Live.All(c => !c.WaitingHeld), Is.True);
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.WaitingForShop), "no first-call guide");
+            Assert.That(spotlight.gameObject.activeSelf, Is.False);
+            book.Toggle();
+            Assert.That(book.IsOpen, Is.True, "the book isn't locked between hints");
+
+            session.Wallet.Earn(1000000);
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.WaitingForShop), "not with the book open");
+            book.Toggle();
+            CableController cable = TrayCord();
+            Click(cable.TrayView.transform);
+            Assert.That(cable.Phase, Is.EqualTo(CablePhase.Held), "setup");
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.WaitingForShop), "not with a cord in hand");
+            cable.TryReturnToTray();
+            float scale = Time.timeScale;
+            try
+            {
+                Time.timeScale = 0;
+                Invoke(guide, "LateUpdate");
+                Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.WaitingForShop), "not while paused");
+            }
+            finally { Time.timeScale = scale; }
+            Invoke(guide, "LateUpdate");
+            AssertStep(FirstOrderGuideStage.Profit, spotlight.Texts.buyProfit,
+                shop.ButtonFor(session.Upgrades.ChainOf(UpgradeKind.ExtraIncome)[0]));
+        }
+
+        [Test]
+        public void ContinueAfterAnEarlySaveSkipsTheFirstCallButShowsTheCordStep()
+        {
+            // Saved during step 7 (the first fee moved the money), then reloaded: Continue.
+            Open(SaveWithHints(ShopHints.None));
+            Assert.That(session.IsTutorial, Is.False);
+            session.Tick(3);
+            Invoke(guide, "LateUpdate");
+            Assert.That(spotlight.gameObject.activeSelf, Is.False, "no first-call guide");
+            session.Wallet.Earn(session.Upgrades.ChainOf(UpgradeKind.ExtraWires)[0].CostCents);
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.BuyCord));
+        }
+
+        [Test]
+        public void ADoneOrBoughtHintNeverComesBackAfterAReload()
+        {
+            Open(SaveWithHints(ShopHints.Cord | ShopHints.Mystery));
+            IUpgrade profit = session.Upgrades.ChainOf(UpgradeKind.ExtraIncome)[0];
+            IUpgrade clients = session.Upgrades.ChainOf(UpgradeKind.ExtraClients)[0];
+            // Bought while the book was open, before its hint could show.
+            book.SetOpen(true);
+            session.Wallet.Earn(profit.CostCents + clients.CostCents);
+            Invoke(guide, "LateUpdate");
+            Assert.That(session.Upgrades.TryBuy(profit.Id), Is.True, "setup");
+            book.SetOpen(false);
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Clients), "no Profit hint for a bought upgrade");
+            Sequence.Tick(FirstOrderGuideSequence.ConnectedClickDelay);
+            PressDim();
+            Invoke(guide, "LateUpdate");
+            SaveData saved = session.CaptureSave();
+            Assert.That(saved.shopHintsDone, Is.EqualTo((int)ShopHints.All));
+
+            TearDown();
+            Open(saved);
+            Assert.That(guide == null || !guide.enabled, Is.True, "every hint done: no guide");
+            session.Wallet.Earn(1000000);
+            Invoke(shop, "LateUpdate");
+            Assert.That(spotlight.gameObject.activeSelf, Is.False);
         }
 
         [Test]
@@ -343,7 +512,7 @@ namespace Switchboard.Game.Tests
         {
             var card = FirstCard();
             Invoke(queue, "OnCardClicked", card);
-            FinishTyping(card);
+            ReadMessage(card);
             book.Toggle();
             book.Toggle();
             CableController cable = TrayCord();
@@ -365,7 +534,7 @@ namespace Switchboard.Game.Tests
             var card = FirstCard();
             Assert.That(card.Call.WaitingHeld, Is.True, "the guided caller waits while the guide runs");
             Invoke(queue, "OnCardClicked", card);
-            FinishTyping(card);
+            ReadMessage(card);
             book.Toggle();
             book.Toggle();
             CableController cable = TrayCord();
@@ -402,7 +571,7 @@ namespace Switchboard.Game.Tests
             Open();
             var card = FirstCard();
             Invoke(queue, "OnCardClicked", card);
-            FinishTyping(card);
+            ReadMessage(card);
             book.SetOpen(true);
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.ReadingBook));
             // Only the dev panel's "Clear calls" can do this now.
@@ -439,7 +608,8 @@ namespace Switchboard.Game.Tests
                 spotlight.SkipButton.targetGraphic.gameObject }), string.Join(", ", clickable.Select(g => g.name)));
             // A blocked click reaches the dark layer and stops: no card, book, shop or socket handler above it.
             Assert.That(ExecuteEvents.GetEventHandler<IPointerClickHandler>(spotlight.Dim.gameObject), Is.Null);
-            Assert.That(ExecuteEvents.GetEventHandler<IPointerDownHandler>(spotlight.Dim.gameObject), Is.Null);
+            Assert.That(spotlight.Dim.GetComponentsInParent<IPointerDownHandler>(true), Is.EquivalentTo(new[] { spotlight.Dim }),
+                "only its own, which reports the press (fix 2)");
             Assert.That(ExecuteEvents.GetEventHandler<IPointerUpHandler>(spotlight.Dim.gameObject), Is.Null);
             Assert.That(spotlight.Dim.GetComponent<IPointerBlocker>(), Is.Not.Null, "the cord input knows it");
             Assert.That(spotlight.Dim.Blocking, Is.False, "nothing is blocked before the guide shows");
@@ -485,7 +655,7 @@ namespace Switchboard.Game.Tests
             var card = FirstCard();
             Call call = card.Call;
             Invoke(queue, "OnCardClicked", card);
-            FinishTyping(card);
+            ReadMessage(card);
             book.Toggle();
             spotlight.Advance(3);
             Rect page = LocalRect(book.OpenBookRect);
@@ -529,8 +699,10 @@ namespace Switchboard.Game.Tests
         [Test]
         public void ALoadedGameHasNoTutorial()
         {
+            // A save from before fix 2 has no shop-hint record: every hint counts as shown.
             Open(new SaveData { version = SaveData.CurrentVersion, cents = 0 });
             Assert.That(session.IsTutorial, Is.False);
+            Assert.That(session.ShopHintsDone, Is.EqualTo(ShopHints.All));
             Assert.That(guide == null || !guide.enabled || guide.Spotlight == null, Is.True, "no guide is bound");
             session.Tick(3);
             Assert.That(session.Calls.Live.Count, Is.GreaterThan(1), "no one-call start: the slots fill at once");

@@ -1,5 +1,7 @@
+using System;
 using Switchboard.UI;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace Switchboard.Game
@@ -7,10 +9,11 @@ namespace Switchboard.Game
     /// <summary>
     /// The tutorial's dark layer (D57): one quad over its whole rect with up to <see cref="MaxHoles"/> soft rounded holes,
     /// drawn by the TutorialSpotlight shader. The tutorial is mandatory (fix 1): while <see cref="Blocking"/>, it is the
-    /// top raycast hit everywhere except its click areas, and it handles no click itself, so a click there does nothing.
+    /// top raycast hit everywhere except its click areas, so a click there reaches nothing beneath it. It only reports
+    /// the press (<see cref="Pressed"/>), which some steps take as "got it" (fix 2).
     /// </summary>
     [RequireComponent(typeof(CanvasRenderer))]
-    public sealed class SpotlightGraphic : Graphic, ICanvasRaycastFilter, IPointerBlocker
+    public sealed class SpotlightGraphic : Graphic, ICanvasRaycastFilter, IPointerBlocker, IPointerDownHandler
     {
         public const int MaxHoles = 8;
         public const int MaxClickAreas = 8;
@@ -29,6 +32,14 @@ namespace Switchboard.Game
 
         /// <summary>Whether clicks outside the click areas are swallowed; off as soon as the guide hides or is skipped.</summary>
         public bool Blocking { get; set; }
+
+        /// <summary>A press this layer swallowed: outside every click area, while blocking.</summary>
+        public event Action Pressed;
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            if (Blocking) Pressed?.Invoke();
+        }
         public int ClickAreaCount { get; private set; }
         public Rect ClickArea(int index) => clickAreas[index];
 

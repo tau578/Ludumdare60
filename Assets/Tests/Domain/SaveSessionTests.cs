@@ -335,5 +335,47 @@ namespace Switchboard.Domain.Tests
             Assert.That(before.cents, Is.EqualTo(1000));
             Assert.That(before.version, Is.EqualTo(SaveData.CurrentVersion));
         }
+
+        [Test]
+        public void ANewGameHasSeenNoShopHintAndASaveKeepsTheOnesDone()
+        {
+            FakeContent content = Content(upgrades: FakeUpgrade.FullShop());
+            var session = new GameSession(content, new FakeSwitchboard(), tutorial: true);
+            Assert.That(session.ShopHintsDone, Is.EqualTo(ShopHints.None));
+            Assert.That(session.ShopHintsPending, Is.EqualTo(ShopHints.All));
+            session.MarkShopHintsDone(ShopHints.Cord | ShopHints.Profit);
+            session.MarkShopHintsDone(ShopHints.Cord);
+
+            var file = new SaveFile(new MemoryStorage());
+            file.Write(session.CaptureSave());
+            SaveData data = file.Load().Data;
+            Assert.That(data.shopHintsDone, Is.EqualTo((int)(ShopHints.Cord | ShopHints.Profit)));
+            var loaded = new GameSession(content, new FakeSwitchboard(), data, tutorial: true);
+            Assert.That(loaded.IsTutorial, Is.False, "Continue: no first-call guide");
+            Assert.That(loaded.ShopHintsDone, Is.EqualTo(ShopHints.Cord | ShopHints.Profit));
+            Assert.That(loaded.ShopHintsPending, Is.EqualTo(ShopHints.Mystery | ShopHints.Clients), "the rest still come");
+
+            Assert.That(new GameSession(content, new FakeSwitchboard(), new SaveData { version = 1, shopHintsDone = 0 })
+                .ShopHintsPending, Is.EqualTo(ShopHints.All), "saved before any hint showed");
+        }
+
+        [Test]
+        public void ASaveFromBeforeShopHintsWereSavedCountsThemAllDone()
+        {
+            Assert.That(SaveFile.TryParse("{\"version\":1,\"cents\":5,\"upgrades\":[]}", out SaveData old, out _), Is.True);
+            Assert.That(old.shopHintsDone, Is.EqualTo(SaveData.ShopHintsMissing), "the field is missing");
+            var session = new GameSession(Content(upgrades: FakeUpgrade.FullShop()), new FakeSwitchboard(), old, tutorial: true);
+            Assert.That(session.ShopHintsDone, Is.EqualTo(ShopHints.All));
+            Assert.That(session.ShopHintsPending, Is.EqualTo(ShopHints.None));
+            Assert.That(session.CaptureSave().shopHintsDone, Is.EqualTo((int)ShopHints.All), "and the next save says so");
+        }
+
+        [Test]
+        public void ASessionWithoutTheTutorialHasNoShopHints()
+        {
+            var session = new GameSession(Content(upgrades: FakeUpgrade.FullShop()), new FakeSwitchboard());
+            Assert.That(session.IsTutorial, Is.False);
+            Assert.That(session.ShopHintsPending, Is.EqualTo(ShopHints.None));
+        }
     }
 }

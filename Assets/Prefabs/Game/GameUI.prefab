@@ -1092,6 +1092,7 @@ MonoBehaviour:
   texts:
     clickCaller: A call! Click the caller to answer.
     readMessage: Read who they want to talk to.
+    readMessageDone: Read who they want to talk to. Click to continue.
     openBook: Open the phone book.
     findJacks: 'Find both jacks: the caller''s and the one they want. Then click
       the book to close it.'
@@ -1100,6 +1101,8 @@ MonoBehaviour:
     connected: Connected! You earn money while they talk.
     buyCord: You can afford another cord. Buy it to handle two calls at once.
     mystery: Save up for the mystery upgrade!
+    buyProfit: 'More Profit: every call pays more. Buy it to earn faster.'
+    buyClients: 'More Clients: more callers at once, and a bigger board.'
   slideSpeed: 9
   fadeSeconds: 0.3
   pulse: 5

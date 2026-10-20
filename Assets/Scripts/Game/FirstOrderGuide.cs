@@ -1,16 +1,17 @@
 using System;
 using System.Collections.Generic;
+using Switchboard.Cables;
 using Switchboard.Domain;
 using Switchboard.UI;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace Switchboard.Game
 {
     /// <summary>
-    /// The tutorial of a new game (D57) with the spotlight: the caller, their message, the book, both jacks in the book,
-    /// a cord, both jacks on the board, the money; later, buying the first extra cord and a look at the mystery upgrade.
-    /// It is mandatory (fix 1): each step lets only its own target take clicks. Bound only when no save was loaded.
+    /// The tutorial (D57) with the spotlight. A new game guides the first call: the caller, their message, the book, both
+    /// jacks in the book, a cord, both jacks on the board, the money. Then the shop hints, each once: buying the first
+    /// extra cord, a look at the mystery upgrade, More Profit and More Clients (fix 2). Continue gets only the shop hints
+    /// its save hasn't seen. Each step lets only its own target take clicks (fix 1).
     /// </summary>
     public sealed class FirstOrderGuide : MonoBehaviour
     {
@@ -23,6 +24,10 @@ namespace Switchboard.Game
         private ShopView shop;
         private UpgradeService upgrades;
         private IUpgrade firstCord;
+        private IUpgrade firstProfit;
+        private IUpgrade firstClients;
+        private Action<ShopHints> shopHintsDone;
+        private ShopHints recordedHints;
         private Action firstCallOver;
         private readonly List<CableController> cables = new List<CableController>();
         private readonly Dictionary<string, SocketView> sockets = new Dictionary<string, SocketView>();
@@ -31,6 +36,7 @@ namespace Switchboard.Game
         private Call firstCall;
         private CallCardView firstCard;
         private FirstOrderGuideStage? renderedStage;
+        private bool renderedTextRead;
         private int renderedSpread = -1;
         private int renderedTrayCords = -1;
 
@@ -38,12 +44,14 @@ namespace Switchboard.Game
         public TutorialSpotlight Spotlight => spotlight;
 
         /// <param name="releaseCall">Called once the first call's steps are over: its caller may hang up again.</param>
+        /// <param name="guideFirstCall">False on Continue: only the shop hints, from <see cref="BindShop"/>.</param>
         public void Bind(CallQueueView callQueue, CallService service, PhoneBookView phoneBook, CableController[] wires,
             CordBridge bridge, TutorialSpotlight view, IReadOnlyList<SocketView> board, RectTransform money,
-            Action releaseCall = null)
+            Action releaseCall = null, bool guideFirstCall = true)
         {
             Unbind();
-            sequence = new FirstOrderGuideSequence();
+            sequence = new FirstOrderGuideSequence(ShopHints.None, guideFirstCall);
+            recordedHints = ShopHints.None;
             renderedStage = null;
             firstCall = null;
             firstCard = null;
@@ -54,7 +62,11 @@ namespace Switchboard.Game
                 foreach (SocketView socket in board)
                     if (socket != null) sockets[socket.Address] = socket;
             if (cordBridge != null) cordBridge.CableAdded += RegisterCable;
-            if (spotlight != null) spotlight.SkipClicked += OnSkipClicked;
+            if (spotlight != null)
+            {
+                spotlight.SkipClicked += OnSkipClicked;
+                spotlight.DimPressed += OnDimPressed;
+            }
             queue.OrderShown += OnOrderShown;
             queue.CardOpened += OnCardOpened;
             calls.CallEnded += OnCallEnded;
@@ -63,13 +75,30 @@ namespace Switchboard.Game
             RefreshHints();
         }
 
-        /// <summary>Steps 8 and 9: buy the first extra cord once affordable, then look at the mystery upgrade.</summary>
-        public void BindShop(ShopView shopView, UpgradeService service)
+        /// <summary>
+        /// The shop hints: the first extra cord (step 8) and the mystery upgrade (9), then the first More Profit and
+        /// More Clients, each once it is affordable. Each chain's first entry comes from Economy.json.
+        /// </summary>
+        /// <param name="done">The hints the save has already shown; they never come back.</param>
+        /// <param name="recordDone">Told whenever another hint is done, so the save remembers it.</param>
+        public void BindShop(ShopView shopView, UpgradeService service, ShopHints done = ShopHints.None,
+            Action<ShopHints> recordDone = null)
         {
             shop = shopView;
             upgrades = service;
-            IReadOnlyList<IUpgrade> chain = upgrades != null ? upgrades.ChainOf(UpgradeKind.ExtraWires) : null;
-            firstCord = chain != null && chain.Count > 0 ? chain[0] : null;
+            firstCord = FirstOf(UpgradeKind.ExtraWires);
+            firstProfit = FirstOf(UpgradeKind.ExtraIncome);
+            firstClients = FirstOf(UpgradeKind.ExtraClients);
+            sequence.MarkShopHintsDone(done);
+            recordedHints = sequence.ShopHintsDone;
+            shopHintsDone = recordDone;
+            RefreshHints();
+        }
+
+        private IUpgrade FirstOf(UpgradeKind kind)
+        {
+            IReadOnlyList<IUpgrade> chain = upgrades != null ? upgrades.ChainOf(kind) : null;
+            return chain != null && chain.Count > 0 ? chain[0] : null;
         }
 
         private void RegisterCable(CableController cable)
@@ -122,6 +151,14 @@ namespace Switchboard.Game
             RefreshHints();
         }
 
+        // Only a click the dark layer swallowed counts: not Skip, not the pause button above it, not a lit target.
+        private void OnDimPressed()
+        {
+            if (Time.timeScale <= 0) return;
+            sequence.AnyClick();
+            RefreshHints();
+        }
+
         private void LateUpdate()
         {
             if (queue == null) return;
@@ -129,30 +166,46 @@ namespace Switchboard.Game
             AdvanceText();
             if (firstCall != null && firstCall.State == CallState.Connected) sequence.FirstOrderConnected();
             sequence.CordsOut(AnyCordOut());
-            FirstOrderGuideStage stage = sequence.Stage;
-            if (stage == FirstOrderGuideStage.WaitingForShop || stage == FirstOrderGuideStage.BuyCord) PollShop();
-            if (stage == FirstOrderGuideStage.Connected || stage == FirstOrderGuideStage.Mystery)
-            {
-                // Game time, so the pause menu holds these steps too; a click on the pause menu doesn't dismiss them.
-                sequence.Tick(Time.deltaTime);
-                Pointer pointer = Pointer.current;
-                if (Time.timeScale > 0 && pointer != null && pointer.press.wasPressedThisFrame) sequence.AnyClick();
-            }
+            // Game time, so the pause menu holds the timed steps, the click guards and the gap between shop hints.
+            sequence.Tick(Time.deltaTime);
+            if (sequence.IsFirstCallOver && !sequence.IsOver) PollShop();
             RefreshHints();
         }
 
         private void PollShop()
         {
-            if (shop == null || upgrades == null || firstCord == null) { sequence.ShopUnavailable(); return; }
-            if (upgrades.IsOwned(firstCord.Id))
-            {
-                sequence.CordBought(shop.Secret != null && shop.ButtonFor(shop.Secret) != null);
-                return;
-            }
-            // The first cord isn't for sale on the shelf (another chain holds every slot): no shop steps.
-            if (shop.ButtonFor(firstCord) == null) { sequence.ShopUnavailable(); return; }
-            // Not while the book is open: its pages would sit dimmed between the player and the shop.
-            sequence.CordAffordable(upgrades.CanBuy(firstCord.Id) == PurchaseCheck.Ok && (book == null || !book.IsOpen));
+            // A hint comes up only in calm play: not paused, the book shut (its pages would sit dimmed between the
+            // player and the shop) and no cord in hand.
+            bool canStart = Time.timeScale > 0 && (book == null || !book.IsOpen) && !AnyCordInHand();
+            sequence.Offer(ShopHints.Cord, OfferOf(firstCord), canStart);
+            sequence.Offer(ShopHints.Mystery, MysteryOffer(), canStart);
+            sequence.Offer(ShopHints.Profit, OfferOf(firstProfit), canStart);
+            sequence.Offer(ShopHints.Clients, OfferOf(firstClients), canStart);
+        }
+
+        private ShopOffer OfferOf(IUpgrade upgrade)
+        {
+            if (shop == null || upgrades == null || upgrade == null) return ShopOffer.NotForSale;
+            if (upgrades.IsOwned(upgrade.Id)) return ShopOffer.Owned;
+            // Not on a shop button (another chain holds every slot): its hint never shows.
+            if (shop.ButtonFor(upgrade) == null) return ShopOffer.NotForSale;
+            return upgrades.CanBuy(upgrade.Id) == PurchaseCheck.Ok ? ShopOffer.Affordable : ShopOffer.TooExpensive;
+        }
+
+        private ShopOffer MysteryOffer()
+        {
+            IUpgrade secret = shop != null && upgrades != null ? shop.Secret : null;
+            if (secret == null) return ShopOffer.NotForSale;
+            if (upgrades.IsOwned(secret.Id)) return ShopOffer.Owned;
+            return shop.ButtonFor(secret) != null ? ShopOffer.Affordable : ShopOffer.NotForSale;
+        }
+
+        private bool AnyCordInHand()
+        {
+            foreach (CableController cable in cables)
+                if (cable != null && cable.gameObject.activeInHierarchy &&
+                    (cable.Phase == CablePhase.Held || cable.Phase == CablePhase.OneEndConnected)) return true;
+            return false;
         }
 
         private void AdvanceText()
@@ -178,12 +231,15 @@ namespace Switchboard.Game
 
         private void RefreshHints()
         {
+            RecordShopHints();
             FirstOrderGuideStage stage = Stage;
             bool changed = renderedStage != stage
+                || (stage == FirstOrderGuideStage.TaskText && sequence.IsTaskTextRead != renderedTextRead)
                 || (stage == FirstOrderGuideStage.ReadingBook && book != null && book.CurrentSpreadIndex != renderedSpread)
                 || (stage == FirstOrderGuideStage.Cables && TrayCordCount() != renderedTrayCords);
             if (!changed) return;
             renderedStage = stage;
+            renderedTextRead = sequence.IsTaskTextRead;
             if (book != null) renderedSpread = book.CurrentSpreadIndex;
             renderedTrayCords = TrayCordCount();
             if (sequence.IsFirstCallOver && firstCallOver != null)
@@ -222,7 +278,8 @@ namespace Switchboard.Game
                     if (firstCard != null) Add(ref count, (RectTransform)firstCard.transform, 10);
                     break;
                 case FirstOrderGuideStage.TaskText:
-                    text = texts.readMessage;
+                    // Once the message has typed out, any click moves on (fix 2); until then there is nothing to do.
+                    text = sequence.IsTaskTextRead ? texts.readMessageDone : texts.readMessage;
                     if (firstCard != null) Add(ref count, firstCard.SpeechBubbleRect, 10, clickable: false);
                     break;
                 case FirstOrderGuideStage.Book:
@@ -255,6 +312,14 @@ namespace Switchboard.Game
                     text = texts.buyCord;
                     Add(ref count, shop != null ? shop.ButtonFor(firstCord) : null, 8);
                     break;
+                case FirstOrderGuideStage.Profit:
+                    text = texts.buyProfit;
+                    Add(ref count, shop != null ? shop.ButtonFor(firstProfit) : null, 8);
+                    break;
+                case FirstOrderGuideStage.Clients:
+                    text = texts.buyClients;
+                    Add(ref count, shop != null ? shop.ButtonFor(firstClients) : null, 8);
+                    break;
                 default:
                     text = texts.mystery;
                     Add(ref count, shop != null ? shop.ButtonFor(shop.Secret) : null, 8, clickable: false);
@@ -284,6 +349,14 @@ namespace Switchboard.Game
             spots[count++] = new SpotlightTarget(rect, padding, round, clickable);
         }
 
+        private void RecordShopHints()
+        {
+            ShopHints done = sequence.ShopHintsDone;
+            if (done == recordedHints) return;
+            recordedHints = done;
+            shopHintsDone?.Invoke(done);
+        }
+
         private void OnDisable() => Unbind();
 
         private void Unbind()
@@ -296,13 +369,18 @@ namespace Switchboard.Game
                 book.OpenLocked = false;
             }
             if (cordBridge != null) cordBridge.CableAdded -= RegisterCable;
-            if (spotlight != null) spotlight.SkipClicked -= OnSkipClicked;
+            if (spotlight != null)
+            {
+                spotlight.SkipClicked -= OnSkipClicked;
+                spotlight.DimPressed -= OnDimPressed;
+            }
             foreach (var cable in cables) if (cable != null) cable.PickedUp -= OnCablePickedUp;
             cables.Clear();
             sockets.Clear();
             cordBridge = null;
             queue = null; calls = null; book = null;
-            shop = null; upgrades = null; firstCord = null;
+            shop = null; upgrades = null; firstCord = null; firstProfit = null; firstClients = null;
+            shopHintsDone = null;
             // A guide that stops early (skipped, or the scene closing) never leaves the call held.
             Action release = firstCallOver;
             firstCallOver = null;

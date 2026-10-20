@@ -31,6 +31,7 @@ namespace Switchboard.Game
     {
         [TextArea] public string clickCaller = "A call! Click the caller to answer.";
         [TextArea] public string readMessage = "Read who they want to talk to.";
+        [TextArea] public string readMessageDone = "Read who they want to talk to. Click to continue.";
         [TextArea] public string openBook = "Open the phone book.";
         [TextArea] public string findJacks = "Find both jacks: the caller's and the one they want. Then click the book to close it.";
         [TextArea] public string takeCord = "Take a cord.";
@@ -38,6 +39,8 @@ namespace Switchboard.Game
         [TextArea] public string connected = "Connected! You earn money while they talk.";
         [TextArea] public string buyCord = "You can afford another cord. Buy it to handle two calls at once.";
         [TextArea] public string mystery = "Save up for the mystery upgrade!";
+        [TextArea] public string buyProfit = "More Profit: every call pays more. Buy it to earn faster.";
+        [TextArea] public string buyClients = "More Clients: more callers at once, and a bigger board.";
     }
 
     /// <summary>
@@ -95,6 +98,8 @@ namespace Switchboard.Game
         private float time;
 
         public event Action SkipClicked;
+        /// <summary>A click the dark layer swallowed (outside the step's click areas, Skip and the pause menu).</summary>
+        public event Action DimPressed;
         public TutorialTexts Texts => texts;
         public bool IsShowing => showing;
         public string HintText => hintLabel != null ? hintLabel.text : string.Empty;
@@ -113,9 +118,10 @@ namespace Switchboard.Game
         public void Show(string text, SpotlightTarget[] spots, int count, RectTransform anchor = null,
             RectTransform extraClickArea = null)
         {
-            if (!listening && skipButton != null)
+            if (!listening)
             {
-                skipButton.onClick.AddListener(OnSkipClicked);
+                if (skipButton != null) skipButton.onClick.AddListener(OnSkipClicked);
+                if (dim != null) dim.Pressed += OnDimPressed;
                 listening = true;
             }
             if (!gameObject.activeSelf)
@@ -166,9 +172,16 @@ namespace Switchboard.Game
             if (showing) SkipClicked?.Invoke();
         }
 
+        private void OnDimPressed()
+        {
+            if (showing) DimPressed?.Invoke();
+        }
+
         private void OnDestroy()
         {
-            if (listening && skipButton != null) skipButton.onClick.RemoveListener(OnSkipClicked);
+            if (!listening) return;
+            if (skipButton != null) skipButton.onClick.RemoveListener(OnSkipClicked);
+            if (dim != null) dim.Pressed -= OnDimPressed;
         }
 
         private void LateUpdate() => Advance(Time.unscaledDeltaTime);
