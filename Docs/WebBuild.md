@@ -19,13 +19,17 @@ How long it takes:
 
 `Builds/` is ignored by git; never commit it.
 
-**After a build, git shows three files you didn't change.** Every build writes them; undo them before you commit:
+**The build tidies up after itself.** Unity rewrites a few files during every build that nobody actually changed: the URP settings (`Assets/Settings/UniversalRP.asset`, `Assets/UniversalRenderPipelineGlobalSettings.asset`), the two dynamic fonts (`Boecklins Universe SDF.asset`, `Della Respira SDF.asset`), `ProjectSettings/TimeManager.asset`, and the `preloadedAssets:` line in `ProjectSettings/ProjectSettings.asset` (the Input System's settings). Since 2026-10-20 the menu saves first, remembers those files, and puts them back when the build ends, even if it fails.
+
+Still look at `git status` before you commit. If one of them shows up anyway, undo it:
 
 ```
 git checkout -- Assets/Settings/UniversalRP.asset Assets/UniversalRenderPipelineGlobalSettings.asset
 ```
 
-and in `ProjectSettings/ProjectSettings.asset`, the `preloadedAssets:` line gains an entry (the Input System's actions). Put it back to `preloadedAssets: []`. If nothing else in that file changed, simply `git checkout -- ProjectSettings/ProjectSettings.asset`.
+(for `ProjectSettings.asset`, put the line back to `preloadedAssets: []`), and tell the team, because the clean-up missed it.
+
+**Never commit the dynamic fonts' glyph changes.** Pressing Play in the editor also adds letters and kerning pairs to the two dynamic fonts and changes two numbers (`_ScaleRatioA`, `_ScaleRatioC`) in the `SDF Static` font materials; saving the project writes them out (thousands of lines). TextMeshPro has no setting that stops this. If git shows those font files changed and you didn't mean to change a font, undo them with `git checkout -- <file>`.
 
 ## Testing the build on your computer
 

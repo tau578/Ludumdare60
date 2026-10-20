@@ -127,6 +127,38 @@ namespace Switchboard.Game.Tests
                 Is.EqualTo(new[] { "Assets/Scenes/MainMenu.unity", "Assets/Scenes/Final.unity" }));
         }
 
+        [Test]
+        public void TheFilesTheBuildRestoresExist()
+        {
+            foreach (string path in WebBuild.RestoredFiles)
+                Assert.That(File.Exists(path), Is.True, path);
+        }
+
+        [Test]
+        public void RestoreWritesBackOnlyTheFilesThatChanged()
+        {
+            string folder = FileUtil.GetUniqueTempPathInProject();
+            Directory.CreateDirectory(folder);
+            try
+            {
+                string kept = Path.Combine(folder, "kept.asset");
+                string changed = Path.Combine(folder, "changed.asset");
+                File.WriteAllText(kept, "same");
+                File.WriteAllText(changed, "before");
+                Dictionary<string, byte[]> snapshot = WebBuild.Snapshot(new[] { kept, changed, Path.Combine(folder, "missing.asset") });
+                Assert.That(snapshot.Keys, Is.EquivalentTo(new[] { kept, changed }), "a missing file isn't created");
+
+                File.WriteAllText(changed, "after the build");
+                Assert.That(WebBuild.Restore(snapshot), Is.EqualTo(new[] { changed }));
+                Assert.That(File.ReadAllText(changed), Is.EqualTo("before"));
+                Assert.That(File.ReadAllText(kept), Is.EqualTo("same"));
+            }
+            finally
+            {
+                Directory.Delete(folder, true);
+            }
+        }
+
         [TestCase(Jslib)]
         [TestCase(PointerJslib)]
         public void TheBrowserPluginIsForWebPlayersOnly(string path)

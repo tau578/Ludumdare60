@@ -154,8 +154,8 @@ namespace Switchboard.Game.Tests
                 Assert.That(bar.raycastTarget, Is.False, bar.name);
         }
 
-        // Anchored to the 1920x1080 play area's top-right corner, including on letterboxed screens, and short
-        // enough to stay above the shop panel's art (about 85 reference px from the top at 16:9).
+        // Anchored to the 1920x1080 play area's top-right corner, so on screens wider than 16:9 (bars at the sides) it
+        // stays on the art, and short enough to stay above the shop panel's art (about 85 reference px from the top).
         [Test]
         public void ThePauseButtonSitsInThePlayAreaTopRightCorner()
         {

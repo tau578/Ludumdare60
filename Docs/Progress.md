@@ -3670,3 +3670,76 @@ Follow-ups:
   - After that call connected through `OperatorDesk`, the other two slots filled, money rose to $1.19, and no caller showed twice.
   - The editor's PlayerPrefs were restored exactly.
 
+
+### Cleanup after tarbaev.d's Settings/Save commits (2026-10-20)
+Result: done (the Web build restore still needs one real build to confirm it)
+Playable now: nothing new to see at 16:9. On screens wider or narrower than 16:9 the editor-only "Dev" button now stays just left of the pause button in the play area's corner instead of following the screen edge. The incoming ring sounds the same as before (0.4875), and it can now be tuned in the Inspector. The fonts and URP settings tarbaev.d's commits re-saved are back to how they were before `94cff92`, and every font still renders.
+How to test:
+1. Play `Final` at 1920×1080: "Dev" sits just left of the pause button, as before. Then try a wide size such as 2340×1080: "Dev" still sits next to the pause button at the corner of the art, not at the screen edge.
+2. Select `Game` › `CallAudio`: "Incoming Gain" is 0.4875.
+3. Open the book while a call is in hand: nothing of ours covers it.
+4. On the next Web build, check that `git status` shows no URP, font, `TimeManager` or `preloadedAssets` changes afterwards.
+Created:
+- `Assets/Tests/Game/Editor/DevPanelLayoutTests.cs` (+ `.meta`)
+Changed:
+- `Assets/Scripts/Game/DevTools/DevPanel.cs`: new `FirstButtonPosition(screenWidth, screenHeight)`. It places the first button from the 1920×1080 play area's right and top edges (centred the way GameUI's Expand canvas centres it), not from the screen's edge. The row's `y` follows the play area's top too, so on 4:3 it stays level with the pause button. `ButtonWidth` and `Gap` are public for the test.
+- `Assets/Scripts/Game/CallAudio.cs`: `[SerializeField, Range(0f, 2f)] private float incomingGain = .4875f` replaces the literal. It uses Range 0–2 to match `cashRegisterGain`, its neighbour.
+- `Assets/Prefabs/Game/Game.prefab`: `incomingGain: 0.4875`. `Final.unity` has no `CallAudio` override.
+- `Assets/Scripts/Game/Editor/WebBuild.cs`:
+  - `Build()` now runs `AssetDatabase.SaveAssets()` first, so a deliberate unsaved edit is kept. It then snapshots the bytes of `RestoredFiles` and `PlayerSettings.GetPreloadedAssets()`, and runs the old build (now `BuildWeb()`) inside `try`.
+  - In `finally` it calls `SetPreloadedAssets(old)` and `SaveAssets()`, then writes back every snapshotted file whose bytes changed, and force-reimports those under `Assets/`.
+  - `RestoredFiles` lists the URP asset, the URP global settings, both dynamic fonts and `ProjectSettings/TimeManager.asset`. `Snapshot` and `Restore` are small public helpers.
+- `Assets/Tests/Game/Editor/WebBuildTests.cs`: `TheFilesTheBuildRestoresExist` and `RestoreWritesBackOnlyTheFilesThatChanged` (temp files under `Temp/`).
+- `Assets/Tests/Game/Editor/GamePauseMenuTests.cs`: comment only. "letterboxed screens" now reads "screens wider than 16:9 (bars at the sides)".
+- **Restored to `94cff92~1`** (the noise committed in `94cff92` and `c43a764`):
+  - `Assets/Settings/UniversalRP.asset`: only URP shader-prefilter flags (`m_PrefilteringMode*`, `m_Prefilter*`)
+  - `Assets/UniversalRenderPipelineGlobalSettings.asset`: only the `m_RuntimeSettings` list (12 rids)
+  - `Assets/Fonts/DellaRespira/Della Respira SDF.asset`: +11,265 lines in `94cff92`, +75 in `c43a764`, all added kerning-pair records (`m_GlyphPairAdjustmentRecords`); no glyph, character, atlas, fallback or setting changes
+  - `Assets/Fonts/BoecklinsUniverse/Boecklins Universe SDF.asset`: +45 lines, kerning-pair records only
+  - `Della Respira SDF Static.asset` and `Boecklins Universe SDF Static.asset`: only the materials' `_ScaleRatioA` (1 to 0.9) and `_ScaleRatioC` (1 to 0.73125), which TMP recalculates itself
+  - Nothing looked deliberate.
+- Docs:
+  - `Docs/Design.md` 4.3 (the pause button sits in the play area's corner; Dev follows it)
+  - `Docs/Plan.md` §4 (the Dev panel, Dynamic TMP fonts and Web builds rows) and §8 (Web build leftovers)
+  - `Docs/WebBuild.md` (the build tidies up after itself; never commit font glyph changes)
+  - `CLAUDE.md` (Web build step 2)
+  - this report
+Scene and prefab changes: `Game.prefab` (one serialized field). No scene changes. `Final.unity` is not dirty.
+Tests: 563/563 EditMode (was 554). New: `DevPanelLayoutTests` (2 cases at 16:9 and 5 aspect ratios checked against the real `PauseButton` and GameUI's CanvasScaler), plus the two `WebBuildTests` above.
+Console: clean
+Screenshots (`Temp/Captures/`):
+- `cleanup-book-closed.png`: a call taken, before its bubble was clicked
+- `cleanup-book-open.png`: the book open with Nora Ellis in hand, speech bubble showing, "New order!" cards in the other slots
+- `cleanup-dev-button-wide.png`: 2340×1080, Dev next to pause at the play area's corner
+- `cleanup-pause-menu.png`: static fonts render
+- `cleanup-main-menu.png`: the dynamic fonts render on MainMenu
+Book overlap check (Task 4): at 1920×1080 the open book (scale 1.1, x −95) covers roughly x 924–1830 and y 488–1060 in reference pixels (bottom right). **Nothing of ours overlaps it.** It stays clear of:
+- the speech bubble (right of the top card, about x 315–460, y 95–235)
+- the call cards
+- the money plaque
+- the pause button
+- the Dev button
+The book covers the lower shop slots, as before; that's the board's own panel under a modal book, not our overlay. No nudge needed.
+Fonts (Task 5c):
+- **"Clear Dynamic Data On Build" (`m_ClearDynamicDataOnBuild`) is already on for both dynamic fonts.** In this TMP (ugui 2.0.0) it clears the character and glyph tables only in `TMP_PreBuildProcessor` and when the editor quits. That is also why a build re-saves the fonts.
+- Nothing stops Play Mode from adding glyphs and kerning pairs in memory, and the next save (Ctrl+S, a scene save, `SaveAssets`) writes them out.
+- The other switches aren't safe fixes:
+  - Turning off `m_GetFontFeatures` would drop kerning (a visible change).
+  - Static atlas mode would need regenerated atlases.
+  - `m_IsMultiAtlasTexturesEnabled` doesn't affect it.
+- No setting changed. The team rule went into WebBuild.md and Plan §4: never commit dynamic font changes; discard them with `git checkout --`.
+- After this pass's Play Mode check, the atlas textures and static materials were dirty in memory (a force reimport didn't clear that). `EditorUtility.ClearDirty` on them keeps the next save from writing them.
+Housekeeping:
+- The lead's `operator.save` and `operator.save.backup` were kept in editor `SessionState` during the Play Mode check and restored exactly afterwards, then the keys were erased.
+- The Game view is back to 1920×1080, and `timeScale` is 1.
+- No callbacks are left.
+- `ProjectSettings.asset` was not touched.
+- Nothing is staged, committed or pushed.
+Deviations from Design/Plan:
+- `incomingGain` uses `Range(0f, 2f)`, not 0–1, to match `cashRegisterGain`.
+- `WebBuild` also restores `TimeManager.asset` (CLAUDE.md listed it as a build re-save).
+Follow-ups:
+- **A real `Build Web` run must confirm the restore:** after the build, `git status` should show no URP, font, `TimeManager` or `preloadedAssets` change. One thing to watch: the restored `preloadedAssets` is saved through `SaveAssets`, which also writes anything else dirty in `ProjectSettings.asset` (such as the Unity Cloud link Unity keeps re-adding).
+- The IMGUI Dev button still shows behind the pause dialog: it hides only for `PresentationOpen`. That's editor-only and predates this pass.
+- Design 4.3 says the bubble sits "left of the caller card", but it shows to the right of the portrait (it predates this pass; the docs wording could be fixed).
+- "Build Web (Dev)" is still open (Plan §8).

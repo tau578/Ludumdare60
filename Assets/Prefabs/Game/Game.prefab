@@ -236,6 +236,7 @@ MonoBehaviour:
   ringSource: {fileID: 4686586232714703171}
   feedbackSource: {fileID: 550449638319770665}
   incoming: {fileID: 8300000, guid: 8542f7dbd65816744a14b0c11c3bb0be, type: 3}
+  incomingGain: 0.4875
   connected: {fileID: 8300000, guid: d040f6a55ee232045ab2dba06c8a5eea, type: 3}
   cashRegister: {fileID: 8300000, guid: e6f75c2bfd414275b20145c540791ade, type: 3}
   cashRegisterGain: 1

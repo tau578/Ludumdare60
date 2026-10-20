@@ -116,10 +116,7 @@ Teammates still push to `main`, so pre-flight always merges first (see the git r
 ## Web build and publish (itch.io)
 When the lead asks for a new build or to publish, the main session can do this directly (team guide: `Docs/WebBuild.md`):
 1. **Build:** run `Tools/Switchboard/Build Web` without blocking MCP: from `execute_code`, `EditorApplication.delayCall += () => EditorApplication.ExecuteMenuItem("Tools/Switchboard/Build Web");`. Then wait until a new `Build Web:` line appears in `~/Library/Logs/Unity/Editor.log` (about 2 min). The build goes to `Builds/Web` (git-ignored). The editor stays on the Web platform.
-2. **Undo the build's re-saves** with `git checkout --`:
-   - `Assets/Settings/UniversalRP.asset` and `Assets/UniversalRenderPipelineGlobalSettings.asset`
-   - `ProjectSettings/TimeManager.asset` and the dynamic TMP fonts (`Boecklins Universe SDF.asset`, `Della Respira SDF.asset`)
-   - In `ProjectSettings.asset`, set `preloadedAssets` back to `[]`, keeping any intended change.
+2. **Check the build's re-saves:** since the 2026-10-20 cleanup the build restores them itself: the URP asset and global settings, `ProjectSettings/TimeManager.asset`, the dynamic TMP fonts (`Boecklins Universe SDF.asset`, `Della Respira SDF.asset`) and `preloadedAssets` in `ProjectSettings.asset` (`WebBuild.RestoredFiles`). Still run `git status`; if one of them shows up anyway, undo it with `git checkout --` (for `ProjectSettings.asset`, set `preloadedAssets` back to `[]`, keeping any intended change) and tell the lead, since the restore missed it. The first real build after the cleanup must confirm this works.
 3. **Optional local check:** `python3 -m http.server 8000 --bind 127.0.0.1 --directory Builds/Web`, then open `http://127.0.0.1:8000`. Stop the server afterwards.
 4. **Publish to the itch Draft page:** `~/bin/butler push Builds/Web llazypixell/operator:html5` (the lead allows Draft pushes, D55). Then poll `~/bin/butler status llazypixell/operator` until the new build shows ✓, and give the lead the build number. butler is logged in; `butler login` needs a real Terminal. Never write the Draft page's secret link anywhere, and never make the page public: that's the lead's call.
 

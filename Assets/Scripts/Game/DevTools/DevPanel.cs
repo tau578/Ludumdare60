@@ -8,18 +8,20 @@ namespace Switchboard.Game
 {
     /// <summary>
     /// Testing shortcuts, compiled only into the editor and development builds. F1 or the corner button toggles it.
-    /// It sits left of the pause button in the free strip along the top edge and opens as a row going left, clear
-    /// of the board, the shop slots (IMGUI clicks would reach a slot under them too), the tray and the open book.
+    /// It sits left of the pause button in the free strip along the play area's top edge and opens as a row going
+    /// left, clear of the board, the shop slots (IMGUI clicks would reach a slot under them too), the tray and the
+    /// open book.
     /// </summary>
     public sealed class DevPanel : MonoBehaviour
     {
         private const float ReferenceWidth = 1920f;
         private const float ReferenceHeight = 1080f;
-        private const float ButtonWidth = 74f;
+        public const float ButtonWidth = 74f;
         private const float ButtonHeight = 34f;
-        private const float Gap = 6f;
+        public const float Gap = 6f;
         private const float Margin = 6f;
-        // The pause button in the top-right corner: its 6 px margin, 72 px width and a 6 px gap, in reference pixels.
+        // The pause button in the play area's top-right corner: its 6 px margin, 72 px width and a 6 px gap, in
+        // reference pixels.
         private const float RightOffset = 84f;
         private const float FastTimeScale = 5f;
 
@@ -29,6 +31,7 @@ namespace Switchboard.Game
         private bool open;
         private GamePauseMenu pauseMenu;
         private GUIStyle style;
+        private float top;
 
         public void Bind(GameSession gameSession, CallQueueView queue, Action startNewGame = null)
         {
@@ -53,7 +56,9 @@ namespace Switchboard.Game
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
             if (style == null) style = new GUIStyle(GUI.skin.button) { fontSize = 13, wordWrap = true };
 
-            float x = Screen.width / scale - RightOffset - ButtonWidth;
+            Vector2 first = FirstButtonPosition(Screen.width, Screen.height);
+            float x = first.x;
+            top = first.y;
             bool fast = Time.timeScale > 1f;
             if (Button(ref x, open ? "Close" : fast ? "Dev ×5" : "Dev")) open = !open;
             if (!open) return;
@@ -74,9 +79,21 @@ namespace Switchboard.Game
             if (newGame != null && Button(ref x, "New game")) newGame();
         }
 
+        /// <summary>
+        /// The top-left corner of the first ("Dev") button in scaled GUI units: just left of the pause button, which
+        /// sits in the top-right corner of the 1920x1080 play area that GameUI's Expand canvas centres on the screen.
+        /// </summary>
+        public static Vector2 FirstButtonPosition(float screenWidth, float screenHeight)
+        {
+            float scale = Mathf.Min(screenWidth / ReferenceWidth, screenHeight / ReferenceHeight);
+            float playRight = (screenWidth / scale + ReferenceWidth) / 2f;
+            float playTop = (screenHeight / scale - ReferenceHeight) / 2f;
+            return new Vector2(playRight - RightOffset - ButtonWidth, playTop + Margin);
+        }
+
         private bool Button(ref float x, string label)
         {
-            bool pressed = GUI.Button(new Rect(x, Margin, ButtonWidth, ButtonHeight), label, style);
+            bool pressed = GUI.Button(new Rect(x, top, ButtonWidth, ButtonHeight), label, style);
             x -= ButtonWidth + Gap;
             return pressed;
         }

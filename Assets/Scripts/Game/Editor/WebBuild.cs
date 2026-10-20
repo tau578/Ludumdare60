@@ -17,8 +17,70 @@ namespace Switchboard.Game.Editor
         public const string OutputFolder = "Builds/Web";
         public const string PushCommand = "butler push Builds/Web llazypixell/operator:html5";
 
+        /// <summary>
+        /// Files a build re-saves with no change anyone wants in git (URP shader-stripping flags, glyph caches, format
+        /// only). <see cref="Build"/> writes their bytes back afterwards, so nobody has to undo them by hand.
+        /// </summary>
+        public static readonly string[] RestoredFiles =
+        {
+            "Assets/Settings/UniversalRP.asset",
+            "Assets/UniversalRenderPipelineGlobalSettings.asset",
+            "Assets/Fonts/BoecklinsUniverse/Boecklins Universe SDF.asset",
+            "Assets/Fonts/DellaRespira/Della Respira SDF.asset",
+            "ProjectSettings/TimeManager.asset"
+        };
+
         [MenuItem("Tools/Switchboard/Build Web")]
         public static void Build()
+        {
+            // Saved first, so an intended change still unsaved in the editor is part of what gets restored.
+            AssetDatabase.SaveAssets();
+            Dictionary<string, byte[]> files = Snapshot(RestoredFiles);
+            // The Input System adds its settings to the preloaded assets for the build and leaves them there.
+            UnityEngine.Object[] preloaded = PlayerSettings.GetPreloadedAssets();
+            try
+            {
+                BuildWeb();
+            }
+            finally
+            {
+                PlayerSettings.SetPreloadedAssets(preloaded);
+                AssetDatabase.SaveAssets();
+                foreach (string path in Restore(files))
+                    if (path.StartsWith("Assets/")) AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            }
+        }
+
+        public static Dictionary<string, byte[]> Snapshot(IEnumerable<string> paths)
+        {
+            var files = new Dictionary<string, byte[]>();
+            foreach (string path in paths)
+                if (File.Exists(path)) files[path] = File.ReadAllBytes(path);
+            return files;
+        }
+
+        /// <summary>Writes back every file whose bytes changed and returns their paths.</summary>
+        public static List<string> Restore(Dictionary<string, byte[]> files)
+        {
+            var restored = new List<string>();
+            foreach (KeyValuePair<string, byte[]> file in files)
+            {
+                if (File.Exists(file.Key) && SameBytes(File.ReadAllBytes(file.Key), file.Value)) continue;
+                File.WriteAllBytes(file.Key, file.Value);
+                restored.Add(file.Key);
+            }
+            return restored;
+        }
+
+        private static bool SameBytes(byte[] a, byte[] b)
+        {
+            if (a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++)
+                if (a[i] != b[i]) return false;
+            return true;
+        }
+
+        private static void BuildWeb()
         {
             ApplyWebSettings();
             if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL &&
