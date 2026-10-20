@@ -19,6 +19,14 @@ How long it takes:
 
 `Builds/` is ignored by git; never commit it.
 
+## What players see while it loads
+
+- **No "Made with Unity" splash.** It is off in the Player settings (Unity 6 allows that on Personal), so the page's own loading screen is the only one.
+- **The loading screen** (our template) is a dark cover over the whole window, phones included, with the title "Operator!" and a gold bar. The bar fills while the files download; when the download is done it is full and "Starting..." appears under it while Unity starts up.
+- **It waits for the game.** The cover doesn't drop when Unity's loader finishes (that could show a frame or two of black). It fades out (0.3 s) only when the main menu has drawn its first frame: the `PageReady` object in `MainMenu` calls the page's `window.operatorGameReady()` through `Assets/Scripts/Game/GameReady.jslib`. In a local test the signal came about 0.3 s after the loader finished.
+- **Fallback:** if that signal never comes, the page lifts the cover anyway 8 seconds after the loader finishes, so nobody is stuck on the loading screen. If loading fails, Unity's red error banner shows above the cover.
+- **No "Click to play" button** (lead, 2026-10-20): the menu plays no sound when it opens, and the first menu click unlocks the browser's audio.
+
 **The build tidies up after itself.** Unity rewrites a few files during every build that nobody actually changed: the URP settings (`Assets/Settings/UniversalRP.asset`, `Assets/UniversalRenderPipelineGlobalSettings.asset`), the two dynamic fonts (`Boecklins Universe SDF.asset`, `Della Respira SDF.asset`), `ProjectSettings/TimeManager.asset`, and the `preloadedAssets:` line in `ProjectSettings/ProjectSettings.asset` (the Input System's settings). Since 2026-10-20 the menu saves first, remembers those files, and puts them back when the build ends, even if it fails.
 
 Still look at `git status` before you commit. If one of them shows up anyway, undo it:

@@ -18,7 +18,7 @@
 | 8. The new phone book | done | ✅ 2026-10-18 (20 min) | ✅ 445/445 tests, scope clean | ✅ | f82ed29 |
 | 9a. Saves, touch, menu, pause | done | ✅ 2026-10-19 (37 min + 21 min fix + 24 min pause + 15 min corner) | ✅ 503/503 tests, scope clean | ✅ | 580c610 |
 | 9b. First Web build on itch | done | ✅ 2026-10-19 (37 min; cursor fixes discarded) | ✅ 517/517 tests, scope clean | ✅ | 709be9d |
-| 10. Tutorial | playtesting | ✅ 2026-10-20 (33 min + 28 min fix) | ✅ 624/624 tests, scope clean | | |
+| 10. Tutorial | playtesting | ✅ 2026-10-20 (33 min + 28 min fix + 21 min fix) | ✅ 638/638 tests, scope clean | | |
 | 11. Sound and feel | not started | | | | |
 | 12. Mobile and Web polish | not started | | | | |
 | 13. Balance | not started | | | | |
@@ -4178,3 +4178,215 @@ Follow-ups:
 - Plan §8 "`SlowGuidePulse` material in EditMode tests": the shop-pulse test is gone too, so no test makes a pulse material any more. The item can probably close.
 - `CableInputController.ProcessTarget` lets tests feed a top hit directly. Real raycasts in a preview scene don't work, because the overlay canvases have no size there.
 - Step 8's hint sits over the board's top-right jacks (dimmed). If the lead prefers it beside the shop, give the hint an anchor there.
+
+### Web build: Step 10 tutorial (2026-10-20)
+- **Built:** `a418ade` (Step 10: the tutorial), clean tree, editor on the Web platform, console cleared first.
+- **Result:** `Build Web: done in 3.5 min. The build is in Builds/Web (27.5 MB).` No build errors; the console had no errors or warnings afterwards. A local check (`python3 -m http.server` on 127.0.0.1) served `index.html` ("Operator!") and all four `Build/` files with 200.
+- **itch:** `butler push Builds/Web llazypixell/operator:html5` uploaded 27.5 MiB. `butler status` shows the `html5` channel at build **#2168670** (from #2164375), version 8, processed ✓. The page is still a Draft.
+- **Leftovers:** none. After the build `git status` was clean: no URP asset, URP global settings, `TimeManager.asset`, dynamic font or `preloadedAssets` changes, and no Unity Cloud link in `ProjectSettings.asset` either. **The automatic restore in `WebBuild` (cleanup `1b6a6af`) works**; nothing had to be undone by hand.
+
+#### Step 10, fix pass 2: reading time and more shop hints (lead, 2026-10-20)
+Result: done
+Playable now: step 2 (the speech bubble) no longer runs off. Once the message has typed out, the hint becomes "Read who they want to talk to. Click to continue." and stays until the player clicks anywhere. After the first call and the cord steps (8–9), the spotlight comes back once for **More Profit** and once for **More Clients**, the first time each is affordable. The player can buy it with the lit button, or dismiss the hint with a click anywhere else. The save remembers which shop hints are done, so Continue shows only the ones still to come. An older save shows none.
+How to test:
+1. Main menu, New Game (Start over if asked). Click the caller. The message types out, then the hint adds "Click to continue." Nothing moves on by itself. Click anywhere, on the bubble or off it: the guide moves to "Open the phone book". That click does nothing else (no card, no book, no cord).
+2. Optional: press the dev panel's "+ $10" during the first call. No shop hint comes up until the call is connected and step 7 is over.
+3. Play through steps 3–7 as before. Then step 8 (buy More Cables) and step 9 (the ??? button) follow as before.
+4. About 1.5 s after step 9 ends, the More Profit button lights up: "More Profit: every call pays more. Buy it to earn faster." Click elsewhere to dismiss it (nothing is bought), or click the button to buy it.
+5. About 1.5 s later, More Clients lights up: "More Clients: more callers at once, and a bigger board." Buy it or dismiss it. The tutorial is over.
+6. The hints wait while the book is open, while you hold a cord, and while the game is paused. If money runs short before a hint shows, it waits until you can afford it again.
+7. **Reload:** while the More Clients hint is showing (or before it comes), go to Pause, then Main menu, then Continue. There is no first-call guide and every slot rings. More Clients comes back, but More Profit (already done) doesn't. Finish it, then reload again: no hint ever comes back.
+8. Skip tutorial (also shown during the shop hints) ends every remaining hint for good, as it ended steps 8–9 before.
+
+**Final texts** (Inspector: `GameUI` > `Tutorial` > `TutorialSpotlight` > Texts; plain ASCII):
+| Step | Lit | Takes clicks | Text |
+|---|---|---|---|
+| 1 Portrait | the caller card | the card | A call! Click the caller to answer. |
+| 2 TaskText, typing | the speech bubble | nothing | Read who they want to talk to. |
+| 2 TaskText, typed | the speech bubble | any click moves on (from 0.5 s after the text finished) | Read who they want to talk to. Click to continue. |
+| 3 Book | the closed book | the closed book (and Tab) | Open the phone book. |
+| 4 ReadingBook | both rows (or the page corner) | the whole open book (and Tab or Esc to close) | Find both jacks: the caller's and the one they want. Then click the book to close it. |
+| 5 Cables | every cord in the tray | the tray cords | Take a cord. |
+| 6 Plugging | the call's two jacks | those two jacks | Plug one end into each jack. |
+| 7 Connected | the money plaque | nothing; any click dismisses | Connected! You earn money while they talk. |
+| 8 BuyCord | the first More Cables button | that button | You can afford another cord. Buy it to handle two calls at once. |
+| 9 Mystery | the ??? button | nothing; any click dismisses (or 5 s) | Save up for the mystery upgrade! |
+| More Profit | the first More Profit button | that button (buys); any other click dismisses | More Profit: every call pays more. Buy it to earn faster. |
+| More Clients | the first More Clients button | that button (buys); any other click dismisses | More Clients: more callers at once, and a bigger board. |
+
+The proposed texts fit what the upgrades do. The income chain multiplies both the connection fee and the per-second rate (`EarningsService`). The first `extra_clients` entry opens more caller slots and a bigger board, and brings a new call pool.
+
+How it works:
+- **Which clicks count.** `SpotlightGraphic` (the `Dim` layer) is now an `IPointerDownHandler`. While blocking, it raises `Pressed` for every press it swallows, and `TutorialSpotlight` forwards it as `DimPressed`. So only a press that lands on the dark layer counts. Skip, the pause button and menu (above the layer) and a lit target's own click never do. It is still swallowed: the layer has no click or up handler, and the cord input still sees `IPointerBlocker`. `FirstOrderGuide` no longer polls `Pointer.current`. Steps 7 and 9 now use the same press, so a press on the pause button no longer dismisses them (before, it did on the press frame).
+- **Step 2** (`FirstOrderGuideSequence`): `TaskTextFinished` no longer advances. It marks the text read and starts the guard. `AnyClick` in TaskText moves to Book only once the text is read and `ReadClickDelay` (0.5 s of game time) has passed. `IsTaskTextRead` switches the hint text.
+- **Shop hints (sequence).**
+  - **New stages:** `Profit = 13` and `Clients = 14`.
+  - **New API:** `Offer(hint, ShopOffer, canStart)` replaces `CordAffordable`/`CordBought`/`ShopUnavailable`. `ShopOffer` is `NotForSale` (not in the file, or not on a button), `TooExpensive`, `Affordable` or `Owned`.
+  - **Polling:** `FirstOrderGuide.PollShop` calls it each frame once the first call is over, in this order: cord, mystery, Profit, Clients. That order is the priority when several are due together. One hint shows at a time.
+  - **Not for sale or owned:** the hint is done for good. A cord that isn't for sale takes step 9 with it, as before.
+  - **Money drops while it shows:** the hint goes back to waiting, as step 8 already did.
+  - **Gap:** after any shop hint ends, the next waits `ShopHintGapSeconds` (1.5 s of game time). Step 9 ignores the gap, so it still follows the cord purchase at once.
+  - **Dismissing:** Profit and Clients end on a swallowed click from `ConnectedClickDelay` (0.6 s) on, so a click already on its way when the hint appears doesn't dismiss it. They don't time out.
+  - **Skip:** Skip, or `Cancel` (the guided call ending before it connects), marks every shop hint done.
+- **When a hint may start:** not paused (`Time.timeScale > 0`), the book shut, and no cord in hand (`Held` or `OneEndConnected`). Steps 8–9 follow the same rule now; before, only the book was checked.
+- **The save (domain).**
+  - New `ShopHints` flags (`Cord 1, Mystery 2, Profit 4, Clients 8, All`).
+  - `SaveData.shopHintsDone`, an int. Its initializer is `ShopHintsMissing = -1`, which `JsonUtility` keeps when the field is absent, so an old save reads as all done.
+  - `GameSession.ShopHintsDone`, `ShopHintsPending`, `MarkShopHintsDone`, and `CaptureSave` writes it.
+  - **A new game** (`IsTutorial`) starts with none. **A loaded save** starts with what it saved. **A session without the tutorial** starts with all.
+  - **No save version bump.** The marker handles the missing field, so no migration is needed.
+- **Binding.**
+  - `GameInstaller` binds the guide when `Session.IsTutorial || Session.ShopHintsPending != None`. On Continue it binds with `guideFirstCall: false`, which means no first-call steps and no call hold (no `EndTutorial` callback).
+  - `BindShop(shop, upgrades, Session.ShopHintsDone, Session.MarkShopHintsDone)` reads the first entry of each chain (`ChainOf(ExtraWires/ExtraIncome/ExtraClients)[0]`) from Economy.json.
+  - `FirstOrderGuide` reports every newly done hint to the session at once. The next autosave (10 s, focus loss, page hide, or leaving through the pause menu) writes it.
+  - The first-call guide stays New Game only.
+- **A reload during steps 1–7.** A new game that hasn't saved yet is a new game again (unchanged: no save until money moves). Once it has saved (from the first fee, at step 7), Continue skips the first call but still shows the cord step and the rest when they come due. `ContinueAfterAnEarlySaveSkipsTheFirstCallButShowsTheCordStep` covers this.
+
+Created:
+- `Assets/Scripts/Domain/Save/ShopHints.cs` (+ `.meta`)
+
+Changed:
+- `Assets/Scripts/Domain/Save/SaveData.cs` (`shopHintsDone`, `ShopHintsMissing`)
+- `Assets/Scripts/Domain/GameSession.cs` (`ShopHintsDone`, `ShopHintsPending`, `MarkShopHintsDone`, saved in `CaptureSave`)
+- `Assets/Scripts/Game/FirstOrderGuideSequence.cs` (step 2 waits for a click; `Profit`/`Clients` stages; `ShopOffer`, `Offer`, the gap, `ShopHintsDone`, `MarkShopHintsDone`, the `firstCall` constructor argument)
+- `Assets/Scripts/Game/FirstOrderGuide.cs` (dark-layer presses instead of `Pointer.current`; `PollShop` for four hints with the start rules; Profit/Clients targets; records done hints; `Bind(..., guideFirstCall)`, `BindShop(..., done, recordDone)`)
+- `Assets/Scripts/Game/GameInstaller.cs` (binds the guide for pending shop hints on Continue)
+- `Assets/Scripts/Game/Views/SpotlightGraphic.cs` (`IPointerDownHandler`, `Pressed`)
+- `Assets/Scripts/Game/Views/TutorialSpotlight.cs` (`DimPressed`; texts `readMessageDone`, `buyProfit`, `buyClients`)
+- `Assets/Prefabs/Game/GameUI.prefab`: the three new texts on `TutorialSpotlight`, edited as text (3 lines added, no Unity re-save)
+- Tests: `Assets/Tests/Domain/SaveSessionTests.cs`, `Assets/Tests/Game/Editor/FirstOrderGuideTests.cs`, `Assets/Tests/Game/Editor/TutorialSpotlightTests.cs`
+- `Docs/Design.md` (5.12 "Saved too", the 6.2 table row), `Docs/Progress.md` (this report)
+
+Scene and prefab changes: `GameUI.prefab` as above. `Final.unity` and `MainMenu.unity` are unchanged.
+
+Tests: 638/638 EditMode (was 624). New or changed:
+- `SaveSessionTests`: `ANewGameHasSeenNoShopHintAndASaveKeepsTheOnesDone`, `ASaveFromBeforeShopHintsWereSavedCountsThemAllDone` (parses JSON without the field), `ASessionWithoutTheTutorialHasNoShopHints`.
+- `FirstOrderGuideTests`:
+  - New: `TheMessageWaitsForAClickOnceTypedAndAnEarlyClickIsSwallowed`, `ProfitAndClientsWaitForTheFirstCallAndComeOneAtATimeWithAGap`, `AnOwnedOrUnsoldUpgradeNeverGetsItsHint`, `ContinueSkipsTheFirstCallAndShowsOnlyTheHintsNotDone`.
+  - The main flow now runs through Profit and Clients.
+  - Skip and call-ending cases now include the new stages.
+  - Changed on purpose: step 9 and "no cord or no mystery" now return to normal play while Profit or Clients are still to come. The old API calls became `Offer`.
+- `TutorialSpotlightTests`, in the real `Final` scene:
+  - `ANewGame...`: step 2 waits after typing, a press during typing and a press inside the guard do nothing, and the advancing press changes nothing else (call state, book, cord). It also checks that a new game has no done hints.
+  - `MoreProfitThenMoreClientsFollowTheCordStepsOnceEachEvenWithMoneyFromTheStart`: money from step 1 on; cord, then mystery, gap, Profit (dismissed, not bought), gap, Clients (bought); Complete; the session holds All; never again.
+  - `ContinueShowsAPendingHintOnlyWithTheBookShutNoCordInHandAndNotPaused`
+  - `ContinueAfterAnEarlySaveSkipsTheFirstCallButShowsTheCordStep`
+  - `ADoneOrBoughtHintNeverComesBackAfterAReload`
+  - `ALoadedGameHasNoTutorial` now also asserts an old save means all hints done.
+  - `TheDarkLayerSwallowsClicks...`: the only down handler on `Dim` and its parents is `Dim` itself.
+
+Console: clean (only Unity's "Ignoring depth surface ... memoryless" lines from Play Mode).
+
+Play Mode check (from `MainMenu` at 1920×1080; frames driven with `EditorApplication.Step`; clicks as EventSystem raycasts plus `CableInputController.ProcessPointer` in `Canvas.willRenderCanvases` handlers):
+- **New Game.** The menu's New Game button loaded `Final`, with the tutorial on and no done hints. The card click hit `Portrait`.
+- **Step 2.** The text finished at about 1.7 s, and the hint switched to "... Click to continue." The step was still on TaskText more than 2 s of game time later.
+- **The advancing click.** A raycast click on the bubble had `Dim` as its top hit and down handler, and no click handler. The guide moved to Book, the call stayed Taken, the book stayed shut and no cord left the tray.
+- **Dev money during the guide.** I added +$10 (the dev panel's `Wallet.Earn(1000)`) during step 3. Steps 3–7 went on undisturbed (`BookShortcut`, `OpenBook`, `StoredCable_01`, `Socket_A1`, `Socket_B3` were the top hits). No shop hint came up during the first call.
+- **Shop hints in order.**
+  - After step 7 came step 8 (More Cables), though Profit and Clients were affordable too. It was bought through its `Buy button`, and step 9 followed at once and ended by time.
+  - 1.5 s later More Profit showed. A click on empty board hit `Dim`, dismissed it and bought nothing, and the session recorded Profit as done.
+  - 1.5 s later More Clients showed.
+- **Reload with a pending hint.** I left More Clients showing and went Pause, then Main menu. The save then held `"shopHintsDone":7`. Continue: `IsTutorial` false, 3 calls at once, and More Clients came back without More Profit. I bought it through its button: Complete, the guide off, and the hints All.
+- **Reload with every hint done.** Main menu, then Continue again: the save held `15`, no guide was bound, the spotlight was off and 4 calls came at once.
+- Screenshots in `Temp/Captures/`: `step-10-fix2-read.png` (step 2 waiting), `step-10-fix2-profit.png`, `step-10-fix2-clients.png`, `step-10-fix2-continue-clients.png` (the pending hint after Continue).
+
+Housekeeping:
+- **The lead's keys.** `operator.save` and `operator.save.backup` (183 chars each, present this time) and `Switchboard.AudioPatch.v1` were kept in SessionState, deleted for the run and then restored exactly; all three were compared. The SessionState keys are erased. The lead's restored save predates this field, so their next Continue counts every shop hint as done (as specified).
+- **Editor state.**
+  - `Time.timeScale` is back to 1 (×5 during two waits).
+  - The Game view is at 1920×1080.
+  - The stepper and click handlers removed themselves.
+  - The dynamic font atlases and "SDF Static" materials were cleared in memory: no font, `TimeManager.asset` or `ProjectSettings.asset` changes.
+  - `Final.unity` is active and not dirty. Unity was idle and out of Play Mode when I started, and is again.
+- Nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+1. **Typing speed is unchanged:** `CallCardView` types at 40 characters a second, so the first message (69 characters) takes about 1.7 s. That is fast, but no longer a problem, because step 2 now waits for the click.
+2. **Which clicks count.** "A click anywhere" means a press the dark layer swallows. A press on Skip, the pause button or a lit target doesn't count. This also changed steps 7 and 9: a press on the pause button no longer dismisses them.
+3. **The start rules now cover the cord step too.** The rules for a hint to come up (not paused, book shut, no cord in hand) apply to steps 8–9 as well as Profit and Clients. Before, step 8 checked only the book.
+4. **Profit and Clients don't wait for an unaffordable cord.** If the cord is too expensive while More Profit is affordable, Profit may show first. With today's Economy.json the cord (25¢) is always affordable first. "Not while steps 8–9 are running" holds: only one hint shows at a time.
+5. **Skip ends the remaining shop hints for good**, More Profit and More Clients included. So does the guided call ending before it connects. This matches fix pass 1, where Skip ended steps 8–9. The Skip button also shows during the shop hints on Continue.
+6. **A done hint is saved at the next autosave.** It is recorded in the session at once, and written within 10 s, on focus loss, on page hide, or when leaving through the pause menu. A bought upgrade never gets its hint anyway (it is owned).
+7. **No save version bump.** The `-1` initializer marks a missing field (Plan §4, "Missing JSON fields"), so `SaveData.CurrentVersion` stays 1.
+
+Follow-ups:
+- Design.md: the D57 status ("fix pass 2 building") is for the orchestrator to update. I updated 5.12 and the 6.2 table, which list the saved fields (4.4 doesn't).
+- The Profit and Clients hints sit over the board's top-right jacks, like step 8's. If the lead prefers the hints beside the shop, they can get an anchor there.
+- `TutorialSpotlightTests` rely on `Time.deltaTime` being 0.33 in EditMode: one `LateUpdate` stays inside the 0.5 s and 0.6 s guards. If a later Unity version changes that, give the guide a test hook for time.
+
+### Web start: no Unity splash, loading until the menu is drawn (2026-10-20)
+Result: done
+Playable now: the Web build opens with no "Made with Unity" splash. Our dark loading cover ("Operator!" and the gold bar) fills the window, phones included. When the download ends the bar is full and "Starting..." appears under it. The cover fades out (0.3 s) only once the main menu has drawn its first frame, so there is no black gap. If the game's signal never came, the page would lift the cover 8 s after Unity's loader finishes. There is no "Click to play" button (lead's decision). The build also carries the uncommitted Step 10 fix pass 2 (reading pace, shop hints).
+How to test: open the itch Draft page (build **#2168919**), press Run game, and watch the start: bar, "Starting...", then the menu fades in with no Unity logo and no black frame. Try it on a phone too.
+
+Created:
+- `Assets/Scripts/Game/PageReady.cs` (+ `.meta`): `Switchboard.Game.PageReady`. Its `Start` coroutine waits one frame, then `WaitForEndOfFrame`, then tells the page once per page load (a static flag, reset at `SubsystemRegistration`). In the editor and desktop builds it does nothing.
+- `Assets/Scripts/Game/GameReady.jslib` (+ `.meta`): `OperatorPage_GameReady` calls `window.operatorGameReady()` if the page defines it. Its importer is Unity's default for `.jslib` (Web only), like the other two plugins. I kept it next to its C# script, as `SystemPointer.jslib` and `BrowserStorage.jslib` are, rather than in `Assets/Plugins/WebGL/`.
+
+Changed:
+- `ProjectSettings/ProjectSettings.asset`: `m_ShowUnitySplashScreen` and `m_ShowUnitySplashLogo` 1 → 0, set through `PlayerSettings.SplashScreen.show`/`showUnityLogo` and saved. Unity accepted it on Personal. The diff is just those two lines: no Unity Cloud link, and `preloadedAssets` stays `[]`.
+- `Assets/WebGLTemplates/Operator/index.html`:
+  - The bar now sits in a full-window `#unity-loading-cover`, with a new `#unity-loading-status` line.
+  - `showProgress` maps Unity's 0–0.9 download progress to a full bar and shows "Starting..." from 0.9 on.
+  - `window.operatorGameReady = liftCover` is defined before the loader runs, so an early signal also works.
+  - `then` no longer hides the bar. It shows it full and starts the 8 s fallback (`setTimeout(liftCover, coverFallbackMs)`).
+  - `liftCover` runs once. It turns off pointer events, fades the opacity to 0, then sets `display: none` after 0.4 s.
+  - Unity's error banner (z-index 10) still shows above the cover (z-index 5).
+- `Assets/WebGLTemplates/Operator/TemplateData/style.css`:
+  - `#unity-loading-cover`: fixed, fills the window, `#15110d`, opacity transition 0.3 s.
+  - `#unity-loading-status`: small, muted serif.
+- `Assets/Scenes/MainMenu.unity`: a new root object `PageReady` with the component. Unity's save also dropped four stale `HandCursorGraphic` texture fields and re-wrapped the credits text, so I reverted the scene and inserted only the new object and its `SceneRoots` entry as text (45 lines added, nothing else).
+- `Assets/Tests/Game/Editor/WebBuildTests.cs` (below).
+- Docs:
+  - `Docs/WebBuild.md`: new section "What players see while it loads".
+  - `Docs/Design.md`: the 9b status row, one sentence.
+  - `Docs/Plan.md` §8: "Menu leftovers" notes that the sound-length line is still there. "Web build leftovers" notes the font gap below.
+  - `Docs/Plan.md` §4: "Checking a Web build" notes that the Chrome extension couldn't reach the local server.
+  - `Docs/Progress.md`: this report.
+
+Scene and prefab changes: `MainMenu.unity` as above. `Final.unity` and the prefabs are unchanged.
+
+Tests: 642/642 EditMode (was 638). New:
+- `TheCommittedPlayerSettingsHaveNoUnitySplash`: checks the API and the asset's two lines.
+- `TheLoadingCoverWaitsForTheGameWithAFallback`: checks the template has the cover, `createUnityInstance`, the ready hook and the fallback timeout, and no longer hides the bar in `then`. It also checks that the jslib calls the hook and `PageReady.cs` calls the jslib.
+- `TheMainMenuSignalsThePageWhenItIsDrawn`: `MainMenu` is the first build scene and depends on `PageReady.cs`.
+- `TheBrowserPluginIsForWebPlayersOnly(GameReady.jslib)`: a new case.
+
+Console: clean.
+
+Build and publish:
+- `Build Web: done in 2.2 min. The build is in Builds/Web (27.5 MB).`
+- `butler push` uploaded 27.46 MiB. `butler status` shows `html5` at build **#2168919** (from #2168670), version 9, processed ✓. The page is still a Draft.
+
+Leftovers after the build:
+- `git status` showed `Boecklins Universe SDF.asset` (+72/−8 glyph lines) and the two `SDF Static` materials (`_ScaleRatio`).
+- Cause: I ran the EditMode tests right before the build. The tests filled the dynamic fonts in memory, and `WebBuild` saves *before* it snapshots, so its restore kept the filled version. The Static materials aren't in its list at all.
+- I discarded all three with `git checkout --`, force-reimported the four font assets and cleared the dirty Della Respira atlas in memory. A later `AssetDatabase.SaveAssets` wrote nothing.
+- No URP, `TimeManager.asset`, `preloadedAssets` or Cloud-link changes.
+
+Browser check:
+- **The Chrome extension was connected but couldn't reach the local server.** Both `127.0.0.1:8000` and `localhost:8000` gave Chrome's offline page, and the server logged no request from it. I closed its tab.
+- `curl`: `index.html` and the four `Build/` files returned 200.
+- Instead I used headless Chrome (SwiftShader) over CDP, as in 9b. It watched `window.operatorGameReady`, the cover's style and the status line, and took screenshots.
+- **1280×720:**
+  - "Starting..." at 2.68 s (download done).
+  - Loader `then` at 4.79 s.
+  - **The game's ready call at 5.08 s.** The cover faded at once and was `display: none` at 5.48 s.
+  - The fallback wasn't needed.
+- **844×390 with mobile emulation:** the same order (then 5.01 s, ready 5.30 s). The cover filled the screen.
+- Every captured frame before the ready call showed the cover; the first one after it showed the menu. No Unity logo appeared. The frames were about 0.15–0.6 s apart, so a single black frame between captures can't be ruled out by screenshots alone. The cover being opaque until the ready call is what rules it out.
+- Console: no warnings or errors. Only the known "Trying to get length of sound which is not loaded yet." log line (Plan §8, "Menu leftovers").
+- I stopped the server and headless Chrome. Screenshots in `Temp/Captures/`: `web-start-cover.png`, `web-start-menu.png`, `web-start-cover-phone.png`, `web-start-menu-phone.png`.
+
+Housekeeping:
+- I never entered Play Mode, so the lead's save keys weren't touched.
+- The editor is idle and out of Play Mode, on the Web platform. `Final.unity` is active and not dirty, and the console is clean.
+- Nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+1. The jslib lives at `Assets/Scripts/Game/GameReady.jslib`, next to `PageReady.cs`, matching the existing plugins. The brief's `Assets/Plugins/WebGL/` path was only an example.
+2. "Starting..." starts at 90% progress (Unity's end of download). Unity's own 1.0 comes only when the player is running.
+
+Follow-ups:
+- `WebBuild` could snapshot the restored files *before* its save, and add the two `SDF Static` materials to `RestoredFiles`. Then a build right after a test run wouldn't keep the test glyphs (Plan §8).
+- The lead could check the start on the real itch page, on a desktop and a phone, especially on the external display.

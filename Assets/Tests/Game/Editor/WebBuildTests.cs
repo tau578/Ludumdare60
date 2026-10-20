@@ -16,6 +16,9 @@ namespace Switchboard.Game.Tests
         private const string Jslib = "Assets/Scripts/Game/Save/BrowserStorage.jslib";
         private const string PointerJslib = "Assets/Scripts/UI/SystemPointer.jslib";
         private const string PointerScript = "Assets/Scripts/UI/SystemPointer.cs";
+        private const string ReadyJslib = "Assets/Scripts/Game/GameReady.jslib";
+        private const string ReadyScript = "Assets/Scripts/Game/PageReady.cs";
+        private const string MainMenuScene = "Assets/Scenes/MainMenu.unity";
 
         private sealed class MemoryStorage : ISaveStorage
         {
@@ -120,6 +123,38 @@ namespace Switchboard.Game.Tests
             Assert.That(html, Does.Not.Contain("unity-footer"));
         }
 
+        // 2026-10-20: the lead turned the "Made with Unity" splash off; the page's own loading screen is the only one.
+        [Test]
+        public void TheCommittedPlayerSettingsHaveNoUnitySplash()
+        {
+            Assert.That(PlayerSettings.SplashScreen.show, Is.False);
+            Assert.That(PlayerSettings.SplashScreen.showUnityLogo, Is.False);
+            string settings = File.ReadAllText("ProjectSettings/ProjectSettings.asset");
+            Assert.That(settings, Does.Contain("m_ShowUnitySplashScreen: 0"));
+            Assert.That(settings, Does.Contain("m_ShowUnitySplashLogo: 0"));
+        }
+
+        [Test]
+        public void TheLoadingCoverWaitsForTheGameWithAFallback()
+        {
+            string html = File.ReadAllText(TemplateIndex);
+            Assert.That(html, Does.Contain("createUnityInstance"));
+            Assert.That(html, Does.Contain("id=\"unity-loading-cover\""));
+            Assert.That(html, Does.Contain("window.operatorGameReady = liftCover"), "the game's ready hook");
+            Assert.That(html, Does.Contain("setTimeout(liftCover, coverFallbackMs)"), "nobody is stuck if the signal never comes");
+            Assert.That(html, Does.Not.Contain("#unity-loading-bar\").style.display = \"none\""),
+                "the cover must not drop as soon as the loader finishes");
+            Assert.That(File.ReadAllText(ReadyJslib), Does.Contain("window.operatorGameReady()"));
+            Assert.That(File.ReadAllText(ReadyScript), Does.Contain("OperatorPage_GameReady"));
+        }
+
+        [Test]
+        public void TheMainMenuSignalsThePageWhenItIsDrawn()
+        {
+            Assert.That(WebBuild.EnabledScenes()[0], Is.EqualTo(MainMenuScene), "the first scene a player sees");
+            Assert.That(AssetDatabase.GetDependencies(MainMenuScene, false), Does.Contain(ReadyScript));
+        }
+
         [Test]
         public void TheBuildListIsMainMenuThenFinal()
         {
@@ -161,6 +196,7 @@ namespace Switchboard.Game.Tests
 
         [TestCase(Jslib)]
         [TestCase(PointerJslib)]
+        [TestCase(ReadyJslib)]
         public void TheBrowserPluginIsForWebPlayersOnly(string path)
         {
             var importer = (PluginImporter)AssetImporter.GetAtPath(path);

@@ -19,10 +19,14 @@
   <body>
     <!-- Operator template (Step 9b): the canvas fills the window and follows its size; no footer, no logo. -->
     <canvas id="unity-canvas" tabindex="-1"></canvas>
-    <div id="unity-loading-bar">
-      <div id="unity-loading-title">Operator!</div>
-      <div id="unity-progress-bar-empty">
-        <div id="unity-progress-bar-full"></div>
+    <!-- The cover hides the canvas until the game says its first menu frame is drawn (window.operatorGameReady). -->
+    <div id="unity-loading-cover">
+      <div id="unity-loading-bar">
+        <div id="unity-loading-title">Operator!</div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+        <div id="unity-loading-status">&nbsp;</div>
       </div>
     </div>
     <div id="unity-warning"> </div>
@@ -79,13 +83,33 @@
 #endif
       document.querySelector("#unity-loading-bar").style.display = "block";
 
+      // The cover stays up after createUnityInstance resolves: Unity can still show a frame or two of black before
+      // the menu draws. GameReady.jslib calls window.operatorGameReady() once the menu's first frame is on screen;
+      // the fallback lifts the cover anyway in case that signal never comes.
+      var coverFallbackMs = 8000;
+      var cover = document.querySelector("#unity-loading-cover");
+      var coverLifted = false;
+      function liftCover() {
+        if (coverLifted) return;
+        coverLifted = true;
+        cover.style.pointerEvents = "none";
+        cover.style.opacity = "0";
+        setTimeout(() => { cover.style.display = "none"; }, 400);
+      }
+      window.operatorGameReady = liftCover;
+
+      // Unity reports 0-0.9 while downloading and 1 once the player runs, so the bar is full when the download ends.
+      function showProgress(progress) {
+        document.querySelector("#unity-progress-bar-full").style.width = Math.min(100, 100 * progress / 0.9) + "%";
+        if (progress >= 0.9) document.querySelector("#unity-loading-status").textContent = "Starting...";
+      }
+
       var script = document.createElement("script");
       script.src = loaderUrl;
       script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
-        }).then((unityInstance) => {
-          document.querySelector("#unity-loading-bar").style.display = "none";
+        createUnityInstance(canvas, config, showProgress).then((unityInstance) => {
+          showProgress(1);
+          setTimeout(liftCover, coverFallbackMs);
 #if SHOW_DIAGNOSTICS
           document.getElementById("diagnostics-icon").onclick = () => {
             unityDiagnostics.openDiagnosticsDiv(unityInstance.GetMetricsInfo);
