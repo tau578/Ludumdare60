@@ -82,6 +82,10 @@ namespace Switchboard.Game
             goalPanel.Bind(Session.Goal);
             loopRunner.Bind(Session);
             if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls);
+            // Faster lookup (D58): callers' jacks light up, and a book row marks its jack.
+            var lights = GetComponent<CallerJackLights>();
+            if (lights == null) lights = gameObject.AddComponent<CallerJackLights>();
+            lights.Bind(callQueue, Session.Desk, bookView, sockets, LevelScene.FindAll<CableInputController>(scene).Find(c => c != null));
             // The first-call guide (D57) runs only on a new game; the session decides, so the one-call start agrees.
             // The shop hints the save hasn't shown yet come on Continue too (fix 2).
             List<TutorialSpotlight> spotlights = LevelScene.FindAll<TutorialSpotlight>(scene);

@@ -20,17 +20,27 @@ namespace Switchboard.Game.Tests
             Assert.That(guide.IsTaskTextRead, Is.True);
             guide.Tick(FirstOrderGuideSequence.ReadClickDelay);
             guide.AnyClick();
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.CallerJack), "10b fix 1: the caller's blinking jack");
+            Assert.That(guide.IsGuiding && !guide.IsFirstCallOver, Is.True);
+            guide.Tick(FirstOrderGuideSequence.ReadClickDelay);
+            guide.AnyClick();
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Book));
             guide.BookChanged(true);
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.ReadingBook));
             guide.BookChanged(false);
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Cables));
             guide.CablePickedUp();
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Plugging));
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.PluggingCaller), "10b fix 2: step 7a, the caller's jack");
             guide.CablePickedUp();
             guide.CordsOut(true);
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Plugging), "moving a plug keeps the step");
-            Assert.That(guide.IsFirstCallOver, Is.False);
+            guide.CallerJackPlugged(false);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.PluggingCaller), "moving a cord keeps the step");
+            guide.CallerJackPlugged(true);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.PluggingRecipient), "step 7b, the found jack");
+            guide.CordsOut(true);
+            guide.CallerJackPlugged(true);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.PluggingRecipient));
+            Assert.That(guide.IsGuiding && guide.IsPlugging && !guide.IsFirstCallOver, Is.True);
             guide.FirstOrderConnected();
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Connected));
             Assert.That(guide.IsGuiding && guide.IsFirstCallOver, Is.True);
@@ -41,7 +51,7 @@ namespace Switchboard.Game.Tests
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.BuyCord));
             Assert.That(guide.IsGuiding, Is.True);
             Poll(guide, ShopOffer.Owned);
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Mystery), "step 9 follows the purchase at once");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Mystery), "the mystery step follows the purchase at once");
             guide.Tick(FirstOrderGuideSequence.MysterySeconds);
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.WaitingForShop));
             Poll(guide, ShopOffer.Owned, profit: ShopOffer.Affordable, clients: ShopOffer.Affordable);
@@ -113,7 +123,7 @@ namespace Switchboard.Game.Tests
             var guide = At(FirstOrderGuideStage.WaitingForShop);
             Poll(guide, ShopOffer.NotForSale, ShopOffer.Affordable);
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.WaitingForShop), "More Profit and More Clients may follow");
-            Assert.That(guide.ShopHintsDone, Is.EqualTo(ShopHints.Cord | ShopHints.Mystery), "no cord to sell: no step 9 either");
+            Assert.That(guide.ShopHintsDone, Is.EqualTo(ShopHints.Cord | ShopHints.Mystery), "no cord to sell: no step 10 either");
             Poll(guide, ShopOffer.NotForSale, ShopOffer.Affordable, ShopOffer.NotForSale, ShopOffer.NotForSale);
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Complete), "nothing left to show");
             guide = At(FirstOrderGuideStage.BuyCord);
@@ -133,10 +143,16 @@ namespace Switchboard.Game.Tests
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Cables));
             guide.CablePickedUp();
             guide.BookChanged(true);
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.ReadingBook), "from Plug the jacks");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.ReadingBook), "from the caller's jack");
             guide.CordsOut(true);
             guide.BookChanged(false);
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Plugging));
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.PluggingCaller));
+            guide.CallerJackPlugged(true);
+            guide.BookChanged(true);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.ReadingBook), "from the found jack");
+            guide.CallerJackPlugged(true);
+            guide.BookChanged(false);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.PluggingRecipient));
             guide.BookChanged(true);
             guide.CordsOut(false);
             guide.BookChanged(false);
@@ -150,13 +166,46 @@ namespace Switchboard.Game.Tests
             guide.CordsOut(false);
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Cables));
             guide.CablePickedUp();
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Plugging));
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.PluggingCaller));
+            guide.CallerJackPlugged(true);
+            guide.CordsOut(false);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Cables), "from step 7b too");
+        }
+
+        [Test]
+        public void PluggingGoesOneJackAtATimeCallerFirst()
+        {
+            var guide = Plugging();
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.PluggingCaller));
+            guide.AnyClick(); guide.Tick(60);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.PluggingCaller), "only the plug moves it on");
+            guide.CallerJackPlugged(true);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.PluggingRecipient));
+            guide.AnyClick(); guide.Tick(60);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.PluggingRecipient), "only the connection ends it");
+            guide.CallerJackPlugged(false);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.PluggingCaller), "the caller's plug came out: 7a again");
+            guide.CallerJackPlugged(true);
+            guide.FirstOrderConnected();
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Connected));
+            guide.CallerJackPlugged(false);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Connected), "the plug only counts while plugging");
+
+            foreach (FirstOrderGuideStage stage in new[] { FirstOrderGuideStage.CallerJack, FirstOrderGuideStage.ReadingBook,
+                         FirstOrderGuideStage.Cables })
+            {
+                var early = At(stage);
+                early.CallerJackPlugged(true);
+                Assert.That(early.Stage, Is.EqualTo(stage), "a plug in the caller's jack skips nothing");
+            }
         }
 
         [TestCase(FirstOrderGuideStage.Portrait)]
         [TestCase(FirstOrderGuideStage.TaskText)]
+        [TestCase(FirstOrderGuideStage.CallerJack)]
         [TestCase(FirstOrderGuideStage.ReadingBook)]
-        [TestCase(FirstOrderGuideStage.Plugging)]
+        [TestCase(FirstOrderGuideStage.PluggingCaller)]
+        [TestCase(FirstOrderGuideStage.PluggingRecipient)]
         [TestCase(FirstOrderGuideStage.Connected)]
         [TestCase(FirstOrderGuideStage.WaitingForShop)]
         [TestCase(FirstOrderGuideStage.BuyCord)]
@@ -170,17 +219,20 @@ namespace Switchboard.Game.Tests
             guide.Skip();
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Cancelled));
             Assert.That(guide.IsOver, Is.True);
-            guide.BookChanged(false); guide.CablePickedUp(); guide.FirstOrderConnected(); guide.CordsOut(false);
+            guide.BookChanged(false); guide.CablePickedUp(); guide.CallerJackPlugged(true); guide.FirstOrderConnected();
+            guide.CordsOut(false);
             Poll(guide, ShopOffer.Affordable); Poll(guide, ShopOffer.Owned, profit: ShopOffer.Affordable);
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Cancelled));
             Assert.That(guide.ShopHintsDone, Is.EqualTo(ShopHints.All), "skipping skips the shop hints too");
         }
 
         [TestCase(FirstOrderGuideStage.Portrait, FirstOrderGuideStage.Cancelled)]
+        [TestCase(FirstOrderGuideStage.CallerJack, FirstOrderGuideStage.Cancelled)]
         [TestCase(FirstOrderGuideStage.Book, FirstOrderGuideStage.Cancelled)]
         [TestCase(FirstOrderGuideStage.ReadingBook, FirstOrderGuideStage.Cancelled)]
         [TestCase(FirstOrderGuideStage.Cables, FirstOrderGuideStage.Cancelled)]
-        [TestCase(FirstOrderGuideStage.Plugging, FirstOrderGuideStage.Cancelled)]
+        [TestCase(FirstOrderGuideStage.PluggingCaller, FirstOrderGuideStage.Cancelled)]
+        [TestCase(FirstOrderGuideStage.PluggingRecipient, FirstOrderGuideStage.Cancelled)]
         [TestCase(FirstOrderGuideStage.Connected, FirstOrderGuideStage.WaitingForShop)]
         [TestCase(FirstOrderGuideStage.BuyCord, FirstOrderGuideStage.BuyCord)]
         [TestCase(FirstOrderGuideStage.Mystery, FirstOrderGuideStage.Mystery)]
@@ -198,6 +250,7 @@ namespace Switchboard.Game.Tests
         // Fix 1: the tutorial is mandatory, so acting ahead can't happen; an out-of-step event changes nothing.
         [TestCase(FirstOrderGuideStage.Portrait)]
         [TestCase(FirstOrderGuideStage.TaskText)]
+        [TestCase(FirstOrderGuideStage.CallerJack)]
         [TestCase(FirstOrderGuideStage.Book)]
         [TestCase(FirstOrderGuideStage.Cables)]
         public void OutOfStepEventsNeitherSkipNorEndTheGuide(FirstOrderGuideStage stage)
@@ -227,14 +280,31 @@ namespace Switchboard.Game.Tests
             guide.TaskTextFinished();
             guide.Tick(FirstOrderGuideSequence.ReadClickDelay * .5f);
             guide.AnyClick();
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Book), "the guard runs from the end of the text, once");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.CallerJack), "the guard runs from the end of the text, once");
+        }
+
+        [Test]
+        public void TheCallersJackStepWaitsForAClickAfterAShortGuard()
+        {
+            var guide = At(FirstOrderGuideStage.CallerJack);
+            guide.AnyClick();
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.CallerJack), "the click that read the message");
+            guide.Tick(FirstOrderGuideSequence.ReadClickDelay * .5f);
+            guide.AnyClick();
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.CallerJack), "a double-click is swallowed");
+            guide.Tick(60);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.CallerJack), "it never moves on by itself");
+            guide.BookChanged(true);
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.CallerJack), "the book is not this step's");
+            guide.AnyClick();
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Book));
         }
 
         [Test]
         public void ProfitAndClientsWaitForTheFirstCallAndComeOneAtATimeWithAGap()
         {
-            foreach (FirstOrderGuideStage stage in new[] { FirstOrderGuideStage.Portrait, FirstOrderGuideStage.Plugging,
-                         FirstOrderGuideStage.Connected })
+            foreach (FirstOrderGuideStage stage in new[] { FirstOrderGuideStage.Portrait, FirstOrderGuideStage.PluggingCaller,
+                         FirstOrderGuideStage.PluggingRecipient, FirstOrderGuideStage.Connected })
             {
                 var during = At(stage);
                 Poll(during, ShopOffer.Affordable, profit: ShopOffer.Affordable, clients: ShopOffer.Affordable);
@@ -300,7 +370,7 @@ namespace Switchboard.Game.Tests
 
             guide = new FirstOrderGuideSequence(ShopHints.Cord, firstCall: false);
             Poll(guide, ShopOffer.Owned, profit: ShopOffer.Affordable);
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Mystery), "a reload during step 9 shows it again");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Mystery), "a reload during step 10 shows it again");
         }
 
         [Test]
@@ -330,10 +400,16 @@ namespace Switchboard.Game.Tests
             guide.AnyClick();
         }
 
+        private static void SeeCallerJack(FirstOrderGuideSequence guide)
+        {
+            guide.Tick(FirstOrderGuideSequence.ReadClickDelay);
+            guide.AnyClick();
+        }
+
         private static FirstOrderGuideSequence BookRead()
         {
             var guide = Accepted();
-            ReadMessage(guide); guide.BookChanged(true); guide.BookChanged(false);
+            ReadMessage(guide); SeeCallerJack(guide); guide.BookChanged(true); guide.BookChanged(false);
             return guide;
         }
 
@@ -352,13 +428,17 @@ namespace Switchboard.Game.Tests
             guide.FirstPortraitClicked();
             if (stage == FirstOrderGuideStage.TaskText) return guide;
             ReadMessage(guide);
+            if (stage == FirstOrderGuideStage.CallerJack) return guide;
+            SeeCallerJack(guide);
             if (stage == FirstOrderGuideStage.Book) return guide;
             guide.BookChanged(true);
             if (stage == FirstOrderGuideStage.ReadingBook) return guide;
             guide.BookChanged(false);
             if (stage == FirstOrderGuideStage.Cables) return guide;
             guide.CablePickedUp();
-            if (stage == FirstOrderGuideStage.Plugging) return guide;
+            if (stage == FirstOrderGuideStage.PluggingCaller) return guide;
+            guide.CallerJackPlugged(true);
+            if (stage == FirstOrderGuideStage.PluggingRecipient) return guide;
             guide.FirstOrderConnected();
             if (stage == FirstOrderGuideStage.Connected) return guide;
             guide.Tick(FirstOrderGuideSequence.ConnectedSeconds);

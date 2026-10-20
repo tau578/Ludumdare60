@@ -8,9 +8,10 @@ using UnityEngine;
 namespace Switchboard.Game
 {
     /// <summary>
-    /// The tutorial (D57) with the spotlight. A new game guides the first call: the caller, their message, the book, both
-    /// jacks in the book, a cord, both jacks on the board, the money. Then the shop hints, each once: buying the first
-    /// extra cord, a look at the mystery upgrade, More Profit and More Clients (fix 2). Continue gets only the shop hints
+    /// The tutorial (D57) with the spotlight. A new game guides the first call: the caller, their message, the caller's
+    /// blinking jack (10b fix 1), the book, the recipient's row in the book (clicking it marks the jack, D58), a cord,
+    /// the caller's jack and then the found jack, one at a time (10b fix 2), the money. Then the shop hints, each once: buying the first extra cord, a look at the
+    /// mystery upgrade, More Profit and More Clients (fix 2). Continue gets only the shop hints
     /// its save hasn't seen. Each step lets only its own target take clicks (fix 1).
     /// </summary>
     public sealed class FirstOrderGuide : MonoBehaviour
@@ -76,7 +77,7 @@ namespace Switchboard.Game
         }
 
         /// <summary>
-        /// The shop hints: the first extra cord (step 8) and the mystery upgrade (9), then the first More Profit and
+        /// The shop hints: the first extra cord (step 9) and the mystery upgrade (10), then the first More Profit and
         /// More Clients, each once it is affordable. Each chain's first entry comes from Economy.json.
         /// </summary>
         /// <param name="done">The hints the save has already shown; they never come back.</param>
@@ -166,6 +167,7 @@ namespace Switchboard.Game
             AdvanceText();
             if (firstCall != null && firstCall.State == CallState.Connected) sequence.FirstOrderConnected();
             sequence.CordsOut(AnyCordOut());
+            if (firstCall != null) sequence.CallerJackPlugged(IsOccupied(firstCall.Request.From));
             // Game time, so the pause menu holds the timed steps, the click guards and the gap between shop hints.
             sequence.Tick(Time.deltaTime);
             if (sequence.IsFirstCallOver && !sequence.IsOver) PollShop();
@@ -220,6 +222,8 @@ namespace Switchboard.Game
                 if (cable != null && cable.gameObject.activeInHierarchy && !cable.IsInTray) return true;
             return false;
         }
+
+        private bool IsOccupied(JackId jack) => sockets.TryGetValue(jack.Label, out SocketView socket) && socket.IsOccupied;
 
         private int TrayCordCount()
         {
@@ -282,16 +286,23 @@ namespace Switchboard.Game
                     text = sequence.IsTaskTextRead ? texts.readMessageDone : texts.readMessage;
                     if (firstCard != null) Add(ref count, firstCard.SpeechBubbleRect, 10, clickable: false);
                     break;
+                case FirstOrderGuideStage.CallerJack:
+                    // D58: blinking means a caller's line. Like the message, any click moves on; the jack takes none.
+                    text = texts.callerJack;
+                    AddSocket(ref count, firstCall.Request.From, clickable: false);
+                    break;
                 case FirstOrderGuideStage.Book:
                     text = texts.openBook;
                     if (book != null && book.ClosedBookGraphic != null) Add(ref count, book.ClosedBookGraphic.rectTransform, 12);
                     break;
                 case FirstOrderGuideStage.ReadingBook:
+                    // D58: the board lights the caller's jack, so only the recipient is looked up. Clicking their row
+                    // marks the jack and closes the book; the page corners still turn the pages.
                     text = texts.findJacks;
-                    // The whole open book takes clicks: page corners turn the pages, the rest closes it.
-                    anchor = clickArea = book != null ? book.OpenBookRect : null;
-                    AddBookRow(ref count, firstCall.Request.From);
+                    anchor = book != null ? book.OpenBookRect : null;
                     AddBookRow(ref count, firstCall.Request.To);
+                    AddPageCorner(ref count, -1);
+                    AddPageCorner(ref count, 1);
                     break;
                 case FirstOrderGuideStage.Cables:
                     text = texts.takeCord;
@@ -299,9 +310,13 @@ namespace Switchboard.Game
                         if (cable != null && cable.gameObject.activeInHierarchy && cable.IsInTray && cable.TrayView != null)
                             Add(ref count, (RectTransform)cable.TrayView.transform, 10);
                     break;
-                case FirstOrderGuideStage.Plugging:
-                    text = texts.plugJacks;
+                // One jack at a time (fix 2): first the caller's blinking jack, then the jack found in the book.
+                case FirstOrderGuideStage.PluggingCaller:
+                    text = texts.plugCaller;
                     AddSocket(ref count, firstCall.Request.From);
+                    break;
+                case FirstOrderGuideStage.PluggingRecipient:
+                    text = texts.plugRecipient;
                     AddSocket(ref count, firstCall.Request.To);
                     break;
                 case FirstOrderGuideStage.Connected:
@@ -332,21 +347,32 @@ namespace Switchboard.Game
         {
             if (book == null) return;
             RectTransform row = book.RowOnSpread(jack.Label);
-            if (row != null) { Add(ref count, row, 4, clickable: false); return; }
+            if (row != null) { Add(ref count, row, 4); return; }
             RectTransform corner = book.PageCorner(book.SpreadDirectionTo(jack.Label));
             for (int i = 0; i < count; i++) if (spots[i].Rect == corner) return;
             Add(ref count, corner, 6);
         }
 
-        private void AddSocket(ref int count, JackId jack)
+        // Takes clicks without a light, unless the corner is already lit (it turns to the row).
+        private void AddPageCorner(ref int count, int direction)
         {
-            if (sockets.TryGetValue(jack.Label, out SocketView socket)) Add(ref count, (RectTransform)socket.transform, 8, true);
+            RectTransform corner = book != null ? book.PageCorner(direction) : null;
+            if (corner == null) return;
+            for (int i = 0; i < count; i++) if (spots[i].Rect == corner) return;
+            Add(ref count, corner, 0, lit: false);
         }
 
-        private void Add(ref int count, RectTransform rect, float padding, bool round = false, bool clickable = true)
+        private void AddSocket(ref int count, JackId jack, bool clickable = true)
+        {
+            if (sockets.TryGetValue(jack.Label, out SocketView socket))
+                Add(ref count, (RectTransform)socket.transform, 8, true, clickable);
+        }
+
+        private void Add(ref int count, RectTransform rect, float padding, bool round = false, bool clickable = true,
+            bool lit = true)
         {
             if (rect == null || count >= spots.Length) return;
-            spots[count++] = new SpotlightTarget(rect, padding, round, clickable);
+            spots[count++] = new SpotlightTarget(rect, padding, round, clickable, lit);
         }
 
         private void RecordShopHints()

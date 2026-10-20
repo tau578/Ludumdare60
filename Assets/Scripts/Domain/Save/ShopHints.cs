@@ -3,7 +3,7 @@ using System;
 namespace Switchboard.Domain
 {
     /// <summary>
-    /// The tutorial's shop hints (D57), each shown once: buy the first cord (step 8), the mystery upgrade (step 9),
+    /// The tutorial's shop hints (D57), each shown once: buy the first cord (step 9), the mystery upgrade (step 10),
     /// More Profit and More Clients. The save remembers which are done, so a reload never shows one twice.
     /// </summary>
     [Flags]

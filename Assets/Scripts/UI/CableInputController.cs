@@ -31,12 +31,19 @@ namespace Switchboard.UI
         private bool stackDirty = true;
         private SocketView hoveredSocket;
         private StoredCableView hoveredStoredCable;
+        private PhoneBookView hoveredBookRows;
+        private bool touchPointer;
+        // The tray's spot each cord rests in (-1 while it is out); parallel to cables (fix 2, D58).
+        private int[] traySpots = new int[0];
+        private readonly bool[] spotTaken = new bool[MaxCables];
         private bool cursorWasVisible;
         private bool ownsCursor;
         private bool suspended;
         private int resumedFrame = -1;
         public CableController ActiveCable => Usable(heldCable) ? heldCable : null;
         public CableCursorMode CursorMode { get; private set; }
+        /// <summary>The top hit under a hovering mouse or pen, or null: a finger has no hover (D58 fix 2's card flare).</summary>
+        public GameObject HoverTarget { get; private set; }
 
         /// <summary>
         /// While suspended (the pause menu, D56) clicks neither pick, plug nor drop, and a held cord stays held.
@@ -69,6 +76,8 @@ namespace Switchboard.UI
             cables = inventory;
             handCursor = cursor;
             stackDirty = true;
+            traySpots = new int[0];
+            RefreshTraySpots();
         }
 
         /// <summary>Called before session binding; only unused tray cords may be removed.</summary>
@@ -149,17 +158,64 @@ namespace Switchboard.UI
 
         public static float TrayPreviewScaleFor(int count) => TrayPreviewScale * TraySpacing(count) / TraySlotSpacing;
 
+        /// <summary>The tray spot a cord rests in, or -1 while it is out of the tray.</summary>
+        public int TraySpotOf(CableController cable)
+        {
+            for (int i = 0; i < cables.Length && i < traySpots.Length; i++)
+                if (cables[i] == cable) return traySpots[i];
+            return -1;
+        }
+
+        /// <summary>
+        /// The tray has one spot per cord (lead, 2026-10-20). A cord leaving the tray frees its spot; a cord coming
+        /// back, or a bought one, takes the first free spot from the left. No cord owns a spot, and no spot holds two.
+        /// Polled every LateUpdate and after every click, so any way back to the tray (a refused circuit, a pulled
+        /// plug) is caught.
+        /// </summary>
+        public void RefreshTraySpots()
+        {
+            if (traySpots.Length != cables.Length)
+            {
+                int[] grown = new int[cables.Length];
+                for (int i = 0; i < grown.Length; i++) grown[i] = i < traySpots.Length ? traySpots[i] : -1;
+                traySpots = grown;
+                LayoutTray();
+            }
+            System.Array.Clear(spotTaken, 0, spotTaken.Length);
+            for (int i = 0; i < cables.Length; i++)
+            {
+                int spot = traySpots[i];
+                if (!RestsInTray(cables[i]) || spot >= cables.Length || (spot >= 0 && spotTaken[spot])) traySpots[i] = -1;
+                else if (spot >= 0) spotTaken[spot] = true;
+            }
+            for (int i = 0; i < cables.Length; i++)
+            {
+                if (traySpots[i] >= 0 || !RestsInTray(cables[i])) continue;
+                int spot = 0;
+                while (spot < cables.Length && spotTaken[spot]) spot++;
+                if (spot >= cables.Length) continue;
+                traySpots[i] = spot;
+                spotTaken[spot] = true;
+                // Sizes follow the cord count in LayoutTray; a spot only moves the coil.
+                ((RectTransform)cables[i].TrayView.transform).anchoredPosition = TraySlotPosition(spot, cables.Length);
+            }
+        }
+
+        private static bool RestsInTray(CableController cable) => cable != null && cable.IsInTray && cable.TrayView != null;
+
         private void LayoutTray()
         {
+            if (traySpots.Length != cables.Length) { RefreshTraySpots(); return; }
             for (int i = 0; i < cables.Length; i++)
             {
                 StoredCableView slot = cables[i] != null ? cables[i].TrayView : null;
                 if (slot == null) continue;
                 var rect = (RectTransform)slot.transform;
-                rect.anchoredPosition = TraySlotPosition(i, cables.Length);
                 rect.sizeDelta = TraySlotSize(cables.Length);
                 Transform preview = rect.Find("Preview");
                 if (preview != null) preview.localScale = Vector3.one * TrayPreviewScaleFor(cables.Length);
+                if (traySpots[i] >= 0 && traySpots[i] < cables.Length)
+                    rect.anchoredPosition = TraySlotPosition(traySpots[i], cables.Length);
             }
         }
 
@@ -172,10 +228,12 @@ namespace Switchboard.UI
             cursorWasVisible = SystemPointer.Visible;
             ownsCursor = true;
             stackDirty = true;
+            RefreshTraySpots();
         }
 
         private void LateUpdate()
         {
+            RefreshTraySpots();
             if (stackDirty) Restack();
         }
 
@@ -210,7 +268,8 @@ namespace Switchboard.UI
             if (pointer == null || !Application.isFocused) { HidePointers(); return; }
             bool pressed = pointer.press.wasPressedThisFrame && Time.frameCount != resumedFrame;
             // A finger leaves no hover behind: between taps only a held cord stays where it was last put.
-            bool hover = !(pointer is Touchscreen) || pressed || pointer.press.isPressed;
+            touchPointer = pointer is Touchscreen;
+            bool hover = !touchPointer || pressed || pointer.press.isPressed;
             if (!hover && ActiveCable == null) { HidePointers(); return; }
             ProcessPointer(pointer.position.ReadValue(), pressed, hover);
         }
@@ -230,9 +289,12 @@ namespace Switchboard.UI
         public void ProcessTarget(GameObject target, Camera eventCamera, Vector2 position, bool leftPressed, bool hover = true)
         {
             if (suspended) { HidePointers(); return; }
+            HoverTarget = hover && !touchPointer ? target : null;
+            if (leftPressed) RefreshTraySpots();
             if (target != null && target.GetComponent<IPointerBlocker>() != null)
             {
                 // Blocked (the mandatory tutorial): no pick, plug, drop or return, and no hover on what lies beneath.
+                HoverBookRow(null, position, eventCamera);
                 UpdatePointers(position, null, null, 0, false, hover);
                 return;
             }
@@ -262,11 +324,21 @@ namespace Switchboard.UI
                     heldCable = stored.Cable;
             }
             if (ActiveCable != null && (heldCable.Phase == CablePhase.Ready || heldCable.Phase == CablePhase.Connected)) heldCable = null;
+            if (leftPressed) RefreshTraySpots();
             var clickHandler = target != null ? ExecuteEvents.GetEventHandler<IPointerClickHandler>(target) : null;
             var book = clickHandler != null ? clickHandler.GetComponent<PhoneBookView>() : null;
             int pageTurn = book != null ? book.PageTurnDirectionAt(position, eventCamera) : 0;
+            HoverBookRow(hover && overOpenBook ? hoveredBook : null, position, eventCamera);
             if (hover) UpdatePointers(position, socket, stored, pageTurn, overOpenBook, true);
             else UpdatePointers(position, null, null, 0, overOpenBook, false);
+        }
+
+        // The open book's rows have no raycast target (D58): the book finds the one under the pointer and tints it.
+        private void HoverBookRow(PhoneBookView book, Vector2 position, Camera eventCamera)
+        {
+            if (hoveredBookRows != null && hoveredBookRows != book) hoveredBookRows.ClearHover();
+            hoveredBookRows = book;
+            if (book != null) book.HoverAt(position, eventCamera);
         }
 
         private GameObject Raycast(Vector2 position)
@@ -368,10 +440,12 @@ namespace Switchboard.UI
 
         private void HidePointers()
         {
+            HoverTarget = null;
             if (hoveredSocket != null) hoveredSocket.SetPointerState(false, null);
             hoveredSocket = null;
             if (hoveredStoredCable != null) hoveredStoredCable.SetHighlighted(false);
             hoveredStoredCable = null;
+            HoverBookRow(null, Vector2.zero, null);
             foreach (var cable in cables) if (cable != null) cable.HidePointer();
             if (handCursor != null) handCursor.gameObject.SetActive(false);
             if (ownsCursor) SystemPointer.Visible = cursorWasVisible;

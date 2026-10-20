@@ -26,6 +26,14 @@ namespace Switchboard.Domain
         /// <summary>Cords with exactly one plug in, as reported by the board.</summary>
         public IReadOnlyList<CordId> HalfPatched => halfPatched;
 
+        /// <summary>Whether a free cord's only plug sits in this jack: the operator is patching from it (D58).</summary>
+        public bool HasLoosePlugIn(JackId jack)
+        {
+            foreach (CordId cord in halfPatched)
+                if (remainingJacks.TryGetValue(cord, out JackId plugged) && plugged == jack) return true;
+            return false;
+        }
+
         // Accepting checks existing correct circuits only: a prewired wrong pair is not a new mistake.
         public bool TryTake(CallId id)
         {

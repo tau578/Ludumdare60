@@ -8,21 +8,25 @@ namespace Switchboard.Game
     /// <summary>
     /// One lit place for the tutorial spotlight: a UI rect, grown by some padding, drawn as a rounded rect or a circle.
     /// A clickable one lets clicks through to the target (its own rect, not the padding); the rest only show the way.
+    /// An unlit one only takes clicks: no hole, no arrow (the book's page corners in step 5, D58).
     /// </summary>
     public readonly struct SpotlightTarget
     {
-        public SpotlightTarget(RectTransform rect, float padding = 12f, bool round = false, bool clickable = true)
+        public SpotlightTarget(RectTransform rect, float padding = 12f, bool round = false, bool clickable = true,
+            bool lit = true)
         {
             Rect = rect;
             Padding = padding;
             Round = round;
             Clickable = clickable;
+            Lit = lit;
         }
 
         public RectTransform Rect { get; }
         public float Padding { get; }
         public bool Round { get; }
         public bool Clickable { get; }
+        public bool Lit { get; }
     }
 
     /// <summary>The guide's words, one per step (D57). Plain ASCII only: the static fonts hold nothing else.</summary>
@@ -32,10 +36,12 @@ namespace Switchboard.Game
         [TextArea] public string clickCaller = "A call! Click the caller to answer.";
         [TextArea] public string readMessage = "Read who they want to talk to.";
         [TextArea] public string readMessageDone = "Read who they want to talk to. Click to continue.";
+        [TextArea] public string callerJack = "This blinking light is the caller's line. Now find who they want.";
         [TextArea] public string openBook = "Open the phone book.";
-        [TextArea] public string findJacks = "Find both jacks: the caller's and the one they want. Then click the book to close it.";
+        [TextArea] public string findJacks = "Find who they want and click their name.";
         [TextArea] public string takeCord = "Take a cord.";
-        [TextArea] public string plugJacks = "Plug one end into each jack.";
+        [TextArea] public string plugCaller = "Plug one end into the caller's blinking jack.";
+        [TextArea] public string plugRecipient = "Now plug the other end into the jack you found.";
         [TextArea] public string connected = "Connected! You earn money while they talk.";
         [TextArea] public string buyCord = "You can afford another cord. Buy it to handle two calls at once.";
         [TextArea] public string mystery = "Save up for the mystery upgrade!";
@@ -52,6 +58,8 @@ namespace Switchboard.Game
     public sealed class TutorialSpotlight : MonoBehaviour
     {
         private const int MaxHoles = SpotlightGraphic.MaxHoles;
+        // Within this many units the hint counts as level with a jack, so rounding never picks the diagonal.
+        private const float LevelTolerance = .5f;
 
         [SerializeField] private SpotlightGraphic dim;
         [SerializeField] private RectTransform hint;
@@ -204,7 +212,7 @@ namespace Switchboard.Game
             bool any = false;
             for (int i = 0; i < MaxHoles; i++)
             {
-                goalValid[i] = i < targetCount &&
+                goalValid[i] = i < targetCount && targets[i].Lit &&
                     TryLocalRect(targets[i].Rect, targetCameras[i], targets[i].Padding, out goals[i]);
                 if (goalValid[i])
                 {
@@ -345,13 +353,16 @@ namespace Switchboard.Game
             hintPosition = hintPlaced ? Vector2.Lerp(hintPosition, goal, follow) : goal;
             hintPlaced = true;
             hint.anchoredPosition = hintPosition;
-            PlaceArrow(size, anchored ? outer : (Rect?)null);
+            PlaceArrow(size, goal, anchored ? outer : (Rect?)null);
         }
 
         // The arrow runs from the hint's edge to just outside the nearest lit place; beside an anchor it stops at the
         // anchor's edge (it never crosses the book's text), and a jack gets a short diagonal arrow that lies between
-        // its neighbours instead of on them.
-        private void PlaceArrow(Vector2 hintSize, Rect? anchor)
+        // its neighbours instead of on them. Which place and which way come from where the hint and the holes are
+        // going, not from where they are while they slide (10b fix 3): a jack's hole and the hint level with it end
+        // up at the same height, so the sliding difference crossed zero and the diagonal flipped up and down until
+        // both settled. The arrow then rides on its sliding hole.
+        private void PlaceArrow(Vector2 hintSize, Vector2 hintGoal, Rect? anchor)
         {
             if (arrow == null) return;
             int nearest = -1;
@@ -359,14 +370,14 @@ namespace Switchboard.Game
             for (int i = 0; i < MaxHoles; i++)
             {
                 if (!goalValid[i]) continue;
-                float distance = (goals[i].center - hintPosition).sqrMagnitude;
+                float distance = (goals[i].center - hintGoal).sqrMagnitude;
                 if (distance < best) { best = distance; nearest = i; }
             }
             if (nearest < 0) { arrow.gameObject.SetActive(false); return; }
             Rect hole = holes[nearest];
-            Vector2 toHole = hole.center - hintPosition;
-            if (toHole.sqrMagnitude < 1) { arrow.gameObject.SetActive(false); return; }
-            Vector2 direction = toHole.normalized;
+            Vector2 toGoal = goals[nearest].center - hintGoal;
+            if (toGoal.sqrMagnitude < 1) { arrow.gameObject.SetActive(false); return; }
+            Vector2 direction = toGoal.normalized;
             float bob = pulse * (.5f - .5f * Mathf.Cos(time * Mathf.PI * 2 / pulseSeconds));
             Vector2 tip;
             float length;
@@ -384,8 +395,9 @@ namespace Switchboard.Game
             }
             else if (targets[nearest].Round)
             {
-                // Diagonal, from the hint's quarter: the jacks sit in a grid, so its diagonals are the free gaps.
-                direction = new Vector2(toHole.x > 0 ? 1 : -1, toHole.y > 0 ? 1 : -1).normalized;
+                // Diagonal, from the hint's quarter: the jacks sit in a grid, so its diagonals are the free gaps. A
+                // hint level with the jack (the usual case) points down at it, from above.
+                direction = new Vector2(toGoal.x > 0 ? 1 : -1, toGoal.y > LevelTolerance ? 1 : -1).normalized;
                 tip = hole.center - direction * (Mathf.Min(hole.width, hole.height) * .5f + jackArrowGap);
                 length = jackArrowLength;
             }

@@ -19,6 +19,8 @@
 | 9a. Saves, touch, menu, pause | done | ✅ 2026-10-19 (37 min + 21 min fix + 24 min pause + 15 min corner) | ✅ 503/503 tests, scope clean | ✅ | 580c610 |
 | 9b. First Web build on itch | done | ✅ 2026-10-19 (37 min; cursor fixes discarded) | ✅ 517/517 tests, scope clean | ✅ | 709be9d |
 | 10. Tutorial | playtesting | ✅ 2026-10-20 (33 min + 28 min fix + 21 min fix) | ✅ 638/638 tests, scope clean | | |
+| 10b. Faster lookup | playtesting | ✅ 2026-10-20 (20 min + 15 + 20 + 19 min fixes) | ✅ 671/671 tests, scope clean | | |
+| 10c. Quick tip and notebook | not started | | | | |
 | 11. Sound and feel | not started | | | | |
 | 12. Mobile and Web polish | not started | | | | |
 | 13. Balance | not started | | | | |
@@ -4390,3 +4392,464 @@ Deviations from Design/Plan:
 Follow-ups:
 - `WebBuild` could snapshot the restored files *before* its save, and add the two `SDF Static` materials to `RestoredFiles`. Then a build right after a test run wouldn't keep the test glyphs (Plan §8).
 - The lead could check the start on the real itch page, on a desktop and a phone, especially on the external display.
+
+### Step 10b report: 2026-10-20
+Result: done
+Playable now: every ringing caller's jack blinks softly on the board (a warm lamp in the hole with a glow around it), and the call in hand's caller jack glows steadily and brighter, so only the person they want needs looking up. Clicking a name in the open book closes the book and marks that jack with the same steady glow. The tutorial's step 4 now lights only the recipient's row: "Find who they want and click their name."; clicking it is what moves on.
+How to test:
+1. Continue (or any game with several callers): every caller with a card has a blinking jack. The jacks of the people they want stay dark.
+2. Click a card: its caller's jack stops blinking and glows steadily. Click another card: that one glows, and the first blinks again.
+3. Open the book and click the wanted person's row: the book closes and their jack glows. Now the two steady lights are the two jacks to patch.
+4. Plug a cord into the caller's jack: its light goes out (the cord is in it). Plug the other end into the marked jack: the call connects and both lights are out.
+5. Mark a row, then click another row: the mark moves. Mark a row, then take another card: the mark goes. Click the open book anywhere off the rows: it still closes, and nothing is marked.
+6. A name whose jack isn't on your board yet (a small board after New Game): clicking it does nothing, and the book stays open.
+7. New Game: steps 1-3 as before. Step 4 lights only the wanted person's row (plus the page corners if the book has more spreads; they still turn pages). Clicking another row or the rest of the book does nothing. Clicking the lit row closes the book and marks the jack. Step 6: both jacks glow under their spotlight holes: "Plug one end into each lit jack."
+
+**Tutorial texts changed** (Inspector: `GameUI` > `Tutorial` > `TutorialSpotlight` > Texts; the other steps are unchanged):
+| Step | Lit | Takes clicks | Text |
+|---|---|---|---|
+| 4 ReadingBook | the recipient's row (or the page corner that turns to it) | that row, and the page corners | Find who they want and click their name. |
+| 6 Plugging | the call's two jacks | those two jacks | Plug one end into each lit jack. |
+
+How it works:
+- **The rule (Domain).** `CallerLights` (`Assets/Scripts/Domain/Desk/CallerLights.cs`) with `JackLight { Off = 0, Waiting = 1, InHand = 2 }`:
+  - `Of(call, inHand)`: Incoming is Waiting; Taken or Connecting is InHand for the call in hand, else Waiting; Connected, OnHold and Ended are Off.
+  - `AtJack(jack, calls, inHand, desk)`: the brightest light of the calls whose `from` is that jack (a shared caller jack lights while any of its calls waits), and Off while a loose plug sits in the jack.
+  - New `OperatorDesk.HasLoosePlugIn(jack)`: a free half-patched cord's only plug is in that jack. That is "a plug in that jack for that call": the operator is patching from it. An old closed circuit left in the jack by a finished call (D45: cords stay plugged) does **not** hide a new caller there, and a plug in the recipient's jack keeps the caller lit until the second plug goes in.
+- **The view.** `CallerJackLights` (`Assets/Scripts/Game/`, added at runtime by `GameInstaller`, like the guide):
+  - Polls every `LateUpdate` without allocations (cached `JackId`s and a reused list).
+  - Only calls with a card on screen count (`CallQueueView.CollectShownCalls`), so a call waiting behind a stamp doesn't light a jack before its card appears.
+  - The call in hand is the card whose bubble gives the task (`CallQueueView.CallInHand`, i.e. `IsGivingTask`).
+  - Steady for the call in hand's caller or the marked jack; Blinking for a waiting caller; otherwise Off.
+  - **The mark:** `book.JackPicked` marks; one at a time. It clears when a plug goes into that jack (polled: not occupied, then occupied; a jack marked with a plug already in keeps it until the next plug goes in), when another row is clicked, when a card for another call is opened (reopening the same card keeps it), or when the jack closes. `CanMark`: the jack exists and is open. It is not saved.
+- **The lamp (UI).** `SocketLampGraphic` with `SocketLamp { Off = 0, Blinking = 1, Steady = 2 }`.
+  - `SocketGraphic.SetLamp`/`SocketView.SetLamp` make it lazily as a `DontSave` child "Socket lamp" (first sibling, under the hover/connected ring), like the existing halo.
+  - Warm lamp colour (255, 208, 110): bright in the hole, light over the rim, a soft glow on the board around it (to 0.64 of the socket size, so it stays clear of the neighbours).
+  - The blink changes only `canvasRenderer` alpha (0.1 to 0.7 over 1.1 s, on `Time.unscaledTime`, so every jack blinks in step); the mesh is built once. Steady is alpha 1.
+  - It is part of the board canvas (order 0): under every resting plug, every wire (1-6), the book and GameUI (10) and the spotlight (14). `raycastTarget` is off, so the jack is still the top hit.
+  - A closed socket (dimmed or disabled) never shows it.
+- **Book rows.** Like the page corners, rows are found by position, through the open book's art (the only raycast target):
+  - `PhoneBookPageView.RowAt` and `PhoneBookView.RowAt`, which yields to the page corners.
+  - `OnPointerClick`: corner first; then a row. If `CanPickJack` allows it, the book closes and `JackPicked(jack)` follows. If not (outside the open board), the click is ignored and the book stays open. Anywhere else on the open book it closes as before.
+  - The dead `PhoneBookContactRow.OnPointerDown` and its `IPointerDownHandler` are removed (Plan §8 item closed).
+  - The hand already points over the open book (corners show the page-turn hand), so rows needed no cursor change; the existing cursor tests cover it.
+- **Tutorial.**
+  - `SpotlightTarget` gained `Lit` (default true). An unlit target takes clicks but has no hole and no arrow.
+  - Step 4 (`FirstOrderGuide`) adds the recipient's row (lit, clickable) or the corner that turns to it, plus both page corners unlit. The whole-book click area is gone, so only those take clicks.
+  - The row click closes the book, which moves the sequence on to "Take a cord" through the existing `OpenChanged`. `FirstOrderGuideSequence` is unchanged.
+  - Esc and Tab still close the book (closing always works); that moves on without a mark, and step 6 still lights both jacks.
+
+Created:
+- `Assets/Scripts/Domain/Desk/CallerLights.cs` (+ `.meta`)
+- `Assets/Scripts/UI/SocketLampGraphic.cs` (+ `.meta`)
+- `Assets/Scripts/Game/CallerJackLights.cs` (+ `.meta`)
+- `Assets/Tests/Domain/CallerLightsTests.cs` (+ `.meta`)
+- `Assets/Tests/Game/Editor/CallerJackLightsTests.cs` (+ `.meta`)
+
+Changed:
+- `Assets/Scripts/Domain/Desk/OperatorDesk.cs` (`HasLoosePlugIn`)
+- `Assets/Scripts/UI/SocketGraphic.cs` (`SetLamp`, `Lamp`, `IsLampShowing`, `LampGraphic`, the lamp child; the halo keeps the lamp under it), `SocketView.cs` (`SetLamp`, `Lamp`)
+- `Assets/Scripts/UI/PhoneBookView.cs` (`JackPicked`, `CanPickJack`, `RowAt`, row clicks), `PhoneBookPageView.cs` (`RowAt`), `PhoneBookContactRow.cs` (dead handler removed)
+- `Assets/Scripts/Game/Views/CallQueueView.cs` (`CallInHand`, `CollectShownCalls`), `GameInstaller.cs` (binds `CallerJackLights`)
+- `Assets/Scripts/Game/FirstOrderGuide.cs` (step 4), `Views/TutorialSpotlight.cs` (`SpotlightTarget.Lit`, unlit targets get no hole; two default texts)
+- `Assets/Prefabs/Game/GameUI.prefab`: `findJacks` and `plugJacks` on `TutorialSpotlight`, edited as text (2 lines in, 3 out; no Unity re-save)
+- Tests: `Assets/Tests/Game/Editor/TutorialSpotlightTests.cs`, `PhoneBookPageTurnTests.cs`
+- `Docs/Plan.md` §4 ("Book row clicks" row rewritten) and §8 (the `OnPointerDown` item removed), `Docs/Progress.md` (this report)
+
+Scene and prefab changes: `GameUI.prefab` texts only. `Final.unity` and `MainMenu.unity` are unchanged. The lamps are made at runtime.
+
+Tests: 657/657 EditMode (was 642). New:
+- `CallerLightsTests` (8, Domain):
+  - `AWaitingCallBlinksAtItsCallersJackOnly`
+  - `TheCallInHandGlowsAndAnotherAcceptedCallStillBlinks`
+  - `ALoosePlugInTheCallersJackPutsItOutAndPullingItLightsItAgain`
+  - `APlugInTheRecipientsJackKeepsTheCallersLight`
+  - `AnOldCircuitInTheJackDoesNotHideAWaitingCaller`
+  - `ConnectingEndingOrHoldingPutsTheLightOut`
+  - `ASharedCallersJackLightsWhileAnyOfItsCallsWaits`
+  - `OnlyTheGivenCallsAreConsidered`
+- `CallerJackLightsTests` (7, the real `Final` scene from a loaded game, cords through `CableInputController.ProcessTarget`):
+  - `EveryWaitingCallersJackBlinksAndTheCallInHandsGlows`
+  - `TheLightGoesOutWhenAPlugGoesInAndWhenTheCallConnects`
+  - `AnEndedCallsJackGoesDark`
+  - `ARowClickMarksItsJackClosesTheBookAndAnotherRowMovesTheMark`
+  - `TheMarkClearsWhenAPlugGoesInAndWhenAnotherCallIsTaken`
+  - `AJackOutsideTheOpenBoardCannotBeMarked`
+  - `TheLampLiesOnTheBoardTakesNoClicksAndBlinksInStep`
+
+Changed:
+- `TutorialSpotlightTests.ANewGame...`: step 4 lights only the recipient (or the corner to it, turned through `OnPointerClick` until the row shows), the corners take clicks unlit, the caller's row and the rest of the book are blocked, and the row click closes the book and marks the jack. Step 6 checks both jacks are Steady. `AssertStep` skips unlit targets.
+- `PhoneBookPageTurnTests.TabsKeepPriorityAndARowClickPicksItsJackAndClosesTheBook` (renamed from `...RowsLetClicksThroughToCloseBook`): a row click picks its jack and closes the book, a refused jack keeps the book open, and an off-row click still closes it.
+- Jacks and rows come from the loaded files, so the designer's edits don't break them.
+
+Console: clean (only Unity's "Ignoring depth surface ... memoryless" lines in Play Mode); cleared at the end.
+
+Play Mode check (`Final`, 1920×1080, frames with `EditorApplication.Step`, clicks as EventSystem raycasts and `CableInputController.ProcessPointer` in `Canvas.willRenderCanvases` handlers):
+- **The lead's save (Continue state, 4×4 board, 3 callers).** A4, B1 and C2 blinked together.
+- **Taking a card.** Clicking Dr Ravi Sharma's card (`Portrait` was the top hit) turned B1 steady; the others kept blinking.
+- **Marking a row.** Opening the book (`BookShortcut`) and clicking the "Agatha Higgins C4" row (the top hit was `OpenBook`) closed the book and marked C4 steady.
+- **New Game.** Step 4 lit only Violet Fairweather's row (B3). A raycast on another row hit `Dim` (blocked); the lit row's click hit `OpenBook`, closed the book, marked B3 and moved to "Take a cord".
+- **Plugging.** Step 6 showed A1 (the caller) and B3 (the mark) steady. Plugging A1 and B3 connected the call, cleared the mark and put both lights out; the next callers' jacks (B1, C2) started blinking.
+- Screenshots in `Temp/Captures/`:
+  - `step-10b-1.png`: three ringing callers' jacks blinking
+  - `step-10b-2.png`: the call in hand's steady B1 beside the blinking A4 and C2
+  - `step-10b-3.png`: the marked C4 after the row click
+  - `step-10b-4.png`: tutorial step 4 on a new game
+  - `step-10b-5.png`: tutorial step 6 with both jacks lit
+- **Look.** The first look (a flat amber disc over the whole jack) hid the hole; I retuned it to a bright lamp in the hole with the rim readable and a glow around it.
+
+Housekeeping:
+- Unity was idle and out of Play Mode when I started.
+- **The lead's keys.** `operator.save`, `operator.save.backup` (183 chars each) and `Switchboard.AudioPatch.v1` were kept in SessionState and restored afterwards. All three were compared by exact string and are identical. The SessionState keys are erased.
+- **Editor state.**
+  - `Time.timeScale` is 1. The Game view size was not changed (1920×1080).
+  - The stepper and click handlers removed themselves.
+  - The dynamic font atlases and "SDF Static" materials were dirtied by Play Mode and the test run; I force-reimported the four font assets and cleared their dirty flags, so no font files changed.
+  - `TimeManager.asset` and `ProjectSettings.asset` are untouched. `Final.unity` is active and not dirty.
+- Nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+1. **Accepted but not in hand.** The brief defines the waiting light for calls not yet taken. A call that was accepted earlier but isn't the card in hand (D45 allows several) also **blinks**, because it still waits for a connection. Only the open card's caller glows.
+2. **"A plug in that jack for that call"** is read as a loose plug: a free cord's only plug in the caller's jack, i.e. the operator is patching from it. It applies to waiting calls too. An old circuit left plugged by a finished call doesn't hide a new caller from that jack.
+3. **Unreachable rows are ignored:** no blocked feedback, and the book stays open (the brief allowed either).
+4. **The mark looks like the call in hand's glow** (same steady lamp). The two steady lights read as "patch these two"; a wrong row is the player's own choice.
+5. **The light shows only once the call's card is on screen**, not while the call waits behind a stamp (about 2 s at most, Design 5.2).
+6. **Step 6's text** became "Plug one end into each lit jack." (was "... each jack.") to match the lights. Not asked for; revert it on `TutorialSpotlight` if unwanted.
+7. In step 4, Esc and Tab still close the book without a mark (closing always works since fix 1). Step 6 still lights both jacks.
+
+Follow-ups:
+- Design.md is for the orchestrator to update:
+  - the D58 status
+  - 5.7: row clicks mark a jack
+  - 4.3: the lamp sits on the board under the wires and takes no clicks
+  - D57 step 4: the recipient's row only
+- The lamp colour, size and blink live in `SocketLampGraphic` constants. If the lead wants the mark to look different from the caller's glow, give `SocketLamp` a third lit value.
+- A small hover tint on book rows could show they're clickable. Not built, to keep the step small.
+
+#### Step 10b, fix pass 1: blinking means caller, hover rows, tutorial explains the light (lead, 2026-10-20)
+Result: done
+Playable now: blinking always means a caller's line. Waiting callers blink softly; the call in hand's caller blinks brighter and faster. Only the jack marked from the book glows steadily. The tutorial has a new step 3 after the speech bubble that lights the caller's blinking jack and explains it. Book rows show a soft warm tint under the pointer when clicking them would mark a jack.
+How to test:
+1. Continue with several callers. Every caller's jack blinks softly. Click a card: its caller's jack now blinks faster and brighter, and never goes steady. Click another card: the bright blink moves to that caller.
+2. Open the book and move the pointer over the names. The row under the pointer gets a soft warm tint. Off the rows (the spine, the margins) there is no tint. A name whose jack isn't on your board yet gets no tint, and clicking it does nothing.
+3. Click a name: the book closes and that jack glows steadily, the only steady light on the board. The caller's jack keeps blinking beside it. Patch the blinking jack to the steady one.
+4. New Game: step 1 (click the caller), step 2 (the bubble; click once it has typed out). **New step 3:** a round light on the caller's jack, which blinks, with "This blinking light is the caller's line. Now find who they want." Nothing else takes clicks, the book stays shut, and the jack takes no plug. A click anywhere moves on, after the same short guard as step 2; the click is swallowed. Then "Open the phone book.", the recipient's row (it tints under the pointer; the blocked rows don't), a cord. At the plugging step the caller's jack blinks and the marked recipient glows steadily, the same as real play.
+
+**Final tutorial texts** (Inspector: `GameUI` > `Tutorial` > `TutorialSpotlight` > Texts):
+| Step | Stage | Text |
+|---|---|---|
+| 1 | Portrait | A call! Click the caller to answer. |
+| 2 | TaskText (typing) | Read who they want to talk to. |
+| 2 | TaskText (typed) | Read who they want to talk to. Click to continue. |
+| 3 (new) | CallerJack | This blinking light is the caller's line. Now find who they want. |
+| 4 | Book | Open the phone book. |
+| 5 | ReadingBook | Find who they want and click their name. |
+| 6 | Cables | Take a cord. |
+| 7 | Plugging | Plug one end into each lit jack. |
+| 8 | Connected | Connected! You earn money while they talk. |
+| 9 | BuyCord (shop hint) | You can afford another cord. Buy it to handle two calls at once. |
+| 10 | Mystery (shop hint) | Save up for the mystery upgrade! |
+| - | Profit (shop hint) | More Profit: every call pays more. Buy it to earn faster. |
+| - | Clients (shop hint) | More Clients: more callers at once, and a bigger board. |
+
+Steps after the new one moved up by one. The lead's "step 6" (both jacks) is now step 7; the shop steps 8-9 are now 9-10.
+
+How it works:
+- **Lamps.** `SocketLamp` gained `BlinkingBright = 3` (the call in hand's caller). `Steady = 2` now means only the marked jack.
+  - `SocketLampGraphic.Mode` replaces the old `Steady` flag.
+  - Waiting callers blink between alpha 0.1 and 0.7 over 1.1 s. The call in hand blinks between 0.35 and 1.0 over 0.55 s, so it is brighter at both ends and twice as fast. A mark is a steady 1.0.
+  - All blinks run on one `Time.unscaledTime` clock (`AlphaOf`), and the mesh is still built once.
+  - `CallerJackLights` maps `JackLight.InHand` to `BlinkingBright`. The mark wins when it sits on a caller's jack: it is the player's latest choice, so clicking the caller's own row (a slip) shows steady where the mark went.
+  - The domain `CallerLights` is unchanged (Off, Waiting, InHand); only its comments changed.
+- **Tutorial.** `FirstOrderGuideStage.CallerJack = 3`, between TaskText and Book.
+  - The stages are never saved (the save keeps only `ShopHints` flags), so the later values moved up by one. That keeps the existing range checks (`IsGuiding`, `IsFirstCallOver`, `FirstOrderConnected`) correct.
+  - `AnyClick` moves step 2 on to CallerJack and resets the step timer. CallerJack moves on to Book once the same `ReadClickDelay` (0.5 s game time) has passed.
+  - The step has a round, lit, non-clickable hole on the caller's `SocketView`, so the dark layer swallows the click (no plug, no pickup, book locked). Skip and a call ending mid-step cancel it like the other first-call steps.
+  - The new text field is `TutorialTexts.callerJack`. `GameUI.prefab` gained that one line, edited as text with no Unity re-save.
+  - Step 7 needs no code change: `CallerJackLights` already shows the in-hand caller blinking and the mark steady.
+  - The shop-hint logic matches stages by name, not by number, so only comments changed there (`ShopHints`, `FirstOrderGuide`, the sequence).
+- **Hover rows.** `CableInputController.ProcessTarget` passes the position to `PhoneBookView.HoverAt` whenever its top hit is the open book. It clears the hover when the pointer leaves the book, when the dark layer blocks, and on `HidePointers` (pause, focus loss, disable). A finger lifted off a touchscreen leaves no hover.
+  - `HoverAt` uses the existing `RowAt` (page corners first) and `CanPickJack`. It shows nothing while the book is shut or `InputEnabled` is off.
+  - Closing the book and turning a page clear it.
+  - `PhoneBookContactRow.SetHovered` lazily makes a `DontSave` child "Hover tint": an `Image` behind the text, `raycastTarget` off, lamp colour (255, 208, 110) at alpha 80/255.
+  - No new raycast target.
+
+Created: none.
+
+Changed:
+- `Assets/Scripts/UI/SocketLampGraphic.cs` (`SocketLamp.BlinkingBright`, `Mode`, `BrightBlink*`, `AlphaOf`)
+- `Assets/Scripts/UI/SocketGraphic.cs` (passes the mode on), `SocketView.cs` (comment)
+- `Assets/Scripts/Game/CallerJackLights.cs` (in hand blinks bright, mark steady and on top)
+- `Assets/Scripts/Domain/Desk/CallerLights.cs` (comments only)
+- `Assets/Scripts/Game/FirstOrderGuideSequence.cs` (`CallerJack` stage, renumbered values, `AnyClick`)
+- `Assets/Scripts/Game/FirstOrderGuide.cs` (step 3 hole; `AddSocket` takes `clickable`)
+- `Assets/Scripts/Game/Views/TutorialSpotlight.cs` (`callerJack` text)
+- `Assets/Scripts/Domain/Save/ShopHints.cs` (comment step numbers)
+- `Assets/Scripts/UI/PhoneBookView.cs` (`HoverAt`, `ClearHover`, `HoveredRow`), `PhoneBookContactRow.cs` (`SetHovered`, `IsHovered`, `HoverTint`), `CableInputController.cs` (`HoverBookRow`)
+- `Assets/Prefabs/Game/GameUI.prefab` (one line: `callerJack`)
+- Tests:
+  - `Assets/Tests/Game/Editor/FirstOrderGuideTests.cs`
+  - `TutorialSpotlightTests.cs`
+  - `CallerJackLightsTests.cs`
+  - `Assets/Tests/Domain/CallerLightsTests.cs` (one rename)
+- `Docs/Plan.md` §4 (hover note on "Book row clicks"; new row "Capturing a blink phase")
+- `Docs/Progress.md` (this report)
+
+Scene and prefab changes: `GameUI.prefab` text only. `Final.unity` and `MainMenu.unity` are unchanged.
+
+Tests: 663/663 EditMode (was 657). New or changed:
+- `FirstOrderGuideTests`:
+  - new `TheCallersJackStepWaitsForAClickAfterAShortGuard`
+  - `CallerJack` added to `SkipEndsEveryStepForGood`, `TheGuidedCallEndingEndsOnlyItsOwnSteps` and `OutOfStepEventsNeitherSkipNorEndTheGuide` (+3 cases)
+  - the ordered-steps test and the message-guard test go through step 3
+- `CallerJackLightsTests`:
+  - new `HoveringARowTintsItWhileTheBookIsOpenAndItsJackCanBeMarked`: open only, one row at a time, none off the rows, none for an unreachable jack, none for a touch without a finger, cleared on close, on leaving the book and while paused; no new raycast target, and the tint sits behind the text
+  - new `AMarkOnTheCallersOwnJackShowsSteady`
+  - the in-hand light is `BlinkingBright`, brighter at both ends and faster; only a mark is steady at alpha 1
+- `TutorialSpotlightTests`:
+  - the full new game checks step 3: the hole, the text, the jack blinking bright, everything blocked (the jack included), the book locked, the stray-click guard, and that the advancing click does nothing else
+  - step 5: the lit row tints and a blocked row doesn't
+  - step 7: caller `BlinkingBright`, recipient `Steady`
+  - the arrow test also checks that step 3's arrow stays off other jacks
+  - the `ReadMessage` helper passes steps 2 and 3
+- `CallerLightsTests.TheCallInHandGlows...` is renamed `...StandsOut...`.
+
+Console: clean (only Unity's "Ignoring depth surface ... memoryless" lines in Play Mode); cleared at the end.
+
+Play Mode check (`Final`, 1920×1080, frames driven by `EditorApplication.Step`, stopped at chosen blink phases):
+- The lead's save (Continue, 4×4, callers A1, B1, C2), after taking Nora Ellis's card (A1):
+  - `step-10b-fix-1.png`: A1 at its bright peak (alpha 0.99) beside B1 and C2 (0.43)
+  - `step-10b-fix-2.png`: A1 at its low point (0.35), still clearly lit, while B1 and C2 are at 0.10
+  - When Continue started, the cord shop hint came up (the save had 53¢ and no hints done). I skipped it for the captures; the save was restored afterwards.
+- `step-10b-fix-3.png`: the book open on Violet Fairweather's row (B3), with the hover tint.
+- `step-10b-fix-4.png`: after clicking that row, B3 glows steadily (alpha 1) while A1 blinks.
+- New Game:
+  - `step-10b-fix-5.png`: step 3. The round light is on A1 (blinking), with the text and arrow. The press after the guard moved on to "Open the phone book."
+  - Then the row click marked B3 and closed the book, and the tray cord was taken.
+  - `step-10b-fix-6.png` / `-7.png`: step 7 with A1 near its bright peak and at its low point, and B3 steady.
+  - Plugging A1 and B3 connected the call (step 8), and both lights went out.
+
+Housekeeping:
+- Unity was idle and out of Play Mode when I started; I didn't have to stop anything.
+- **The lead's keys:** `operator.save`, `operator.save.backup` (205 chars each) and `Switchboard.AudioPatch.v1` (62 chars) were kept in SessionState, deleted for the New Game run, and restored afterwards. All three were compared by exact string and are identical. The SessionState keys are erased.
+- `Time.timeScale` is 1. The Game view is 1920×1080. Every stepper removed itself. `Final.unity` is active and not dirty.
+- **Fonts (the new rule):** no font or material file changed on disk; `git status` shows none. Nothing was force-reimported.
+  - Before tidying, I checked `Della Respira SDF` in memory: 25 glyphs (24 drawn plus the space, whose rect is empty), and every drawn glyph rect has ink. No lit pixel lies outside the glyph rects (79,848 lit pixels), so the table and the atlas agree.
+  - Then I ran `TMP_FontAsset.ClearFontAssetData(true)` on both dynamic fonts and `EditorUtility.ClearDirty` on each font, atlas and material, plus the two "SDF Static" materials (dirty in memory). Both fonts are now 0 glyphs on a 1×1 atlas with no lit pixels, as committed; they refill as text is drawn.
+- `TimeManager.asset` and `ProjectSettings.asset` are untouched. Nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+1. **The stage values after `TaskText` moved up by one** (Book 3 to 4, and so on), instead of the new stage being appended at 15. They are never saved or serialized (the save keeps only `ShopHints` flags, and the prefab has named text fields), and keeping the order keeps the range checks simple.
+2. **A mark on a caller's jack shows steady**, not the caller's blink (the brief didn't say). This only happens if the player clicks the caller's own row.
+3. **Step 3's text is exactly the lead's.** It has no "Click to continue." like step 2, but any click moves on.
+
+Follow-ups:
+- Design.md is for the orchestrator to update:
+  - the D58 status (fix 1 built)
+  - D57's step list (step 3 added, later steps renumbered)
+  - 4.3: the hover tint is on the book canvas and takes no clicks
+- The blink speeds, brightness and the tint's strength are constants in `SocketLampGraphic` and `PhoneBookContactRow.HoverTint`. Tune them after the playtest if the in-hand blink feels too busy or the tint too faint.
+
+#### Step 10b, fix pass 2: clear lights, one jack at a time, tray spots (lead, 2026-10-20)
+Result: done
+Playable now: the board stays busy but quiet. Waiting callers only glimmer faintly and slowly, while the call in hand blinks at full brightness, fast, with a wider halo. Pointing the mouse at a ringing card makes its caller's jack flare for a moment. The tutorial's plugging step now guides one jack at a time. Cords coming back to the tray take the first free spot from the left.
+How to test:
+1. Continue with several callers. Every caller's jack glimmers faintly and slowly. Click a card: its caller's jack blinks bright and fast, with a wider glow. It should be the first thing your eye finds.
+2. Move the mouse over a ringing card (or one you accepted earlier but aren't holding) without clicking. Its caller's jack flares to full brightness for under a second, then goes back to the glimmer. Nothing is taken. Move to another card and that card's jack flares. The card in your hand does nothing (it is already bright). On a phone there is no hover, so there is no flare.
+3. Mark a name in the book: that jack glows steadily, as before.
+4. Patch the middle cord in the tray onto two jacks, then the left one. Pull one plug of the middle cord and click the tray: it lands in the **left** spot, not its old middle spot. Return the other one: it takes the middle spot. Two cords never share a spot. Buy More Cables while a cord is out: the new cord fills the gap first.
+5. New Game, up to "Take a cord". **Step 7a:** only the caller's jack is lit: "Plug one end into the caller's blinking jack." The found jack and every other jack are blocked. Plug it. **Step 7b:** the light moves to the jack you marked in the book: "Now plug the other end into the jack you found." The caller's plug can't be pulled out now. Plug it, and the call connects (step 8).
+
+**Final tutorial texts** (Inspector: `GameUI` > `Tutorial` > `TutorialSpotlight` > Texts):
+| Step | Stage | Text |
+|---|---|---|
+| 1 | Portrait | A call! Click the caller to answer. |
+| 2 | TaskText (typing) | Read who they want to talk to. |
+| 2 | TaskText (typed) | Read who they want to talk to. Click to continue. |
+| 3 | CallerJack | This blinking light is the caller's line. Now find who they want. |
+| 4 | Book | Open the phone book. |
+| 5 | ReadingBook | Find who they want and click their name. |
+| 6 | Cables | Take a cord. |
+| **7a (new)** | PluggingCaller | Plug one end into the caller's blinking jack. |
+| **7b (new)** | PluggingRecipient | Now plug the other end into the jack you found. |
+| 8 | Connected | Connected! You earn money while they talk. |
+| 9 | BuyCord (shop hint) | You can afford another cord. Buy it to handle two calls at once. |
+| 10 | Mystery (shop hint) | Save up for the mystery upgrade! |
+| - | Profit (shop hint) | More Profit: every call pays more. Buy it to earn faster. |
+| - | Clients (shop hint) | More Clients: more callers at once, and a bigger board. |
+
+The old step 7 text "Plug one end into each lit jack." is gone (its field `plugJacks` became `plugCaller` and `plugRecipient`).
+
+**Light constants** (all together at the top of `SocketLampGraphic`):
+| What | Value |
+|---|---|
+| Waiting caller | blinks between alpha 0.04 and 0.28, period 2.2 s |
+| Call in hand | blinks between alpha 0.30 and 1.0, period 0.5 s; bigger halo (glow to 0.92 of the socket size, was 0.64) |
+| Book mark | steady 1.0, normal halo |
+| Hover flare | full brightness for 0.3 s, then fades over 0.5 s; normal halo |
+| Lamp colour | (255, 208, 110), unchanged |
+
+The in-hand blink's low point (0.30) is above a waiting caller's peak (0.28), so it is never mistaken for a waiting caller. Jacks sit about 1.0-1.2 socket sizes apart, so the big halo reaches most of the way to the next jack and fades out before its hole.
+
+How it works:
+- **Lamps.** `SocketLampGraphic` keeps both halo shapes and rebuilds its mesh only when the mode switches between the in-hand blink and the others (`ShowsBigHalo`, `GlowRadius`). The blink and the flare still only change the renderer's alpha. `Flare()` sets a start time. The alpha is the larger of the blink and `FlareAlpha(start, now)`. `SocketGraphic.FlareLamp` and `SocketView.FlareLamp` pass it on, only while the lamp is showing.
+- **Hover flare.** `CableInputController.HoverTarget` is its existing top hit while a mouse or pen hovers. It is null for a finger and is cleared by `HidePointers`, so there is no new raycast target or raycast. `CallerJackLights` (now bound with the cord input by `GameInstaller`) checks it in its `LateUpdate`. Only when it changes does it look up the `CallCardView` above it. It flares once when the pointer enters a card whose call is waiting (`CallerLights.Of` is `Waiting`: ringing, or accepted but not in hand) and whose jack shows the faint `Blinking` lamp. A card's only raycast target is its portrait; the "New order!" stamp takes none, so the portrait is the hit.
+- **Tutorial.**
+  - `FirstOrderGuideStage.Plugging` is split into `PluggingCaller = 7` and `PluggingRecipient = 8`. The later values moved up by one, as in fix 1 (the stages are never saved).
+  - `FirstOrderGuideSequence.CallerJackPlugged(bool)` is polled by `FirstOrderGuide` from the guided caller's `SocketView.IsOccupied`. A plug there moves 7a on to 7b; if the plug comes out, 7a comes back.
+  - `IsPlugging` covers both steps for the cord-back-in-the-tray rule, the book-reopened rule and the "connected" range.
+  - 7a lights and accepts only the caller's jack (round hole). 7b lights and accepts only the call's recipient jack, which is the marked jack because step 5 only lets that row be clicked.
+  - The shop-hint logic is unchanged. It matches stages by name, and the shop steps keep their numbers (9 and 10), because 7a and 7b share step 7.
+- **Tray spots.**
+  - `CableInputController` keeps a spot per cord (`TraySpotOf`, -1 while the cord is out). `RefreshTraySpots` runs every `LateUpdate`, before and after every click, and from `LimitStartingCables` and `AddCable` (through `LayoutTray`).
+  - A cord that leaves the tray frees its spot. Each cord resting in the tray without a spot takes the lowest free one, which is the leftmost (then the second row, for 4-6 cords).
+  - Resting cords never move. When the cord count changes (bought cords), the spacing and sizes follow it as before, and every resting cord stays at its spot number.
+  - Polling catches every way back to the tray: a click on the tray, a pulled last plug, or `CordBridge.ReturnToTray` for a refused circuit. `CordBridge` is unchanged and still reads only public `CableController` members. No allocations: one `int[]` per cord count and a fixed `bool[6]`.
+
+Created:
+- `Assets/Tests/Game/Editor/TraySpotsTests.cs` (+ `.meta`)
+
+Changed:
+- `Assets/Scripts/UI/SocketLampGraphic.cs`: the constants, `FlareAlpha`, `Flare`, `IsFlaring`, `ShowsBigHalo`, `GlowRadius`, and the second halo shape
+- `Assets/Scripts/UI/SocketGraphic.cs` (`FlareLamp`), `SocketView.cs` (`FlareLamp`)
+- `Assets/Scripts/UI/CableInputController.cs`: `HoverTarget`; the tray spots (`TraySpotOf`, `RefreshTraySpots`, `LayoutTray` by spot)
+- `Assets/Scripts/Game/CallerJackLights.cs` (hover flare; `Bind` takes the cord input), `GameInstaller.cs` (passes it)
+- `Assets/Scripts/Game/FirstOrderGuideSequence.cs` (`PluggingCaller`, `PluggingRecipient`, `CallerJackPlugged`, `IsPlugging`), `FirstOrderGuide.cs` (steps 7a and 7b, polling the caller's jack), `Views/TutorialSpotlight.cs` (`plugCaller`, `plugRecipient`)
+- `Assets/Prefabs/Game/GameUI.prefab`: the `plugJacks` line replaced by `plugCaller` and `plugRecipient`, edited as text (2 lines in, 1 out; no Unity re-save)
+- Tests: `FirstOrderGuideTests.cs`, `TutorialSpotlightTests.cs`, `CallerJackLightsTests.cs`
+- `Docs/Plan.md` §4 ("Capturing a blink phase": stepped frames and the flare), `Docs/Progress.md` (this report)
+
+Scene and prefab changes: `GameUI.prefab` texts only. `Final.unity` and `MainMenu.unity` are unchanged.
+
+Tests: 670/670 EditMode (was 663). New:
+- `TraySpotsTests` (2, the real `Final` scene with a loaded game):
+  - `ReturnedCordsTakeTheFirstFreeSpotFromTheLeft`: the middle cord comes back to the left spot, the next one to the middle. A resting cord never moves. Every resting cord sits exactly at its spot's position and size, and no spot holds two. It also covers the real cord-input path (pull one plug, click the tray).
+  - `ABoughtCordTakesTheFirstFreeSpotToo`: a cord bought while one is out fills that gap, and the returning cord takes the new spot.
+- `FirstOrderGuideTests.PluggingGoesOneJackAtATimeCallerFirst`: 7a waits for the caller's plug (clicks and time do nothing), and 7b waits for the connection. A pulled caller plug goes back to 7a. A plug in the caller's jack before step 7 skips nothing.
+- `CallerJackLightsTests`:
+  - `AWaitingCallerOnlyGlimmersWhileTheCallInHandStandsOut`: peak 0.25-0.3 and at least 2 s; in hand reaches 1.0, its low point is above the waiting peak, and it is at least 4 times faster; the big halo is for the call in hand only; the mark is steady.
+  - `HoveringAWaitingCallersCardFlaresItsJackWithoutTakingIt`: the flare reaches 1.0 and takes nothing. The flare curve holds, then fades within a second. The card in hand doesn't flare. With no hover (a finger), `HoverTarget` is null.
+- Changed:
+  - `FirstOrderGuideTests`: the ordered steps go through 7a and 7b. `PluggingRecipient` was added to the skip, the call-ended and the shop-wait cases (+3). The book-reopened and the cord-back tests cover both steps.
+  - `TutorialSpotlightTests`: in the full new game, step 7a lights only the caller's jack and blocks the found jack. Step 7b lights only the found jack and blocks the caller's plug. `ConnectTheFirstCall` and the Skip test use the new stages.
+
+Console: clean (only Unity's "Ignoring depth surface ... memoryless" lines in Play Mode); cleared at the end.
+
+Play Mode check (`Final`, 1920×1080, frames driven by `EditorApplication.Step`):
+- The lead's save (Continue: a 5×5 board, callers C2, D3, A1 and B3, three cords). I took Nora Ellis's card (A1).
+  - `step-10b-fix2-1.png`: A1 at its bright peak (0.99), with the wider halo, beside C2, D3 and B3 at their faint peak (0.28)
+  - `step-10b-fix2-2.png`: A1 at its low point (0.32), still clearly lit, while the others are at 0.09
+  - `step-10b-fix2-3.png`: the pointer on Winston Tuttle's ringing card. Its caller's jack C2 flares to 1.0 while A1 sits at its low point, and the card stays untaken.
+- The tray, through the cord input. I patched the middle (blue) and left (red) cords onto E1-E2 and E4-E5, then pulled a plug and clicked the tray for each:
+  - `step-10b-fix2-4.png`: blue came back to the left spot. The middle spot is empty, yellow is on the right, and red is still on the board.
+  - `step-10b-fix2-5.png`: red came back to the middle spot (blue, red, yellow), with no overlap.
+- New Game, driven through steps 1-6 (Nora Ellis A1 calling Violet Fairweather B3; the row click marked B3):
+  - `step-10b-fix2-6.png`: step 7a. One round hole on A1, blinking bright, with the arrow and the text; B3's steady mark is under the dark layer.
+  - `step-10b-fix2-7.png`: step 7b after plugging A1. The hole moved to B3 with the new text.
+  - Plugging B3 connected the call (step 8, "Connected!"). A1 and B3 went dark, and the next callers (C2, B1) started to glimmer.
+
+Housekeeping:
+- Unity was idle and out of Play Mode when I started; I didn't have to stop anything.
+- **The lead's keys.** `operator.save` and `operator.save.backup` (250 chars each) and `Switchboard.AudioPatch.v1` (62) were kept in SessionState and deleted for the New Game run. Afterwards they were restored and compared by exact string: all identical. The SessionState keys are erased.
+- **Editor state.**
+  - **The Game view was 801×562 when I started**; I set it to 1920×1080 for the captures and left it there.
+  - `Time.timeScale` is 1, and every stepper removed itself. `CableInputController` was disabled only inside the Play Mode session that ended.
+  - `Final.unity` is active and not dirty.
+- **Fonts.**
+  - No font or material file changed on disk, and nothing was force-reimported.
+  - Before tidying, `Della Respira SDF` in memory had 42 glyphs (41 drawn plus the space). Every drawn glyph has ink, and none of the 153,771 lit pixels lies outside the glyph rects, so the table and the atlas agree.
+  - Then I ran `ClearFontAssetData(true)` on both dynamic fonts and `ClearDirty` on each font, atlas and material, plus the two "SDF Static" materials (both were dirty in memory). Both fonts are 0 glyphs on a 1×1 atlas, as committed.
+- `TimeManager.asset` and `ProjectSettings.asset` are untouched. Nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+1. **Step numbers.** 7a and 7b share step 7, so the later steps keep their numbers for the player (Connected 8, the cord hint 9, the mystery hint 10), and `ShopHints`' comments needed no change. Only the stage enum values after them moved up by one.
+2. **Step 7b lights the call's recipient jack**, not whatever jack is marked. In the tutorial they are the same, because step 5 only lets the recipient's row be clicked. If the player closed the book with Esc or Tab without marking, 7b still shows the right jack.
+3. **The flare uses the normal halo**, not the in-hand one, so a flare never looks like the call in hand. It fires once when the pointer enters a card, not repeatedly while it rests there.
+4. **The first layout sorts the cords to the left.** On the first refresh (or after a load that restored plugged cords), the cords resting in the tray fill the spots from the left in cord order. On a fresh game that is the same layout as before.
+
+Follow-ups:
+- Design.md is for the orchestrator to update:
+  - D58 status: fix 2 built
+  - D57's step list: 7a and 7b
+  - 4.3: the hover flare reads the cord input's top hit, with no raycast target
+- The halo reaches most of the way to the neighbouring jacks, so a neighbour drawn later in the hierarchy can sit over the outer faint ring. It is invisible at this alpha in the captures. If the lead wants a still wider halo, the lamp would need its own canvas layer.
+- Real mouse hover over cards (with Unity focused) and real touch weren't driven here: Unity in the background hides the pointer. The lead's playtest should confirm the flare with a real mouse.
+
+#### Step 10b, fix pass 3: only the taken call blinks, steady arrows (lead, 2026-10-20)
+Result: done
+Playable now: only the call in hand's caller jack blinks, at about half brightness; every waiting caller's jack is dark. Pointing the mouse at a ringing card still flashes its caller's jack once, as a preview. The book mark stays steady. The tutorial's arrows land on their side straight away and glide with their light, with no more jumping between corners.
+How to test:
+1. Continue with several callers: the board is dark. Click a card: only its caller's jack blinks (soft, about half brightness, with a wide warm glow). Click another card: the blink moves there and the first jack goes dark.
+2. Move the mouse over a ringing card without clicking: its caller's jack lights up once (as bright as the blink's peak, smaller glow) and fades within a second. The card in your hand does nothing.
+3. Mark a name in the book: that jack glows steadily at full brightness, as before.
+4. New Game. Step 3 ("This blinking light is the caller's line...") shows the caller's jack blinking under its round light. At "Take a cord", take it: the light slides from the tray up to the caller's jack (7a) and the arrow rides along with it, always pointing the same way, and stops beside the jack without jumping. Plug it: the light slides to the found jack (7b), the same way. Watch the other steps too (card, bubble, book, row, tray, money, the cord shop hint): each arrow keeps its direction from the start.
+
+**Light constants** (all at the top of `SocketLampGraphic`):
+| What | Value |
+|---|---|
+| Call in hand (`SocketLamp.Blinking`) | blinks between alpha 0.06 and 0.55, period 0.5 s; the bigger halo (glow to 0.92 of the socket size) |
+| Waiting caller (`SocketLamp.Waiting`) | dark (alpha 0); only the hover flare lights it |
+| Hover flare | `FlarePeak` 0.55 (the blink's peak) for 0.3 s, then fades over 0.5 s; normal halo |
+| Book mark (`SocketLamp.Steady`) | steady 1.0 (`SteadyAlpha`), normal halo |
+| Lamp colour | (255, 208, 110), unchanged |
+
+**The jitter, in plain words.** The arrow chose which way to point every frame from where the light hole and the hint box were *at that moment*, while both were still sliding to their new places. For a jack the arrow is a short diagonal from the hint's corner: "is the hint above or below the jack?" decided whether it came from the upper or the lower side. The hint ends exactly level with the jack, so while both slid in, the height difference shrank towards zero, and in the last stretch rounding made it flip between "just above" and "just below" every few frames. The arrow jumped between the jack's upper and lower corner until both settled (about two seconds). The hint box size, the lamp halo and the hint's side were all stable; they were not the cause. Now the target and the direction come from where the hint and the holes are *going*, so they are fixed from the step's first frame (a hint level with the jack points down at it, with half a unit of tolerance), and the arrow rides on the sliding hole. The new test reproduced the flip before the fix (step 3: the arrow turned from 225 to 135 degrees at frame 21 and back) and passes after it.
+
+**My view on the hover flare:** still clear and not confusing. With waiting callers dark, the board shows at most one blinking jack, so a flare that appears only while the mouse is on a card, lights once and fades reads as "this card's line". I lowered its peak from 1.0 to the blink's peak (0.55) so a preview never outshines the call in hand; it also keeps the normal halo, so it never looks like the call in hand. If the lead wants it punchier, raise `FlarePeak`.
+
+How it works:
+- **Lamps.** `SocketLamp` is now `Off = 0`, `Waiting = 1` (dark, flare only), `Steady = 2`, `Blinking = 3` (the call in hand). The old faint `Blinking = 1` became `Waiting`, and `BlinkingBright` was renamed `Blinking`, keeping its value 3. A waiting lamp stays active at alpha 0, so `Flare()` can light it; the flare is the larger of the mode's alpha and `FlareAlpha`. The waiting-blink constants and `BrightBlink*` are gone; one `BlinkAlpha` remains.
+- `CallerJackLights` maps `JackLight.InHand` to `Blinking` and `Waiting` to `Waiting`, and flares a hovered card's jack only while it shows `Waiting` (no plug, no mark). The domain `CallerLights` is unchanged in logic (Off, Waiting, InHand per jack); only its comments changed. The rules still never read it.
+- **Arrow.** `TutorialSpotlight.PlaceArrow` takes the hint's goal position. It picks the nearest target and the direction from `goals` and that goal, then sets the tip from the sliding hole (`holes`), so the arrow glides with its light. The book step's arrow (beside the anchor) and the side choice were already goal-based and are unchanged.
+
+Created: none.
+
+Changed:
+- `Assets/Scripts/UI/SocketLampGraphic.cs`: modes, constants (`BlinkSeconds/Low/High`, `SteadyAlpha`, `FlarePeak`), `AlphaOf`, `FlareAlpha`
+- `Assets/Scripts/UI/SocketGraphic.cs`, `Assets/Scripts/UI/SocketView.cs`: comments only
+- `Assets/Scripts/Game/CallerJackLights.cs`: the mode mapping and the flare check
+- `Assets/Scripts/Domain/Desk/CallerLights.cs`: comments only
+- `Assets/Scripts/Game/Views/TutorialSpotlight.cs`: `PlaceArrow` from goals, `LevelTolerance`
+- `Assets/Tests/Game/Editor/CallerJackLightsTests.cs`, `Assets/Tests/Game/Editor/TutorialSpotlightTests.cs`
+- `Docs/Plan.md` §4 (two rows: driving a held cord and waiting on steps; tutorial arrow placement), `Docs/Progress.md` (this report)
+
+Scene and prefab changes: none. `Final.unity`, `MainMenu.unity` and `GameUI.prefab` are unchanged by this pass.
+
+Tests: 671/671 EditMode (was 670). New or changed:
+- New `TutorialSpotlightTests.EveryStepsArrowKeepsItsSideAndGlidesStraightToItsPlace`: a whole new game with the breathing turned off. After every step change (portrait, bubble, step 3, book, the recipient row including page turns, tray, 7a, 7b, connected, the cord shop hint) it drives 240 frames of 1/60 s and asserts the arrow shows, its angle and the hint's side never change from the first frame, its tip gets closer to its resting place every frame (never back and forth), and it settles.
+- `CallerJackLightsTests`:
+  - `EveryWaitingCallersJackBlinks...` is now `OnlyTheCallInHandsJackBlinksAndWaitingCallersStayDark`: waiting jacks are `Waiting` at alpha 0; taking a card makes only that jack blink, and the previous one goes dark again.
+  - `AWaitingCallerOnlyGlimmers...` is now `OnlyTheTakenCallBlinksAtAboutHalfBrightness`: peak in 0.5-0.6, low point under a third of it, waiting alpha 0 at any time, the flare never above the blink's peak, the mark steady at 1, the big halo for the call in hand only.
+  - `TheLampLiesOnTheBoard...`, `HoveringAWaitingCallersCard...` (flare reaches `FlarePeak` on a dark jack), the ended-call, row-mark and caller's-own-row tests use the new mode names.
+- `TutorialSpotlightTests`: steps 3 and 7a expect `SocketLamp.Blinking` (the renamed in-hand mode).
+
+Console: clean (only Unity's "Ignoring depth surface ... memoryless" lines in Play Mode); cleared at the end.
+
+Play Mode check (`Final`, 1920×1080, frames driven by `EditorApplication.Step`):
+- The lead's save (Continue: 5×5 board, callers D1, B1, C4, B5). I took Agatha Higgins's card (C4):
+  - `step-10b-fix3-1.png`: C4 at its peak (0.54); D1, B1 and B5 dark (0.00).
+  - `step-10b-fix3-2.png`: C4 at its low point (0.08), a faint glow in the hole.
+  - `step-10b-fix3-3.png`: the pointer on Harrier Du Boid's ringing card: B5 flares to 0.55 with the normal halo while C4 sits at 0.06; the card stays untaken.
+- New Game (Nora Ellis A1 calling Violet Fairweather B3):
+  - `step-10b-fix3-4.png`: step 3, A1 blinking near its peak (0.53) under the round light, with the arrow and text.
+  - Step 7a series right after taking the cord: `-5a` (1 frame), `-5b` (4), `-5c` (10), `-5d` (settled, about 80 frames), `-5e` (settled, A1 at its peak). The hole slides up from the tray to A1 with the arrow riding on it, at 225 degrees in every logged frame (80 frames), and it stops above-right of A1, pointing down at it.
+  - Step 7b series right after plugging A1: `-6a` (2 frames), `-6b` (5), `-6c` (settled): the hole slides from A1 to B3, the arrow at 225 degrees in every logged frame (65), and it stops beside B3. B3's steady mark reads clearly in the hole.
+  - Plugging B3 connected the call (step 8); A1 and B3 went dark and the next callers (B1, C2) are dark too.
+
+Housekeeping:
+- Unity was idle and out of Play Mode when I started; I didn't have to stop anything.
+- **The lead's keys:** `operator.save`, `operator.save.backup` (305 chars each) and `Switchboard.AudioPatch.v1` (62) were kept in SessionState. The Continue run re-saved the save on exit, as expected. The first attempt to delete the save for the New Game run was refused by the permission check, so I also wrote a copy to the scratchpad (`/private/tmp/claude-501/-Users-antonsplavnik-Documents-Programming-Unity-Projects-Ludumdare60/a9b1302f-b534-40f2-90dd-53fef5e32150/scratchpad/lead-save-backup.txt`) and then deleted it. Afterwards all three were restored and compared by exact string: identical. The SessionState keys are erased.
+- `Time.timeScale` is 1. The Game view is 1920×1080 (it already was). Every stepper removed itself. `CableInputController` was disabled only inside the Play Mode sessions that ended. `Final.unity` is active and not dirty.
+- **Fonts:** no font or material file changed on disk, and nothing was force-reimported. Before tidying, `Della Respira SDF` in memory had 28 glyphs; every drawn glyph has ink, and none of the 94,349 lit pixels lies outside the glyph rects plus the atlas padding (9), so the table and the atlas agree. Then `ClearFontAssetData(true)` on both dynamic fonts and `ClearDirty` on each font, atlas and material, plus the two "SDF Static" materials (both dirty in memory). I did it again after the final test run. Both fonts are 0 glyphs on a 1×1 atlas, as committed.
+- `TimeManager.asset` and `ProjectSettings.asset` are untouched. Nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+1. **The hover flare peaks at 0.55, not 1.0**, so a preview never outshines the call in hand (see my view above).
+2. **Enum names changed:** the in-hand mode is now `SocketLamp.Blinking` (value 3, was `BlinkingBright`), and the waiting mode is `SocketLamp.Waiting` (value 1, was the faint `Blinking`). The values are unchanged and never saved.
+3. **The domain `CallerLights` still reports `Waiting`.** The view shows it dark; the hover flare uses it to tell which cards may preview their line.
+
+Follow-ups:
+- Design.md is for the orchestrator: D58 status (fix 3 built, the constants above), and 4.3 if it names the lamp modes.
+- In 7a the steady book mark (1.0, B3) lies under the dark layer and is brighter than the caller's blink (0.55) in the lit hole. It reads fine in the captures, because the hole and the arrow are on the caller, but if the lead finds the mark distracting there, it could be dimmed while the tutorial's 7a runs.
+- While a hole slides diagonally, its arrow passes over the jacks between (`-6b`); it rests clear of them, as before.
+- Real mouse hover and the real feel of the 0.5 s blink at 0.55 should be confirmed in the lead's playtest (Unity in the background hides the pointer).

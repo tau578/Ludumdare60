@@ -30,6 +30,16 @@ namespace Switchboard.UI
             return null;
         }
 
+        /// <summary>The shown row under a screen point, or null.</summary>
+        public PhoneBookContactRow RowAt(Vector2 screenPoint, Camera camera)
+        {
+            foreach (PhoneBookContactRow row in rows)
+                if (row != null && row.gameObject.activeInHierarchy && row.Jack.Length > 0 &&
+                    RectTransformUtility.RectangleContainsScreenPoint((RectTransform)row.transform, screenPoint, camera))
+                    return row;
+            return null;
+        }
+
         public void Render(BookCatalog book, int pageIndex, string message = null)
         {
             if (jackDivider == null)

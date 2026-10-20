@@ -169,16 +169,38 @@ namespace Switchboard.Game.Tests
         }
 
         [Test]
-        public void TabsKeepPriorityAndRowsLetClicksThroughToCloseBook()
+        public void TabsKeepPriorityAndARowClickPicksItsJackAndClosesTheBook()
         {
             var row = opened.GetComponentInChildren<PhoneBookContactRow>();
             Assert.That(row.GetComponentsInChildren<Graphic>(true).Any(g => g.raycastTarget), Is.False,
-                "rows never take clicks since the Notepad went (D54)");
+                "rows take no raycast: the book finds the row under the click, as it finds the corners (D58)");
+            Assert.That(row.GetComponent<IPointerDownHandler>(), Is.Null, "the old row handler is gone");
             Assert.That(ExecuteEvents.GetEventHandler<IPointerClickHandler>(row.gameObject), Is.EqualTo(root),
                 "a click on a row reaches the book");
+            string picked = null;
+            book.JackPicked += jack => picked = jack;
+            Vector2 rowCentre = row.transform.TransformPoint(((RectTransform)row.transform).rect.center);
+            Assert.That(book.RowAt(rowCentre, null), Is.SameAs(row));
             ExecuteEvents.ExecuteHierarchy(row.gameObject, new PointerEventData(null)
-                { position = Position(0), button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
+                { position = rowCentre, button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
             Assert.That(book.IsOpen, Is.False, "a row click closes the book");
+            Assert.That(picked, Is.EqualTo(row.Jack), "and picks its jack");
+
+            // A jack the board can't mark: the click is ignored and the book stays open.
+            book.SetOpen(true);
+            picked = null;
+            book.CanPickJack = jack => jack != row.Jack;
+            ExecuteEvents.ExecuteHierarchy(row.gameObject, new PointerEventData(null)
+                { position = rowCentre, button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
+            Assert.That(book.IsOpen, Is.True);
+            Assert.That(picked, Is.Null);
+            book.CanPickJack = null;
+            Assert.That(book.RowAt(Position(200), null), Is.Null, "a page corner is no row");
+            bool onRow = book.RowAt(Position(0), null) != null;
+            ExecuteEvents.ExecuteHierarchy(opened.gameObject, new PointerEventData(null)
+                { position = Position(0), button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
+            Assert.That(book.IsOpen, Is.False, "anywhere else on the open book a click still closes it");
+            Assert.That(picked, onRow ? Is.Not.Null : Is.Null);
             book.SetOpen(true);
             var tab = opened.GetComponentInChildren<PhoneBookTab>(true);
             for (Transform parent = tab.transform; parent != opened; parent = parent.parent) parent.gameObject.SetActive(true);

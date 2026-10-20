@@ -22,6 +22,7 @@ namespace Switchboard.UI
         [SerializeField] private PhoneBookTab[] tabs = new PhoneBookTab[0];
         private BookCatalog directory = BookCatalog.Empty;
         private string pageMessage;
+        private PhoneBookContactRow hoveredRow;
 
         public bool IsOpen { get; private set; }
         /// <summary>Off while the game is paused (D56): keys and clicks leave the book as it is.</summary>
@@ -40,6 +41,10 @@ namespace Switchboard.UI
         /// <summary>The tutorial's other steps (D57): the player can't open the book (Tab or a click); closing still works.</summary>
         public bool OpenLocked { get; set; }
         public event System.Action<bool> OpenChanged;
+        /// <summary>A row was clicked (D58): its jack, to mark on the board. The book closes in the same click.</summary>
+        public event System.Action<string> JackPicked;
+        /// <summary>Whether a row's jack can be marked (the open board); null: every row. Other rows ignore clicks.</summary>
+        public System.Func<string, bool> CanPickJack { get; set; }
         public Graphic ClosedBookGraphic => closedBook != null ? closedBook.targetGraphic : null;
         public RectTransform OpenBookRect => openBook != null ? (RectTransform)openBook.transform : null;
         public int CurrentSpreadIndex { get; private set; }
@@ -47,6 +52,8 @@ namespace Switchboard.UI
         public int ContactCount => directory.Entries.Count;
         public int PageCount => Mathf.Max(1, Mathf.CeilToInt(ContactCount / (float)directory.ContactsPerPage));
         public BookEntry ContactAt(int index) => directory.Entries[index];
+        /// <summary>The row with the hover tint: under the pointer, on the open book, and its jack can be marked.</summary>
+        public PhoneBookContactRow HoveredRow => hoveredRow;
         public bool CanGoBack => CurrentSpreadIndex > 0;
         public bool CanGoForward => (CurrentSpreadIndex + 1) * 2 * directory.ContactsPerPage < ContactCount;
         private int ContactsPerSpread => 2 * directory.ContactsPerPage;
@@ -138,6 +145,8 @@ namespace Switchboard.UI
 
         private void RefreshPages()
         {
+            // A turned page shows other entries in the same rows; the next hover finds the right one.
+            ClearHover();
             if (leftPage != null) leftPage.Render(directory, CurrentSpreadIndex * 2, pageMessage);
             if (rightPage != null) rightPage.Render(directory, CurrentSpreadIndex * 2 + 1);
             if (previousSpread != null) previousSpread.gameObject.SetActive(CanGoBack);
@@ -191,16 +200,57 @@ namespace Switchboard.UI
             return 0;
         }
 
+        /// <summary>The open spread's row under a screen point (the page corners come first), or null.</summary>
+        public PhoneBookContactRow RowAt(Vector2 position, Camera camera)
+        {
+            if (!IsOpen || PageTurnDirectionAt(position, camera) != 0) return null;
+            PhoneBookContactRow row = leftPage != null ? leftPage.RowAt(position, camera) : null;
+            return row != null ? row : rightPage != null ? rightPage.RowAt(position, camera) : null;
+        }
+
+        /// <summary>
+        /// Tints the row under the pointer (10b fix 1), found by position like a click; the cord input calls it with
+        /// its top hit's position each frame. Nothing shows while the book is shut or paused, or for a row whose jack
+        /// is off the open board (a click there does nothing either).
+        /// </summary>
+        public void HoverAt(Vector2 position, Camera camera)
+        {
+            PhoneBookContactRow row = IsOpen && InputEnabled ? RowAt(position, camera) : null;
+            if (row != null && CanPickJack != null && !CanPickJack(row.Jack)) row = null;
+            SetHoveredRow(row);
+        }
+
+        public void ClearHover() => SetHoveredRow(null);
+
+        private void SetHoveredRow(PhoneBookContactRow row)
+        {
+            if (hoveredRow == row) return;
+            if (hoveredRow != null) hoveredRow.SetHovered(false);
+            hoveredRow = row;
+            if (hoveredRow != null) hoveredRow.SetHovered(true);
+        }
+
         public void OnPointerDown(PointerEventData eventData) { }
 
+        // Like the page corners, rows are found by position: the open book's art is the only raycast target (D58).
         public void OnPointerClick(PointerEventData eventData)
         {
             if (!IsOpen || !InputEnabled || openBook == null || eventData.button != PointerEventData.InputButton.Left) return;
             int direction = PageTurnDirectionAt(eventData.position, eventData.pressEventCamera);
-            if (direction < 0) PreviousSpread();
-            else if (direction > 0) NextSpread();
-            else if (RectTransformUtility.RectangleContainsScreenPoint((RectTransform)openBook.transform,
-                         eventData.position, eventData.pressEventCamera)) SetOpen(false);
+            if (direction < 0) { PreviousSpread(); return; }
+            if (direction > 0) { NextSpread(); return; }
+            PhoneBookContactRow row = RowAt(eventData.position, eventData.pressEventCamera);
+            if (row != null)
+            {
+                // A jack outside the open board can't be marked: the click does nothing and the book stays open.
+                if (CanPickJack != null && !CanPickJack(row.Jack)) return;
+                string jack = row.Jack;
+                SetOpen(false);
+                JackPicked?.Invoke(jack);
+                return;
+            }
+            if (RectTransformUtility.RectangleContainsScreenPoint((RectTransform)openBook.transform,
+                    eventData.position, eventData.pressEventCamera)) SetOpen(false);
         }
 
         private void Awake()
@@ -255,6 +305,7 @@ namespace Switchboard.UI
         {
             bool changed = IsOpen != value;
             IsOpen = value;
+            if (!value) ClearHover();
             closedBook.gameObject.SetActive(!value);
             openBook.gameObject.SetActive(value);
             if (changed) OpenChanged?.Invoke(value);

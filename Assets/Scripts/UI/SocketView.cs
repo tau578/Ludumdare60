@@ -34,6 +34,11 @@ namespace Switchboard.UI
 
         public void SetCallConnected(bool connected) => Graphic.SetCallConnected(connected && IsOccupied);
 
+        /// <summary>The jack's lamp (D58): the call in hand's caller blinks; a marked jack glows; a waiting caller is dark.</summary>
+        public void SetLamp(SocketLamp lamp) => Graphic.SetLamp(lamp);
+        public void FlareLamp() => Graphic.FlareLamp();
+        public SocketLamp Lamp => Graphic.Lamp;
+
         public bool TryOccupy(CableController cable)
         {
             if (cable == null || IsOccupied || !open) return false;

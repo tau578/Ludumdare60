@@ -31,10 +31,29 @@ namespace Switchboard.UI
         private bool dimmed;
         private bool callConnected;
         private SocketHaloGraphic halo;
+        private SocketLamp lamp;
+        private SocketLampGraphic lampGraphic;
         public bool IsHighlighted => highlighted;
         public bool IsBlockedHighlight => blockedHighlight;
         public bool IsDimmed => dimmed;
         public bool IsCallConnected => callConnected;
+        /// <summary>The lamp asked for (D58); a closed socket never shows it.</summary>
+        public SocketLamp Lamp => lamp;
+        public bool IsLampShowing => lampGraphic != null && lampGraphic.gameObject.activeSelf;
+        public SocketLampGraphic LampGraphic => lampGraphic;
+
+        public void SetLamp(SocketLamp value)
+        {
+            if (lamp == value) return;
+            lamp = value;
+            RefreshLamp();
+        }
+
+        /// <summary>A brief flare of a waiting caller's dark lamp (hovering its card, D58 fix 2).</summary>
+        public void FlareLamp()
+        {
+            if (IsLampShowing) lampGraphic.Flare();
+        }
 
         public void SetDimmed(bool value)
         {
@@ -42,6 +61,7 @@ namespace Switchboard.UI
             dimmed = value;
             SetVerticesDirty();
             RefreshHalo();
+            RefreshLamp();
         }
 
         public void SetCallConnected(bool value)
@@ -81,12 +101,37 @@ namespace Switchboard.UI
                 rect.sizeDelta = Vector2.zero;
                 halo = child.AddComponent<SocketHaloGraphic>();
                 halo.raycastTarget = false;
+                // The lamp glows under the hover and connected rings.
+                if (lampGraphic != null) lampGraphic.transform.SetAsFirstSibling();
             }
             if (halo == null) return;
             halo.color = blockedHighlight ? new Color32(241, 87, 70, 255)
                 : ShowsConnected ? new Color32(125, 255, 155, 255) : SocketHaloGraphic.HoverColor;
             halo.Intensity = ShowsConnected && !blockedHighlight ? 1.4f : 1f;
             halo.gameObject.SetActive(visible);
+        }
+
+        private void RefreshLamp()
+        {
+            bool visible = isActiveAndEnabled && !dimmed && lamp != SocketLamp.Off;
+            if (lampGraphic == null && visible)
+            {
+                var child = new GameObject("Socket lamp", typeof(RectTransform), typeof(CanvasRenderer));
+                child.hideFlags = HideFlags.DontSave;
+                child.layer = gameObject.layer;
+                var rect = (RectTransform)child.transform;
+                rect.SetParent(transform, false);
+                rect.SetAsFirstSibling();
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.sizeDelta = Vector2.zero;
+                lampGraphic = child.AddComponent<SocketLampGraphic>();
+                lampGraphic.raycastTarget = false;
+                lampGraphic.color = SocketLampGraphic.LampColor;
+            }
+            if (lampGraphic == null) return;
+            lampGraphic.gameObject.SetActive(visible);
+            if (visible) lampGraphic.Mode = lamp;
         }
 
         protected override void OnPopulateMesh(VertexHelper mesh)
@@ -152,6 +197,7 @@ namespace Switchboard.UI
         {
             base.OnEnable();
             RefreshHalo();
+            RefreshLamp();
         }
 
         protected override void OnDisable()
@@ -161,6 +207,7 @@ namespace Switchboard.UI
             // Closing a board section hides its graphic, but an existing call can survive a dev reset.
             if (!dimmed) callConnected = false;
             if (halo != null) halo.gameObject.SetActive(false);
+            if (lampGraphic != null) lampGraphic.gameObject.SetActive(false);
             base.OnDisable();
         }
 
@@ -170,6 +217,11 @@ namespace Switchboard.UI
             {
                 if (Application.isPlaying) Destroy(halo.gameObject);
                 else DestroyImmediate(halo.gameObject);
+            }
+            if (lampGraphic != null)
+            {
+                if (Application.isPlaying) Destroy(lampGraphic.gameObject);
+                else DestroyImmediate(lampGraphic.gameObject);
             }
             base.OnDestroy();
         }

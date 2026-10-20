@@ -104,9 +104,14 @@ namespace Switchboard.Game.Tests
             spotlight.Dim.OnPointerDown(null);
         }
 
+        // Steps 2 and 3: the message, then the caller's blinking jack; each moves on with a click after its guard.
         private void ReadMessage(CallCardView card)
         {
             FinishTyping(card);
+            Sequence.Tick(FirstOrderGuideSequence.ReadClickDelay);
+            PressDim();
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.CallerJack), "setup");
             Sequence.Tick(FirstOrderGuideSequence.ReadClickDelay);
             PressDim();
             Invoke(guide, "LateUpdate");
@@ -145,11 +150,38 @@ namespace Switchboard.Game.Tests
             spotlight.Advance(3);
             for (int i = 0; i < spotlight.TargetCount; i++)
             {
+                if (!spotlight.TargetAt(i).Lit)
+                {
+                    // Clicks only (step 5's page corners): no hole.
+                    Assert.That(spotlight.HasGoal(i), Is.False, $"{stage} target {i} is not lit");
+                    continue;
+                }
                 Assert.That(spotlight.HasGoal(i), Is.True, $"{stage} hole {i}");
                 Assert.That(spotlight.Dim.HoleStrength(i), Is.EqualTo(1f), $"{stage} hole {i}");
             }
             Assert.That(spotlight.Hint.gameObject.activeSelf && spotlight.Arrow.gameObject.activeSelf, Is.True);
             Assert.That(spotlight.Dim.Blocking, Is.True, $"{stage} is mandatory");
+        }
+
+        private void BookClick(RectTransform target) => book.OnPointerClick(new PointerEventData(null)
+            { position = Centre(target), button = PointerEventData.InputButton.Left });
+
+        private void AssertReadingStep(TutorialTexts texts, string recipient)
+        {
+            var targets = new List<Transform> { (Transform)book.RowOnSpread(recipient) ?? book.PageCorner(book.SpreadDirectionTo(recipient)) };
+            Assert.That(targets[0], Is.Not.Null);
+            foreach (int direction in new[] { -1, 1 })
+            {
+                RectTransform corner = book.PageCorner(direction);
+                if (corner != null && !targets.Contains(corner)) targets.Add(corner);
+            }
+            AssertStep(FirstOrderGuideStage.ReadingBook, texts.findJacks, targets.ToArray());
+            Assert.That(spotlight.TargetAt(0).Lit && spotlight.TargetAt(0).Clickable, Is.True, "the recipient is lit and clickable");
+            for (int i = 1; i < spotlight.TargetCount; i++)
+            {
+                Assert.That(spotlight.TargetAt(i).Lit, Is.False, "the other corners only take clicks");
+                Assert.That(Blocked(spotlight.TargetAt(i).Rect), Is.False, "page corners turn the pages");
+            }
         }
 
         // Every place a player might click, except the step's own; the open book counts only while it is the step.
@@ -212,6 +244,29 @@ namespace Switchboard.Game.Tests
             Assert.That(session.Calls.Live.Count, Is.EqualTo(1));
             Assert.That(book.IsOpen, Is.False);
             Assert.That(cable.IsInTray, Is.True);
+
+            // 10b fix 1: step 3 lights the caller's jack, which the game makes blink (the call in hand: brighter).
+            CallerJackLights lights = All<CallerJackLights>().Single();
+            lights.Refresh();
+            AssertStep(FirstOrderGuideStage.CallerJack, texts.callerJack, a.transform);
+            Assert.That(texts.callerJack, Is.EqualTo("This blinking light is the caller's line. Now find who they want."));
+            Assert.That(a.Lamp, Is.EqualTo(SocketLamp.Blinking), "the caller's jack blinks");
+            Assert.That(spotlight.TargetAt(0).Round && !spotlight.TargetAt(0).Clickable, Is.True, "a round hole that only shows");
+            AssertBlockedEverywhereBut(call, card);
+            Assert.That(Blocked(a.transform), Is.True, "the jack takes no plug here");
+            book.Toggle();
+            Assert.That(book.IsOpen, Is.False, "the book waits for its own step");
+            Click(cable.TrayView.transform);
+            Click(a.transform);
+            Assert.That(cable.IsInTray && !a.IsOccupied, Is.True, "a blocked click changes nothing");
+            PressDim();
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.CallerJack), "the click that read the message is a stray one");
+            Sequence.Tick(FirstOrderGuideSequence.ReadClickDelay);
+            PressDim();
+            Invoke(guide, "LateUpdate");
+            Assert.That(call.State, Is.EqualTo(before), "the advancing click does nothing else");
+            Assert.That(cable.IsInTray && !a.IsOccupied, Is.True);
             AssertStep(FirstOrderGuideStage.Book, texts.openBook, book.ClosedBookGraphic.transform);
             AssertBlockedEverywhereBut(call, card, book.ClosedBookGraphic.transform);
             Click(cable.TrayView.transform);
@@ -219,21 +274,38 @@ namespace Switchboard.Game.Tests
             book.Toggle();
             Assert.That(book.IsOpen, Is.True, "the book step opens the book");
 
-            // Book.json sets how many spreads there are: a row on another spread lights the corner that turns to it.
-            Transform[] rows = new[] { call.Request.From.Label, call.Request.To.Label }
-                .Select(jack => (Transform)(book.RowOnSpread(jack) ?? book.PageCorner(book.SpreadDirectionTo(jack))))
-                .Distinct().ToArray();
-            Assert.That(rows.All(r => r != null), Is.True);
-            AssertStep(FirstOrderGuideStage.ReadingBook, texts.findJacks, rows);
+            // D58: the board lights the caller's jack, so only the recipient's row lights (Book.json sets how many
+            // spreads there are: a row on another spread lights the corner that turns to it). The corners take clicks.
+            string recipient = call.Request.To.Label;
+            AssertReadingStep(texts, recipient);
             AssertBlockedEverywhereBut(call, card);
-            Assert.That(spotlight.BlocksScreenPoint(Centre(book.OpenBookRect)), Is.False, "the whole open book takes clicks");
-            foreach (int direction in new[] { -1, 1 })
+            RectTransform callerRow = book.RowOnSpread(call.Request.From.Label);
+            if (callerRow != null && callerRow != book.RowOnSpread(recipient))
+                Assert.That(Blocked(callerRow), Is.True, "only the recipient's row takes the click");
+            if (book.RowAt(Centre(book.OpenBookRect), null) == null)
+                Assert.That(spotlight.BlocksScreenPoint(Centre(book.OpenBookRect)), Is.True, "the rest of the book is dark");
+            while (book.RowOnSpread(recipient) == null)
             {
-                RectTransform corner = book.PageCorner(direction);
-                if (corner != null) Assert.That(Blocked(corner), Is.False, "page corners turn the pages");
+                RectTransform corner = book.PageCorner(book.SpreadDirectionTo(recipient));
+                Assert.That(Blocked(corner), Is.False, "the lit corner turns the page");
+                BookClick(corner);
+                Invoke(guide, "LateUpdate");
+                AssertReadingStep(texts, recipient);
             }
+            RectTransform row = book.RowOnSpread(recipient);
+            Assert.That(Blocked(row), Is.False, "the recipient's row takes the click");
+            // 10b fix 1: the lit row tints under the pointer; a blocked row is under the dark layer and shows none.
+            input.ProcessTarget(book.OpenBookRect.gameObject, null, Centre(row), false);
+            Assert.That(book.HoveredRow, Is.SameAs(row.GetComponent<PhoneBookContactRow>()));
+            if (callerRow != null && callerRow != row)
+            {
+                input.ProcessTarget(spotlight.Dim.gameObject, null, Centre(callerRow), false);
+                Assert.That(book.HoveredRow, Is.Null, "a blocked row shows no hover");
+            }
+            BookClick(row);
+            Assert.That(book.IsOpen, Is.False, "the row click closes the book");
+            Assert.That(lights.MarkedJack, Is.EqualTo(recipient), "and marks the jack");
 
-            book.Toggle();
             AssertStep(FirstOrderGuideStage.Cables, texts.takeCord, All<CableController>()
                 .Where(c => c.gameObject.activeInHierarchy && c.IsInTray).Select(c => c.TrayView.transform).ToArray());
             AssertBlockedEverywhereBut(call, card, All<CableController>()
@@ -245,18 +317,24 @@ namespace Switchboard.Game.Tests
 
             Click(cable.TrayView.transform);
             Assert.That(cable.Phase, Is.EqualTo(CablePhase.Held), "the tray cord takes the click");
-            AssertStep(FirstOrderGuideStage.Plugging, texts.plugJacks, a.transform, b.transform);
+            // 10b fix 2: one jack at a time. Step 7a lights only the caller's blinking jack.
+            AssertStep(FirstOrderGuideStage.PluggingCaller, texts.plugCaller, a.transform);
+            lights.Refresh();
+            // As in real play: the caller's jack blinks, the marked recipient glows steadily.
+            Assert.That(a.Lamp, Is.EqualTo(SocketLamp.Blinking), "the game blinks the caller's jack");
+            Assert.That(b.Lamp, Is.EqualTo(SocketLamp.Steady), "and the marked one glows");
             Assert.That(spotlight.TargetAt(0).Round, Is.True, "jacks get round holes");
-            AssertBlockedEverywhereBut(call, card, a.transform, b.transform);
-            Assert.That(Blocked(b.transform), Is.False);
+            AssertBlockedEverywhereBut(call, card, a.transform);
+            Assert.That(Blocked(b.transform), Is.True, "the found jack waits for step 7b");
 
-            // Only the call's two jacks take a plug; any other click keeps the cord in hand (no drop, no return).
+            // Only the caller's jack takes a plug; any other click keeps the cord in hand (no drop, no return).
             Click(other.transform);
+            Click(b.transform);
             Click(cable.TrayView.transform);
             Click(card.transform);
             input.ProcessTarget(spotlight.Dim.gameObject, null, new Vector2(5, 5), true);
             Assert.That(cable.Phase, Is.EqualTo(CablePhase.Held), "a blocked click never drops a held cord");
-            Assert.That(other.IsOccupied, Is.False);
+            Assert.That(other.IsOccupied || b.IsOccupied, Is.False);
             Assert.That(input.ActiveCable, Is.SameAs(cable));
             book.Toggle();
             Assert.That(book.IsOpen, Is.False);
@@ -264,6 +342,16 @@ namespace Switchboard.Game.Tests
             Click(a.transform);
             bridge.Synchronize();
             Assert.That(a.OccupyingCable, Is.SameAs(cable));
+            Invoke(guide, "LateUpdate");
+            // Step 7b: only the jack found in the book.
+            AssertStep(FirstOrderGuideStage.PluggingRecipient, texts.plugRecipient, b.transform);
+            lights.Refresh();
+            Assert.That(b.Lamp, Is.EqualTo(SocketLamp.Steady), "the found jack still glows");
+            AssertBlockedEverywhereBut(call, card, b.transform);
+            Assert.That(Blocked(a.transform), Is.True, "the caller's plug stays put");
+            Click(a.transform);
+            Assert.That(a.OccupyingCable, Is.SameAs(cable));
+            Assert.That(cable.Phase, Is.EqualTo(CablePhase.OneEndConnected));
             Click(other.transform);
             Assert.That(other.IsOccupied, Is.False, "a wrong number is impossible in the tutorial");
             Click(b.transform);
@@ -273,7 +361,7 @@ namespace Switchboard.Game.Tests
             Transform header = All<RectTransform>().Single(t => t.name == "HeaderSlot" && t.parent.name == "UpgradeShopPanel");
             AssertStep(FirstOrderGuideStage.Connected, texts.connected, header);
             AssertBlockedEverywhereBut(call, card);
-            Assert.That(Blocked(header), Is.True, "step 7 takes any click only to dismiss itself");
+            Assert.That(Blocked(header), Is.True, "step 8 takes any click only to dismiss itself");
             Assert.That(call.WaitingHeld, Is.False, "connected: the tutorial's hold on the call is over");
 
             session.Tick(call.SecondsLeft + .1);
@@ -320,13 +408,13 @@ namespace Switchboard.Game.Tests
             }
             RectTransform secret = shop.ButtonFor(shop.Secret);
             AssertStep(FirstOrderGuideStage.Mystery, spotlight.Texts.mystery, secret);
-            Assert.That(Blocked(secret), Is.True, "any click only dismisses step 9");
+            Assert.That(Blocked(secret), Is.True, "any click only dismisses step 10");
 
             Sequence.Tick(FirstOrderGuideSequence.ConnectedClickDelay);
             PressDim();
             Invoke(guide, "LateUpdate");
             Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.WaitingForShop), "More Profit and More Clients may follow");
-            Assert.That(session.ShopHintsDone, Is.EqualTo(ShopHints.Cord | ShopHints.Mystery), "the save remembers steps 8-9");
+            Assert.That(session.ShopHintsDone, Is.EqualTo(ShopHints.Cord | ShopHints.Mystery), "the save remembers steps 9-10");
             Assert.That(spotlight.Dim.Blocking, Is.False);
             spotlight.Advance(1);
             Assert.That(spotlight.gameObject.activeSelf, Is.False);
@@ -344,13 +432,13 @@ namespace Switchboard.Game.Tests
             IUpgrade cord = session.Upgrades.ChainOf(UpgradeKind.ExtraWires)[0];
             IUpgrade profit = session.Upgrades.ChainOf(UpgradeKind.ExtraIncome)[0];
             IUpgrade clients = session.Upgrades.ChainOf(UpgradeKind.ExtraClients)[0];
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.BuyCord), "steps 8-9 first");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.BuyCord), "steps 9-10 first");
             Invoke(shop.ButtonFor(cord).GetComponent<UpgradeSlotView>(), "OnClick");
             Invoke(guide, "LateUpdate");
             Assert.That(guide.Stage, Is.EqualTo(shop.Secret != null ? FirstOrderGuideStage.Mystery : FirstOrderGuideStage.WaitingForShop));
             Sequence.Tick(FirstOrderGuideSequence.MysterySeconds);
             Invoke(guide, "LateUpdate");
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.WaitingForShop), "a short gap after step 9");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.WaitingForShop), "a short gap after step 10");
 
             Sequence.Tick(FirstOrderGuideSequence.ShopHintGapSeconds);
             Invoke(guide, "LateUpdate");
@@ -432,7 +520,7 @@ namespace Switchboard.Game.Tests
         [Test]
         public void ContinueAfterAnEarlySaveSkipsTheFirstCallButShowsTheCordStep()
         {
-            // Saved during step 7 (the first fee moved the money), then reloaded: Continue.
+            // Saved during step 8 (the first fee moved the money), then reloaded: Continue.
             Open(SaveWithHints(ShopHints.None));
             Assert.That(session.IsTutorial, Is.False);
             session.Tick(3);
@@ -490,7 +578,7 @@ namespace Switchboard.Game.Tests
             ConnectTheFirstCall();
             IUpgrade first = session.Upgrades.ChainOf(UpgradeKind.ExtraWires)[0];
             session.Wallet.Earn(first.CostCents);
-            Assert.That(session.Upgrades.TryBuy(first.Id), Is.True, "setup: bought during step 7");
+            Assert.That(session.Upgrades.TryBuy(first.Id), Is.True, "setup: bought during step 8");
             Sequence.Tick(FirstOrderGuideSequence.ConnectedSeconds);
             Invoke(guide, "LateUpdate");
             Assert.That(guide.Stage, Is.EqualTo(shop.Secret != null ? FirstOrderGuideStage.Mystery : FirstOrderGuideStage.Complete),
@@ -519,6 +607,7 @@ namespace Switchboard.Game.Tests
             Click(cable.TrayView.transform);
             Call call = card.Call;
             Click(Socket(call.Request.From).transform);
+            Invoke(guide, "LateUpdate"); // step 7b
             Click(Socket(call.Request.To).transform);
             bridge.Synchronize();
             Assert.That(call.State, Is.EqualTo(CallState.Connected), "setup");
@@ -539,7 +628,7 @@ namespace Switchboard.Game.Tests
             book.Toggle();
             CableController cable = TrayCord();
             Click(cable.TrayView.transform);
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Plugging));
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.PluggingCaller));
             spotlight.Advance(1);
             Assert.That(Blocked(OtherSocket(card.Call).transform), Is.True, "setup");
             // The cord input keeps a held cord when the clicked target is a button (9a); Skip is one, not under the filter.
@@ -655,21 +744,119 @@ namespace Switchboard.Game.Tests
             var card = FirstCard();
             Call call = card.Call;
             Invoke(queue, "OnCardClicked", card);
-            ReadMessage(card);
+            FinishTyping(card);
+            Sequence.Tick(FirstOrderGuideSequence.ReadClickDelay);
+            PressDim();
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.CallerJack), "setup");
+            spotlight.Advance(3);
+            AssertArrowOffOtherJacks(call);
+            Sequence.Tick(FirstOrderGuideSequence.ReadClickDelay);
+            PressDim();
+            Invoke(guide, "LateUpdate");
+            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Book), "setup");
             book.Toggle();
             spotlight.Advance(3);
             Rect page = LocalRect(book.OpenBookRect);
-            Assert.That(page.Overlaps(LocalRect(spotlight.Arrow)), Is.False, "step 4's arrow stops at the book's edge");
+            Assert.That(page.Overlaps(LocalRect(spotlight.Arrow)), Is.False, "step 5's arrow stops at the book's edge");
 
             book.Toggle();
             Click(TrayCord().TrayView.transform);
             spotlight.Advance(3);
+            AssertArrowOffOtherJacks(call);
+        }
+
+        // 10b fix 3: right after a step change the arrow jumped between several places for a moment (steps 7a and
+        // 7b). Every step's arrow must keep its side and direction from its first frame and glide straight to its place.
+        [Test]
+        public void EveryStepsArrowKeepsItsSideAndGlidesStraightToItsPlace()
+        {
+            Open();
+            // The breathing moves the arrow by design; without it, any other movement is the arrow being re-placed.
+            typeof(TutorialSpotlight).GetField("pulse", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(spotlight, 0f);
+            var card = FirstCard();
+            Call call = card.Call;
+            CableController cable = TrayCord();
+            SocketView a = Socket(call.Request.From), b = Socket(call.Request.To);
+            AssertArrowSteady(FirstOrderGuideStage.Portrait);
+            Invoke(queue, "OnCardClicked", card);
+            AssertArrowSteady(FirstOrderGuideStage.TaskText);
+            FinishTyping(card);
+            Sequence.Tick(FirstOrderGuideSequence.ReadClickDelay);
+            PressDim();
+            Invoke(guide, "LateUpdate");
+            AssertArrowSteady(FirstOrderGuideStage.CallerJack);
+            Sequence.Tick(FirstOrderGuideSequence.ReadClickDelay);
+            PressDim();
+            Invoke(guide, "LateUpdate");
+            AssertArrowSteady(FirstOrderGuideStage.Book);
+            book.Toggle();
+            AssertArrowSteady(FirstOrderGuideStage.ReadingBook);
+            string recipient = call.Request.To.Label;
+            while (book.RowOnSpread(recipient) == null)
+            {
+                BookClick(book.PageCorner(book.SpreadDirectionTo(recipient)));
+                Invoke(guide, "LateUpdate");
+                AssertArrowSteady(FirstOrderGuideStage.ReadingBook);
+            }
+            BookClick(book.RowOnSpread(recipient));
+            AssertArrowSteady(FirstOrderGuideStage.Cables);
+            Click(cable.TrayView.transform);
+            AssertArrowSteady(FirstOrderGuideStage.PluggingCaller);
+            Click(a.transform);
+            bridge.Synchronize();
+            Invoke(guide, "LateUpdate");
+            AssertArrowSteady(FirstOrderGuideStage.PluggingRecipient);
+            Click(b.transform);
+            bridge.Synchronize();
+            Invoke(guide, "LateUpdate");
+            AssertArrowSteady(FirstOrderGuideStage.Connected);
+            session.Wallet.Earn(session.Upgrades.ChainOf(UpgradeKind.ExtraWires)[0].CostCents);
+            Sequence.Tick(FirstOrderGuideSequence.ConnectedSeconds);
+            Invoke(guide, "LateUpdate");
+            AssertArrowSteady(FirstOrderGuideStage.BuyCord);
+        }
+
+        private void AssertArrowSteady(FirstOrderGuideStage stage)
+        {
+            Assert.That(guide.Stage, Is.EqualTo(stage), "setup");
+            const int frames = 240;
+            var positions = new Vector2[frames];
+            var angles = new float[frames];
+            var sides = new int[frames];
+            var path = new System.Text.StringBuilder();
+            for (int i = 0; i < frames; i++)
+            {
+                spotlight.Advance(1 / 60f);
+                Assert.That(spotlight.Arrow.gameObject.activeSelf, Is.True, $"{stage} frame {i}: the arrow shows");
+                // The tip, which rides on the hole; the tail follows the hint, and the length moves in whole units.
+                positions[i] = Tip();
+                angles[i] = spotlight.Arrow.localEulerAngles.z;
+                sides[i] = System.Convert.ToInt32(Field<object>(spotlight, "side"));
+                if (i < 40) path.Append($" {positions[i]:F1}@{angles[i]:F0}");
+            }
+            Vector2 end = positions[frames - 1];
+            Assert.That(Vector2.Distance(positions[frames - 2], end), Is.LessThan(.01f), $"{stage}: the arrow settles");
+            for (int i = 1; i < frames; i++)
+            {
+                Assert.That(Mathf.Abs(Mathf.DeltaAngle(angles[i], angles[0])), Is.LessThan(.01f),
+                    $"{stage} frame {i}: the arrow turned from {angles[0]} to {angles[i]};{path}");
+                Assert.That(sides[i], Is.EqualTo(sides[0]), $"{stage} frame {i}: the hint changed sides");
+                // Closer to where it lands every frame: never back and forth.
+                Assert.That(Vector2.Distance(positions[i], end), Is.LessThanOrEqualTo(Vector2.Distance(positions[i - 1], end) + .01f),
+                    $"{stage} frame {i}: the arrow moved away from its place;{path}");
+            }
+        }
+
+        private void AssertArrowOffOtherJacks(Call call)
+        {
             Rect arrow = LocalRect(spotlight.Arrow);
             foreach (SocketView socket in All<SocketView>().Where(s => s.gameObject.activeInHierarchy &&
                          s.Address != call.Request.From.Label && s.Address != call.Request.To.Label))
             {
                 Rect jack = LocalRect((RectTransform)socket.transform);
-                Assert.That(Vector2.Distance(Tip(), jack.center), Is.GreaterThan(jack.width * .5f), $"the arrow tip is on {socket.Address}");
+                Assert.That(Vector2.Distance(Tip(), jack.center), Is.GreaterThan(jack.width * .5f),
+                    $"{guide.Stage}: the arrow tip is on {socket.Address}");
             }
             Assert.That(arrow.width, Is.GreaterThan(0));
         }

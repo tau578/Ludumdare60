@@ -1093,11 +1093,12 @@ MonoBehaviour:
     clickCaller: A call! Click the caller to answer.
     readMessage: Read who they want to talk to.
     readMessageDone: Read who they want to talk to. Click to continue.
+    callerJack: This blinking light is the caller's line. Now find who they want.
     openBook: Open the phone book.
-    findJacks: 'Find both jacks: the caller''s and the one they want. Then click
-      the book to close it.'
+    findJacks: Find who they want and click their name.
     takeCord: Take a cord.
-    plugJacks: Plug one end into each jack.
+    plugCaller: Plug one end into the caller's blinking jack.
+    plugRecipient: Now plug the other end into the jack you found.
     connected: Connected! You earn money while they talk.
     buyCord: You can afford another cord. Buy it to handle two calls at once.
     mystery: Save up for the mystery upgrade!

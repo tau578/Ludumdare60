@@ -63,6 +63,25 @@ namespace Switchboard.Game
             }
         }
 
+        /// <summary>The call whose card is open and still waits for its connection: the call in hand (D58).</summary>
+        public Call CallInHand
+        {
+            get
+            {
+                foreach (CallCardView card in shown)
+                    if (card != null && card.IsGivingTask) return card.Call;
+                return null;
+            }
+        }
+
+        /// <summary>Fills the list with the calls on cards, in slot order; a call still waiting for a slot has none.</summary>
+        public void CollectShownCalls(List<Call> into)
+        {
+            into.Clear();
+            foreach (CallCardView card in shown)
+                if (card != null && card.Call != null) into.Add(card.Call);
+        }
+
         public bool ShowDurations
         {
             get => showDurations;
