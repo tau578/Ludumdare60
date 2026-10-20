@@ -51,7 +51,7 @@ namespace Switchboard.Game
             // One bell for this new order. No reminders while its card stays in the queue.
             ringSource.loop = false;
             ringSource.pitch = e.Call.HasResponseTime ? 1.18f : 1f;
-            ringSource.PlayOneShot(incoming, .65f);
+            ringSource.PlayOneShot(incoming, .4875f);
         }
 
         private void OnChanged(CallStateChangedArgs e)

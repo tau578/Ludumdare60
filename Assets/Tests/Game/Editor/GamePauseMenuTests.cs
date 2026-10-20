@@ -154,20 +154,20 @@ namespace Switchboard.Game.Tests
                 Assert.That(bar.raycastTarget, Is.False, bar.name);
         }
 
-        // 9a pass 3: anchored to the screen's top-right corner, so it follows the corner at any aspect ratio, and short
+        // Anchored to the 1920x1080 play area's top-right corner, including on letterboxed screens, and short
         // enough to stay above the shop panel's art (about 85 reference px from the top at 16:9).
         [Test]
-        public void ThePauseButtonSitsInTheTopRightCorner()
+        public void ThePauseButtonSitsInThePlayAreaTopRightCorner()
         {
             var button = (RectTransform)pause.transform.Find("PauseButton");
-            Assert.That(button.anchorMin, Is.EqualTo(Vector2.one));
-            Assert.That(button.anchorMax, Is.EqualTo(Vector2.one));
+            Assert.That(button.anchorMin, Is.EqualTo(Vector2.one * .5f));
+            Assert.That(button.anchorMax, Is.EqualTo(Vector2.one * .5f));
             Assert.That(button.pivot, Is.EqualTo(Vector2.one));
             Assert.That(button.sizeDelta.x, Is.GreaterThanOrEqualTo(72f));
             Assert.That(button.sizeDelta.y, Is.GreaterThanOrEqualTo(72f));
-            Assert.That(button.anchoredPosition.x, Is.InRange(-16f, 0f));
-            Assert.That(button.anchoredPosition.y, Is.InRange(-16f, 0f));
-            Assert.That(-button.anchoredPosition.y + button.sizeDelta.y, Is.LessThanOrEqualTo(80f), "the button reaches down into the shop panel");
+            Assert.That(button.anchoredPosition.x, Is.InRange(944f, 960f));
+            Assert.That(button.anchoredPosition.y, Is.InRange(524f, 540f));
+            Assert.That(540f - button.anchoredPosition.y + button.sizeDelta.y, Is.LessThanOrEqualTo(80f), "the button reaches down into the shop panel");
             var stretch = (RectTransform)pause.transform;
             Assert.That(stretch.anchorMin, Is.EqualTo(Vector2.zero));
             Assert.That(stretch.anchorMax, Is.EqualTo(Vector2.one));

@@ -2867,7 +2867,7 @@ PrefabInstance:
       objectReference: {fileID: 8616984818015709328, guid: b9031aec38e6f0c45ae0813ea73cead0, type: 2}
     - target: {fileID: 7341963678683996979, guid: 10d01240acfa80a43a4156c2c78c1063, type: 3}
       propertyPath: m_text
-      value: "Dmitry Tarbaev - Game Design; \nAnton Splavnik - Programming;
+      value: "Dmitrii Tarbaev - Game Design; \nAnton Splavnik - Programming;
         \nMia Rose - Art, Ui/Ux Design; \nSergei Voronov - Technical Design. "
       objectReference: {fileID: 0}
     - target: {fileID: 7341963678683996979, guid: 10d01240acfa80a43a4156c2c78c1063, type: 3}
