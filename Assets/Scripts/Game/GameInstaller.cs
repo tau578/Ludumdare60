@@ -20,7 +20,11 @@ namespace Switchboard.Game
 
         public GameSession Session { get; private set; }
 
-        private void Start()
+        private void Start() => Install(Application.isPlaying ? SaveStorage.OpenFile() : null, null);
+
+        /// <param name="saveFile">The player's save; null outside Play Mode, so EditMode tests never touch it.</param>
+        /// <param name="restored">Tests only: progress to start from when there is no save file.</param>
+        private void Install(SaveFile saveFile, SaveData restored)
         {
             if (config == null)
             {
@@ -51,20 +55,21 @@ namespace Switchboard.Game
 
             // The save loads after the content and before the session is built (Design 4.4, step 2). EditMode tests
             // build the game outside Play Mode, and must never read or write the player's real save.
-            SaveFile saveFile = Application.isPlaying ? SaveStorage.OpenFile() : null;
             SaveLoad save = saveFile?.Load();
             if (save != null)
                 foreach (string message in save.Messages) Debug.LogWarning(message, this);
+            SaveData progress = save?.Data ?? restored;
 
             // Trim unused prefab cords before binding; missing starting cords are added below.
             cordBridge.Attach(scene, config.ExtraCordColors, economy.StartingCords);
             if (cordBridge.CordCount > economy.StartingCords)
                 Debug.LogWarning($"The scene has {cordBridge.CordCount} cords but Economy.json starts with {economy.StartingCords}.", config);
-            Session = new GameSession(new GameContent(economy), cordBridge, save?.Data, tutorial: true);
+            Session = new GameSession(new GameContent(economy), cordBridge, progress, tutorial: true);
             cordBridge.Bind(Session.Desk, Session.Calls);
             cordBridge.EnsureCords(Session.Stats.Cords);
             Session.Stats.Changed += OnStatsChanged;
-            moneyCounter.Bind(Session.Wallet, LevelScene.FindShopHeader(scene), Session.Penalties, Session.Upgrades);
+            RectTransform shopHeader = LevelScene.FindShopHeader(scene);
+            moneyCounter.Bind(Session.Wallet, shopHeader, Session.Penalties, Session.Upgrades);
             RectTransform[] callerSlots = LevelScene.FindCallerSlots(scene);
             if (callerSlots.Length < economy.MostClientSlots)
                 Debug.LogWarning($"The caller panel has {callerSlots.Length} slots, but Economy.json can open {economy.MostClientSlots} " +
@@ -77,10 +82,19 @@ namespace Switchboard.Game
             goalPanel.Bind(Session.Goal);
             loopRunner.Bind(Session);
             if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls);
-            var guide = GetComponent<FirstOrderGuide>();
-            if (guide == null) guide = gameObject.AddComponent<FirstOrderGuide>();
-            guide.Bind(callQueue, Session.Calls, bookView,
-                LevelScene.FindAll<CableController>(scene).ToArray(), cordBridge);
+            // The tutorial (D57) runs only on a new game; the session decides, so the one-call start agrees.
+            List<TutorialSpotlight> spotlights = LevelScene.FindAll<TutorialSpotlight>(scene);
+            foreach (TutorialSpotlight spotlight in spotlights) spotlight.gameObject.SetActive(false);
+            if (Session.IsTutorial)
+            {
+                if (spotlights.Count != 1)
+                    Debug.LogWarning($"The tutorial needs one TutorialSpotlight in GameUI, but found {spotlights.Count}.", this);
+                var guide = GetComponent<FirstOrderGuide>();
+                if (guide == null) guide = gameObject.AddComponent<FirstOrderGuide>();
+                guide.Bind(callQueue, Session.Calls, bookView, LevelScene.FindAll<CableController>(scene).ToArray(), cordBridge,
+                    spotlights.Count == 1 ? spotlights[0] : null, sockets, shopHeader, Session.EndTutorial);
+                guide.BindShop(shop, Session.Upgrades);
+            }
             if (saveFile != null)
             {
                 autosave = GetComponent<Autosave>();

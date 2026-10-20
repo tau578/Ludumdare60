@@ -22,6 +22,14 @@ namespace Switchboard.UI
             emptyMessage = empty;
         }
 
+        /// <summary>The shown row with this jack, or null.</summary>
+        public RectTransform RowWithJack(string jack)
+        {
+            foreach (PhoneBookContactRow row in rows)
+                if (row != null && row.gameObject.activeSelf && row.Jack == jack) return (RectTransform)row.transform;
+            return null;
+        }
+
         public void Render(BookCatalog book, int pageIndex, string message = null)
         {
             if (jackDivider == null)

@@ -223,6 +223,19 @@ namespace Switchboard.UI
         {
             if (suspended) { HidePointers(); return; }
             GameObject target = Raycast(position);
+            ProcessTarget(target, hits.Count > 0 ? hits[0].module.eventCamera : null, position, leftPressed, hover);
+        }
+
+        /// <summary>What a click or hover does on this top raycast hit; integration checks call it directly.</summary>
+        public void ProcessTarget(GameObject target, Camera eventCamera, Vector2 position, bool leftPressed, bool hover = true)
+        {
+            if (suspended) { HidePointers(); return; }
+            if (target != null && target.GetComponent<IPointerBlocker>() != null)
+            {
+                // Blocked (the mandatory tutorial): no pick, plug, drop or return, and no hover on what lies beneath.
+                UpdatePointers(position, null, null, 0, false, hover);
+                return;
+            }
             SocketView hit = target != null ? target.GetComponentInParent<SocketView>() : null;
             // A closed socket (D42) is no target: it doesn't highlight, and a click there only bounces the held cord.
             SocketView socket = hit != null && hit.IsOpen ? hit : null;
@@ -251,7 +264,7 @@ namespace Switchboard.UI
             if (ActiveCable != null && (heldCable.Phase == CablePhase.Ready || heldCable.Phase == CablePhase.Connected)) heldCable = null;
             var clickHandler = target != null ? ExecuteEvents.GetEventHandler<IPointerClickHandler>(target) : null;
             var book = clickHandler != null ? clickHandler.GetComponent<PhoneBookView>() : null;
-            int pageTurn = book != null ? book.PageTurnDirectionAt(position, hits[0].module.eventCamera) : 0;
+            int pageTurn = book != null ? book.PageTurnDirectionAt(position, eventCamera) : 0;
             if (hover) UpdatePointers(position, socket, stored, pageTurn, overOpenBook, true);
             else UpdatePointers(position, null, null, 0, overOpenBook, false);
         }

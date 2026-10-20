@@ -27,6 +27,9 @@ namespace Switchboard.Domain
         /// <summary>Counts down while the call waits, is in hand or is connecting; stops for good once connected.</summary>
         public double ResponseSecondsLeft { get; internal set; }
 
+        /// <summary>The response timer is held: the tutorial's guided call can't run out while the guide runs (D57).</summary>
+        public bool WaitingHeld { get; internal set; }
+
         /// <summary>The fine actually taken when the call ended; 0 if none.</summary>
         public long FineCents { get; internal set; }
     }

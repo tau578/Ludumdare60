@@ -17,7 +17,6 @@ namespace Switchboard.Game.Tests
         private Scene scene;
         private GameSession session;
         private CallQueueView queue;
-        private FirstOrderGuide guide;
         private CordBridge bridge;
         private PhoneBookView book;
 
@@ -47,7 +46,6 @@ namespace Switchboard.Game.Tests
             session = installer.Session;
             Assert.That(session, Is.Not.Null);
             queue = All<CallQueueView>().Single();
-            guide = All<FirstOrderGuide>().Single();
             bridge = All<CordBridge>().Single();
         }
 
@@ -82,32 +80,6 @@ namespace Switchboard.Game.Tests
             var card = All<CallCardView>().Single(c => c.Call == call);
             Invoke(queue, "OnCardClicked", card);
             return card;
-        }
-
-        [Test]
-        public void FirstCordHintTracksAffordabilityAndStopsAfterPurchase()
-        {
-            var shop = All<ShopView>().Single();
-            var first = session.Upgrades.ChainOf(UpgradeKind.ExtraWires)[0];
-            var slots = All<UpgradeSlotView>().OrderByDescending(s => s.transform.position.y).ToArray();
-            int index = Enumerable.Range(0, ShopShelf.SlotCount).Single(i => session.Shelf.OfferAt(i) == first);
-            var graphic = slots[index].GuideGraphic;
-            Invoke(shop, "LateUpdate");
-            Assert.That(graphic.GetComponent<SlowGuidePulse>(), Is.Null);
-            session.Wallet.Earn(first.CostCents);
-            Invoke(shop, "LateUpdate");
-            var pulse = graphic.GetComponent<SlowGuidePulse>();
-            Assert.That(pulse.IsShowing, Is.True);
-            session.Wallet.TrySpend(1);
-            Invoke(shop, "LateUpdate");
-            Assert.That(pulse.IsShowing, Is.False);
-            session.Wallet.Earn(1);
-            Invoke(shop, "LateUpdate");
-            Assert.That(pulse.IsShowing, Is.True);
-            Assert.That(session.Upgrades.TryBuy(first.Id), Is.True);
-            session.Wallet.Earn(10000);
-            Invoke(shop, "LateUpdate");
-            Assert.That(pulse.IsShowing, Is.False, "Later cord upgrades must not repeat the tutorial");
         }
 
         // Economy.json sets the starting board, slots and cords and every upgrade (the designer balances it at any
@@ -156,89 +128,6 @@ namespace Switchboard.Game.Tests
             Assert.That(ActiveCables().Length, Is.EqualTo(session.Stats.Cords));
             Assert.That(ActiveCables().Select(c => c.CableColor).Distinct().Count(), Is.EqualTo(session.Stats.Cords),
                 "every cord has its own colour: removed tray cords come back with theirs before the extra colours");
-        }
-
-        [Test]
-        public void FreshSessionFirstPortraitHasVisibleHaloUntilClicked()
-        {
-            session.Tick(3);
-            Assert.That(All<CallCardView>().Count(c => c.Call != null), Is.EqualTo(1), "only the tutorial call appears at first");
-            var card = All<CallCardView>().Single(c => c.Call == session.Calls.Live[0]);
-            Assert.That(card.Call.Request.Script.Id, Is.EqualTo("call_001"));
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Portrait));
-            var pulse = card.PortraitRect.GetComponent<SlowGuidePulse>();
-            Assert.That(pulse.IsShowing, Is.True);
-            var halo = Field<SocketHaloGraphic>(pulse, "portraitHalo");
-            Assert.That(halo, Is.Not.Null);
-            Assert.That(halo.transform.parent, Is.EqualTo(card.PortraitRect.parent));
-            Assert.That(halo.transform.GetSiblingIndex(), Is.LessThan(card.PortraitRect.GetSiblingIndex()),
-                "the halo sits just before the portrait, so it draws underneath");
-            Assert.That(halo.color.a, Is.EqualTo(1f), "A fresh hint starts at full brightness");
-            Assert.That(halo.raycastTarget, Is.False);
-            var elapsed = typeof(SlowGuidePulse).GetField("elapsed", BindingFlags.Instance | BindingFlags.NonPublic);
-            elapsed.SetValue(pulse, 0f);
-            Invoke(pulse, "Refresh");
-            Assert.That(halo.color.a, Is.EqualTo(.45f).Within(.001));
-            Invoke(queue, "OnCardClicked", card);
-            Assert.That(pulse.IsShowing, Is.False);
-            Assert.That(halo.gameObject.activeSelf, Is.False);
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.TaskText));
-        }
-
-        [Test]
-        public void FinishedFirstDialogueShowsBrightBookSilhouetteUntilOpened()
-        {
-            var card = AcceptOrder();
-            Invoke(guide, "LateUpdate");
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.TaskText));
-            Assert.That(book.ClosedBookGraphic.GetComponent<SlowGuidePulse>(), Is.Null);
-            Field<TypingReveal>(card, "typing").Advance(60, 40);
-            Invoke(card, "TypeOn");
-            Invoke(guide, "LateUpdate");
-            Assert.That(card.IsTaskTextComplete, Is.True);
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Book));
-            var pulse = book.ClosedBookGraphic.GetComponent<SlowGuidePulse>();
-            Assert.That(pulse.IsShowing, Is.True);
-            var halo = Field<Image>(pulse, "silhouetteHalo");
-            Assert.That(halo.isActiveAndEnabled, Is.True);
-            Assert.That(halo.sprite, Is.SameAs(((Image)book.ClosedBookGraphic).sprite));
-            Assert.That(halo.transform.GetSiblingIndex(), Is.LessThan(book.ClosedBookGraphic.transform.GetSiblingIndex()));
-            Assert.That(halo.raycastTarget, Is.False);
-            Assert.That(halo.material.shader.name, Is.EqualTo("Switchboard/UI/GuideSilhouette"));
-            Assert.That(ShaderUtil.ShaderHasError(halo.material.shader), Is.False);
-            Assert.That(halo.material.GetColor("_Color").a, Is.EqualTo(1f));
-            typeof(SlowGuidePulse).GetField("elapsed", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(pulse, 0f);
-            Invoke(pulse, "Refresh");
-            Assert.That(halo.material.GetColor("_Color").a, Is.EqualTo(.45f).Within(.001));
-            book.SetOpen(true);
-            Assert.That(halo.gameObject.activeSelf, Is.False);
-            Assert.That(pulse.IsShowing, Is.False);
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.ReadingBook));
-        }
-
-        [Test]
-        public void PurchasedCordJoinsCurrentGuideAndPickupClearsEveryPulse()
-        {
-            var card = AcceptOrder();
-            Field<TypingReveal>(card, "typing").Advance(60, 40);
-            Invoke(card, "TypeOn");
-            Invoke(guide, "LateUpdate");
-            book.SetOpen(true);
-            book.SetOpen(false);
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Cables));
-            session.Wallet.Earn(session.Upgrades.All.Sum(u => u.CostCents));
-            var bought = BuyFirstCord();
-            var hints = bought.TrayView.GetComponentsInChildren<SlowGuidePulse>();
-            Assert.That(hints.Length, Is.EqualTo(1), "The complete coiled-cord sprite is highlighted");
-            Assert.That(hints.All(p => p.IsShowing), Is.True, "Cloned and newly registered hints must work together");
-            foreach (var hint in hints) Invoke(hint, "Update");
-            Assert.That(bought.TryPickUp(), Is.True);
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Complete));
-            Assert.That(All<SlowGuidePulse>().Any(p => p.IsShowing), Is.False);
-            IUpgrade second = session.Upgrades.NextInChain(UpgradeKind.ExtraWires);
-            if (second != null) Assert.That(session.Upgrades.TryBuy(second.Id), Is.True, second.Id);
-            Assert.That(guide.Stage, Is.EqualTo(FirstOrderGuideStage.Complete), "Purchase must not restart hints");
-            Assert.That(All<SlowGuidePulse>().Any(p => p.IsShowing), Is.False);
         }
 
         [Test]

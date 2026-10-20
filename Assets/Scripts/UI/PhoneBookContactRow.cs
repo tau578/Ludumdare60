@@ -13,6 +13,8 @@ namespace Switchboard.UI
         [SerializeField] private Text details;
         [SerializeField, FormerlySerializedAs("socketAddress")] private Text jack;
 
+        public string Jack => jack != null ? jack.text : string.Empty;
+
         public void Configure(Text nameLabel, Text detailsLabel, Text jackLabel)
         {
             contactName = nameLabel;

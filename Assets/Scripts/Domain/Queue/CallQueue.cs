@@ -18,6 +18,7 @@ namespace Switchboard.Domain
         private IReadOnlyList<CallScript> pool;
         private bool waitingForFirstCall;
         private Call tutorialCall;
+        private Call heldCall;
 
         public CallQueue(CallService calls, StatSheet stats, bool tutorial = false)
         {
@@ -50,6 +51,13 @@ namespace Switchboard.Domain
             }
         }
 
+        /// <summary>The tutorial is over: the guided call's response timer runs again, if it is still waiting.</summary>
+        public void ReleaseTutorialCall()
+        {
+            if (heldCall != null) calls.HoldWaiting(heldCall.Id, false);
+            heldCall = null;
+        }
+
         /// <summary>The pool's first call comes next (a new pool, or the dev reset).</summary>
         public void Restart()
         {
@@ -76,6 +84,9 @@ namespace Switchboard.Domain
                     if (index < 0) return;
                     tutorialCall = calls.Add(new CallRequest(pool[index]));
                     dealt.Add(new DealtCall(tutorialCall.Id, index));
+                    // The guided call waits for the player while the tutorial runs (D57).
+                    calls.HoldWaiting(tutorialCall.Id, true);
+                    heldCall = tutorialCall;
                 }
                 if (!tutorialCall.ConnectionFeePaid && tutorialCall.State != CallState.Ended) return;
                 waitingForFirstCall = false;

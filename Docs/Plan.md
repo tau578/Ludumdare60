@@ -1755,13 +1755,46 @@ Asked at the 9a playtest and built before 9b, so the first Web build has it. **R
 - making the itch page public (the lead)
 - the menu leftovers in §8 (Step 12), unless the browser console shows errors from them
 
-### Step 10: Tutorial (outline)
-- **Pacing is no longer part of this step:** since D51/D52 the designer sets the difficulty through the call queues in `Economy.json` (hand-written calls, one queue per board size), so the progress curves and type weights (D19, D37) are dropped.
-- **From Step 9a:** `FirstOrderGuide` runs on the first call of every session, a reloaded one too. A tutorial flag in the save (a new `SaveData` field; `JsonUtility` keeps the default for old saves) can stop it after the first time.
-- **The one-call tutorial start already exists** (the designer's `7312e43`, Design 5.2): a new game deals only `startPool`'s first call and fills the other slots once its fee is paid or it ends. `GameInstaller` always asks for it, and `GameSession` applies it only when there is no save, so **Continue skips it**, but a new game that hasn't saved yet gets it again after a reload. (The orchestrator's note said it also runs on Continue; the merge `baed5b4` added the `save == null` check.) The ShopView pulse on the first extra-cord upgrade is part of the same tutorial. **Open question for Step 10:** should both stay "new game only", and should a saved flag (above) decide instead of "no save yet"?
-- **Tutorial:** hints for the first calls, such as "Click the ringing card", "Find them in the book" and "Connect the two jacks". **Sergei's `FirstOrderGuide` (merged `e7acec5`, `6226ead`) already pulses the portrait, the book and the cords on the first call; build on it instead of adding a second guide**, and check with the lead and the designer what else is needed (the first calls of `startPool` are the tutorial calls).
-- **Tests:** the tutorial sequence.
-- **Playtest:** a new player gets through the first calls without help.
+### Step 10: Tutorial: a spotlight guide for the first call (D57)
+**Decisions (lead, 2026-10-20, D57):**
+- **New game only.** The tutorial (the one-call start, the first-call guide, the shop's first-cord pulse) runs only when no save was loaded. Continue never shows it. No save flag: a new game that hasn't saved yet is simply a new game again.
+- **Spotlight instead of pulses.** Sergei's pulses blend into the art. The guide now dims the whole screen (about 55% dark) with soft holes around the current target(s), plus a short text hint and an arrow next to the hole. The holes slide between steps. It **replaces** the pulses (portrait, book glow, cord pulse) instead of stacking on them.
+- **Clicks pass through** the dark layer: it is visual only (`raycastTarget` off everywhere except the Skip button), so the player can never get stuck.
+- **A "Skip tutorial" button** ends the guide at once (the one-call start may still finish dealing as it does today).
+
+**What exists (read first):**
+- `Assets/Scripts/Game/FirstOrderGuideSequence.cs`: plain-C# stages `WaitingForOrder, Portrait, TaskText, Book, ReadingBook, Cables, Complete, Cancelled`. Keep it as the step logic; extend it if a stage is missing (e.g. a final "Connected" stage).
+- `Assets/Scripts/Game/FirstOrderGuide.cs` (Sergei): drives the pulses (`SlowGuidePulse`, the book glow, the cord pulse, the portrait halo). Today it runs on the first call of *every* session, Continue included.
+- `GameInstaller` builds `GameSession(..., save?.Data, tutorial: true)`; `GameSession`/`CallQueue` apply the one-call start only when `save == null`. Use the same "no save loaded" fact for the guide and the shop pulse (one place decides; pass it in from `GameInstaller`).
+- The ShopView pulse on the first extra-cord upgrade: also new game only.
+
+**Steps of the first call (text is a proposal; plain ASCII/atlas glyphs only, no "→"):**
+1. The ringing caller card (hole on the card): "A call! Click the caller."
+2. The speech bubble (hole on the bubble): "They want to reach someone. Read who." Advances when the text has finished (TaskText).
+3. The book on the desk (hole on the closed book/Tab): "Look them up in the directory."
+4. Book open (ReadingBook): holes on the caller's row and the recipient's row in the open book: "Find both jacks." If the player closes the book without plugging, go back to step 3 as today.
+5. The cord in the tray (hole on the tray cord): "Take a cord."
+6. The two jacks of the call on the board (two holes): "Plug one end into each jack."
+7. Connected (hole on the money plaque `HeaderSlot`): "Connected! You earn while they talk." Ends after a few seconds or on any click.
+A wrong number, a hang-up or the call ending mid-tutorial should not leave the guide stuck: follow what `FirstOrderGuideSequence.BreakOrder`/`Cancel` do today, and end cleanly.
+
+**Layers and input (CLAUDE.md "UI"):**
+- Sorting today: board `SwitchboardCanvas` 0, cord wires 1–6 (`SwitchboardUISorting.Wire`), book 10, `GameUI` 10, Goal dialog 15, pause menu 16, held plugs and the hand 20. The spotlight needs its **own canvas above the book and GameUI but below the pause menu and the hand** (e.g. 14; pick a free order and add it to `SwitchboardUISorting` or wherever the orders live). The pause menu must still cover it; the guide may hide while paused.
+- Full screen at every aspect ratio (it must also dim the side bars on wide phones): anchor-stretch on the Expand canvas.
+- Holes: one procedural `Graphic` (like the project's `CircleGraphic`/`SocketHaloGraphic`) that draws the dark quad with N soft rounded holes; no shader required unless simpler. Target rects come from the real objects (card, bubble, book, book rows, tray cord, `SocketView`s by jack id, `HeaderSlot`), converted to the spotlight canvas each LateUpdate while the guide is active. No per-frame allocations; nothing runs once the guide is done.
+- Everything has `raycastTarget` off except the Skip button. The cord input takes the topmost hit: check that clicks on the card, book, tray and sockets still work through the dark layer, and that clicking Skip does not drop a held cord (9a: `Button` clicks keep a held cord).
+- Text: TMP with a font whose atlas has the glyphs (the static fonts hold printable ASCII). Arrow: a small procedural or sprite arrow pointing at the hole, placed so it stays on screen.
+
+**Clean-ups this step may take (Plan §8):** `SlowGuidePulse` material freed only in `OnDestroy`; if the pulses go, remove the dead code (or keep `SlowGuidePulse` only where the shop pulse still uses it).
+
+**Tests (EditMode):**
+- The sequence with the new stages, including closing the book, skip, and a call that ends mid-guide.
+- New game shows the guide; a loaded save does not (guide, one-call start, shop pulse).
+- The spotlight is visual only (no raycast targets but Skip), sits between GameUI/book and the pause menu, and its holes follow the targets.
+
+**Play Mode check:** a full first call on a new game at 1920x1080 and at 2340x1080, screenshots of each step (`Temp/Captures/step-10-<n>.png`) and of Skip; then Continue shows no guide. Protect the lead's saves (keep `operator.save`, `operator.save.backup` and `Switchboard.AudioPatch.v1` in SessionState and restore them exactly).
+
+**Playtest:** a new player gets through the first call without help, nothing feels blocked, and Skip works.
 
 ### Step 11: Sound and feel (outline)
 - **From Step 3:** replace the placeholder `card-take-click.wav` (set on `UiClickSound` in `GameUI.prefab`) with a real sound, and fill `CallCardView.OnCharacterShown` with the callers' talking sound (lead request).

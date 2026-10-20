@@ -18,7 +18,7 @@
 | 8. The new phone book | done | ✅ 2026-10-18 (20 min) | ✅ 445/445 tests, scope clean | ✅ | f82ed29 |
 | 9a. Saves, touch, menu, pause | done | ✅ 2026-10-19 (37 min + 21 min fix + 24 min pause + 15 min corner) | ✅ 503/503 tests, scope clean | ✅ | 580c610 |
 | 9b. First Web build on itch | done | ✅ 2026-10-19 (37 min; cursor fixes discarded) | ✅ 517/517 tests, scope clean | ✅ | 709be9d |
-| 10. Tutorial | not started | | | | |
+| 10. Tutorial | playtesting | ✅ 2026-10-20 (33 min + 28 min fix) | ✅ 624/624 tests, scope clean | | |
 | 11. Sound and feel | not started | | | | |
 | 12. Mobile and Web polish | not started | | | | |
 | 13. Balance | not started | | | | |
@@ -3913,3 +3913,268 @@ Deviations from Design/Plan: none.
 Follow-ups:
 - Design 5.4 still describes the removed `RingingPulse` halo (nested canvas at order 9). It no longer exists in the code; the line could go.
 - If the lead doesn't like a vertical cord's wire running over its own lower jack (B3–E3 above), the fix would be per-cord: draw that cord's lower jack above its own wire only. It's a design question, so it was left alone.
+
+### Step 10 report: 2026-10-20
+Result: done (about 40 min)
+Playable now: a New Game guides the first call with a spotlight. The whole screen dims, except soft holes around what to click next, with a short hint and an arrow. The holes slide from step to step: the caller card, the speech bubble, the closed book, the caller's and the recipient's rows in the open book, the cord in the tray, the two jacks, then the money plaque. Clicks go straight through the dark layer. "Skip tutorial" (top centre) ends the guide at once. Continue never shows the guide, the one-call start or the shop's first-cord pulse.
+How to test:
+1. Main menu: New Game (or play `Final` with no save). The first caller rings and everything but the card dims: "A call! Click the caller to answer."
+2. Click the card: the light slides to the bubble, "Read who they want to talk to." When the message has finished typing, it moves to the book, "Open the phone book."
+3. Open the book (click it or press Tab): both rows (the caller's and the person they want) light up, and the hint sits left of the book: "Find both jacks: the caller's and the one they want. Then click the book to close it."
+4. Close the book: the cord in the tray lights, "Take a cord." Take it: both jacks light as circles, "Plug one end into each jack."
+5. Plug both: the money plaque lights, "Connected! You earn money while they talk." It ends after 5 s or on your next click, and the screen is normal again. The other caller slots fill as before.
+6. Detours: put the cord back (click empty space) and the hint asks for the cord again. Open the book again while taking or plugging a cord and the rows light again; close it and you're back where you were.
+7. Wrong number, or the call ending before you connect: the guide ends quietly.
+8. Start a new game again and press "Skip tutorial" at any step, also while holding a cord: the guide fades out and the cord stays in your hand.
+9. Quit to the menu after connecting (that writes a save), then Continue: no dimming, all caller slots ring at once, and the "More Cables" price doesn't pulse.
+10. Pause during the guide: the pause menu covers it, and the "Connected" timer waits.
+
+**Final texts** (Inspector: `GameUI` > `Tutorial` > `TutorialSpotlight` > Texts; plain ASCII only, since the static fonts hold nothing else):
+| Step | Lit | Text |
+|---|---|---|
+| 1 Portrait | the caller card | A call! Click the caller to answer. |
+| 2 TaskText | the speech bubble | Read who they want to talk to. |
+| 3 Book | the closed book | Open the phone book. |
+| 4 ReadingBook | the caller's and recipient's rows (or the page corner that turns to one on another spread) | Find both jacks: the caller's and the one they want. Then click the book to close it. |
+| 5 Cables | every cord in the tray | Take a cord. |
+| 6 Plugging | both jacks (round holes) | Plug one end into each jack. |
+| 7 Connected | the money plaque (`HeaderSlot`) | Connected! You earn money while they talk. |
+
+How it works:
+- **One decision:** `GameSession.IsTutorial` (`tutorial && save == null`) drives the one-call start (`CallQueue`), and `GameInstaller` uses it for the guide and for `ShopView.Bind(..., guideFirstCord)`. A loaded game binds no `FirstOrderGuide` and keeps the spotlight off. A new game that never saved (no progress) is a new game again.
+- **Sequence** (`FirstOrderGuideSequence`): new stages `Plugging` and `Connected` after `Cables`. Picking a cord moves Cables to Plugging. Putting it back (polled `CordsOut(false)`) returns to Cables. Opening the book in Cables or Plugging goes back to ReadingBook, and closing it returns to the step it left. Connecting the guided call moves to Connected, which ends after `ConnectedSeconds` (5 s of game time) or a click from `ConnectedClickDelay` (0.6 s) on, so the plugging click itself doesn't count. `FirstOrderEnded` ends the guide: Complete after connecting, Cancelled before. `Skip` cancels. Sergei's rules stay: exploring ahead (a cord or the book before reading the message) still ends the guide, and only the portrait hint survives an early look.
+- **Spotlight** (`TutorialSpotlight` on `GameUI/Tutorial`):
+  - It has its own canvas at `SwitchboardUISorting.Tutorial` = 14. That is above the book and GameUI (10), below the Goal dialog (15), the pause menu (16) and the hand and held plugs (20). It is stretched over the whole Expand canvas, so it also dims the side bars at 19.5:9.
+  - Children:
+    - `Dim`: `SpotlightGraphic`, one quad drawn by `Switchboard/UI/TutorialSpotlight` (`Assets/Content/Shaders/`). It has up to 8 soft rounded holes, whose positions are passed in the quad's UVs, so they stay sharp at any resolution.
+    - `Arrow`: `GuideArrowGraphic`.
+    - `Hint`: a parchment panel with a Della Respira SDF Static label.
+    - `Skip`: the pause menu's button art.
+  - Only Skip's image is a raycast target.
+  - Holes track their targets every `LateUpdate`: world corners become screen points, then spotlight-local points, using a camera per target canvas cached at `Show`. They slide (exponential follow) and breathe a few units. A new hole grows out of the nearest open one.
+  - The hint goes on the roomier side of the lit area, or beside the open book in step 4, and is clamped on screen. The arrow runs from the hint's edge to just outside the nearest hole.
+  - Nothing allocates per frame: arrays are fixed, and the arrow mesh rebuilds only when its whole-unit length changes.
+  - When the guide ends, it fades out, frees its material, deactivates itself, and the guide component disables itself.
+- **The pulses are gone from the guide.** `FirstOrderGuide` no longer creates `SlowGuidePulse`s (portrait halo, book silhouette, cord pulse). `SlowGuidePulse` stays for the book and tray hover glows and the shop's first-cord pulse.
+
+Created:
+- `Assets/Scripts/Game/Views/TutorialSpotlight.cs` (+ `.meta`): the view, `SpotlightTarget`, `TutorialTexts`
+- `Assets/Scripts/Game/Views/SpotlightGraphic.cs` (+ `.meta`)
+- `Assets/Scripts/Game/Views/GuideArrowGraphic.cs` (+ `.meta`)
+- `Assets/Content/Shaders/TutorialSpotlight.shader` (+ `.meta`, and `Assets/Content/Shaders.meta`)
+- `Assets/Tests/Game/Editor/TutorialSpotlightTests.cs` (+ `.meta`)
+
+Changed:
+- `Assets/Scripts/Game/FirstOrderGuideSequence.cs`: new stages and verbs (above), `IsGuiding`, `IsOver`. `Cancel` no longer overwrites Complete.
+- `Assets/Scripts/Game/FirstOrderGuide.cs`: drives the spotlight instead of the pulses. `Bind` takes the spotlight, the board's sockets and the money plaque. Targets are recomputed on a stage change, a page turn (step 4) and a change in the tray (step 5). It unbinds and disables itself when the guide is over.
+- `Assets/Scripts/Game/GameInstaller.cs`: `Start` calls `Install(saveFile, restored)`, so tests can start from a save without PlayerPrefs. It binds the guide only when `Session.IsTutorial`, deactivates the spotlight first, and passes `guideFirstCord` to the shop.
+- `Assets/Scripts/Domain/GameSession.cs`: `IsTutorial`.
+- `Assets/Scripts/Game/Views/ShopView.cs`: `Bind(..., guideFirstCord = true)`.
+- `Assets/Scripts/Game/Views/CallCardView.cs`: `SpeechBubbleRect`.
+- `Assets/Scripts/UI/PhoneBookView.cs`: `OpenBookRect`, `RowOnSpread(jack)`, `SpreadDirectionTo(jack)`, `PageCorner(direction)`.
+- `Assets/Scripts/UI/PhoneBookPageView.cs`: `RowWithJack(jack)`.
+- `Assets/Scripts/UI/PhoneBookContactRow.cs`: `Jack`.
+- `Assets/Scripts/UI/SwitchboardUISorting.cs`: `Tutorial = 14`, and the summary lists GameUI's orders.
+- `Assets/Tests/Domain/CallQueueTests.cs`, `Assets/Tests/Game/Editor/FirstOrderGuideTests.cs`, `Assets/Tests/Game/Editor/MergedSystemsTests.cs` (its three pulse tests replaced by `TutorialSpotlightTests`)
+- `Docs/Progress.md` (this report)
+
+Scene and prefab changes:
+- `GameUI.prefab` has a new inactive child, `Tutorial`: Canvas (override sorting 14), GraphicRaycaster, CanvasGroup and `TutorialSpotlight`, with children `Dim`, `Arrow`, `Hint/Label` and `Skip/Label`.
+- The save re-sorted the prefab's objects (Unity orders them by fileID) and normalised three `m_Name:` lines. Compared object by object: 31 objects were added, 0 removed, and the only other change is the new child in the root's child list.
+- `Final.unity` is unchanged.
+
+Tests: 615/615 EditMode (was 595; 3 pulse tests removed, 23 added). New:
+- `CallQueueTests.OnlyANewGameGetsTheTutorial` (3 cases)
+- `FirstOrderGuideTests`:
+  - `ConnectedStepEndsOnAClickButNotOnThePluggingClick`
+  - `CheckingTheBookAgainReturnsToTheStepItLeft`
+  - `PuttingTheCordBackAsksForItAgain`
+  - `SkipEndsEveryStepForGood` (5)
+  - `TheGuidedCallEndingEndsTheGuide` (6)
+  - the first test extended through Plugging, Connected and Complete
+- `TutorialSpotlightTests`, which run the real `Final` scene in a preview scene. Its overlay canvases have no size there, so the test lays them out as 1920×1080:
+  - `ANewGameGuidesTheFirstCallStepByStep`: every step's text and exact targets, holes open, no pulses; the end frees the material and disables the guide
+  - `SkipEndsTheGuideAtOnceAndKeepsAHeldCord`
+  - `TheGuidedCallEndingMidGuideEndsTheGuideCleanly`
+  - `TheSpotlightIsVisualOnlyAndSitsBetweenTheBookAndThePauseMenu`
+  - `HolesFollowTheirTargetsAndSlideToTheNextStep`
+  - `ALoadedGameHasNoTutorial`: no guide, the slots fill at once, no shop pulse
+- The tests read the cord count, the book's spreads and the jacks from the real files, so the designer's edits don't break them.
+
+Console: clean (only Unity's own "Ignoring depth surface ... memoryless" lines in Play Mode, and one MCP bridge message).
+
+Play Mode check (`Final`, new game; clicks through EventSystem raycasts and `CableInputController.ProcessPointer` in a `Canvas.willRenderCanvases` handler; frames driven with `EditorApplication.Step`):
+- At 1920×1080, the whole first call ran start to finish. The top raycast hit through the dark layer was the real target every time: `Portrait`, `ClosedBook`, `OpenBook` (which closed it), `StoredCable_01`, `Socket_A1`, `Socket_B3`. The guide ended Complete with the spotlight off and its material freed.
+- Then Continue: `IsTutorial` false, no guide, 3 calls at once, no shop pulse.
+- At 2340×1080: the dim covers the side bars, and Skip (top hit `Skip`) ended the guide with a fade.
+- The Game view is back at 1920×1080.
+- Screenshots in `Temp/Captures/`: `step-10.png` (the smoke-test shot, step 1), `step-10-1b`, `-2b`, `-3`, `-4b`, `-5`, `-6`, `-7` (steps 1–7 at 1920×1080), `step-10-8-done`, `step-10-continue`, `step-10-wide-1b`, `step-10-wide-3` and `step-10-skip` (2340×1080).
+- The 1920 shots were taken before the alpha fix below, so their PNG alpha is 211: image viewers show them washed out over white, though the game looked right. The wide shots come after the fix.
+
+Housekeeping:
+- **Play Mode was already running when I started** (about 40 s of game time, the first card clicked, Unity unfocused). No frames advanced for over six minutes and there was no save, so I stopped it before compiling. Nothing was lost.
+- The lead's keys were kept in SessionState and restored exactly afterwards. `operator.save` and `operator.save.backup` didn't exist before and are deleted again; `Switchboard.AudioPatch.v1` is identical. The SessionState keys are erased.
+- `Time.timeScale` is back to 1.
+- The dynamic font atlases and "SDF Static" materials were cleared in memory; no font files changed.
+- `TimeManager.asset` and `ProjectSettings.asset` are untouched.
+- `Final.unity` is active and not dirty. The editor is idle and out of Play Mode.
+- Nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+1. **Darkness 0.78 alpha, not 0.55.** The project renders in linear colour space, where 0.55 alpha darkens the board by only about 30% to the eye (83 → 57 on the board's green). At 0.78 the board is at about 47% brightness, which looks like the "about 55% dark" asked for. Tune it on `Tutorial/Dim`'s colour.
+2. **The shader keeps the frame's alpha opaque** (`Blend SrcAlpha OneMinusSrcAlpha, One OneMinusSrcAlpha`). With plain alpha blending the dark layer left the frame partly transparent (alpha 211). That washes out screenshots, and in a browser it could show the page through the game. Unity's own UI shader keeps alpha at 1.
+3. **Closing the book.** The brief said "if the player closes the book without plugging, go back to step 3 as today". In the code, closing the book after reading has always moved on to "Take a cord". I kept that, and added the reverse: opening the book again while taking or plugging a cord returns to "Find both jacks", then back to the step it left.
+4. **Exploring ahead still ends the guide** (Sergei's rule, tested): taking a cord or opening the book before the message is read. The player is never stuck, but the guide doesn't follow them forward. Following them is a small change in the sequence if the lead prefers it.
+5. **Step 4's hint sits beside the open book**, not beside the rows, so it doesn't cover the left page. The arrow stretches from the hint to the nearest row.
+6. **Step 7 ends after 5 s of game time or a click** (clicks in the first 0.6 s are ignored), or when the call ends, whichever comes first.
+7. The texts live on the `TutorialSpotlight` component in `GameUI.prefab`, because `FirstOrderGuide` is added at runtime and has no prefab.
+8. The shader is in `Assets/Content/Shaders/` (Plan §3.7) and reaches builds through the `SpotlightGraphic.shader` reference in the prefab, not through `Resources`.
+
+Follow-ups:
+- **Web:** Sergei's `Resources/GuideSilhouette.shader` (the book-hover glow and the shop's first-cord pulse) uses plain `Blend SrcAlpha OneMinusSrcAlpha`, so it also lowers the frame's alpha where it draws. Check on the next Web build whether the itch page shows through. The fix is the same one-line blend change.
+- Plan §8 "`SlowGuidePulse` material in EditMode tests": the guide no longer makes pulses. Only the shop pulse test (`FirstCordHintTracksAffordabilityAndStopsAfterPurchase`) still leaves one material per run. The item can shrink to that.
+- `Final` was not re-checked from `MainMenu` this step. The installer path is the same, but it's worth one click in the playtest.
+- Design 5.2 ("the tutorial is Step 10"), the D57 status and 4.3 (the spotlight layer at 14) are for the orchestrator to update.
+- The first-call hint's arrow points at the "New order!" stamp side of the card. If the stamp feels in the way, the card hole could use the portrait only.
+
+#### Step 10, fix pass 1: mandatory guide and shop steps (lead, 2026-10-20)
+Result: done
+Playable now: the tutorial can't be skipped by acting ahead any more. On a New Game, only the lit target answers a click or tap; everything else under the dark layer does nothing (no card, book, cord, socket or shop action, and a held cord is never dropped or put back). Skip tutorial, the pause button and Esc always work. The guided caller can't hang up while the guide runs. After step 7, normal play resumes until the player can first afford More Cables; then the light comes back on that button (step 8, buy it), then on the ??? button (step 9, any click or 5 s), and the tutorial is over.
+How to test:
+1. Main menu, New Game (Start over if asked). Step 1 lights the caller. Click a cord, the book, a jack, or press Tab: nothing happens. Click the caller.
+2. Step 2 (the message types out): nothing is clickable. Then step 3: only the closed book (click it or press Tab).
+3. Step 4: the open book is fully usable (page corners, a click closes it, Esc closes it); the rest is blocked. Close the book.
+4. Step 5: only the cord in the tray. Step 6: only the two lit jacks take the plug. Click another jack, empty board, the tray or a caller while holding the cord: the cord stays in your hand. Plug both jacks.
+5. Step 7: the money plaque. A click anywhere ends it (from 0.6 s on), or it ends after 5 s. Trying to buy More Cables here does nothing.
+6. As soon as More Cables is affordable (with today's Economy.json that is right after step 7: the first fee is 25¢ and the price is 25¢), step 8 lights only that button. Other callers ring but can't be clicked. Buy it.
+7. Step 9 lights ???: a click anywhere (or 5 s) ends the tutorial; the screen is normal again.
+8. Pause during any step: the pause menu works as usual; after Resume the block is back.
+9. New Game again and press Skip tutorial while holding a cord: the block goes at once (even while the dark fades), and the cord stays in your hand.
+10. Quit to the menu and Continue: no guide, no shop steps.
+
+**Final texts** (Inspector: `GameUI` > `Tutorial` > `TutorialSpotlight` > Texts; plain ASCII):
+| Step | Lit | Takes clicks | Text |
+|---|---|---|---|
+| 1 Portrait | the caller card | the card | A call! Click the caller to answer. |
+| 2 TaskText | the speech bubble | nothing | Read who they want to talk to. |
+| 3 Book | the closed book | the closed book (and Tab) | Open the phone book. |
+| 4 ReadingBook | both rows (or the page corner that turns to one) | the whole open book (and Tab or Esc to close) | Find both jacks: the caller's and the one they want. Then click the book to close it. |
+| 5 Cables | every cord in the tray | the tray cords | Take a cord. |
+| 6 Plugging | the call's two jacks | those two jacks | Plug one end into each jack. |
+| 7 Connected | the money plaque | nothing; any click dismisses | Connected! You earn money while they talk. |
+| 8 BuyCord | the first More Cables button | that button | You can afford another cord. Buy it to handle two calls at once. |
+| 9 Mystery | the ??? button | nothing; any click dismisses | Save up for the mystery upgrade! |
+
+How it works:
+- **Blocking.** `SpotlightGraphic` (the `Dim` layer) is now a raycast target and an `ICanvasRaycastFilter`. While `Blocking` is on, it reports a hit everywhere except its click areas, so on its canvas (14, with its own `GraphicRaycaster`) it is the top hit over the book, GameUI and the board.
+  - **Card, book and shop.** These are EventSystem clicks. The layer has no click, down or up handler in its parents, so a blocked click lands nowhere.
+  - **Cords.** `CableInputController` takes the topmost hit itself. A top hit with the new marker interface `Switchboard.UI.IPointerBlocker` now means "blocked": no pick, plug, drop or return, and no socket hover. The hand and a held plug still follow the pointer.
+  - **Click areas** are the clickable targets' own rects (round ones as an ellipse, without the visual padding), plus one optional extra area (the open book in step 4). They are recomputed at once in `Show` and then every frame, so they follow moving targets.
+  - **What stays on top.** Skip is on the spotlight canvas but outside `Dim`, so the filter never touches it. The pause button and menu (16) and the Goal dialog (15) sit above it.
+  - **Ending.** `Hide` (Skip, the end, or the break between steps 7 and 8) turns `Blocking` off at once; the fade is visual only.
+  - **Touch.** Taps go through the same EventSystem raycast and `ProcessPointer`, so the same rules apply.
+- **Tab.** `PhoneBookView.OpenLocked` (new) stops Tab, the cover and the shortcut button from *opening* the book; closing always works. The guide sets it in every step except step 3, and also before the first card shows; it is cleared in normal play and when the guide ends. A separate flag from `InputEnabled`, because the pause menu sets that one back on Resume.
+- **The caller doesn't hang up (domain).**
+  - New `Call.WaitingHeld` and `CallService.HoldWaiting(id, held)`; `CallService.Tick` skips the response timer of a held call.
+  - `CallQueue` holds the tutorial call when it deals it (only when `tutorial`, so only on a new game). `GameSession.EndTutorial()` → `CallQueue.ReleaseTutorialCall()` releases it.
+  - The guide calls it once the first-call steps are over (connected, skipped, or the call cleared), and also when it unbinds.
+  - Only emergencies have a response timer, so this matters only if the designer puts an emergency first in `startPool` (today `call_001` isn't one). A wrong number is impossible (step 6 accepts only the two jacks). Patience doesn't exist for normal calls. Dev "Clear calls" ends the guide cleanly (tested).
+- **Sequence** (`FirstOrderGuideSequence`):
+  - **Stages.** New stages `WaitingForShop`, `BuyCord`, `Mystery`, and the enum got explicit values.
+  - **Sergei's rules removed.** The "acting ahead ends the guide" rule (`BreakOrder`, `outOfOrder`) is gone: out-of-step events are now ignored.
+  - **After step 7.** The "Connected" step ends (5 s, a click, or the call finishing) into `WaitingForShop`. That is normal play: no light, no block.
+  - **Shop polling.** The guide polls the shop each frame. If the first `extra_wires` entry (`ChainOf(ExtraWires)[0]`, price from `Economy.json`) is on a shelf button, the player can buy it, and the book is closed, it goes to `BuyCord`. If the money drops below the price (a fine), it goes back to waiting.
+  - **No shop steps** when there is no first cord in the file, or it isn't on the shelf: the guide is `Complete` at once.
+  - **After the purchase**, `Mystery` follows, or `Complete` if the file has no secret. `Mystery` ends after 5 s or on a click from 0.6 s on, so the buying click doesn't count.
+  - **Clicks while paused** don't dismiss steps 7 or 9.
+- **Shop.** `ShopView` lost the first-cord pulse (`guideFirstCord`, `guidePulses`) and gained `ButtonFor(upgrade)` and `Secret`. `UpgradeSlotView.GuideGraphic` is gone (no users). `SlowGuidePulse` stays for the book and tray hover glows.
+- **Arrows (the lead's screenshot notes).**
+  - **Step 4.** The hint now sits beside the open book, level with the lit rows, and the arrow is a short straight one that stops 12 px before the book's edge. It no longer crosses the left page.
+  - **Jacks (step 6).** The arrow is short (36) and diagonal, coming from the hint's quarter. The jacks sit in a grid, so its diagonals are the free gaps, and the tip is no longer on B4.
+- **Choices the brief left open.**
+  - Putting a held cord back in the tray during step 6 is **blocked** (the tray isn't a click area). Nothing needs undoing, because a wrong jack is impossible; clicking a plugged jack of the call picks that end up again.
+  - The book is **not** openable during steps 5–6 (simplest; the jacks are lit on the board anyway). The sequence still handles a book that opens anyway, by returning to step 4 and back.
+  - Steps 8–9 follow only a **completed** first call. Skip, or the guided call cleared before connecting, ends the whole tutorial.
+  - **A save between step 7 and step 8** loads as Continue, so steps 8–9 are skipped (accepted by the lead).
+
+Created:
+- `Assets/Scripts/UI/IPointerBlocker.cs` (+ `.meta`)
+
+Changed:
+- Domain: `Assets/Scripts/Domain/Calls/Call.cs` (`WaitingHeld`), `Calls/CallService.cs` (`HoldWaiting`, held timers don't run), `Queue/CallQueue.cs` (holds the tutorial call, `ReleaseTutorialCall`), `GameSession.cs` (`EndTutorial`)
+- `Assets/Scripts/Game/FirstOrderGuideSequence.cs` (rewritten: mandatory, shop stages), `FirstOrderGuide.cs` (rewritten: click areas per step, book lock, `BindShop`, shop polling, call release)
+- `Assets/Scripts/Game/Views/SpotlightGraphic.cs` (raycast filter, click areas, `Blocking`), `TutorialSpotlight.cs` (`SpotlightTarget.Clickable`, extra click area, blocking on show/hide, `BlocksScreenPoint`, two new texts, anchored and jack arrows, `jackArrowLength`/`jackArrowGap`)
+- `Assets/Scripts/Game/Views/ShopView.cs` (pulse removed; `ButtonFor`, `Secret`), `Assets/Scripts/Game/GameInstaller.cs` (passes `Session.EndTutorial`, `BindShop`)
+- `Assets/Scripts/UI/CableInputController.cs` (`ProcessTarget`, split out of `ProcessPointer`; blocked top hit), `PhoneBookView.cs` (`OpenLocked`), `UpgradeSlotView.cs` (`GuideGraphic` removed)
+- `Assets/Prefabs/Game/GameUI.prefab`: `Tutorial/Dim` `m_RaycastTarget: 1`; `TutorialSpotlight` gets `buyCord`, `mystery`, `jackArrowLength: 36`, `jackArrowGap: 6`. Edited as text (4 lines); no Unity re-save.
+- Tests: `Assets/Tests/Domain/CallQueueTests.cs`, `Assets/Tests/Game/Editor/FirstOrderGuideTests.cs`, `TutorialSpotlightTests.cs`, `MergedSystemsTests.cs` (its shop-pulse test removed)
+- `Docs/Progress.md` (this report)
+
+Scene and prefab changes: `GameUI.prefab` as above. `Final.unity` and `MainMenu.unity` unchanged.
+
+Tests: 624/624 EditMode (was 615). New or changed:
+- `CallQueueTests`: `TheGuidedCallWaitsWhileTheTutorialRunsAndRunsOutOnceItEnds`, `OnlyTheTutorialCallIsHeld`.
+- `FirstOrderGuideTests`:
+  - Rewritten for the mandatory flow.
+  - New: `TheCordStepAppearsOnlyWhileAffordableAndEndsOnPurchase`, `TheMysteryStepEndsOnAClickButNotOnThePurchaseClick`, `NoCordOrNoMysteryToShowSkipsTheShopSteps`, `OutOfStepEventsNeitherSkipNorEndTheGuide` (4; replaces the 8 "exploring ahead" cases).
+  - Skip and call-ending cases now include the shop stages.
+- `TutorialSpotlightTests`, in the real `Final` scene:
+  - `ANewGameGuidesTheFirstCallStepByStepAndBlocksEverythingElse`: for every step, the card, tray cords, another jack, a call jack, two shop buttons and the closed book are blocked except the step's own target. Real clicks go through `CableInputController.ProcessTarget`: no pickup on steps 1 and 3, no plug in a call jack on step 5. On step 6, B4, the tray, the card and empty space keep the cord held, and a wrong jack is impossible. Tab can't open the book except on step 3. The call's hold ends on connect.
+  - `TheShopStepsLightTheFirstCordOnceAffordableThenTheMysteryUpgrade`, `AlreadyAffordableTheCordStepFollowsStepSevenAtOnce`, `TheShopStepsFollowTheShelf`.
+  - `SkipUnblocksAtOnceKeepsAHeldCordAndLetsTheCallerHangUpAgain`, which includes the control check: after Skip, the same empty-space click does put the cord back.
+  - `TheGuidedCallEndingMidGuideEndsTheGuideCleanly` (dev Clear calls).
+  - `TheDarkLayerSwallowsClicksAndSitsBetweenTheBookAndThePauseMenu`: only `Dim` and Skip are raycast targets, there are no click, down or up handlers above `Dim`, and pause is above the layer.
+  - `ArrowsStayOffOtherJacksAndOffTheBookPages`.
+  - `ALoadedGameHasNoTutorial`: no hold, no lock, no shop steps.
+  - Prices, the shelf and the secret all come from the loaded files.
+
+Console: clean (only Unity's "Ignoring depth surface ... memoryless" lines in Play Mode).
+
+Play Mode check (from `MainMenu`, New Game, at 1920×1080; frames with `EditorApplication.Step`; clicks as EventSystem raycasts plus `CableInputController.ProcessPointer` in a `Canvas.willRenderCanvases` handler):
+- **New Game from the menu works.** The New Game button loaded `Final`, and the card rang within about 1.4 s, with the tutorial on and the call held.
+- **Blocked clicks.** Every forbidden click had `Dim` as its top hit and did nothing:
+  - step 1: the tray cord, the closed book (`BookShortcut`), A1, and Tab
+  - step 2: the bubble
+  - step 3: the tray cord
+  - step 4: A1 and the card
+  - step 5: B3, the book, and Tab
+  - step 6, holding the cord: B4, empty board, the tray and the card; the cord stayed `Held`
+  - step 7: More Cables, which was affordable; no purchase
+  - step 8: another ringing caller and More Clients
+  - step 9: ??? (no buy attempt)
+- **Allowed clicks.** The real targets were the top hits: `Portrait`, `BookShortcut`, `OpenBook` (which closed it), `StoredCable_01`, `Socket_A1`, `Socket_B3`, and More Cables' `Buy button`.
+- **Steps 7 to 9.** Step 7 ended by time, and step 8 followed at once (60¢ against a 25¢ price). Buying gave 2 cords and moved to step 9, which ended by time: Complete, unblocked, with the book free. A normal click then took the next caller.
+- **Continue.** Pause, then Main menu, then Continue: `IsTutorial` false, no guide, 3 calls at once.
+- **Second New Game (Start over).**
+  - Step 4 captured.
+  - The pause button's top hit was `PauseButton` above `Dim`, and the game paused. Resume worked, and the block was back (A1 was `Dim` again).
+  - Esc (`HandleEscape`) closed the book, moving to step 5.
+  - I took the cord, then clicked Skip: its top hit was `Skip`, and the stage became `Cancelled`. The cord stayed `Held`, `Blocking` went off at once and the call's hold was released.
+  - While the layer was still fading (alpha 0.87), an empty-board click put the cord back in the tray.
+- The clicks that dismiss steps 7 and 9 read the real pointer (`Pointer.current`), which a simulated click can't press. They are covered by tests; in Play Mode both steps ended by time.
+- Screenshots in `Temp/Captures/`: `step-10-fix-1` to `-9` (one per step, including 8 and 9), `step-10-fix-pause`, `step-10-fix-skip` (the fade just after Skip), and `step-10-fix-continue`.
+
+Housekeeping:
+- **The lead's keys.** `operator.save` and `operator.save.backup` (both absent before) and `Switchboard.AudioPatch.v1` were kept in SessionState and restored exactly: the two saves are deleted again, and the audio patch is identical. The SessionState keys are erased, and the stepper and click handlers removed themselves when Play Mode stopped.
+- **Editor state.**
+  - `Time.timeScale` is back to 1 (it was ×5 for two waits).
+  - The Game view is at 1920×1080.
+  - The dynamic font assets and "SDF Static" materials were cleared in memory: no font, `TimeManager.asset` or `ProjectSettings.asset` changes.
+  - `Final.unity` is the active scene, not dirty. Unity was idle and not in Play Mode when I started, and is so again.
+- Nothing staged, committed or pushed.
+
+Deviations from Design/Plan:
+1. Steps 7 and 9 swallow every click (their lit places aren't click areas). A click only dismisses them, so clicking ??? never tries to buy it.
+2. Step 8 waits while the book is open, so its pages don't sit dimmed between the player and the shop.
+3. A drop in money below the price during step 8 (a fine) returns to normal play until the cord is affordable again, instead of leaving the player stuck on a button they can't use.
+4. The tutorial hold is on the response timer only; normal calls have no timer to hold.
+
+Follow-ups:
+- **Design.md is for the orchestrator to update:**
+  - D57 status
+  - 5.2: the hold on the guided call
+  - 4.3: the spotlight is now a click-blocking top hit, not visual only
+  - 5.9: the shop pulse is gone
+- Plan §8 "`SlowGuidePulse` material in EditMode tests": the shop-pulse test is gone too, so no test makes a pulse material any more. The item can probably close.
+- `CableInputController.ProcessTarget` lets tests feed a top hit directly. Real raycasts in a preview scene don't work, because the overlay canvases have no size there.
+- Step 8's hint sits over the board's top-right jacks (dimmed). If the lead prefers it beside the shop, give the hint an anchor there.

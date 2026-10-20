@@ -9,7 +9,7 @@ namespace Switchboard.Domain
         private readonly long startingCents;
 
         /// <param name="save">Loaded progress; null starts a new game.</param>
-        /// <param name="tutorial">Only new games start with one tutorial call.</param>
+        /// <param name="tutorial">Whether a new game gets the tutorial; a loaded save never does.</param>
         public GameSession(IGameContent content, ISwitchboard switchboard, SaveData save = null, bool tutorial = false)
         {
             if (content == null) throw new ArgumentNullException(nameof(content));
@@ -23,7 +23,8 @@ namespace Switchboard.Domain
             Stats = new StatSheet(Upgrades, content.StartingCords, content.StartingBoard, content.StartingClientSlots,
                 content.StartPool);
             Board = new OpenBoard(Stats);
-            Queue = new CallQueue(Calls, Stats, tutorial && save == null);
+            IsTutorial = tutorial && save == null;
+            Queue = new CallQueue(Calls, Stats, IsTutorial);
             if (save != null) Queue.Restore(save.queuePosition);
             Shelf = new ShopShelf(Upgrades);
             Goal = new GoalProgress(Upgrades, Wallet);
@@ -47,6 +48,15 @@ namespace Switchboard.Domain
         public PenaltyService Penalties { get; }
         public OperatorDesk Desk { get; }
         public CareerStats Career { get; }
+
+        /// <summary>
+        /// Whether this is a new game that gets the tutorial (D57): the one-call start, the first-call guide and the
+        /// shop's first-cord pulse. Never for a loaded save.
+        /// </summary>
+        public bool IsTutorial { get; }
+
+        /// <summary>The first-call guide is over (done or skipped): the guided call may run out again like any other.</summary>
+        public void EndTutorial() => Queue.ReleaseTutorialCall();
 
         /// <summary>Whether this session was loaded from a save.</summary>
         public bool IsRestored { get; }

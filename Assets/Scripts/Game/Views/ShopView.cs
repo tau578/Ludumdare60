@@ -23,8 +23,6 @@ namespace Switchboard.Game
         private readonly Action[] clickHandlers = new Action[SlotCount];
         private readonly IUpgrade[] shownOffers = new IUpgrade[SlotCount];
         private readonly SlotState[] shownStates = new SlotState[SlotCount];
-        private readonly SlowGuidePulse[] guidePulses = new SlowGuidePulse[SlotCount];
-        private IUpgrade firstCordUpgrade;
         private UpgradeService upgrades;
         private ShopShelf shelf;
         private GoalProgress goal;
@@ -36,7 +34,8 @@ namespace Switchboard.Game
         private bool stale;
 
         /// <param name="found">The team's shop buttons in the scene; exactly 4 are expected.</param>
-        public bool Bind(UpgradeService service, ShopShelf offers, GoalProgress savings, Wallet money, List<UpgradeSlotView> found, MoneyCounterView counter = null)
+        public bool Bind(UpgradeService service, ShopShelf offers, GoalProgress savings, Wallet money, List<UpgradeSlotView> found,
+            MoneyCounterView counter = null)
         {
             Unbind();
             if (found == null || found.Count != SlotCount)
@@ -49,8 +48,6 @@ namespace Switchboard.Game
             Canvas.ForceUpdateCanvases();
             found.Sort((a, b) => b.transform.position.y.CompareTo(a.transform.position.y));
             upgrades = service;
-            var cordChain = upgrades.ChainOf(UpgradeKind.ExtraWires);
-            firstCordUpgrade = cordChain.Count > 0 ? cordChain[0] : null;
             shelf = offers;
             goal = savings;
             wallet = money;
@@ -75,16 +72,25 @@ namespace Switchboard.Game
             for (int i = 0; i < SlotCount; i++)
             {
                 if (slots[i] != null && clickHandlers[i] != null) slots[i].Clicked -= clickHandlers[i];
-                if (guidePulses[i] != null) guidePulses[i].SetShowing(false);
-                guidePulses[i] = null;
                 shownOffers[i] = null;
                 shownStates[i] = SlotState.None;
                 slots[i] = null;
                 clickHandlers[i] = null;
             }
             shelf = null;
-            firstCordUpgrade = null;
             moneyCounter = null;
+        }
+
+        /// <summary>The mystery upgrade on the pinned bottom button; null when the file has none.</summary>
+        public IUpgrade Secret => shelf != null ? goal?.Goal : null;
+
+        /// <summary>The button that sells this upgrade right now, or null (the tutorial's shop steps, D57).</summary>
+        public RectTransform ButtonFor(IUpgrade upgrade)
+        {
+            if (shelf == null || upgrade == null) return null;
+            for (int i = 0; i < SlotCount; i++)
+                if (slots[i] != null && OfferAt(i) == upgrade) return (RectTransform)slots[i].transform;
+            return null;
         }
 
         private void OnShelfChanged() => stale = true;
@@ -155,16 +161,6 @@ namespace Switchboard.Game
             if (state == SlotState.Empty) view.ShowEmpty();
             else if (state == SlotState.Owned) view.Show(title, OwnedText, string.Empty, true);
             else view.Show(title, offer.Description, MoneyFormat.Dollars(offer.CostCents), state == SlotState.Affordable);
-
-            bool showGuide = offer != null && offer == firstCordUpgrade && upgrades.CanBuy(offer.Id) == PurchaseCheck.Ok;
-            if (showGuide && guidePulses[slot] == null && view.GuideGraphic != null)
-            {
-                var graphic = view.GuideGraphic;
-                guidePulses[slot] = graphic.GetComponent<SlowGuidePulse>();
-                if (guidePulses[slot] == null) guidePulses[slot] = graphic.gameObject.AddComponent<SlowGuidePulse>();
-                guidePulses[slot].UseSilhouetteHalo();
-            }
-            if (guidePulses[slot] != null) guidePulses[slot].SetShowing(showGuide);
         }
     }
 }

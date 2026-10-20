@@ -37,8 +37,11 @@ namespace Switchboard.UI
         }
         /// <summary>Off when the pause menu owns Esc: it closes an open book before it pauses (D56).</summary>
         public bool ClosesOnEscape { get; set; } = true;
+        /// <summary>The tutorial's other steps (D57): the player can't open the book (Tab or a click); closing still works.</summary>
+        public bool OpenLocked { get; set; }
         public event System.Action<bool> OpenChanged;
         public Graphic ClosedBookGraphic => closedBook != null ? closedBook.targetGraphic : null;
+        public RectTransform OpenBookRect => openBook != null ? (RectTransform)openBook.transform : null;
         public int CurrentSpreadIndex { get; private set; }
         /// <summary>Every entry of Book.json the loader kept, whatever the board size (D53).</summary>
         public int ContactCount => directory.Entries.Count;
@@ -92,6 +95,31 @@ namespace Switchboard.UI
             pageMessage = directory.Entries.Count == 0 && directory.Errors.Count > 0 ? directory.Errors[0] : null;
             CurrentSpreadIndex = 0;
             RefreshPages();
+        }
+
+        /// <summary>The open spread's row for the jack; null while closed or when the entry is on another spread.</summary>
+        public RectTransform RowOnSpread(string jack)
+        {
+            if (!IsOpen) return null;
+            RectTransform row = leftPage != null ? leftPage.RowWithJack(jack) : null;
+            if (row == null && rightPage != null) row = rightPage.RowWithJack(jack);
+            return row;
+        }
+
+        /// <summary>Which way to turn to the jack's first entry: -1 back, 1 forward, 0 here or not in the book.</summary>
+        public int SpreadDirectionTo(string jack)
+        {
+            IReadOnlyList<BookEntry> entries = directory.Entries;
+            for (int i = 0; i < entries.Count; i++)
+                if (entries[i].Jack == jack) return System.Math.Sign(i / ContactsPerSpread - CurrentSpreadIndex);
+            return 0;
+        }
+
+        /// <summary>The corner that turns the page that way, while it can.</summary>
+        public RectTransform PageCorner(int direction)
+        {
+            Button corner = direction < 0 && CanGoBack ? previousSpread : direction > 0 && CanGoForward ? nextSpread : null;
+            return corner != null ? (RectTransform)corner.transform : null;
         }
 
         public void NextSpread()
@@ -220,7 +248,7 @@ namespace Switchboard.UI
 
         public void Toggle()
         {
-            if (InputEnabled) SetOpen(!IsOpen);
+            if (InputEnabled && (IsOpen || !OpenLocked)) SetOpen(!IsOpen);
         }
 
         public void SetOpen(bool value)

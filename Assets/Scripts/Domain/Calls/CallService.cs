@@ -100,6 +100,15 @@ namespace Switchboard.Domain
             return true;
         }
 
+        /// <summary>Holds or releases a waiting call's response timer; it never ends a call by itself.</summary>
+        public bool HoldWaiting(CallId id, bool held)
+        {
+            Call call = Find(id);
+            if (call == null) return false;
+            call.WaitingHeld = held;
+            return true;
+        }
+
         public bool End(CallId id, CallEndReason reason)
         {
             Call call = Find(id);
@@ -118,7 +127,7 @@ namespace Switchboard.Domain
                     call.SecondsLeft = Math.Max(0, call.SecondsLeft - dt);
                     if (call.SecondsLeft <= 0) expired.Add(call);
                 }
-                else if (call.HasResponseTime && IsAwaitingConnection(call.State))
+                else if (call.HasResponseTime && !call.WaitingHeld && IsAwaitingConnection(call.State))
                 {
                     call.ResponseSecondsLeft = Math.Max(0, call.ResponseSecondsLeft - dt);
                     if (call.ResponseSecondsLeft <= 0) missed.Add(call);

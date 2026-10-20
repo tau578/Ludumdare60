@@ -75,6 +75,64 @@ namespace Switchboard.Domain.Tests
             Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_2", "call_3", "call_4" }));
         }
 
+        // D57: one fact decides the whole tutorial (one-call start, guide, shop pulse): a new game, no save loaded.
+        [TestCase(true, false, true, 1)]
+        [TestCase(true, true, false, 3)]
+        [TestCase(false, false, false, 3)]
+        public void OnlyANewGameGetsTheTutorial(bool tutorial, bool loaded, bool expected, int firstCalls)
+        {
+            var session = new GameSession(new FakeContent
+            {
+                StartingBoard = Small, StartingClientSlots = 3, StartPool = Scripts.Pool(5, Small)
+            }, new FakeSwitchboard(), loaded ? new SaveData { version = SaveData.CurrentVersion, cents = 50 } : null, tutorial);
+            Assert.That(session.IsTutorial, Is.EqualTo(expected));
+            session.Tick(.01);
+            Assert.That(session.Calls.Live.Count, Is.EqualTo(firstCalls));
+        }
+
+        // D57 fix 1: the tutorial is mandatory, so its guided call can't run out while the guide runs.
+        [Test]
+        public void TheGuidedCallWaitsWhileTheTutorialRunsAndRunsOutOnceItEnds()
+        {
+            var session = new GameSession(new FakeContent
+            {
+                StartingBoard = Small, StartingClientSlots = 3,
+                StartPool = new[] { Scripts.Emergency("sos", "A1", "B1", responseTimeSeconds: 10), Scripts.Call("next", "C1", "C2") }
+            }, new FakeSwitchboard(), tutorial: true);
+            session.Tick(.01);
+            Call first = session.Calls.Live[0];
+            Assert.That(first.WaitingHeld, Is.True);
+            session.Desk.TryTake(first.Id);
+            session.Tick(60);
+            Assert.That(first.State, Is.EqualTo(CallState.Taken), "no miss and no fine while the guide runs");
+            Assert.That(first.ResponseSecondsLeft, Is.EqualTo(10));
+
+            session.EndTutorial();
+            Assert.That(first.WaitingHeld, Is.False);
+            session.Tick(10);
+            Assert.That(first.EndReason, Is.EqualTo(CallEndReason.Missed), "a skipped tutorial leaves an ordinary call");
+        }
+
+        [Test]
+        public void OnlyTheTutorialCallIsHeld()
+        {
+            var pool = new[] { Scripts.Emergency("sos_1", "A1", "B1", responseTimeSeconds: 10), Scripts.Emergency("sos_2", "C1", "C2", responseTimeSeconds: 10) };
+            var loaded = new GameSession(new FakeContent { StartingBoard = Small, StartingClientSlots = 3, StartPool = pool },
+                new FakeSwitchboard(), new SaveData { version = SaveData.CurrentVersion }, tutorial: true);
+            loaded.Tick(.01);
+            Assert.That(loaded.Calls.Live.Count, Is.EqualTo(2));
+            foreach (Call call in loaded.Calls.Live) Assert.That(call.WaitingHeld, Is.False, "a loaded game has no tutorial");
+
+            var fresh = new GameSession(new FakeContent { StartingBoard = Small, StartingClientSlots = 3, StartPool = pool },
+                new FakeSwitchboard(), tutorial: true);
+            fresh.Tick(.01);
+            Call guided = fresh.Calls.Live[0];
+            fresh.Calls.Take(guided.Id);
+            fresh.Calls.Connect(guided.Id);
+            fresh.Tick(.01);
+            Assert.That(fresh.Calls.Live[1].WaitingHeld, Is.False, "later calls run as usual");
+        }
+
         [TestCase(CallEndReason.WrongConnection)]
         [TestCase(CallEndReason.DisconnectedEarly)]
         [TestCase(CallEndReason.Missed)]

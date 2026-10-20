@@ -100,6 +100,8 @@ namespace Switchboard.Game
 
         public Call Call { get; private set; }
         public RectTransform PortraitRect => portrait != null ? portrait.rectTransform : (RectTransform)transform;
+        /// <summary>The speech bubble, for the tutorial's spotlight; null when the card has none.</summary>
+        public RectTransform SpeechBubbleRect => speechBubble != null ? (RectTransform)speechBubble.transform : null;
         public bool ShowDuration { get; set; }
         public bool IsSpeechBubbleVisible => Call != null && speechBubble != null && speechBubble.activeInHierarchy;
         public bool IsGivingTask => IsSpeechBubbleVisible && (Call.State == CallState.Taken || Call.State == CallState.Connecting);
