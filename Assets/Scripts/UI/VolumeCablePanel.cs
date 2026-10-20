@@ -11,6 +11,10 @@ namespace Switchboard.UI
         [SerializeField] private HandCursorGraphic hand;
         [SerializeField] private RectTransform overlay;
         private readonly List<RaycastResult> hits = new List<RaycastResult>();
+        // A jack sticks out of the board, so every wire lies over the resting jacks; wires stack by recency and a held
+        // jack is above them all (lead, 2026-10-20). The drawn order is cached so siblings move only on change.
+        private readonly int[] shownStack = { -1, -1, -1 };
+        private int shownHeld = -2;
         private bool originalCursorVisible;
         public VolumeCableSlider[] Rows => rows;
         public bool OwnsPointerAt(Vector2 position)
@@ -29,6 +33,7 @@ namespace Switchboard.UI
         {
             if (!Application.isPlaying || rows == null) return;
             originalCursorVisible = SystemPointer.Visible;
+            shownHeld = -2;
             Refresh(Vector3.zero);
         }
         // Mouse and touch alike (D28); a finger leaves no hover behind.
@@ -65,14 +70,14 @@ namespace Switchboard.UI
                 {
                     int held = patch.HeldCable;
                     if (rowIndex >= 0 && AudioVolumeSettings.Connect(rowIndex, socketIndex)) rows[held].PlayFeedback(true);
-                    else patch.Cancel();
+                    else AudioVolumeSettings.Cancel();
                 }
                 else if (plug >= 0 && patch.PickUp(plug)) rows[plug].PlayFeedback(false);
             }
             for (int r = 0; r < rows.Length; r++)
             {
                 for (int s = 0; s < rows[r].Sockets.Length; s++)
-                    rows[r].Sockets[s].SetHighlighted(hover && rowIndex == r && socketIndex == s && (patch.HeldCable >= 0 || plug >= 0));
+                    rows[r].Sockets[s].SetHighlighted(hover && rowIndex == r && socketIndex == s && (patch.HeldCable >= 0 ? patch.IsFree(r, s) : plug >= 0));
             }
             var canvas = overlay.GetComponentInParent<Canvas>();
             var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
@@ -96,12 +101,32 @@ namespace Switchboard.UI
             var patch = AudioVolumeSettings.Patch;
             for (int i = 0; i < rows.Length; i++)
                 rows[i].Render(patch.HeldCable == i ? pointer : rows[patch.RowOf(i)].Sockets[patch.SocketOf(i)].transform.position);
-            if (patch.HeldCable >= 0) rows[patch.HeldCable].MovingPlug.transform.SetAsLastSibling();
+            OrderLayers(patch);
+        }
+        private void OrderLayers(VolumePatchState patch)
+        {
+            int held = patch.HeldCable;
+            bool changed = held != shownHeld;
+            for (int layer = 0; layer < shownStack.Length; layer++) changed |= shownStack[layer] != patch.CableInLayer(layer);
+            if (!changed) return;
+            shownHeld = held;
+            for (int layer = 0; layer < shownStack.Length; layer++) shownStack[layer] = patch.CableInLayer(layer);
+            for (int cable = 0; cable < rows.Length; cable++)
+                if (rows[cable].MovingPlug.transform.parent != overlay) return;
+            int index = 0;
+            for (int cable = 0; cable < rows.Length; cable++)
+                if (cable != held) rows[cable].MovingPlug.transform.SetSiblingIndex(index++);
+            for (int layer = 0; layer < shownStack.Length; layer++)
+            {
+                var wire = rows[shownStack[layer]].Wire.transform;
+                (wire.parent == overlay ? wire : wire.parent).SetSiblingIndex(index++);
+            }
+            if (held >= 0) rows[held].MovingPlug.transform.SetSiblingIndex(index);
         }
         private void OnDisable()
         {
             if (!Application.isPlaying || rows == null) return;
-            AudioVolumeSettings.Patch.Cancel();
+            AudioVolumeSettings.Cancel();
             Refresh(Vector3.zero);
             foreach (var row in rows)
             {

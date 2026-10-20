@@ -137,6 +137,7 @@ namespace Switchboard.Editor
                 hand.transform.localScale = Vector3.one;
                 root.gameObject.AddComponent<VolumeCablePanel>().Configure(rows, hand, overlay);
                 ConvertWallOutputs(root.gameObject);
+                LayerCables(root.gameObject);
                 return PrefabUtility.SaveAsPrefabAsset(root.gameObject, PanelPath);
             }
             finally { Object.DestroyImmediate(root.gameObject); }
@@ -168,6 +169,59 @@ namespace Switchboard.Editor
                 if (plug != null) Object.DestroyImmediate(plug.gameObject);
                 row.Render(row.MovingPlug.transform.position);
             }
+        }
+
+        [MenuItem("Tools/Switchboard/Layer Volume Cables")]
+        public static void UpgradeCableLayers()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Exit Play Mode first.");
+            var root = PrefabUtility.LoadPrefabContents(PanelPath);
+            try
+            {
+                LayerCables(root);
+                PrefabUtility.SaveAsPrefabAsset(root, PanelPath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        // CableOverlay holds the resting jacks first, then one <Channel>WireClip per wire; VolumeCablePanel orders the clips
+        // by recency and lifts a held jack above them. A jack sticks out of the board, so every wire lies over the jacks.
+        // Each clip is a RectMask2D starting at the left frame's inner edge, so a wire's wall end stays hidden
+        // while the jacks (not inside a mask) can still be carried over the frame.
+        static void LayerCables(GameObject root)
+        {
+            var panel = (RectTransform)root.transform;
+            var overlay = (RectTransform)panel.Find("CableOverlay");
+            var cover = panel.Find("LeftFrameCover") as RectTransform;
+            float clipLeft = cover != null ? cover.localPosition.x + cover.rect.xMax : panel.rect.xMin;
+            const float reach = 8000;
+            var rows = root.GetComponentsInChildren<VolumeCableSlider>(true);
+            var clips = new Transform[rows.Length];
+            for (int i = 0; i < rows.Length; i++)
+            {
+                var row = rows[i];
+                var oldParent = row.Wire.transform.parent;
+                var clip = oldParent.GetComponent<RectMask2D>() != null ? (RectTransform)oldParent : null;
+                if (clip == null)
+                {
+                    clip = Rect("WireClip", overlay, new Vector2(reach, reach));
+                    clip.pivot = new Vector2(0, .5f);
+                    clip.anchoredPosition = new Vector2(clipLeft, 0);
+                    clip.gameObject.AddComponent<RectMask2D>();
+                    row.Wire.transform.SetParent(clip, true);
+                }
+                var group = clip.parent;
+                clip.SetParent(overlay, true);
+                clip.name = row.Channel + "WireClip";
+                row.MovingPlug.transform.SetParent(overlay, true);
+                if (group != overlay && group.childCount == 0) Object.DestroyImmediate(group.gameObject);
+                clips[i] = clip;
+            }
+            int index = 0;
+            foreach (var row in rows) row.MovingPlug.transform.SetSiblingIndex(index++);
+            foreach (var clip in clips) clip.SetSiblingIndex(index++);
+            var oldWires = panel.Find("WiresBehindFrame");
+            if (oldWires != null && oldWires.childCount == 0) Object.DestroyImmediate(oldWires.gameObject);
         }
 
         static void Place(RectTransform target, Vector2 position, Vector3 scale)

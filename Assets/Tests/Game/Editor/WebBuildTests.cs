@@ -70,7 +70,7 @@ namespace Switchboard.Game.Tests
             Assert.That(AudioVolumeSettings.SaveKey, Is.EqualTo("Switchboard.AudioPatch.v1"));
             Assert.That(storage.Values.Keys, Is.EquivalentTo(new[] { AudioVolumeSettings.SaveKey }));
             Assert.That(storage.Values[AudioVolumeSettings.SaveKey],
-                Is.EqualTo("{\"version\":1,\"rows\":[2,0,1],\"sockets\":[0,4,3]}"));
+                Is.EqualTo("{\"version\":1,\"rows\":[2,0,1],\"sockets\":[0,4,3],\"order\":[0,1,2]}"));
 
             VolumePatchState loaded = AudioVolumeSettings.Load(storage);
             for (int i = 0; i < 3; i++)

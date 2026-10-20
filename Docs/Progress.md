@@ -3743,3 +3743,110 @@ Follow-ups:
 - The IMGUI Dev button still shows behind the pause dialog: it hides only for `PresentationOpen`. That's editor-only and predates this pass.
 - Design 4.3 says the bubble sits "left of the caller card", but it shows to the right of the portrait (it predates this pass; the docs wording could be fixed).
 - "Build Web (Dev)" is still open (Plan §8).
+
+### Volume patch: free plugging without jumping jacks (2026-10-20)
+Result: done
+Playable now: in Options (main menu and pause menu) any wire can be plugged into any free socket in any row; the column sets that wire's volume, and no other jack ever moves. A socket that already holds another wire's jack refuses the held jack, which goes back where it was. While holding a jack, only free sockets (and the jack's own) light up.
+How to test:
+1. Main menu, Options: put Master (yellow) at 75 in the Master row and Music (blue) at 25 in the Music row. Pick up only the yellow jack and plug it into the Music row's 50 socket: the blue jack stays at 25, nothing else moves, and the master volume is now 50%.
+2. Pick up the yellow jack again and move it over the blue jack's socket: that socket doesn't light up. Click there: the yellow jack goes back to where it was. Free sockets in any row light up and accept it.
+3. Leave Options and come back (or restart, or open Options from the pause menu in a game): the wires are exactly where you left them, two of them sharing the Music row.
+Created:
+- `Assets/Tests/Game/Editor/VolumePatchStateTests.cs` (+ `.meta`)
+Changed:
+- `Assets/Scripts/UI/VolumePatchState.cs`: the cross-row swap is gone. `Connect` refuses (returns false) a socket held by another wire; the held wire's own socket counts as free (no-op connect). New `IsFree(row, socket)`. `Restore` accepts shared rows and rejects out-of-range values and two wires in one (row, socket). Class comment updated.
+- `Assets/Scripts/UI/VolumeCablePanel.cs`: while a jack is held, a hovered socket lights up only if it is free (`patch.IsFree`); without a held jack, the pick-up hint is unchanged. Pickup (`plug` detection, `CableAt`) already works per (row, socket), so several wires in one row needed no change. A refused drop goes through the existing `Cancel`. `OwnsPointerAt` and touch handling unchanged.
+- `Assets/Scripts/UI/MasterVolume.cs`: if its target socket in Master's row is taken by another wire, `Apply` cancels the pickup and does nothing (it has no callers today).
+- `Docs/Design.md` (5.12 item 8: the volume patch rule), `Docs/Progress.md` (this report)
+`VolumeCableSlider.cs` unchanged: a wire in another row draws from its own wall anchor to the other row's socket.
+Scene and prefab changes: none. `Final.unity` active, not dirty.
+Tests: 577/577 EditMode (was 563). New in `VolumePatchStateTests` (14): the lead's repro (Master row 0 "75", Music row 1 "25", Master to row 1 "50": Music unchanged at .25, Master .5), moving any wire to any socket never moves another (all 45 moves), an occupied socket refuses and the held wire stays, dropping on its own socket is allowed, all three wires sharing one row, `Restore` accepts shared rows, rejects 7 bad saves (duplicate (row, socket), out-of-range rows and sockets, wrong length), and an old one-wire-per-row save loads unchanged. No existing test asserted the swap; `WebBuildTests`' broken-save case `rows [0,0,2], sockets [3,3,3]` is still rejected (two wires in one socket) and was left as it is.
+Console: clean (only Unity's own "Ignoring depth surface ... memoryless" lines during Play Mode).
+Play Mode check (MainMenu Options, driven through `VolumeCablePanel.ProcessPointer` in a one-shot `Canvas.willRenderCanvases` handler):
+- Repro: Master picked up from row 0/socket "75" and dropped on row 1/socket "50". Result: Master r1 s1 (.5), Music r1 s0 (.25, unmoved), SFX r2 s1; saved `{"version":1,"rows":[1,1,2],"sockets":[1,0,1]}`.
+- Holding Master: hovering Music's occupied socket shows no highlight, a free socket and Master's own socket do; clicking Music's socket was refused and Master stayed at r1 s1.
+Screenshots: `Temp/Captures/volume-patch-before.png`, `Temp/Captures/volume-patch-after.png` (blue jack stays at 25; yellow now at 50 in the Music row).
+Housekeeping:
+- The lead's `Switchboard.AudioPatch.v1` (`{"version":1,"rows":[0,1,2],"sockets":[3,0,2]}`), `operator.save` and `operator.save.backup` were kept in editor `SessionState` during the check and restored exactly afterwards (hashes compared), then the keys were erased. The check ran in MainMenu, so no game save was written.
+- Dynamic TMP fonts and static materials were dirty in memory after Play Mode: `EditorUtility.ClearDirty`; nothing on disk changed. `ProjectSettings.asset` untouched. No callbacks left. Nothing staged, committed or pushed.
+Deviations from Design/Plan: none.
+Follow-ups:
+- In the after screenshot the yellow wire (Master) is drawn over the blue jack it crosses in the Music row: each slider draws its wire and plug together, so a wire from an upper row passes over a plug in a lower row. Readable, but if it bothers the lead, plugs could be lifted above all wires.
+
+### Volume patch: last-plugged wire lies on top (2026-10-20)
+Result: done
+Playable now: in Options (main menu and pause menu) wires stack like on a real board: the wire you plugged last lies on top. Each wire is drawn under its own jack, and that pair lies over every older wire and jack, so a newer wire crossing an older jack covers it, and a held wire is on top while you carry it. The order is saved with the patch and survives closing Options and restarting. The wires still come out from behind the left frame.
+How to test:
+1. Main menu, Options: put Master (yellow) at 75 in the Master row and Music (blue) at 25 in the Music row. Move the yellow jack into the Music row's 50: the yellow wire now passes over the blue jack.
+2. Pick up the blue jack and plug it into the Master row's 50: the blue wire now lies over the yellow wire.
+3. Pick up the red (SFX) jack and carry it around: its wire is drawn over all the others; carried over the left frame, the jack is still visible. Click on an empty spot so it goes back: its wire stays on top.
+4. Leave Options and come back, restart the game, or open Options from the pause menu in a game: the wires lie in the same order.
+Created:
+- `Assets/Tests/Game/Editor/VolumeStackTests.cs` (+ `.meta`)
+Changed:
+- `Assets/Scripts/UI/VolumePatchState.cs`: the stack order (`CableInLayer(layer)`, `LayerOf(cable)`, bottom to top, default Master, Music, SFX). `PickUp` lifts the wire to the top, so connecting it and putting it back both leave it there. `Restore(rows, sockets, order = null)` takes the saved order if it is a permutation of 0..2; otherwise the default, without rejecting the rows and sockets.
+- `Assets/Scripts/UI/AudioVolumeSettings.cs`: `SavedPatch.order` (still version 1, same key; a missing field loads as the default stack). New `Cancel()` puts a held jack back and saves, because the pickup changed the order.
+- `Assets/Scripts/UI/VolumeCablePanel.cs`: `OrderLayers` sets the sibling index of each wire+jack pair from the patch's order, only when the order has changed (cached in `shownStack`, reset in `OnEnable`). It replaces "held plug to last sibling". A refused drop and `OnDisable` go through `AudioVolumeSettings.Cancel()`. Pointer, touch, `OwnsPointerAt` and highlights are unchanged.
+- `Assets/Scripts/UI/MasterVolume.cs`: a refused `Apply` uses `AudioVolumeSettings.Cancel()`.
+- `Assets/Editor/VolumeOptionsBuilder.cs`: new `LayerCables` (also the menu `Tools/Switchboard/Layer Volume Cables`, run once on the prefab), and `BuildPanel` calls it so a rebuild gives the same structure.
+- `Assets/Tests/Game/Editor/WebBuildTests.cs`: the expected saved JSON now ends in `"order":[0,1,2]`.
+- `Docs/Design.md` (5.12 item 8), `Docs/Progress.md` (this report)
+Scene and prefab changes: `Assets/Prefabs/UI/VolumeCablePanel.prefab` changed once: `WiresBehindFrame` is gone, and `CableOverlay` now holds `MasterCable`, `MusicCable` and `SfxCable` (each `WireClip/<Channel>Wire` and then `<Channel>MovingPlug`), followed by `HandCursor`. All existing fileIDs are kept, so the overrides in `MainMenu.unity` and `GameUI.prefab` (plug sizes, sounds, the panel's position) still apply; neither file changed. When Unity re-saved the prefab, it also wrote values that were already applied at runtime: the plugs' art size and pivot, the lamps' default `glow`/`litTint`, and float rounding. It also dropped stale `HandCursorGraphic` texture fields that no longer exist in the script. `Final.unity` is active and not dirty.
+How the frame still hides the wire start: every wire sits in its own `WireClip`, a `RectMask2D` whose left edge is the left frame's inner edge (panel x -499.5, the right edge of `LeftFrameCover`). The clip reaches 8000 px right, up and down. Each wall end (x -530) is therefore cut off exactly where the frame used to cover it. The jacks are outside the mask, so a held jack stays visible over the frame. I chose this over a second copy of the frame cover because the pairs must interleave (wire, jack, wire, jack), and one cover can't sit above every wire but below every jack. Differences from before: a wire carried up past the top of the board now lies over the column lamps instead of under them, and a jack carried left of the board loses its wire behind the frame, as it already did.
+Tests: 589/589 EditMode (was 577). New in `VolumeStackTests` (12):
+- the default stack
+- each connect lifts that wire to the top
+- a held wire is on top and stays there when put back, also after a refused drop
+- save and load keep the order (`"order":[1,0,2]`)
+- a save without the field gets the default
+- six bad orders (duplicate, short, long, out of range, negative, empty) fall back to the default but keep rows and sockets
+- the prefab: after Master's connect the pairs are Music, SFX, Master with the hand above; each wire lies under its own jack inside a `RectMask2D` starting at the frame's inner edge; jacks are never clipped; every wall anchor stays left of that edge
+
+`MainMenuLayoutTests` (including `SocketRowsFitTheirLayoutAndClearTheCableAnchor`) unchanged and green.
+Console: clean (only Unity's own "Ignoring depth surface ... memoryless" lines during Play Mode).
+Play Mode check (MainMenu Options, `VolumeCablePanel.ProcessPointer` in `Canvas.willRenderCanvases` handlers):
+- Repro: start `rows [0,1,2] sockets [2,0,1]`. Master to row 1/50: stack Music, SFX, Master; saved `{"version":1,"rows":[1,1,2],"sockets":[1,0,1],"order":[1,2,0]}`. Then Music to row 0/50: stack SFX, Master, Music.
+- Held SFX shown over the frame and over the board, then dropped on an empty spot: SFX on top, `order [0,1,2]` saved. Close and reopen Options: same sibling order.
+- Stop and start Play Mode: the patch and order came back from the save (`order [1,2,0]` after one more connect), and so did the sibling order.
+- `Final.unity`: pause, then Options. The pause menu's panel shows the same structure and order (Master's yellow wire over Music's blue). No errors.
+
+Screenshots in `Temp/Captures/`:
+- `volume-stack-1.png`: yellow wire over the blue jack
+- `volume-stack-2.png`: blue wire over the yellow one
+- `volume-stack-held.png`: held red jack over the left frame
+- `volume-stack-held-board.png`: held red wire over the yellow jack and the other wires
+- `volume-stack-pause.png`: the pause menu's Options
+
+Test note: while Unity has focus, the panel's own `Update` moves a held jack to the real mouse each frame. The held screenshots therefore re-applied the simulated pointer and rebuilt the wire meshes in the handler. This affects only the check, not the game.
+Housekeeping:
+- The lead's `Switchboard.AudioPatch.v1` (`{"version":1,"rows":[2,2,0],"sockets":[3,2,3]}`), `operator.save` and `operator.save.backup` were kept in editor `SessionState` during the check and restored exactly afterwards (hashes compared). The keys were then erased. The Final check wrote the game save; it was restored too.
+- The dynamic TMP fonts (`Boecklins Universe SDF.asset`) and the "SDF Static" materials (Boecklins, Della Respira) were written during the check. They were discarded with `git checkout --` and cleared in memory.
+- `ProjectSettings.asset` untouched. Game view back to 1920×1080. No callbacks left. Nothing staged, committed or pushed.
+
+Deviations from Design/Plan: none.
+Follow-ups:
+- The panel's top hit is still the jack drawn on top, because the raycaster sorts by hierarchy depth, which now follows the stack. Two connected jacks never overlap (one per socket), so this matters only for a held jack, which isn't raycast.
+
+#### Pass 2: wires always over other jacks (lead, 2026-10-20)
+The lead's playtest put Master at Music/100, SFX at Master/100 and Music at Music/50, plugged last. The red wire ran under the blue jack because blue was newer. The lead wanted "the wire should go above a jack if it covers it", and a real jack sticks out of the board, so the rule changed.
+- New layering, bottom to top: all resting jacks, then the wires in plugging order (last plugged on top, still saved as `order`), then the held jack, then the hand. A strict per-pair order can't put a wire both under its own jack and over every other jack, so each wire now also lies over its own jack.
+- How a wire meets its own jack: the wire ends exactly at the jack's tail tip (`PlugGraphic.TailOffset`, the sprite's bottom edge) and comes in from below. Only a pixel or two of the wire's highlight overlaps the tail, so it reads as the cord entering the boot (`Temp/Captures/volume-stack-own-tail.png`). No extra sprite was needed.
+- Clicks: wires take no clicks and the `WireClip` masks draw nothing, so the top hit over a jack is still the jack, even with a wire drawn over it. Play Mode check: a raycast at four points on the blue jack under the yellow and red wires hit `MusicMovingPlug` each time. Pressing there picked it up, which put the blue jack above all wires. Dropping it back on its own socket returned it to the jack layer.
+- Prefab: `CableOverlay` is now flat: `MasterMovingPlug`, `MusicMovingPlug`, `SfxMovingPlug`, `MasterWireClip`, `MusicWireClip`, `SfxWireClip` (each a `RectMask2D` holding its wire, starting at the frame's inner edge as before), `HandCursor`. The pass-1 `<Channel>Cable` groups are gone. All fileIDs were kept, and `MainMenu.unity` and `GameUI.prefab` are unchanged.
+- Changed in this pass:
+  - `Assets/Scripts/UI/VolumeCablePanel.cs`: `OrderLayers` sets the sibling order for resting jacks, then wires by recency, then the held jack. It is cached on the order plus the held jack.
+  - `Assets/Editor/VolumeOptionsBuilder.cs`: `LayerCables` builds the flat structure and also converts the pass-1 groups. It ran once through `Tools/Switchboard/Layer Volume Cables`.
+  - `Assets/Prefabs/UI/VolumeCablePanel.prefab`
+  - `Assets/Tests/Game/Editor/VolumeStackTests.cs`: the pass-1 prefab test is replaced by three tests on the lead's case:
+    - every wire lies over every resting jack, the wires stack by recency, and a held jack and its wire go on top with the hand above
+    - the top hit over each jack is that jack
+    - the wires start hidden at the frame's edge, and the jacks are never clipped
+  - `Docs/Design.md` (5.12 item 8), `Docs/Progress.md`
+- Tests: 591/591 EditMode (was 589). Console clean.
+- Screenshots in `Temp/Captures/`:
+  - `volume-stack-lead-case.png`: the lead's layout. Red and yellow lie over the blue jack, and blue (newest) lies over red where those wires cross.
+  - `volume-stack-own-tail.png`: close-up of the red and yellow wires meeting their own jacks.
+- Housekeeping:
+  - The lead had played since pass 1, so the saved values were new: `Switchboard.AudioPatch.v1` = `{"version":1,"rows":[1,1,0],"sockets":[3,1,3],"order":[2,0,1]}`, plus `operator.save` and `operator.save.backup`. They were kept in `SessionState` and restored exactly (string compare), and the keys were erased.
+  - The font assets were cleared in memory. No font, ProjectSettings or scene files changed.
+  - `Final.unity` is active and not dirty. Nothing was committed.

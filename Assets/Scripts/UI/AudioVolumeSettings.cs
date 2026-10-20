@@ -18,6 +18,8 @@ namespace Switchboard.UI
             public int version = 1;
             public int[] rows;
             public int[] sockets;
+            // Bottom to top; saves from before 2026-10-20 have none and get the default stack.
+            public int[] order;
         }
         public static VolumePatchState Patch { get; private set; } = new VolumePatchState();
         public static event Action Changed;
@@ -37,18 +39,19 @@ namespace Switchboard.UI
             try
             {
                 var saved = JsonUtility.FromJson<SavedPatch>(json);
-                if (saved != null && saved.version == 1) patch.Restore(saved.rows, saved.sockets);
+                if (saved != null && saved.version == 1) patch.Restore(saved.rows, saved.sockets, saved.order);
             }
             catch (ArgumentException) { /* Invalid saves fall back to the default connections. */ }
             return patch;
         }
         public static void Save(VolumePatchState patch, ISaveStorage storage)
         {
-            var saved = new SavedPatch { rows = new int[3], sockets = new int[3] };
+            var saved = new SavedPatch { rows = new int[3], sockets = new int[3], order = new int[3] };
             for (int i = 0; i < 3; i++)
             {
                 saved.rows[i] = patch.RowOf(i);
                 saved.sockets[i] = patch.SocketOf(i);
+                saved.order[i] = patch.CableInLayer(i);
             }
             storage.Write(SaveKey, JsonUtility.ToJson(saved));
         }
@@ -60,6 +63,13 @@ namespace Switchboard.UI
             Save(Patch, SaveStorage.Create());
             Apply();
             return true;
+        }
+        // Putting a jack back where it was still lifts its wire to the top, so the order is saved too.
+        public static void Cancel()
+        {
+            if (Patch.HeldCable < 0) return;
+            Patch.Cancel();
+            Save(Patch, SaveStorage.Create());
         }
         private static void Apply()
         {
