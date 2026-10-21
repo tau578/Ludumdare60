@@ -207,7 +207,7 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 12 | Mobile and Web polish | Good on phones and desktop browsers |
 | 13 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–9 are built (9a saves and touch; 9b the Web build on itch.io, D26). **Step 10 (tutorial) comes next.** Steps 10–13 are outlines; the orchestrator turns each one into a full brief before launching it.
+Steps 1–10c are built (9a saves and touch; 9b the Web build on itch.io, D26; 10 the tutorial, D57; 10b faster lookup, D58; 10c the quick-connect tip, D59). **Step 11 (sound and feel) comes next;** the Operator's notebook (D59) waits for the lead. Steps 10–13 are outlines; the orchestrator turns each one into a full brief before launching it.
 
 > **Renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7, 7d → 8, 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11, 9 → 12, 10 → 13. The briefs of done steps, commit messages and older reports keep the numbers they were written with.
 
