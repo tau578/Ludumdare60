@@ -73,7 +73,7 @@ namespace Switchboard.UI
         public bool HasLetter(char letter) => FirstContactWithLetter(letter) >= 0;
 
         /// <summary>
-        /// Opens the spread with the first name starting with the letter. Names are "SURNAME, First" and sorted, so this
+        /// Opens the spread with the first name starting with the letter. Names are "Surname, First" and sorted, so this
         /// is the surname; a service goes by its whole name.
         /// </summary>
         public bool ShowLetter(char letter)

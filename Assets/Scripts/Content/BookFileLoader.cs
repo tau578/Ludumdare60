@@ -94,7 +94,7 @@ namespace Switchboard.Content
             int errorsBefore = errors.Count;
 
             if (name.Length == 0)
-                errors.Add($"{where}: the name is missing. Write it \"SURNAME, First\", such as \"MOSS, Ada\".");
+                errors.Add($"{where}: the name is missing. Write it \"Surname, First\", such as \"Ellis, Nora\".");
             else if (names.TryGetValue(name, out int first))
                 errors.Add($"{where}: this name is already listed as entry {first + 1}. Every name must be different; " +
                     "give one of them another first name.");

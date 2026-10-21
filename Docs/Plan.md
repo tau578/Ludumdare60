@@ -1887,7 +1887,7 @@ A wrong number, a hang-up or the call ending mid-tutorial should not leave the g
   - Its skill (lookup time, error rate) is configurable.
   - It runs hours of game time in seconds.
   - It reports the time to reach the mystery, the income curve and the fines.
-- **Tuning:** adjust prices, rates and pacing in `Economy.json` toward the target in D27, with the designer.
+- **Tuning:** adjust prices, rates and pacing in `Economy.json` toward the target in D27.
 - **Playtest:** a full run from a new save feels right.
 
 #### Step 9b playtest, round 4 (lead, 2026-10-19): iPhone

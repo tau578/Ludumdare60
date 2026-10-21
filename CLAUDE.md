@@ -7,16 +7,16 @@ A casual telephone switchboard-operator game:
 - Wrong connections make the caller hang up; the same call returns only when the queue comes round to it (D52).
 - A missed emergency brings a fine, but money never drops below 0 and there is no lose condition.
 - The player buys upgrades and saves for a final "mystery upgrade" (the `secret` entry) whose effect is still undecided.
-- The economy is driven by the designer's hand-edited `Assets/Configs/Economy.json` (D39, D40): one-time upgrade entries in chains, values that set the result, costs in cents.
+- The economy is driven by the hand-edited `Assets/Configs/Economy.json` (D39, D40): one-time upgrade entries in chains, values that set the result, costs in cents.
 
 Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile browsers, hosted on itch.io (D26), mouse and touch through the new Input System. Team repo: `github.com/tau578/Ludumdare60`, branch `main`. Teammates push often.
 
 ## Read first, every session
 1. `Docs/Progress.md`: status table (what's done, what's next), step reports, and verification and playtest notes.
 2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), open items (§8) and the step briefs (§9).
-3. `Docs/Design.md`: the source of truth for game rules, architecture and decisions D01–D55. If the code or a brief disagrees with it, stop and ask; don't improvise.
+3. `Docs/Design.md`: the source of truth for game rules, architecture and decisions D01–D59. The game follows the docs. If the code or a brief disagrees with it, stop and ask the lead; don't improvise, and don't change either side on your own.
 
-**Next step:** see the first row in `Docs/Progress.md` that isn't "done". As of 2026-10-18, Step 5 is split (D39–D44): **5a** (the designer's `Economy.json`, the shop panel, income upgrades, the secret goal), **5b** (extra wires up to 6 cords, the Notepad) and **5c** (calls, pacing, starting money and cords in `Economy.json`, D47) are done, and so is **7a** (board growth from a 3×3 start, D49). Step 6 (board growth, built as "7a") is done too. Step 7 (hand-written calls and call queues, D51, D52, D54) is done too. Step 8 (the lookup-only phone book, `Book.json`, D53) is done too. Step 9 is split (D55): **9a** (saves, New Game menu, pause menu, touch input; D55, D56) is done (`580c610`); **9b** (the first Web build on itch.io, D26) is done (`709be9d`; team guide: `Docs/WebBuild.md`); the game draws its own hand again, and `SystemPointer` hides the system pointer (a transparent image in browsers); only the lead's external display still flickers (Plan §8). **10** (the spotlight tutorial, D57), **10b** (faster lookup: lit caller jack, book-row marking, D58) and **10c** (the quick-connect tip, D59) are done (`845a1b3`). **Step 11 (sound) comes next**, then 12 (mobile and Web polish), 13 (balance); the Operator's notebook (D59) is on hold for the lead. Steps were renumbered on 2026-10-18 to follow the build order; older reports and commits use the old numbers.
+**Next step:** see the first row in `Docs/Progress.md` that isn't "done". Steps 1–10c are done, the latest being **10** (the spotlight tutorial, D57), **10b** (faster lookup: the call in hand's caller jack blinks, a book-row click marks a jack, D58) and **10c** (the quick-connect tip, D59), all on `main`. **Step 11 (sound and feel) comes next**, then 12 (mobile and Web polish) and 13 (balance). The Operator's notebook (D59) is on hold for the lead. Steps were renumbered on 2026-10-18 to follow the build order; older reports and commits use the old numbers.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).
@@ -63,7 +63,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 
 Teammates still push to `main`, so pre-flight always merges first (see the git rules).
 
-- **The designer** edits `Assets/Configs/Economy.json` (D39; one entry per line, guide in `Docs/EconomyFile.md`) and `Assets/Configs/Book.json` (D53; guide in `Docs/BookFile.md`) by hand. Keep both human-readable, keep validator messages plain, and keep the book's format and `contactsPerPage`. The book sorts itself (services first, then names A–Z), so the file's order doesn't matter.
+- **Config files are everyone's (lead, 2026-10-21).** `Assets/Configs/Economy.json` (D39; guide `Docs/EconomyFile.md`), `Calls.json` (D51) and `Book.json` (D53; guide `Docs/BookFile.md`) are edited by hand by anyone, steps included, along with their guides; never ask a teammate before changing them or treat a past author's choice as needing sign-off. Keep them human-readable (one entry per line), keep validator messages plain, and keep the book's format and `contactsPerPage`. The book sorts itself (services first, then names A–Z), so the file's order doesn't matter.
 - **Mia** makes the art (`Assets/Sprites/`, `Assets/Fonts/`).
 
 ## Architecture in brief (details in Design.md §4–§7)
@@ -81,8 +81,8 @@ Teammates still push to `main`, so pre-flight always merges first (see the git r
 - **UI:**
   - Our `GameUI.prefab` is a Screen Space Overlay canvas (sorting order 10, 1920×1080 Expand), laid over the board's `SwitchboardCanvas`.
   - Anything not meant to be clicked has `raycastTarget` off, because his cord input takes the topmost hit. His book is also at sorting order 10, so nothing of ours may overlap it.
-  - The money counter fills `HeaderSlot`. The call in hand shows as a speech bubble left of the caller column. Cards sit over the caller slots.
-- **Data:** every call (caller name, portrait, message, jacks, pay) is hand-written in the designer's `Assets/Configs/Calls.json` (D51) and played from the queues in `Economy.json` (D52). The book reads `Book.json` (D53): name, profession, address and jack, every entry from the start; the rules never read it. Names are English.
+  - The money counter fills `HeaderSlot`. The call in hand shows as a speech bubble to the right of the caller's portrait. Cards sit over the caller slots.
+- **Data:** every call (caller name, portrait, message, jacks, pay) is hand-written in `Assets/Configs/Calls.json` (D51) and played from the queues in `Economy.json` (D52). The book reads `Book.json` (D53): name, profession, address and jack, every entry from the start; the rules never read it. Names are English.
 
 ## Code conventions
 - Match the existing style:
@@ -126,7 +126,5 @@ Known issues and to-dos, such as touch input in the cord code, held cords droppi
 ## Open decisions (Design §10)
 - D15: what the mystery upgrade does.
 - D27: currency scale and target playtime.
-
-**Designer:** edits `Assets/Configs/Calls.json`, `Assets/Configs/Economy.json` and `Assets/Configs/Book.json` by hand. Keep it human-readable and keep validator messages plain.
 
 Don't assume answers to these; ask the lead when a step needs them.

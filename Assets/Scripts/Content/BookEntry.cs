@@ -12,7 +12,7 @@ namespace Switchboard.Content
             Jack = jack;
         }
 
-        /// <summary>As written in the file, "SURNAME, First"; a service by its whole name.</summary>
+        /// <summary>As written in the file, "Surname, First" (a title after the first name in brackets); a service by its whole name.</summary>
         public string Name { get; }
         public string Profession { get; }
         public string Address { get; }

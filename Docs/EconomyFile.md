@@ -1,4 +1,4 @@
-# The economy and calls files: a guide for the designer
+# The economy and calls files: a guide
 
 Two files are yours. You edit them by hand, and the game reads them every time it starts. Nothing in Unity needs to change when you edit them.
 
@@ -43,9 +43,9 @@ Every call is one line in `calls`:
 | `responseTimeSeconds` | Emergencies only: the seconds the player has to connect it. | above 0 |
 | `penaltyCents` | Emergencies only: the fine when the time runs out. | 0 or more, whole cents |
 
-**Jack labels** are written as on the board and in the book: a row letter **A to F**, then a column number **1 to 6**, such as `"C3"` (row C, column 3). The game starts on a 3x3 corner (rows A to C, columns 1 to 3) and grows from there.
+**Jack labels** are written as on the board and in the book: a row letter **A to F**, then a column number **1 to 6**, such as `"C3"` (row C, column 3). The game starts on the `startingBoard` corner (4x4 in the shipped file: rows A to D, columns 1 to 4) and grows from there.
 
-**What a call pays.** A correct connection pays `connectCents` at once, then `centsPerSecond` every second for `durationSeconds`: the shipped first call pays 10¢ + 20 × 5¢ = $1.10. Income upgrades multiply both. The card shows "10¢ + 5¢/s"; the duration stays hidden.
+**What a call pays.** A correct connection pays `connectCents` at once, then `centsPerSecond` every second for `durationSeconds`: the shipped first call pays 25¢ + 25 × 5¢ = $1.50. Income upgrades multiply both. The card shows "25¢" and "5¢/s"; the duration stays hidden. Connecting quickly adds a tip (see "Quick-connect tip").
 
 **What can go wrong for the player:**
 - A wrong patch ends the call with "Wrong number!". There is **no fine**, and the next call in the queue takes the slot. The same call comes back when the queue comes round to it.
@@ -68,9 +68,9 @@ The whole file looks like this (the pools and upgrades are shortened here):
 ```json
 {
   "startingCents": 0,
-  "startingCords": 2,
-  "startingBoard": { "cols": 3, "rows": 3 },
-  "startingClientSlots": 2,
+  "startingCords": 1,
+  "startingBoard": { "cols": 4, "rows": 4 },
+  "startingClientSlots": 3,
   "quickConnectSeconds": 5,
   "quickConnectTipCents": 5,
   "startPool": [ "call_001", "call_002", "call_003", ... ],
@@ -97,29 +97,30 @@ Calls don't ring at random any more: they come from a queue, the list of call id
 - **Busy lines.** A call whose jack is already in use waits on its card until the player can connect it.
 - **Bigger boards.** Each `extra_clients` upgrade has its own `stagePool`. Buying it **replaces** the queue, starting at its first call. Calls already on cards finish normally. The queue is always the last bought board's `stagePool`, or `startPool` before any.
 - **Every call must fit its stage.** A call in `startPool` must use jacks on `startingBoard`; a call in a `stagePool` must use jacks on that entry's `boardSize`. A call outside is left out of the queue, because the player could never connect it. A `stagePool` may reuse calls from earlier stages.
-- A new game (and, until saves arrive in Step 9, every restart) begins at `startPool`'s first call. Make that one simple: the first-call guide walks the player through it.
+- A new game begins at `startPool`'s first call, and deals **only that call** until its fee is paid or it ends: it is the tutorial's call (the spotlight guide walks the player through it). Make it a simple, regular call. Continue picks up where the save left off.
+- **One live call per caller.** A call whose caller is already on a card is skipped for now and comes round again later.
 
-The designer's draft wrote `start_pool` and `stage_pool`; the file uses `startPool` and `stagePool`, like its other names.
+The first draft wrote `start_pool` and `stage_pool`; the file uses `startPool` and `stagePool`, like its other names.
 
 ## Starting money and cords
 
 ```json
 "startingCents": 0,
-"startingCords": 2,
+"startingCords": 1,
 ```
 
 | Field | Meaning | If left out |
 |---|---|---|
 | `startingCents` | The money a new game starts with, in cents. 500 starts the counter at $5.00. 0 or more. | 0 |
-| `startingCords` | The cords in the tray when a game starts: **2 to 6**. | 2 |
+| `startingCords` | The cords in the tray when a game starts: **1 to 6**. The shipped file uses 1. | 2 |
 
 - The `extra_wires` upgrades must start above `startingCords`. With `"startingCords": 4`, a `wires` of 4 is reported, and the first cord the shop offers is the one with `"wires": 5`.
 
 ## Starting board and caller slots
 
 ```json
-"startingBoard": { "cols": 3, "rows": 3 },
-"startingClientSlots": 2,
+"startingBoard": { "cols": 4, "rows": 4 },
+"startingClientSlots": 3,
 ```
 
 | Field | Meaning | If left out or wrong |
@@ -180,7 +181,7 @@ Every upgrade is bought **once**. An entry looks like this:
 
 ### Extra cords: `wires`
 
-`wires` is the **total** number of cords after buying, not the number added. The game starts with `startingCords` cords (2 in the shipped file), so:
+`wires` is the **total** number of cords after buying, not the number added. The game starts with `startingCords` cords (1 in the shipped file). In this example the game starts with 3, so:
 
 ```json
 { "id": "wires_1", "type": "extra_wires", "name": "Extra cord", "description": "4 cords", "costCents": 500, "wires": 4 },
@@ -204,7 +205,7 @@ Every upgrade is bought **once**. An entry looks like this:
 - `clientSlots` is the **total** number of open caller slots after buying, 1 to 4. It may stay the same but never goes down, starting from `startingClientSlots`.
 - Along the chain, starting from `startingBoard`, the board must **grow**: neither `cols` nor `rows` may go down, and at least one must go up.
 - `stagePool` is the queue once this board is bought; see "Call queues". If it's missing or empty, the board can still be bought and the queue stays as it was, with a message.
-- Each new ring of the shipped board brings one emergency service: the Doctor (D4) at 4x4, the Fire Brigade (E5) at 5x5 and the Police (B6) at 6x6. Their emergency calls are in that board's `stagePool`.
+- In the shipped files all three emergency services are on the 4x4 start (Hospital A2, Police station D3, Fire station D4), so emergencies can come from the first pool on.
 - Write "x", not "×", in the description: the game's font has no "×".
 
 ### Chains
@@ -225,7 +226,7 @@ Entries of the same type form a **chain**, in the order they appear in the file.
 In Unity, choose **Tools > Switchboard > Validate Content**. It checks `Calls.json`, `Economy.json` and `Book.json` together. The Console then shows either "Validate Content: no problems found." or one plain message per problem, naming the file, the entry and the fix. For example:
 
 ```
-Economy file: startPool: call_014 uses E5, but the startingBoard opens only 3x3. The player could never connect it, so it is left out. Move it to the pool of a bigger board, or give it jacks on this one.
+Economy file: startPool: call_014 uses E5, but the startingBoard opens only 4x4. The player could never connect it, so it is left out. Move it to the pool of a bigger board, or give it jacks on this one.
 ```
 
 **Calls.json** messages report:
@@ -243,9 +244,9 @@ A call with a problem is left out; the others still play.
 
 **Economy.json** messages report:
 - a missing file, or one that isn't valid JSON
-- a negative `startingCents`, or a `startingCords` outside 2 to 6 (the game then starts with 2)
+- a negative `startingCents`, or a `startingCords` outside 1 to 6 (the game then starts with 2)
 - a note when `quickConnectSeconds` or `quickConnectTipCents` is missing; a negative one, or a `quickConnectTipCents` that isn't whole cents (the game then uses 5)
-- a missing `startingBoard` or `startingClientSlots`, a `startingBoard` without both `cols` and `rows` or outside 1 to 6, or a `startingClientSlots` outside 1 to 6 (the game then opens the full board and all 6 slots)
+- a missing `startingBoard` or `startingClientSlots`, a `startingBoard` without both `cols` and `rows` or outside 1 to 6, or a `startingClientSlots` outside 1 to 4 (the game then opens the full board and all 4 slots)
 - a missing or empty `startPool`; an `extra_clients` entry without a `stagePool`, or with an empty one
 - a pool id that isn't in `Calls.json`, or a call that has a problem there
 - a call that doesn't fit its stage's board (it is left out of that queue)

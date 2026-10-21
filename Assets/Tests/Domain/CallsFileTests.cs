@@ -19,7 +19,7 @@ namespace Switchboard.Domain.Tests
             var calls = JsonUtility.FromJson<CallsFileData>(AssetDatabase.LoadAssetAtPath<TextAsset>(CallsFilePath).text);
             foreach (var call in calls.calls)
             {
-                var caller = Array.Find(book.entries, entry => entry.name == call.name);
+                var caller = Array.Find(book.entries, entry => string.Equals(AsCalled(entry.name), call.name.Trim(), StringComparison.OrdinalIgnoreCase));
                 Assert.That(caller, Is.Not.Null, call.id);
                 Assert.That(call.from, Is.EqualTo(caller.jack), call.id + " caller jack");
                 var recipient = Array.Find(book.entries, entry => entry.jack == call.to);
@@ -33,7 +33,7 @@ namespace Switchboard.Domain.Tests
         }
 
         [TestCase("call_004", "Police station")]
-        [TestCase("call_103", "PC Percy Plodwell")]
+        [TestCase("call_103", "Plodwell, Percy (PC)")]
         public void AgathasPoliceCallsUseTheRequestedBookEntry(string id, string recipientName)
         {
             var book = JsonUtility.FromJson<BookFileData>(AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Configs/Book.json").text);
@@ -60,6 +60,23 @@ namespace Switchboard.Domain.Tests
 
         private static CallsCatalog Load(string json) =>
             CallsFileLoader.Load(json?.Replace('\'', '"'), name => name != null && name.StartsWith("caller-", StringComparison.Ordinal));
+
+        // The book writes people "Surname, First (Title)" (lead, 2026-10-21); calls name them "Title First Surname".
+        private static string AsCalled(string bookName)
+        {
+            int comma = bookName.IndexOf(", ", StringComparison.Ordinal);
+            if (comma < 0) return bookName.Trim();
+            string surname = bookName.Substring(0, comma).Trim();
+            string first = bookName.Substring(comma + 2).Trim();
+            string title = "";
+            int open = first.LastIndexOf(" (", StringComparison.Ordinal);
+            if (open >= 0 && first.EndsWith(")", StringComparison.Ordinal))
+            {
+                title = first.Substring(open + 2, first.Length - open - 3) + " ";
+                first = first.Substring(0, open);
+            }
+            return title + first + " " + surname;
+        }
 
         private static string File(params string[] calls) => "{ 'calls': [ " + string.Join(", ", calls) + " ] }";
 
@@ -254,7 +271,7 @@ namespace Switchboard.Domain.Tests
 
             BookCatalog book = config.LoadBook();
             var callers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (BookEntry entry in book.Entries) callers.Add(entry.Name);
+            foreach (BookEntry entry in book.Entries) callers.Add(AsCalled(entry.Name));
             Assert.That(ContentValidator.ValidateCallJacks(catalog.Calls, book.Entries), Is.Empty, "every jack a call uses is in the book");
             foreach (CallScript call in catalog.Calls)
             {
