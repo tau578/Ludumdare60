@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using TMPro;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
@@ -18,24 +20,41 @@ namespace Switchboard.Game.Editor
         public const string PushCommand = "butler push Builds/Web llazypixell/operator:html5";
 
         /// <summary>
-        /// Files a build re-saves with no change anyone wants in git (URP shader-stripping flags, glyph caches, format
-        /// only). <see cref="Build"/> writes their bytes back afterwards, so nobody has to undo them by hand.
+        /// The dynamic TMP fonts and their static materials: test and Play runs fill them in memory, and nobody edits them
+        /// on purpose, so their committed disk state is snapshotted <i>before</i> the save that would write the fill out.
         /// </summary>
-        public static readonly string[] RestoredFiles =
+        public static readonly string[] DiskStateFiles =
+        {
+            "Assets/Fonts/BoecklinsUniverse/Boecklins Universe SDF.asset",
+            "Assets/Fonts/DellaRespira/Della Respira SDF.asset",
+            "Assets/Fonts/BoecklinsUniverse/Boecklins Universe SDF Static.asset",
+            "Assets/Fonts/DellaRespira/Della Respira SDF Static.asset"
+        };
+
+        /// <summary>Snapshotted <i>after</i> the save, so an intended change still unsaved in the editor is kept.</summary>
+        public static readonly string[] SavedStateFiles =
         {
             "Assets/Settings/UniversalRP.asset",
             "Assets/UniversalRenderPipelineGlobalSettings.asset",
-            "Assets/Fonts/BoecklinsUniverse/Boecklins Universe SDF.asset",
-            "Assets/Fonts/DellaRespira/Della Respira SDF.asset",
             "ProjectSettings/TimeManager.asset"
         };
+
+        public static readonly string[] DynamicFonts =
+        {
+            "Assets/Fonts/BoecklinsUniverse/Boecklins Universe SDF.asset",
+            "Assets/Fonts/DellaRespira/Della Respira SDF.asset"
+        };
+
+        /// <summary>
+        /// Files a build re-saves with no change anyone wants in git (URP shader-stripping flags, glyph caches, format
+        /// only). <see cref="Build"/> writes their bytes back afterwards, so nobody has to undo them by hand.
+        /// </summary>
+        public static readonly string[] RestoredFiles = Concat(DiskStateFiles, SavedStateFiles);
 
         [MenuItem("Tools/Switchboard/Build Web")]
         public static void Build()
         {
-            // Saved first, so an intended change still unsaved in the editor is part of what gets restored.
-            AssetDatabase.SaveAssets();
-            Dictionary<string, byte[]> files = Snapshot(RestoredFiles);
+            Dictionary<string, byte[]> files = SnapshotAroundSave(DiskStateFiles, SavedStateFiles, AssetDatabase.SaveAssets);
             // The Input System adds its settings to the preloaded assets for the build and leaves them there.
             UnityEngine.Object[] preloaded = PlayerSettings.GetPreloadedAssets();
             try
@@ -45,10 +64,49 @@ namespace Switchboard.Game.Editor
             finally
             {
                 PlayerSettings.SetPreloadedAssets(preloaded);
+                ResetDynamicFonts();
                 AssetDatabase.SaveAssets();
+                var fonts = new HashSet<string>(DynamicFonts);
                 foreach (string path in Restore(files))
-                    if (path.StartsWith("Assets/")) AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+                    // Never force-reimport a dynamic font (Plan §4): memory is reset above instead.
+                    if (path.StartsWith("Assets/") && !fonts.Contains(path))
+                        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
             }
+        }
+
+        /// <summary>Snapshots <paramref name="beforeSave"/>, runs <paramref name="save"/>, then snapshots <paramref name="afterSave"/>.</summary>
+        public static Dictionary<string, byte[]> SnapshotAroundSave(IEnumerable<string> beforeSave, IEnumerable<string> afterSave,
+            Action save)
+        {
+            Dictionary<string, byte[]> files = Snapshot(beforeSave);
+            save();
+            foreach (KeyValuePair<string, byte[]> file in Snapshot(afterSave))
+                files[file.Key] = file.Value;
+            return files;
+        }
+
+        /// <summary>Empties the dynamic fonts in memory to match their committed (empty) files, so no later save writes them.</summary>
+        private static void ResetDynamicFonts()
+        {
+            foreach (string path in DynamicFonts)
+            {
+                var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);
+                if (font == null) continue;
+                font.ClearFontAssetData(true);
+                EditorUtility.ClearDirty(font);
+                if (font.atlasTextures != null)
+                    foreach (Texture2D atlas in font.atlasTextures)
+                        if (atlas != null) EditorUtility.ClearDirty(atlas);
+                if (font.material != null) EditorUtility.ClearDirty(font.material);
+            }
+        }
+
+        private static string[] Concat(string[] a, string[] b)
+        {
+            var all = new string[a.Length + b.Length];
+            a.CopyTo(all, 0);
+            b.CopyTo(all, a.Length);
+            return all;
         }
 
         public static Dictionary<string, byte[]> Snapshot(IEnumerable<string> paths)

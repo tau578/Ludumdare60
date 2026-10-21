@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using Switchboard.Domain;
 using Switchboard.Game;
@@ -167,6 +168,49 @@ namespace Switchboard.Game.Tests
         {
             foreach (string path in WebBuild.RestoredFiles)
                 Assert.That(File.Exists(path), Is.True, path);
+        }
+
+        [Test]
+        public void TheFontsAndTheirStaticMaterialsAreRestoredFromTheirStateBeforeTheSave()
+        {
+            string[] committed =
+            {
+                "Assets/Fonts/BoecklinsUniverse/Boecklins Universe SDF.asset",
+                "Assets/Fonts/DellaRespira/Della Respira SDF.asset",
+                "Assets/Fonts/BoecklinsUniverse/Boecklins Universe SDF Static.asset",
+                "Assets/Fonts/DellaRespira/Della Respira SDF Static.asset"
+            };
+            Assert.That(WebBuild.DiskStateFiles, Is.EquivalentTo(committed));
+            Assert.That(WebBuild.DynamicFonts, Is.SubsetOf(WebBuild.DiskStateFiles));
+            Assert.That(WebBuild.SavedStateFiles, Does.Contain("ProjectSettings/TimeManager.asset"));
+            Assert.That(WebBuild.RestoredFiles,
+                Is.EquivalentTo(WebBuild.DiskStateFiles.Concat(WebBuild.SavedStateFiles)));
+        }
+
+        [Test]
+        public void SnapshotAroundSaveTakesDiskFilesBeforeTheSaveAndTheRestAfter()
+        {
+            string folder = FileUtil.GetUniqueTempPathInProject();
+            Directory.CreateDirectory(folder);
+            try
+            {
+                string font = Path.Combine(folder, "font.asset");
+                string settings = Path.Combine(folder, "settings.asset");
+                File.WriteAllText(font, "committed");
+                File.WriteAllText(settings, "committed");
+                Dictionary<string, byte[]> snapshot = WebBuild.SnapshotAroundSave(new[] { font }, new[] { settings }, () =>
+                {
+                    File.WriteAllText(font, "filled by a test run");
+                    File.WriteAllText(settings, "intended edit");
+                });
+
+                Assert.That(System.Text.Encoding.UTF8.GetString(snapshot[font]), Is.EqualTo("committed"));
+                Assert.That(System.Text.Encoding.UTF8.GetString(snapshot[settings]), Is.EqualTo("intended edit"));
+            }
+            finally
+            {
+                Directory.Delete(folder, true);
+            }
         }
 
         [Test]
