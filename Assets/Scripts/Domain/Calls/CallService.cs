@@ -127,8 +127,10 @@ namespace Switchboard.Domain
                     call.SecondsLeft = Math.Max(0, call.SecondsLeft - dt);
                     if (call.SecondsLeft <= 0) expired.Add(call);
                 }
-                else if (call.HasResponseTime && !call.WaitingHeld && IsAwaitingConnection(call.State))
+                else if (IsAwaitingConnection(call.State))
                 {
+                    if (call.State != CallState.Incoming) call.SecondsInHand += dt;
+                    if (!call.HasResponseTime || call.WaitingHeld) continue;
                     call.ResponseSecondsLeft = Math.Max(0, call.ResponseSecondsLeft - dt);
                     if (call.ResponseSecondsLeft <= 0) missed.Add(call);
                 }

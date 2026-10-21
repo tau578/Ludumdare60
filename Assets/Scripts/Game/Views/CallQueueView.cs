@@ -117,6 +117,7 @@ namespace Switchboard.Game
             calls.CallAdded += OnCallAdded;
             calls.CallStateChanged += OnCallStateChanged;
             earnings.ConnectionFeePaid += OnConnectionFeePaid;
+            earnings.QuickConnectTipPaid += OnQuickConnectTipPaid;
             if (penalties != null) penalties.FineApplied += OnFineApplied;
             foreach (CallCardView card in pool)
             {
@@ -192,6 +193,7 @@ namespace Switchboard.Game
                 calls.CallStateChanged -= OnCallStateChanged;
             }
             if (earnings != null) earnings.ConnectionFeePaid -= OnConnectionFeePaid;
+            if (earnings != null) earnings.QuickConnectTipPaid -= OnQuickConnectTipPaid;
             if (penalties != null) penalties.FineApplied -= OnFineApplied;
             foreach (CallCardView card in pool)
             {
@@ -280,6 +282,8 @@ namespace Switchboard.Game
             card.ShowConnectionFee(e.Cents);
             if (moneyCounter != null) moneyCounter.FlyIncomeFrom(card.PortraitRect);
         }
+
+        private void OnQuickConnectTipPaid(QuickConnectTipPaidArgs e) => CardOf(e.Call)?.ShowQuickConnectTip(e.Cents);
 
         // "Missed -$2.00" names the amount actually taken, which is known only once the fine lands.
         private void OnFineApplied(FineAppliedArgs e) => CardOf(e.Call)?.RefreshStamp();

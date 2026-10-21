@@ -18,6 +18,12 @@ namespace Switchboard.Domain
         /// <summary>The queue of a new game, Economy.json's startPool (D52), in play order.</summary>
         IReadOnlyList<CallScript> StartPool { get; }
 
+        /// <summary>The quick-connect tip's window in seconds (D59); 0 turns the tip off.</summary>
+        double QuickConnectSeconds { get; }
+
+        /// <summary>The quick-connect tip in cents, before the income multiplier (D59); 0 turns the tip off.</summary>
+        long QuickConnectTipCents { get; }
+
         /// <summary>Economy.json's upgrades in file order (D39, D40).</summary>
         IReadOnlyList<IUpgrade> Upgrades { get; }
     }

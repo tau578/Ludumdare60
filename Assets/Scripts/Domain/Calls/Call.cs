@@ -19,6 +19,12 @@ namespace Switchboard.Domain
         public double SecondsLeft { get; internal set; }
         public double CentsEarned { get; internal set; }
         public bool ConnectionFeePaid { get; internal set; }
+
+        /// <summary>Game seconds since the card was taken, counted only while it waits for its connection (D59).</summary>
+        public double SecondsInHand { get; internal set; }
+
+        /// <summary>The quick-connect tip this call paid (D59); 0 if it connected too late or tips are off.</summary>
+        public double TipCents { get; internal set; }
         public CordId? Cord { get; internal set; }
 
         /// <summary>Whether the call must be connected in time (D09).</summary>

@@ -10,15 +10,22 @@ namespace Switchboard.Domain
         private readonly Func<double> multiplier;
 
         // The multiplier is read live, so an upgrade bought mid-call applies at once (D12). Null means 1.
-        public EarningsService(CallService calls, Wallet wallet, Func<double> multiplier = null)
+        public EarningsService(CallService calls, Wallet wallet, Func<double> multiplier = null,
+            QuickConnectTip quickTip = default)
         {
             this.calls = calls ?? throw new ArgumentNullException(nameof(calls));
             this.wallet = wallet ?? throw new ArgumentNullException(nameof(wallet));
             this.multiplier = multiplier ?? (() => 1);
+            QuickTip = quickTip;
             calls.CallStateChanged += OnCallStateChanged;
         }
 
         public event Action<ConnectionFeePaidArgs> ConnectionFeePaid;
+
+        /// <summary>Raised after the fee when a call connects quickly enough for the tip (D59).</summary>
+        public event Action<QuickConnectTipPaidArgs> QuickConnectTipPaid;
+
+        public QuickConnectTip QuickTip { get; }
 
         public double CurrentMultiplier => multiplier();
 
@@ -39,15 +46,22 @@ namespace Switchboard.Domain
             }
         }
 
-        // The fee is paid the moment a call first connects, so it never waits on the tick order (D32).
+        // The fee is paid the moment a call first connects, so it never waits on the tick order (D32). A resume after
+        // hold is not a first connection, so it pays neither the fee nor the tip again.
         private void OnCallStateChanged(CallStateChangedArgs e)
         {
             Call call = e.Call;
             if (e.To != CallState.Connected || call.ConnectionFeePaid) return;
             call.ConnectionFeePaid = true;
-            double cents = call.Request.ConnectionFeeCents * multiplier();
-            if (!Pay(call, cents)) return;
-            ConnectionFeePaid?.Invoke(new ConnectionFeePaidArgs(call, cents));
+            double factor = multiplier();
+            double cents = call.Request.ConnectionFeeCents * factor;
+            if (Pay(call, cents)) ConnectionFeePaid?.Invoke(new ConnectionFeePaidArgs(call, cents));
+            if (!QuickTip.Qualifies(call.SecondsInHand)) return;
+            // Multiplied like the fee, so the tip stays worth chasing as rates grow (fines alone are never multiplied).
+            double tip = QuickTip.Cents * factor;
+            if (!Pay(call, tip)) return;
+            call.TipCents = tip;
+            QuickConnectTipPaid?.Invoke(new QuickConnectTipPaidArgs(call, tip));
         }
 
         private bool Pay(Call call, double cents)

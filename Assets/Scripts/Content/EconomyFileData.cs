@@ -16,6 +16,10 @@ namespace Switchboard.Content
         public BoardSizeEntry startingBoard = new BoardSizeEntry();
         public int startingClientSlots = Unset;
 
+        // NaN marks a field the file leaves out (D59); doubles so a tip with decimals can be reported, not rounded away.
+        public double quickConnectSeconds = double.NaN;
+        public double quickConnectTipCents = double.NaN;
+
         /// <summary>Call ids from Calls.json for a new game (D52); null when the file leaves it out.</summary>
         public string[] startPool;
 

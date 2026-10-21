@@ -21,7 +21,8 @@ namespace Switchboard.Domain.Tests
 
         // A valid start, so each test sees only its upgrades' messages. Without a calls file the pools aren't checked.
         private const string Head =
-            "'startingCords': {0}, 'startingBoard': { 'cols': 3, 'rows': 3 }, 'startingClientSlots': 3, ";
+            "'startingCords': {0}, 'startingBoard': { 'cols': 3, 'rows': 3 }, 'startingClientSlots': 3, " +
+            "'quickConnectSeconds': 5, 'quickConnectTipCents': 5, ";
 
         private static string Json(params string[] entries) => JsonStartingWith(StatSheet.DefaultStartingCords, entries);
 
@@ -204,6 +205,65 @@ namespace Switchboard.Domain.Tests
             var ids = new List<string>();
             foreach (IUpgrade upgrade in catalog.Upgrades) ids.Add(upgrade.Id);
             Assert.That(ids, Is.EqualTo(new[] { "income_1", "income_3", "secret" }));
+        }
+
+        // The quick-connect tip (D59): two top-level fields.
+        private static EconomyCatalog LoadWithQuickConnect(string fields) =>
+            EconomyFileLoader.Load(("{ 'startingCords': 2, 'startingBoard': { 'cols': 3, 'rows': 3 }, 'startingClientSlots': 3, " +
+                fields + $"'upgrades': [ {Secret} ] }}").Replace('\'', '"'));
+
+        [Test]
+        public void TheRealFileSetsAQuickConnectTip()
+        {
+            EconomyCatalog catalog = EconomyFileLoader.Load(AssetDatabase.LoadAssetAtPath<TextAsset>(EconomyFilePath).text);
+            var data = JsonUtility.FromJson<EconomyFileData>(AssetDatabase.LoadAssetAtPath<TextAsset>(EconomyFilePath).text);
+            Assert.That(double.IsNaN(data.quickConnectSeconds), Is.False, "quickConnectSeconds is in the file");
+            Assert.That(double.IsNaN(data.quickConnectTipCents), Is.False, "quickConnectTipCents is in the file");
+            Assert.That(catalog.QuickTip.Seconds, Is.EqualTo(data.quickConnectSeconds));
+            Assert.That(catalog.QuickTip.Cents, Is.EqualTo((long)data.quickConnectTipCents));
+        }
+
+        [Test]
+        public void QuickConnectValuesComeFromTheFile()
+        {
+            EconomyCatalog catalog = LoadWithQuickConnect("'quickConnectSeconds': 3.5, 'quickConnectTipCents': 12, ");
+            Assert.That(catalog.Errors, Is.Empty, string.Join("\n", catalog.Errors));
+            Assert.That(catalog.QuickTip.Seconds, Is.EqualTo(3.5));
+            Assert.That(catalog.QuickTip.Cents, Is.EqualTo(12));
+            Assert.That(new GameContent(catalog).QuickConnectTipCents, Is.EqualTo(12));
+            Assert.That(new GameContent(catalog).QuickConnectSeconds, Is.EqualTo(3.5));
+        }
+
+        [Test]
+        public void ZeroTurnsTheTipOffWithNoMessage()
+        {
+            EconomyCatalog catalog = LoadWithQuickConnect("'quickConnectSeconds': 5, 'quickConnectTipCents': 0, ");
+            Assert.That(catalog.Errors, Is.Empty);
+            Assert.That(catalog.QuickTip.IsOn, Is.False);
+        }
+
+        [Test]
+        public void MissingQuickConnectFieldsGetTheirDefaultsWithANote()
+        {
+            EconomyCatalog catalog = LoadWithQuickConnect("");
+            Assert.That(catalog.Errors.Count, Is.EqualTo(2), string.Join("\n", catalog.Errors));
+            Assert.That(catalog.Errors[0], Does.Contain("quickConnectSeconds is missing").And.Contain("A note only")
+                .And.Contain("\"quickConnectSeconds\": 5"));
+            Assert.That(catalog.Errors[1], Does.Contain("quickConnectTipCents is missing").And.Contain("A note only")
+                .And.Contain("\"quickConnectTipCents\": 5"));
+            Assert.That(catalog.QuickTip.Seconds, Is.EqualTo(QuickConnectTip.DefaultSeconds));
+            Assert.That(catalog.QuickTip.Cents, Is.EqualTo(QuickConnectTip.DefaultCents));
+        }
+
+        [TestCase("'quickConnectSeconds': -2, 'quickConnectTipCents': 5, ", "quickConnectSeconds -2 is negative")]
+        [TestCase("'quickConnectSeconds': 5, 'quickConnectTipCents': -1, ", "quickConnectTipCents -1 is negative")]
+        [TestCase("'quickConnectSeconds': 5, 'quickConnectTipCents': 2.5, ", "quickConnectTipCents 2.5 must be whole cents")]
+        public void AWrongQuickConnectValueIsReportedAndFallsBack(string fields, string message)
+        {
+            EconomyCatalog catalog = LoadWithQuickConnect(fields);
+            AssertSingleError(catalog, message, "The game uses 5 for now");
+            Assert.That(catalog.QuickTip.Seconds, Is.EqualTo(QuickConnectTip.DefaultSeconds));
+            Assert.That(catalog.QuickTip.Cents, Is.EqualTo(QuickConnectTip.DefaultCents));
         }
     }
 }

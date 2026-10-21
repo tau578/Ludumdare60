@@ -21,6 +21,9 @@ namespace Switchboard.Domain.Tests
 
         private const string Start = "'startingCords': 2, 'startingBoard': { 'cols': 3, 'rows': 3 }, 'startingClientSlots': 2";
 
+        // The tip's fields (D59), so each test sees only its own messages.
+        private const string QuickConnect = "'quickConnectSeconds': 5, 'quickConnectTipCents': 5, ";
+
         private const string Secret = "{ 'id': 'secret', 'type': 'secret', 'name': '???', 'costCents': 25000 }";
 
         private static string Board(string id, int side, int slots, string pool) =>
@@ -28,7 +31,7 @@ namespace Switchboard.Domain.Tests
             $"'boardSize': {{ 'cols': {side}, 'rows': {side} }}, 'clientSlots': {slots}{(pool != null ? ", 'stagePool': " + pool : "")} }}";
 
         private static string File(string start, string startPool, params string[] upgrades) =>
-            ("{ " + start + (startPool != null ? ", 'startPool': " + startPool : "") +
+            ("{ " + QuickConnect + start + (startPool != null ? ", 'startPool': " + startPool : "") +
                 $", 'upgrades': [ {string.Join(", ", upgrades)}{(upgrades.Length > 0 ? ", " : "")}{Secret} ] }}").Replace('\'', '"');
 
         private static EconomyCatalog Load(string startPool, params string[] upgrades) =>

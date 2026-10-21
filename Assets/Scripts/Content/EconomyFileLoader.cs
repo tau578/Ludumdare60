@@ -34,6 +34,7 @@ namespace Switchboard.Content
             int startingCords = StatSheet.DefaultStartingCords;
             BoardSize startingBoard = BoardSize.Full;
             int startingClientSlots = StatSheet.MaxClientSlots;
+            var quickTip = new QuickConnectTip(QuickConnectTip.DefaultSeconds, QuickConnectTip.DefaultCents);
             EconomyFileData data = Parse(json, errors);
             if (data != null)
             {
@@ -41,6 +42,7 @@ namespace Switchboard.Content
                 startingCords = CheckStartingCords(data.startingCords, errors);
                 startingBoard = CheckStartingBoard(data.startingBoard, errors);
                 startingClientSlots = CheckStartingClientSlots(data.startingClientSlots, errors);
+                quickTip = CheckQuickConnect(data, errors);
                 CheckRemovedSections(data, errors);
 
                 var ids = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -72,7 +74,8 @@ namespace Switchboard.Content
                     }
                 }
             }
-            return new EconomyCatalog(startingCents, startingCords, startingBoard, startingClientSlots, startPool, upgrades, errors);
+            return new EconomyCatalog(startingCents, startingCords, startingBoard, startingClientSlots, startPool, upgrades, errors,
+                quickTip);
         }
 
         /// <summary>
@@ -223,6 +226,36 @@ namespace Switchboard.Content
                 errors.Add($"startingClientSlots {slots} is outside 1 to {all}, the caller panel's slots. The game opens all {all} for now.");
             else return slots;
             return all;
+        }
+
+        // The tip (D59) is optional: a field left out gets its default with a note; a wrong value is an error.
+        private static QuickConnectTip CheckQuickConnect(EconomyFileData data, List<string> errors)
+        {
+            const string off = "0 turns the tip off.";
+            double seconds = QuickConnectTip.DefaultSeconds;
+            double value = data.quickConnectSeconds;
+            if (double.IsNaN(value))
+                errors.Add($"quickConnectSeconds is missing, so the quick-connect tip uses {Number(seconds)} seconds. " +
+                    $"A note only: add \"quickConnectSeconds\": {Number(seconds)}, the seconds the player has after taking a card " +
+                    "to earn the tip, to choose your own.");
+            else if (value < 0)
+                errors.Add($"quickConnectSeconds {Number(value)} is negative. Use 0 or more seconds; {off} " +
+                    $"The game uses {Number(seconds)} for now.");
+            else seconds = value;
+
+            long cents = QuickConnectTip.DefaultCents;
+            value = data.quickConnectTipCents;
+            if (double.IsNaN(value))
+                errors.Add($"quickConnectTipCents is missing, so a quick connection pays a {cents}¢ tip. " +
+                    $"A note only: add \"quickConnectTipCents\": {cents}, the tip in cents, to choose your own.");
+            else if (value < 0)
+                errors.Add($"quickConnectTipCents {Number(value)} is negative. Use 0 or more, in cents; {off} " +
+                    $"The game uses {cents} for now.");
+            else if (Math.Abs(value - Math.Round(value)) > 1e-9)
+                errors.Add($"quickConnectTipCents {Number(value)} must be whole cents, such as {Number(Math.Round(value))}. " +
+                    $"The game uses {cents} for now.");
+            else cents = (long)Math.Round(value);
+            return new QuickConnectTip(seconds, cents);
         }
 
         private static UpgradeRecord Check(int index, UpgradeEntry entry, Dictionary<string, int> ids,

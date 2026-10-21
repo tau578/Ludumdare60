@@ -29,7 +29,8 @@ namespace Switchboard.Domain
             if (save != null) Queue.Restore(save.queuePosition);
             Shelf = new ShopShelf(Upgrades);
             Goal = new GoalProgress(Upgrades, Wallet);
-            Earnings = new EarningsService(Calls, Wallet, () => Stats.IncomeMultiplier);
+            Earnings = new EarningsService(Calls, Wallet, () => Stats.IncomeMultiplier,
+                new QuickConnectTip(content.QuickConnectSeconds, content.QuickConnectTipCents));
             Penalties = new PenaltyService(Calls, Wallet);
             Desk = new OperatorDesk(Calls, new ConnectionRule(), switchboard);
             Career = new CareerStats(Calls, Earnings, Penalties, save?.career);

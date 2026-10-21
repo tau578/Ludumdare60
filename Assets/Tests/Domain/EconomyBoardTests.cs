@@ -11,7 +11,7 @@ namespace Switchboard.Domain.Tests
     {
         private const string EconomyFilePath = "Assets/Configs/Economy.json";
 
-        private const string Rest = "'startingCords': 3";
+        private const string Rest = "'startingCords': 3, 'quickConnectSeconds': 5, 'quickConnectTipCents': 5";
 
         private const string Start = "'startingBoard': { 'cols': 3, 'rows': 3 }, 'startingClientSlots': 3";
 

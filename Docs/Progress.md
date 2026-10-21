@@ -20,7 +20,7 @@
 | 9b. First Web build on itch | done | ✅ 2026-10-19 (37 min; cursor fixes discarded) | ✅ 517/517 tests, scope clean | ✅ | 709be9d |
 | 10. Tutorial | playtesting | ✅ 2026-10-20 (33 min + 28 min fix + 21 min fix) | ✅ 638/638 tests, scope clean | | |
 | 10b. Faster lookup | playtesting | ✅ 2026-10-20 (20 min + 15 + 20 + 19 min fixes) | ✅ 671/671 tests, scope clean | | |
-| 10c. Quick tip and notebook | not started | | | | |
+| 10c. Quick-connect tip | playtesting | ✅ 2026-10-21 (14 min) | ✅ 697/697 tests, scope clean | | |
 | 11. Sound and feel | not started | | | | |
 | 12. Mobile and Web polish | not started | | | | |
 | 13. Balance | not started | | | | |
@@ -4853,3 +4853,70 @@ Follow-ups:
 - In 7a the steady book mark (1.0, B3) lies under the dark layer and is brighter than the caller's blink (0.55) in the lit hole. It reads fine in the captures, because the hole and the arrow are on the caller, but if the lead finds the mark distracting there, it could be dimmed while the tutorial's 7a runs.
 - While a hole slides diagonally, its arrow passes over the jacks between (`-6b`); it rests clear of them, as before.
 - Real mouse hover and the real feel of the 0.5 s blink at 0.55 should be confirmed in the lead's playtest (Unity in the background hides the pointer).
+
+### Step 10c report: 2026-10-21
+Result: done
+
+Playable now: connecting a call within 5 seconds of taking its card pays a 5¢ tip on top of its fee. A small dark-green "Quick! +5¢" pill rises from the card, just under the usual "+25¢" fee popup. A slower connection shows only the fee popup, as before. Both numbers are the designer's, in `Economy.json`.
+
+How to test:
+1. Continue (or New Game and finish the tutorial). Click a ringing card, read who they want, and patch both jacks within 5 seconds: "+fee" and, under it, "Quick! +5¢" rise from the card. The card's earnings and the money counter include the tip.
+2. Take another card and wait more than 5 seconds before closing the circuit: only "+fee" shows.
+3. Pull one plug of a quickly connected call (on hold) and put it back: no second fee, no second tip.
+4. Pause (Esc) right after taking a card, wait, resume: the paused time doesn't count.
+5. Buy More Profit (Earn x2): a quick connection now shows "Quick! +10¢".
+6. In `Economy.json`, set `"quickConnectTipCents": 0`: no tip at all. Remove the two lines: Validate Content (and the console at start) shows two "A note only" messages and the game uses 5 and 5.
+
+**Decision: More Profit multiplies the tip, like the fee.** A flat 5¢ would be worth nothing next to the x8 and x16 rates late in the game, which is when a busy board makes speed matter most. It's one line in `EarningsService.OnCallStateChanged` (`QuickTip.Cents * factor`) if the lead prefers a flat tip. Fines stay unmultiplied.
+
+How it works:
+- **Domain.** `Call.SecondsInHand` counts game seconds while a call is Taken or Connecting (in `CallService.Tick`, so it only moves with `GameSession.Tick`; the pause menu's `timeScale` 0 ticks with 0 s, so it stops). `QuickConnectTip` (seconds, cents; 0 in either turns it off; `Qualifies` is `secondsInHand <= Seconds`) is passed to `EarningsService`, which pays the tip right after the fee at a call's **first** connection, behind the same `ConnectionFeePaid` flag, so a resume after hold never pays it again. The tip goes through the same `Pay` as the fee: it is in `Call.CentsEarned` (the card's earnings badge and the "Paid" stamp), the wallet and `TotalPaidCents` (career earnings). `Call.TipCents` records it, and `QuickConnectTipPaid` (`QuickConnectTipPaidArgs`) is raised for the view. A call that connects as it is taken (D45 persistent wiring) has 0 s in hand and gets the tip. The tutorial is unchanged.
+- **Content.** `IGameContent.QuickConnectSeconds`/`QuickConnectTipCents`, filled by `GameContent` from `EconomyCatalog.QuickTip`. `EconomyFileLoader.CheckQuickConnect`: a missing field gets its default (5) with an "A note only" message; a negative value, or a tip that isn't whole cents, is reported and falls back to 5. The two fields are doubles with a NaN "missing" marker in `EconomyFileData`, so 2.5 is reported instead of silently truncated.
+- **View.** `CallCardView` gets a `tipPopup` (`FloatingTextView`, the same component as the fee popup) and `ShowQuickConnectTip`; `CallQueueView` listens to `QuickConnectTipPaid`. The popup is hidden with the fee popup wherever that one is hidden. No coins of its own: the fee's coins already fly at the same moment.
+- **Sorting.** `TipPopup` is a sibling of `FeePopup` on the card, on `GameUI`'s canvas (order 10) with no nested canvas: above the board wires (1-6), at the book's order 10 like the fee popup (the cards sit left of the board and never under the open book), under the tutorial spotlight (14), the Goal dialog (15), the pause menu (16) and the hand (20). Its image and text have `raycastTarget` off and its `CanvasGroup` blocks no raycasts, so it never takes a cord click. A test checks the canvas, the order and the raycast flags.
+
+Created:
+- `Assets/Scripts/Domain/Economy/QuickConnectTip.cs` (+ `.meta`)
+- `Assets/Tests/Domain/QuickConnectTipTests.cs` (+ `.meta`)
+
+Changed:
+- `Assets/Configs/Economy.json`: two new lines after `startingClientSlots`, in the file's style: `"quickConnectSeconds": 5,` and `"quickConnectTipCents": 5,`. Nothing else in the file changed.
+- `Assets/Scripts/Domain/Calls/Call.cs` (`SecondsInHand`, `TipCents`), `Calls/CallService.cs` (counts in-hand time; the response-timer branch is restructured, same behaviour), `Calls/CallEvents.cs` (`QuickConnectTipPaidArgs`), `Definitions/IGameContent.cs`, `Economy/EarningsService.cs` (optional `QuickConnectTip`, `QuickTip`, `QuickConnectTipPaid`), `GameSession.cs`
+- `Assets/Scripts/Content/EconomyFileData.cs`, `EconomyFileLoader.cs`, `EconomyCatalog.cs` (`QuickTip`), `GameContent.cs`
+- `Assets/Scripts/Game/Views/CallCardView.cs`, `CallQueueView.cs`
+- `Assets/Prefabs/Game/GameUI.prefab`: see below
+- `Assets/Tests/Domain/Fakes.cs` (`FakeContent`'s tip is off by default, so exact-money tests are unchanged), `EconomyFileTests.cs`, `EconomyBoardTests.cs`, `EconomyPoolTests.cs` (their sample files now include the two fields, so each test still sees only its own messages), `Assets/Tests/Game/Editor/MergedSystemsTests.cs`
+- `Docs/EconomyFile.md`: the fields in the section table and the sample file, a new "Quick-connect tip" section, the message list and an example message. `Docs/Progress.md` (this report).
+
+Scene and prefab changes: `GameUI.prefab` only (additions, no other lines changed): `Calls/CallCard/TipPopup`, a copy of `FeePopup` right after it: anchored (0, -72) under the fee popup's (0, -20), 196×44, a dark green pill (27, 61, 38, 240) with pale gold bold text at 30 pt, shown for 1.4 s (the fee popup 1 s), rising 30 px; inactive; `CallCardView.tipPopup` points at it. `Final.unity` and `MainMenu.unity` are unchanged.
+
+Tests: 697/697 EditMode (was 673; 24 new):
+- `QuickConnectTipTests` (15): a quick connection pays the tip on top of the fee (wallet, `CentsEarned`, `TotalPaidCents`, event); the window's last instant still counts; a slow connection pays only the fee; ringing time before the take doesn't count; half-patching (Connecting) doesn't stop the clock; a call that connects as it is taken gets the tip; reconnecting after hold pays no second tip; a slow call stays tipless after hold; a wrong number pays none; the multiplier multiplies the tip; a 0¢-fee call still gets it; a 0 window or 0 tip turns it off (2 cases); the default service has no tip; a paused session (ticks of 0 s) doesn't run the window down, and `GameSession` reads both values from the content.
+- `EconomyFileTests` (7): the real file has both fields and the catalog uses them (no values pinned); values come from the file into `GameContent`; 0 turns it off with no message; missing fields give two notes and the defaults; negative seconds, a negative tip and a 2.5¢ tip are each one message and fall back to 5 (3 cases).
+- `MergedSystemsTests` (2 new, 1 changed): in the real `Final` scene a quick connection shows "Quick! +X¢" on the card with the fee popup, on GameUI's canvas at order 10 with no raycast targets; a connection after the window shows only the fee. Both use `Assume` on the real file's tip, so they skip if the designer turns it off. `NewCordKeepsConnectionHighlightsCoinsAndAudio` now expects fee + `call.TipCents` (it connects at once, so it earns the tip) and still checks that a resume pays nothing more.
+
+Console: clean (only Unity's "Ignoring depth surface ... memoryless" lines in Play Mode); cleared at the end.
+
+Screenshots (Play Mode in `Final`, the lead's save via Continue: 4×4 board, 2 cords, 3 callers; 1920×1080; frames driven by `EditorApplication.Step`):
+- `Temp/Captures/step-10c-1.png`: Nora Ellis (A1 to B3) taken and patched at once with the red cord: "+25¢" and "Quick! +5¢" under it on her card. The wallet rose by 30¢.
+- `Temp/Captures/step-10c-2.png`: Winston Tuttle (C2 to D1) taken, then 6.4 game seconds (stepped at `timeScale` 20, then set back to 1), then patched with the blue cord: only "+15¢"; tip 0, the wallet rose by 15¢.
+- In the first capture the tip pill briefly covers the caller's name plate; it fades out within 1.4 s.
+
+Housekeeping:
+- Unity was idle, out of Play Mode, on `Final.unity`; I didn't have to stop anything.
+- **The lead's keys:** `operator.save` (214 chars), `operator.save.backup` (212) and `Switchboard.AudioPatch.v1` (62) were kept in SessionState only, restored exactly after Play Mode (string-compared: identical) and the SessionState keys erased. No copies outside the editor.
+- `Time.timeScale` is 1; the Game view is 1920×1080 (it already was). Every stepper removed itself. `Final.unity` is active and not dirty; no scene re-saves.
+- **Fonts:** no font or material file changed on disk. After Play Mode: `ClearFontAssetData(true)` on both dynamic fonts (Boecklins 2 glyphs, Della Respira 25, now 0) and `ClearDirty` on each font, atlas and material, plus the two "SDF Static" materials (both dirty in memory). Nothing force-reimported.
+- `TimeManager.asset` and `ProjectSettings.asset` are untouched. Nothing staged, committed or pushed. The orchestrator's doc edits (Plan 10c brief, D59, the Progress row) are kept.
+- `MainMenu` was not played: nothing in it or the scene flow changed. The EditMode tests ran before Play Mode; no code changed after them.
+
+Deviations from Design/Plan:
+1. **The tip is multiplied by More Profit** (the brief allowed either; see the decision above).
+2. **Missing fields default to 5 and 5 with a note**, not to "off". So a file without the lines still has the tip, and Validate Content says so; the designer turns it off with 0. The notes go through the economy file's message list, which `GameInstaller` logs as errors at start, like every other "A note only" message (e.g. a short pool).
+3. **The tip popup sits on the card under the fee popup**, not by the money plaque: it's where the player is looking when they connect, and the fee popup is already there.
+
+Follow-ups:
+- Design.md is for the orchestrator: D59's status (built: multiplied tip, defaults 5/5, `SecondsInHand`), 6.4's field list and validator list, 5.8 (the tip is part of what `EarningsService` pays) and 5.4 (the card's "Quick! +X¢" popup).
+- `Docs/EconomyFile.md` still says `startingCords` is 2 to 6 and the game starts on 3×3 in a few places (the loader allows 1 to 6 since `7312e43`); not touched here.
+- The tip pill covers the caller's name plate for about a second; if that bothers the lead in the playtest, it could move left or right of the portrait, or rise from the fee popup after it.
+- The tutorial's first call can earn the tip if the player is quick; the tutorial says nothing about it (as the brief asked).

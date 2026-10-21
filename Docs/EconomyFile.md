@@ -59,6 +59,7 @@ Every call is one line in `calls`:
 |---|---|
 | `startingCents`, `startingCords` | The money and the cords a new game starts with. |
 | `startingBoard`, `startingClientSlots` | How much of the board, and how many caller slots, a new game opens. |
+| `quickConnectSeconds`, `quickConnectTipCents` | The quick-connect tip: how fast the player must connect a call after taking its card, and what that pays. |
 | `startPool` | The call queue of a new game. |
 | `upgrades` | Everything the shop sells. Each `extra_clients` entry has its own `stagePool`. |
 
@@ -70,6 +71,8 @@ The whole file looks like this (the pools and upgrades are shortened here):
   "startingCords": 2,
   "startingBoard": { "cols": 3, "rows": 3 },
   "startingClientSlots": 2,
+  "quickConnectSeconds": 5,
+  "quickConnectTipCents": 5,
   "startPool": [ "call_001", "call_002", "call_003", ... ],
   "upgrades": [
     { "id": "board_1", "type": "extra_clients", ..., "stagePool": [ "call_101", "call_102", ... ] },
@@ -125,6 +128,26 @@ The designer's draft wrote `start_pool` and `stage_pool`; the file uses `startPo
 | `startingClientSlots` | How many caller slots, from the top, take calls in a new game: **1 to 4**. The others are hidden. | All 4, with a message |
 
 - Closed jacks are dimmed and can't take a plug. The board in Unity has 6 by 6 jacks and 6 caller slots; those are the only fixed limits.
+
+## Quick-connect tip
+
+```json
+"quickConnectSeconds": 5,
+"quickConnectTipCents": 5,
+```
+
+A call connected within `quickConnectSeconds` of the player taking its card (clicking it, so its speech bubble shows) pays `quickConnectTipCents` once, on top of its connection fee. The card shows a small "Quick! +5¢" under the "+fee" popup.
+
+| Field | Meaning | If left out or wrong |
+|---|---|---|
+| `quickConnectSeconds` | The seconds the player has after taking a card. Decimals are fine: 3.5 is three and a half seconds. 0 or more; **0 turns the tip off**. | Left out: 5, with a note. Negative: 5, with a message. |
+| `quickConnectTipCents` | The tip in **cents**, whole cents only. 0 or more; **0 turns the tip off**. | Left out: 5, with a note. Negative or not whole: 5, with a message. |
+
+- The clock starts when the card is taken, not when it starts ringing, and it stops while the game is paused.
+- Income upgrades (More Profit) **multiply the tip**, like the fee: with "Earn x4", a 5¢ tip pays 20¢. Fines are still never multiplied.
+- A call pays the tip at most once: reconnecting it after a pulled plug (on hold) pays neither the fee nor the tip again.
+- A call whose two jacks are already patched when the card is taken connects at once, and so gets the tip.
+- A wrong number never pays a tip.
 
 ## Upgrades
 
@@ -221,6 +244,7 @@ A call with a problem is left out; the others still play.
 **Economy.json** messages report:
 - a missing file, or one that isn't valid JSON
 - a negative `startingCents`, or a `startingCords` outside 2 to 6 (the game then starts with 2)
+- a note when `quickConnectSeconds` or `quickConnectTipCents` is missing; a negative one, or a `quickConnectTipCents` that isn't whole cents (the game then uses 5)
 - a missing `startingBoard` or `startingClientSlots`, a `startingBoard` without both `cols` and `rows` or outside 1 to 6, or a `startingClientSlots` outside 1 to 6 (the game then opens the full board and all 6 slots)
 - a missing or empty `startPool`; an `extra_clients` entry without a `stagePool`, or with an empty one
 - a pool id that isn't in `Calls.json`, or a call that has a problem there
@@ -250,6 +274,7 @@ Economy file: The pacing section is no longer used: calls now come from the queu
 Economy file: Upgrade 7 "notepad": the notepad upgrade is no longer used, so this entry is left out. Remove it from the file.
 Economy file: Upgrade 2 "income_2": incomeMultiplier 1.2 is not higher than income_1's 1.5. Values in a chain must grow.
 Economy file: Upgrade 5 "board_2": boardSize 4x4 is the same as board_1's 4x4. The board must grow: raise cols, rows or both.
+Economy file: quickConnectTipCents -1 is negative. Use 0 or more, in cents; 0 turns the tip off. The game uses 5 for now.
 Economy file: startingBoard is missing. Add the part of the board a new game opens, such as "startingBoard": { "cols": 3, "rows": 3 }. The game starts on the full 6x6 board for now.
 ```
 

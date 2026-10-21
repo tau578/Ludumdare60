@@ -41,6 +41,9 @@ namespace Switchboard.Domain.Tests
         public int StartingClientSlots { get; set; } = 6;
         public int StartingCords { get; set; } = 3;
         public IReadOnlyList<CallScript> StartPool { get; set; } = Array.Empty<CallScript>();
+        // Off by default, so tests that count money exactly don't see a tip.
+        public double QuickConnectSeconds { get; set; }
+        public long QuickConnectTipCents { get; set; }
         public IReadOnlyList<IUpgrade> Upgrades { get; set; } = Array.Empty<IUpgrade>();
     }
 

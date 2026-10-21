@@ -44,4 +44,16 @@ namespace Switchboard.Domain
         public Call Call { get; }
         public double Cents { get; }
     }
+
+    public readonly struct QuickConnectTipPaidArgs
+    {
+        public QuickConnectTipPaidArgs(Call call, double cents)
+        {
+            Call = call;
+            Cents = cents;
+        }
+
+        public Call Call { get; }
+        public double Cents { get; }
+    }
 }

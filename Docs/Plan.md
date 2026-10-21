@@ -1849,10 +1849,13 @@ A wrong number, a hang-up or the call ending mid-tutorial should not leave the g
 2. **Tutorial arrows jitter.** In steps 7a and 7b (the caller's jack, then the found jack), the arrow jumps between several positions for a couple of seconds before it settles. Find the cause (e.g. the hole sliding to its new target while the arrow re-picks its side every frame, or a target rect that changes with the lamp) and make the arrow settle at once and move smoothly with its target. Check every step's arrow, not just 7a and 7b.
 - Tests for both.
 
-### Step 10c: Quick-connect tip and the Operator's notebook (D59, outline)
-- **Quick-connect tip:** if a call connects within `quickConnectSeconds` of being taken (in hand), it pays `quickConnectTipCents` extra, once, with a small "Quick! +X¢" popup near the card or money. Both are new top-level fields in `Economy.json` (document them in `Docs/EconomyFile.md`; validator messages plain; sensible defaults if missing, e.g. 5 s and 5¢, and tell the designer). Domain rule with EditMode tests (timer from taking the card; pause stops time; a reconnect after a hold doesn't count again).
-- **Operator's notebook:** a new upgrade kind (not the dropped `notepad`; e.g. `notebook`) with one entry in `Economy.json` (placeholder price for the designer). Once bought, when a call's recipient has been connected before in this save, the card shows the recipient's jack (e.g. in the bubble). Remember connected recipients in the save (new `SaveData` field; old saves start empty). Shop placement: read how `ShopShelf` and the slot art pick a slot; if no slot can show a new kind, stop and report options to the orchestrator before building.
-- **Tutorial:** none needed for the tip; the notebook could get a shop hint later.
+### Step 10c: Quick-connect tip (D59)
+**Scope (lead, 2026-10-21):** the quick-connect tip only. The Operator's notebook is on hold while the lead decides; don't build it.
+- **Rule (domain):** when a call connects within `quickConnectSeconds` of being taken (the moment its card is accepted, `CallState.Taken`), it pays `quickConnectTipCents` once, on top of the connection fee. Time comes only from `GameSession.Tick` (so pause stops it). A call that connects again after a hold doesn't pay a second tip. Decide whether More Profit multiplies the tip like the fee (say which; simplest is a flat amount).
+- **Data:** two new top-level fields in `Economy.json`, `quickConnectSeconds` and `quickConnectTipCents`. Add both lines to the designer's file with sensible starting values (e.g. 5 s and 5 cents), keep the file's one-entry-per-line style, validate them with plain messages (missing: default and a gentle note; negative: error), and document them in `Docs/EconomyFile.md`.
+- **Feedback:** a small "Quick! +X¢" popup near the card or the money plaque when the tip is paid, reusing the existing money popups/coins (`IncomeCoinsView`, the spend/fee popups) rather than a new system; `raycastTarget` off; plain ASCII plus "¢".
+- **Tutorial:** none. The tutorial's first call will rarely qualify; that's fine.
+- **Tests:** the rule (inside and outside the window, pause, hold and reconnect, a call that auto-connects on take), the loader and validator, and the popup appearing.
 
 ### Step 11: Sound and feel (outline)
 - **From Step 3:** replace the placeholder `card-take-click.wav` (set on `UiClickSound` in `GameUI.prefab`) with a real sound, and fill `CallCardView.OnCharacterShown` with the callers' talking sound (lead request).

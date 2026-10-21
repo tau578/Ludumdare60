@@ -154,7 +154,9 @@ namespace Switchboard.Game.Tests
             Assert.That(b.GetComponentInChildren<SocketHaloGraphic>(), Is.Not.Null);
             var coins = All<IncomeCoinsView>().Single();
             Assert.That(coins.IsFlying, Is.True);
-            Assert.That(session.Wallet.Cents, Is.EqualTo(before + 100));
+            // A connection this quick also earns the tip (D59), when Economy.json turns it on.
+            long paid = 100 + (long)call.TipCents;
+            Assert.That(session.Wallet.Cents, Is.EqualTo(before + paid));
             Assert.That(audioCues, Is.EqualTo(1));
             coins.Tick(2);
             Assert.That(cable.TryRemove(b), Is.True);
@@ -168,7 +170,50 @@ namespace Switchboard.Game.Tests
             Assert.That(call.State, Is.EqualTo(CallState.Connected));
             Assert.That(audioCues, Is.EqualTo(2));
             Assert.That(coins.IsFlying, Is.False, "Resume must not pay or replay reward coins");
-            Assert.That(session.Wallet.Cents, Is.EqualTo(before + 100));
+            Assert.That(session.Wallet.Cents, Is.EqualTo(before + paid), "nor a second tip");
+        }
+
+        private void ConnectWithoutCables(Call call) =>
+            session.Desk.OnCircuitClosed(new CordId(0), call.Request.From, call.Request.To);
+
+        // Economy.json sets the window and the tip (D59); a file with the tip off has nothing to show.
+        [Test]
+        public void AQuickConnectionShowsTheTipPopupOnTheCard()
+        {
+            QuickConnectTip tip = session.Earnings.QuickTip;
+            Assume.That(tip.IsOn, "Economy.json turns the quick-connect tip off");
+            var card = AcceptOrder();
+            var popup = Field<FloatingTextView>(card, "tipPopup");
+            Assert.That(popup, Is.Not.Null, "GameUI's card has a TipPopup");
+            Assert.That(popup.gameObject.activeSelf, Is.False);
+            ConnectWithoutCables(card.Call);
+
+            Assert.That(card.Call.State, Is.EqualTo(CallState.Connected));
+            Assert.That(popup.gameObject.activeSelf, Is.True);
+            Assert.That(popup.GetComponentInChildren<TMPro.TMP_Text>().text,
+                Is.EqualTo("Quick! +" + MoneyFormat.Compact(tip.Cents * session.Earnings.CurrentMultiplier)));
+            Assert.That(popup.GetComponentsInChildren<Graphic>(true).All(g => !g.raycastTarget), Is.True, "it never blocks cords");
+            Assert.That(popup.GetComponentInParent<Canvas>().rootCanvas.sortingOrder, Is.EqualTo(10),
+                "on GameUI's canvas with the fee popup: above the wires (1-6), under the tutorial (14) and the pause menu (16)");
+            Assert.That(popup.GetComponentInParent<Canvas>(), Is.SameAs(popup.GetComponentInParent<Canvas>().rootCanvas),
+                "no nested canvas of its own");
+            Assert.That(Field<FloatingTextView>(card, "feePopup").gameObject.activeSelf, Is.True, "the fee shows too");
+        }
+
+        [Test]
+        public void ASlowConnectionShowsOnlyTheFee()
+        {
+            QuickConnectTip tip = session.Earnings.QuickTip;
+            Assume.That(tip.IsOn, "Economy.json turns the quick-connect tip off");
+            var card = AcceptOrder();
+            for (double t = 0; t < tip.Seconds + 1; t += 0.1) session.Tick(0.1);
+            Assert.That(card.Call.State, Is.EqualTo(CallState.Taken));
+            ConnectWithoutCables(card.Call);
+
+            Assert.That(card.Call.State, Is.EqualTo(CallState.Connected));
+            Assert.That(card.Call.TipCents, Is.EqualTo(0));
+            Assert.That(Field<FloatingTextView>(card, "tipPopup").gameObject.activeSelf, Is.False);
+            Assert.That(Field<FloatingTextView>(card, "feePopup").gameObject.activeSelf, Is.True);
         }
     }
 }

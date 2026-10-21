@@ -34,6 +34,8 @@ namespace Switchboard.Game
         [SerializeField, Min(1), Tooltip("How fast the bubble's text types out.")]
         private float charactersPerSecond = 40f;
         [SerializeField] private FloatingTextView feePopup;
+        [SerializeField, Tooltip("\"Quick! +5¢\" under the fee popup when a quick connection pays a tip (D59).")]
+        private FloatingTextView tipPopup;
         [SerializeField, Tooltip("A ring around the portrait in the colour of the call's cord.")]
         private Graphic cordRing;
         [SerializeField, Tooltip("The caller type's badge, e.g. EMERGENCY.")] private GameObject typeBadge;
@@ -121,6 +123,7 @@ namespace Switchboard.Game
             shownRingFill = -1;
             ringWasUrgent = false;
             feePopup.Hide();
+            if (tipPopup != null) tipPopup.Hide();
             shownCents = -1;
             shownSeconds = -1;
             typedText = null;
@@ -194,6 +197,7 @@ namespace Switchboard.Game
             }
             durationBadge.SetActive(false);
             feePopup.Hide();
+            if (tipPopup != null) tipPopup.Hide();
             // Cleared calls leave at once; the others show what happened for a moment.
             if (Call.EndReason == CallEndReason.Cleared || stampSeconds <= 0)
             {
@@ -214,6 +218,11 @@ namespace Switchboard.Game
         }
 
         public void ShowConnectionFee(double cents) => feePopup.Show("+" + MoneyFormat.Compact(cents));
+
+        public void ShowQuickConnectTip(double cents)
+        {
+            if (tipPopup != null) tipPopup.Show("Quick! +" + MoneyFormat.Compact(cents));
+        }
 
         public void SetDetailsVisible(bool visible)
         {
@@ -243,6 +252,7 @@ namespace Switchboard.Game
             DismissStamp();
             StopPress();
             feePopup.Hide();
+            if (tipPopup != null) tipPopup.Hide();
             gameObject.SetActive(false);
         }
 

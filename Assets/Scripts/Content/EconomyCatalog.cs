@@ -7,8 +7,10 @@ namespace Switchboard.Content
     public sealed class EconomyCatalog
     {
         public EconomyCatalog(long startingCents, int startingCords, BoardSize startingBoard, int startingClientSlots,
-            IReadOnlyList<CallScript> startPool, IReadOnlyList<IUpgrade> upgrades, IReadOnlyList<string> errors)
+            IReadOnlyList<CallScript> startPool, IReadOnlyList<IUpgrade> upgrades, IReadOnlyList<string> errors,
+            QuickConnectTip quickTip = default)
         {
+            QuickTip = quickTip;
             StartingCents = startingCents;
             StartingCords = startingCords;
             StartingBoard = startingBoard;
@@ -22,6 +24,9 @@ namespace Switchboard.Content
         public int StartingCords { get; }
         public BoardSize StartingBoard { get; }
         public int StartingClientSlots { get; }
+
+        /// <summary>quickConnectSeconds and quickConnectTipCents (D59).</summary>
+        public QuickConnectTip QuickTip { get; }
 
         /// <summary>The queue of a new game (D52), with unknown calls and calls off the starting board left out.</summary>
         public IReadOnlyList<CallScript> StartPool { get; }

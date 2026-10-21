@@ -3,6 +3,8 @@
   "startingCords": 1,
   "startingBoard": {"cols": 4, "rows": 4},
   "startingClientSlots": 3,
+  "quickConnectSeconds": 5,
+  "quickConnectTipCents": 5,
   "startPool": ["call_001", "call_002", "call_007", "call_005", "call_006", "call_004", "call_003", "call_008", "call_009", "call_010"],
   "upgrades": [
     {"id": "wires_1", "type": "extra_wires", "name": "Extra cord", "description": "2 cords", "costCents": 25, "wires": 2},
