@@ -1857,6 +1857,21 @@ A wrong number, a hang-up or the call ending mid-tutorial should not leave the g
 - **Tutorial:** none. The tutorial's first call will rarely qualify; that's fine.
 - **Tests:** the rule (inside and outside the window, pause, hold and reconnect, a call that auto-connects on take), the loader and validator, and the popup appearing.
 
+### Step 10d: Static fonts, so Play Mode stops changing font files (lead, 2026-10-21)
+**Why.** `Della Respira SDF.asset` and `Boecklins Universe SDF.asset` are TextMeshPro *dynamic* fonts (TMP's default when Sergei imported them in `deb792b`, not a design choice). They draw each letter into their atlas the first time it's shown, and in the editor that writes into the font files, so every Play session leaves ~38k changed lines in git, and a careless reset once left the menu with missing letters (Plan §4 "Dynamic TMP fonts"). Static copies already exist (`… SDF Static.asset`, printable ASCII) and the pause menu uses them. Goal: **nothing in the game uses the dynamic fonts any more**, so they never change.
+
+**Where the dynamic fonts are used today** (by GUID): `Della Respira SDF` in `MainMenu.unity`, `Assets/Prefabs/UI/PhoneBook.prefab`, `Assets/Prefabs/UI/UpgradeShopPanel.prefab` and `Assets/Prefabs/Game/GameUI.prefab`; `Boecklins Universe SDF` in `MainMenu.unity` and `GameUI.prefab`. Re-check with a GUID search (scenes, prefabs, materials, the menu package under `Assets/Tools/`, and any font asset set from code) before changing anything.
+
+**Do:**
+1. **Character audit.** List every character those texts can show: the scene and prefab strings, and runtime strings (shop prices and "MAX", upgrade names and descriptions from `Economy.json`, book entries from `Book.json`, tutorial and hint texts on `TutorialSpotlight`, menu labels, credits, the Goal dialog). Anything beyond the Static atlases' printable ASCII (e.g. "¢", "—", "×") either gets added to the Static atlas (regenerate it with the TMP Font Asset Creator from the same source font and settings, keeping its GUID) or is confirmed unused.
+2. **Switch every text** that uses a dynamic font to the matching Static asset, including its material preset if one is set (keep the look: size, colour, outline). Prefer swapping the font reference in the prefab/scene YAML or through a one-off editor script over hand-editing many objects; list every object changed.
+3. **Leave the dynamic font files in place**, unused (deleting them is a separate decision). If nothing references them, Play Mode no longer touches them.
+4. **Tests:** an EditMode test that no scene or prefab in the build (and no `GameUI`/book/shop/menu prefab) references the two dynamic font GUIDs, and that every string in `Economy.json`, `Book.json` and the tutorial texts renders with the Static atlases (no missing glyphs, via `TMP_FontAsset.HasCharacters`).
+5. **Check:** play `MainMenu` → New Game through the tutorial and the shop, open the book; screenshots show all text as before; afterwards `git status` shows no font file changes.
+6. **Docs:** Plan §4 "Dynamic TMP fonts" row (now historical), CLAUDE.md "Web build" step 2 (the font restore is no longer needed but harmless), `Design.md` 4.3 text glyphs line.
+
+**Size:** small, one agent at high effort. No gameplay change.
+
 ### Step 11: Sound and feel (outline)
 - **From Step 3:** replace the placeholder `card-take-click.wav` (set on `UiClickSound` in `GameUI.prefab`) with a real sound, and fill `CallCardView.OnCharacterShown` with the callers' talking sound (lead request).
 - **Audio:** `AudioService`, `AudioCueLibrary` and `FeedbackDirector` (Design §5.11):
