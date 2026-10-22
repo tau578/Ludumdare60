@@ -16,7 +16,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), open items (§8) and the step briefs (§9).
 3. `Docs/Design.md`: the source of truth for game rules, architecture and decisions D01–D59. The game follows the docs. If the code or a brief disagrees with it, stop and ask the lead; don't improvise, and don't change either side on your own.
 
-**Next step:** see the first row in `Docs/Progress.md` that isn't "done". Steps 1–10d are done, the latest being **10** (the spotlight tutorial, D57), **10b** (faster lookup: the call in hand's caller jack blinks, a book-row click marks a jack, D58) and **10c** (the quick-connect tip, D59), all on `main`. **10d** (all text on the static fonts, so Play Mode stops changing font files) is done too. Next is **Step 11 (sound and feel)**, 12 (mobile and Web polish) and 13 (balance). The Operator's notebook (D59) is on hold for the lead. Steps were renumbered on 2026-10-18 to follow the build order; older reports and commits use the old numbers.
+**Next step:** see the first row in `Docs/Progress.md` that isn't "done". Steps 1–10d are done, the latest being **10** (the spotlight tutorial, D57), **10b** (faster lookup: the call in hand's caller jack blinks, a book-row click marks a jack, D58) and **10c** (the quick-connect tip, D59), all on `main`. **10d** (all text on the static fonts, so Play Mode stops changing font files) is done too. Next is **Step 11 (sound and feel, D60)**, split into **11a** (gather the sounds: the orchestrator directly, with the lead picking), **11b** (wire them), **11c** and **11d** (visual feedback); briefs in Plan §9. After that come 12 (mobile and Web polish) and 13 (balance). The Operator's notebook (D59) is on hold for the lead. Steps were renumbered on 2026-10-18 to follow the build order; older reports and commits use the old numbers.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).
@@ -119,6 +119,14 @@ When the lead asks for a new build or to publish, the main session can do this d
 2. **Check the build's re-saves:** since the 2026-10-20 cleanup the build restores them itself: the URP asset and global settings, `ProjectSettings/TimeManager.asset`, the dynamic TMP fonts (`Boecklins Universe SDF.asset`, `Della Respira SDF.asset`) and their `SDF Static` materials (snapshotted before its save, and the fonts are emptied in memory afterwards) and `preloadedAssets` in `ProjectSettings.asset` (`WebBuild.RestoredFiles`). Still run `git status`; if one of them shows up anyway, undo it with `git checkout --` (for `ProjectSettings.asset`, set `preloadedAssets` back to `[]`, keeping any intended change) and tell the lead, since the restore missed it. The first real build after the cleanup must confirm this works. Since Step 10d the game uses only the Static fonts, so the font restore is no longer needed; it stays as a harmless safety net.
 3. **Optional local check:** `python3 -m http.server 8000 --bind 127.0.0.1 --directory Builds/Web`, then open `http://127.0.0.1:8000`. Stop the server afterwards.
 4. **Publish to the itch Draft page:** `~/bin/butler push Builds/Web llazypixell/operator:html5` (the lead allows Draft pushes, D55). Then poll `~/bin/butler status llazypixell/operator` until the new build shows ✓, and give the lead the build number. butler is logged in; `butler login` needs a real Terminal. Never write the Draft page's secret link anywhere, and never make the page public: that's the lead's call.
+
+## Sound sourcing (Step 11a, D60)
+- **ElevenLabs sound effects:**
+  - The lead's key is in `ELEVENLABS_API_KEY` (set in `~/.zshrc`). A session that started before it existed reads it inside one command: `zsh -c 'source ~/.zshrc >/dev/null 2>&1; …'`.
+  - **Never print, log or write the key** (no `env`, no `set -x`, not in files or docs).
+  - The lead is on the free plan: about 10,000 credits a month, and 40 credits per second of sound. The Credits screen names elevenlabs.io.
+- **Kenney packs** are CC0.
+- Candidates go to `Builds/SoundCandidates/` (git-ignored). The lead's picks go into `Assets/Audio/`, and each one is listed in `Docs/AudioSources.md`.
 
 ## Open items (Plan §8)
 Known issues and to-dos, such as touch input in the cord code, held cords dropping on button clicks, stale editor-menu paths and the hidden A–Z tabs, are listed in `Docs/Plan.md` §8. A step that fixes one removes it there.

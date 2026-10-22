@@ -172,12 +172,12 @@ Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs 
 | Stale paths in editor menus | `LevelBackgroundBuilder` and `GamePresentationBuilder` still name `Assets/Scenes/Level.unity` (now `Final.unity`, same GUID); `GamePresentationBuilder` opens it additively, so check what it does before changing the path. `PhoneBookBuilder.CreatePhoneBook`'s message still says "Open Level". (`PhoneBookBuilder`'s book path was fixed in Step 8.) | cleanup, any step |
 | A–Z tabs are hidden | `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab` (lead, 2026-10-18); the code, objects and tests stay. `Tools/Switchboard/Update Phone Book Tabs` rebuilds them active, so untick them again after running it. | |
 | Loose scene objects | `SwitchboardCanvas` and `EventSystem` are loose in `Final.unity`; making them prefabs would keep scene merges small. | optional |
-| Sound effects | Ring, alarm, coins, paid, fine, hang-up: find them or generate them. | before Step 11 |
+| Sound effects | Ring, alarm, coins, paid, fine, hang-up: find them or generate them. Planned in detail as S1–S16 (Step 11 overview): Kenney packs and ElevenLabs. | 11a |
 | Art imports | Mia has no Unity, so her re-exports keep the old slices: `caller-04`/`05` (5b) and `caller-06`/`07`/`08` (6) came back at 190×190 with 191×191 slices, and Unity dropped them silently (all fixed to 190×190 in the `.meta`). After every art merge, compare each changed PNG's size with its `.meta` sprite rect. `Assets/Sprites/board/caller.png` (229×190, slice 190×191) has no sprite for the same reason; nothing uses it yet. `3ca8bc9` (9b fix): `caller-02` came back at 190×190 with a 191-high slice (fixed to 190×190). `police.png` is 191×191 with a 190×186 slice that cuts off the top 5 rows; full size or not is for the lead or Mia. | check after art merges |
 | Closed caller-slot covers (6) | Closed slots are hidden since Sergei's `041fb90` (Step 6's dark discs are gone). A cover-plate drawing from Mia could show them as closed. | when art exists |
 | Unused random helpers (7) | `IRandom`, `SeededRandom`, `RandomExtensions` and `FloatRange` in `Domain/Common` have no users since the spawner went. Delete them, or keep `IRandom` if a later step needs randomness. | cleanup, any step |
-| "New order!" stamp over the emergency badge (7) | While a call rings, the stamp hides half the EMERGENCY badge and most of the countdown ring. This predates Step 7. | Step 11 or 12 |
-| Menu leftovers (9a fix) | The Options and Credits "Go back" buttons keep the old 24/20 label sizes (big, slightly low). The menu package's `Music_randomizer` (in `StartMenu.prefab` and `Music_randomizer.prefab`) points at two tracks never committed (`a84ac8ff…`, `e974b80e…`, since `3522d9a`), so it plays nothing; in the Web build it is the likely source of one "Trying to get length of sound which is not loaded yet" console line (9b; still there, as a plain log line, in the 2026-10-20 build with the new loading cover). | Step 12, or with 9b |
+| "New order!" stamp over the emergency badge (7) | While a call rings, the stamp hides half the EMERGENCY badge and most of the countdown ring. This predates Step 7. | 11c (V13) |
+| Menu leftovers (9a fix) | The Options and Credits "Go back" buttons keep the old 24/20 label sizes (big, slightly low). The menu package's `Music_randomizer` (in `StartMenu.prefab` and `Music_randomizer.prefab`) points at two tracks never committed (`a84ac8ff…`, `e974b80e…`, since `3522d9a`), so it plays nothing; in the Web build it is the likely source of one "Trying to get length of sound which is not loaded yet" console line (9b; still there, as a plain log line, in the 2026-10-20 build with the new loading cover). | `Music_randomizer` in 11b (S16); the labels in 12 |
 | Pointer on external displays (9b) | The game draws its own hand again (lead, 2026-10-19), and `SystemPointer` hides the system pointer: only on a change, with a transparent 1×1 image in browsers (`SystemPointer.jslib`, which also re-hides it if Unity rewrites the canvas cursor while starting up). Sergei's PNG system-pointer hands (`d79421d`) were set aside because a system pointer doesn't shrink with the window. **It depends on the monitor:** on the MacBook's built-in screen every version tried was steady in Chrome and the editor. On the lead's external display (120–140 Hz), Chrome flickers the pointer by itself, and the editor loses custom pointers. Safari is fine. Not fixed yet: when the mouse leaves itch's frame, the drawn hand stays at the frame's edge (fix pass 1 had a rule for this, since discarded). | check other machines in 12 |
 | `SlowGuidePulse` material in EditMode tests | The guide's hidden book-glow material is freed only in `OnDestroy`, which EditMode tests don't run, so each test run leaves 2 materials in editor memory. Free it in `OnDisable` too, or in the test teardown. | cleanup, any step |
 | Web build leftovers (9b) | Done in the 2026-10-20 cleanup: `WebBuild` saves, snapshots the URP asset, the URP global settings, the two dynamic fonts and `TimeManager.asset`, builds, and writes back whatever changed (in a `finally`), then puts `preloadedAssets` back. **Confirmed by the Step 10 build (2026-10-20, itch #2168670): `git status` was clean afterwards.** **Gap fixed (2026-10-21):** `WebBuild` now snapshots the two dynamic fonts and the two `SDF Static` materials from disk *before* its save, restores them, and empties the fonts in memory afterwards; the next real build should confirm `git status` stays clean. **Since Step 10d the font part is a safety net only:** nothing in the game uses the dynamic fonts and the Static materials already hold TMP's own `_ScaleRatio` values, so a build has nothing font-related to restore; the snapshot code and `WebBuildTests` stay, harmless. Still open: a "Build Web (Dev)" menu would put the dev panel in a phone build. | Dev menu in Step 12 |
@@ -203,11 +203,14 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 9a | Saves and touch input | Progress survives a restart; New game; taps work |
 | 9b | First Web build on itch.io | Plays in a browser, and progress survives a reload and a new upload |
 | 10 | Tutorial | A guided first call |
-| 11 | Sound and feel | Rings, alarms, coins and animations |
+| 11a | Gather the sounds | Kenney and ElevenLabs candidates; the lead picks; picks imported |
+| 11b | Wire the sounds | Emergency bell and ticks, end-of-call cues, stamps, tip, talking, shop, ambience and a second track |
+| 11c | Main visual feedback | Rolling counter, fines, emergencies, card arrival, wrong number, connection flash |
+| 11d | Extra visual feedback | Earnings coins, finished-call exit, shop effects, goal shimmer, wall clock, caller reactions |
 | 12 | Mobile and Web polish | Good on phones and desktop browsers |
 | 13 | Balance | A tuned time to reach the mystery upgrade |
 
-Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 10 the tutorial, D57; 10b faster lookup, D58; 10c the quick-connect tip, D59; 10d static fonts). **Step 11 (sound and feel)** comes next; the Operator's notebook (D59) waits for the lead. Steps 10–13 are outlines; the orchestrator turns each one into a full brief before launching it.
+Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 10 the tutorial, D57; 10b faster lookup, D58; 10c the quick-connect tip, D59; 10d static fonts). **Step 11 (sound and feel, D60)** comes next, split into 11a (gather the sounds, the orchestrator with the lead), 11b (wire them), 11c and 11d (visual feedback); the Operator's notebook (D59) waits for the lead. Steps 10–13 are outlines; the orchestrator turns each one into a full brief before launching it.
 
 > **Renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7, 7d → 8, 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11, 9 → 12, 10 → 13. The briefs of done steps, commit messages and older reports keep the numbers they were written with.
 
@@ -1872,18 +1875,166 @@ A wrong number, a hang-up or the call ending mid-tutorial should not leave the g
 
 **Size:** small, one agent at high effort. No gameplay change.
 
-### Step 11: Sound and feel (outline)
-- **From Step 3:** replace the placeholder `card-take-click.wav` (set on `UiClickSound` in `GameUI.prefab`) with a real sound, and fill `CallCardView.OnCharacterShown` with the callers' talking sound (lead request).
-- **Audio:** `AudioService`, `AudioCueLibrary` and `FeedbackDirector` (Design §5.11):
-  - One ringing loop and one alarm loop.
-  - Coin ticks. (Sergei's merge `e7acec5` added a cash-register sound and fee coins flying to the counter; build on them.)
-  - Cues for paid, hung up, missed and fined.
-- **Animation:**
-  - Cards: a ringing wobble, sliding in and out, and stamps.
-  - A rolling money counter.
-  - Popups.
-- **Depends on** the sound-effects open item (§8).
-- **Playtest:** it sounds and feels good without getting noisy.
+### Step 11: Sound and feel (D60): overview
+The lead took every item on the orchestrator's list (2026-10-22), split into four small steps. The numbers **S1–S16** (sounds) and **V1–V14** (visuals) are the list's, and every brief below uses them.
+
+**Already in the game** (don't rebuild): a ring per new order, card take, cash register on the first connection, relay on resume, hold latch, wrong-number buzz, the connection babble, receiver down on every end, plug in/out, book open/close/flip, shop buy/can't afford/secret, menu clicks, the volume cords, the victory wire clicks, one music track. The visuals that exist: card press squash, stamps with pop and exit, typed speech, the emergency countdown ring with its urgent pulse, fee and tip popups, fee coins flying to the counter, green connected jacks, the blinking caller jack, the fine and spend popups, the tutorial spotlight, the victory scene. The Step 3 placeholder `Assets/Content/Audio/card-take-click.wav` is already replaced by `CardTake.wav` and unused.
+
+| # | Sound | Source idea | Step |
+|---|---|---|---|
+| S1 | Emergency arrives, and again every few seconds while it waits (D60) | ElevenLabs: an old electric fire-alarm bell, two short rings; or the unused `RotaryRingSource.mp3` | 11a, 11b |
+| S2 | Emergency's last 10 s: a clock tick that speeds up with the ring's pulse | ElevenLabs: one mechanical clock tick (played repeatedly by code) | 11a, 11b |
+| S3 | Missed call and fine: a sad muted-trumpet "wah-wah" plus coins sliding away | Kenney Music Jingles / Casino Audio, or ElevenLabs | 11a, 11b |
+| S4 | Every stamp: a rubber-stamp thunk, 2–3 variants, slight pitch change | Kenney Impact Sounds or ElevenLabs | 11a, 11b |
+| S5 | Paid: receiver down plus a light coin jingle; S5b a soft single coin tick for V7 | Kenney Casino Audio | 11a, 11b (S5b in 11d) |
+| S6 | Cut off: a line click and a short busy tone | ElevenLabs | 11a, 11b |
+| S7 | Quick-connect tip: a brass desk-bell "ding" | ElevenLabs (a test clip exists) | 11a, 11b |
+| S8 | Callers talking while the bubble types: muffled telephone syllables, a pitch per caller | ElevenLabs, 4–6 short syllables | 11a, 11b |
+| S9 | Mystery becomes affordable (`GoalAffordable`): a short "ta-da" | Kenney Music Jingles | 11a, 11b |
+| S10 | Board growth (heavy clunk and relays), new cord (cord rattle into the tray), new caller slot (cover plate sliding open) | ElevenLabs | 11a, 11b |
+| S11 | Plug into a closed jack: a dull thud (today it shares the wrong-number buzz) | the unused `Assets/Audio/Cable/PlugBlocked.wav` | 11b |
+| S12 | Book row click (marks a jack): a pencil tick | ElevenLabs or Kenney | 11a, 11b |
+| S13 | Page turns alternate `bookFlip1` and the unused `bookFlip2` | in the project | 11b |
+| S14 | Pause open/close: a switch click (`switch_001/002`, unused) | in the project | 11b |
+| S15 | Victory: a brass fanfare, the music ducked under it | Kenney Music Jingles | 11a, 11b |
+| S16 | An office ambience loop (distant operators, a typewriter, room tone) and a second jazz track | ElevenLabs (loop); a free music library (e.g. Pixabay) for the track | 11a, 11b |
+
+| # | Visual | Step |
+|---|---|---|
+| V1 | Rolling money counter: the reels roll like an odometer; a soft glow when money comes in | 11c |
+| V2 | Fines: the plaque shakes and flashes red; a few coins fly out of the counter to the missed card | 11c |
+| V3 | Emergencies: the card wobbles while waiting, harder in the last 10 s; a red warning lamp flashes on the board | 11c |
+| V4 | A new card slides in with a bounce and shakes when it rings | 11c |
+| V5 | Wrong number: the card shakes "no", both jacks flash red, a small spark at the plug | 11c |
+| V6 | Connection: a flash ring at both jacks (a cord wiggle if the cord code allows it cheaply) | 11c |
+| V7 | Live earnings: small coins or "+¢" rise from a connected card now and then, with S5b | 11d |
+| V8 | A finished call's card slides out with a coin burst (cosmetic, no extra money) | 11d |
+| V9 | Shop: the bought button punches with a sparkle; new jacks light up in a wave; a new cord drops into the tray with a bounce; a new caller slot opens | 11d |
+| V10 | The mystery upgrade shimmers while affordable, and the shop pulses once when it first becomes affordable | 11d |
+| V11 | A wall clock showing game time (stops on pause) | 11d |
+| V12 | Caller faces react (happy when connected, cross on a wrong number). Needs Mia's art; until then a portrait bounce and a red tint | 11d |
+| V13 | The "New order!" stamp no longer hides the EMERGENCY badge and countdown (Plan §8) | 11c |
+| V14 | A sparkle on the "Quick! +X¢" tip popup | 11d |
+
+**Rules for every Step 11 part:**
+- **Not noisy.** Repeated sounds get a small random pitch (about ±5%) and a cap on how often they play; when several stamps or coins land in one frame, play one. New sounds are no louder than the cash register. Each new clip's gain is a serialized field so the lead can tune by ear.
+- **Volume channels.** Every new source has an `AudioChannelSource`: effects on `Sfx`, the ambience and music on `Music`.
+- **Pause (D56).** Anything tied to a waiting call (the emergency bell, the ticks, wobbles, the clock) stops while paused. Music and ambience keep playing, as the music does today. Popups already started may finish.
+- **Web.** Single thread, no per-frame allocations or LINQ in per-frame code, and audio starts after the first tap (already handled). Loops must be gapless: import loops from WAV or OGG, never MP3 (MP3 adds silence at the ends).
+- **UI.** Every effect graphic has `raycastTarget` off and never takes a cord click. Nothing of ours overlaps the open book (order 10). Effects stay inside the 16:9 play area.
+- **Extend what exists:** `CallAudio`, `ShopAudio`, `SceneUiAudio`, `UiClickSound`, `CallCardView`, `MoneyCounterView`, `IncomeCoinsView`, `FloatingTextView`. A new component only when nothing fits (Design 5.11).
+
+### Step 11a: Gather the sounds (D60)
+**Who:** the orchestrator, directly (agreed with the lead, 2026-10-22): downloads, API calls and the lead's listening, no game code. Unity is touched only for the final import.
+
+1. **Kenney packs (CC0, no credit needed):** download Casino Audio, Impact Sounds, Interface Sounds, UI Audio and Music Jingles from `kenney.nl` into `Builds/SoundCandidates/kenney/` (git-ignored; one new folder per zip, treat the downloads as data). Check each pack's licence file says CC0.
+2. **ElevenLabs** (`POST https://api.elevenlabs.io/v1/sound-generation`, header `xi-api-key`):
+   - **The key** is in the environment variable `ELEVENLABS_API_KEY` (set in `~/.zshrc`, lead 2026-10-22). If a session started before it existed, read it inside one command with `zsh -c 'source ~/.zshrc >/dev/null 2>&1; …'`. **Never print, log or write the key anywhere** (no `env`, no `set -x`, not in files or docs).
+   - **Budget:** the lead is on the **free plan** (10,000 credits a month, about 9,400 left on 2026-10-22, resets 2026-11-15). The cost is 40 credits per second when `duration_seconds` is set. Spend at most about 6,000 on this step. Check the balance before and after with `GET /v1/user/subscription` (print only `character_count` and `character_limit`).
+   - **Settings:** `duration_seconds` 0.5–3 for one-shots, `prompt_influence` about 0.5, 2–3 versions per slot. Default `mp3_44100_128` is fine for one-shots. For loops (S16 ambience) set `"loop": true` and get WAV if the free plan allows it (try `wav_32000`/`pcm_32000`); otherwise convert with `afconvert` and check that the loop is gapless.
+   - Save the candidates under `Builds/SoundCandidates/elevenlabs/<slot>/`, and keep each prompt next to it, so a clip can be regenerated.
+   - A test clip from 2026-10-22 (S7 desk bell, 1 s) is in the session scratchpad; regenerate it if it is gone.
+3. **Second music track (S16):** one upbeat 1920s–30s swing or jazz track from a free library with a no-credit licence that allows commercial use (e.g. Pixabay Music). The current track's filename (`evolvingvibes-bring-back-the-swing-…`) suggests it came from Pixabay. If the site needs a login, give the lead two or three links to download.
+4. **Listening page:** `Builds/SoundCandidates/index.html`, one row per slot (S1–S16) with an `<audio>` player per candidate, its source and licence. The lead opens it in a browser (`open Builds/SoundCandidates/index.html`) and picks one per slot, or asks for a retry with a changed prompt.
+5. **Import the picks:**
+   - Copy each pick into `Assets/Audio/Sfx/` (ambience and music into `Assets/Audio/Music/`) with a plain name (`EmergencyBell`, `ClockTick`, `StampThunk1`…), then `refresh_unity`. Keep Kenney's OGGs as OGG.
+   - Write `Docs/AudioSources.md`: every clip in the game, where it came from, its licence, and the ElevenLabs prompt for generated ones.
+   - The wiring is 11b.
+6. **Credit:** the free plan requires a credit to elevenlabs.io for commercial use, so 11b adds "Sound effects: Kenney (kenney.nl), ElevenLabs (elevenlabs.io)" to the Credits screen.
+
+**Done when:** every slot from S1 to S16 that needs a new file has a pick the lead approved, the picks are in `Assets/Audio/`, `Docs/AudioSources.md` lists them, and the credit balance is noted in the Progress report.
+
+### Step 11b: Wire the sounds (D60)
+**Who:** one agent at high effort. **Needs 11a's picks.**
+
+- **S1 and S2: emergencies.**
+  - In `CallAudio`, an emergency (`Call.HasResponseTime`) rings its own bell when it arrives instead of the pitched-up normal ring. It rings again every few seconds (serialized interval, about 6 s) while it is still waiting (not yet taken), and stops once it is taken, connected, missed or cleared.
+  - Ticks start at `CallCardView.urgentSeconds` (10 s) left and speed up as time runs out, in step with the ring's urgent pulse. Move the threshold somewhere both can read rather than copying the number.
+  - Both run on game time, so the pause stops them (`CallAudio.SetPaused`).
+  - Normal calls keep their single bell (D60).
+- **S3 to S6: call ends.**
+  - `Missed`: the sad sting, plus the coins-away sound when a fine is actually taken (`FineApplied`). A missed call with no fine, from an empty wallet, plays only the sting.
+  - `Finished`: receiver down plus the coin jingle.
+  - `DisconnectedEarly`: the line click and busy tone.
+  - The stamp thunk (S4) plays when each stamp pops, timed to the pop: a hook in `CallCardView`'s stamp, through an event the audio listens to, not audio code inside the view.
+- **S7:** the desk bell on `EarningsService.QuickConnectTipPaid`.
+- **S8: caller talking.** Fill `CallCardView.OnCharacterShown`: a syllable every 2–3 visible letters (skip spaces), with a pitch fixed per caller (derived from the caller's id, so it is stable) and a cap per second. Only the card whose bubble types plays; pause stops it.
+- **S9:** the "ta-da" on `GoalAffordable`.
+- **S10:** in `ShopAudio`, upgrade-specific sounds by the upgrade's effect (board growth, extra cord, extra caller slot), falling back to the purchase sound. Pick by effect type, never by an id.
+- **S11:** `PlugBlocked.wav` as the cords' blocked sound in `CableInteraction.prefab` (and anywhere else `blockedSound` uses `WrongConnection.wav`).
+- **S12:** the pencil tick on `PhoneBookView.JackPicked`.
+- **S13:** `SceneUiAudio`'s page turn picks between `bookFlip1` and `bookFlip2`, never the same one twice in a row.
+- **S14:** switch sounds when the pause panel opens and closes. These replace the generic menu click on the pause button, so the click doesn't play twice.
+- **S15:** the fanfare in `VictorySequenceView`, with the music ducked under it (`AudioChannelSource.DuckMusic`).
+- **S16: music and ambience.**
+  - The ambience loop plays in `Final` on the Music channel at a low volume.
+  - `BackgroundMusic` alternates the two tracks with a short fade.
+  - Fix the menu's `Music_randomizer`: it points at two tracks that were never committed (Plan §8 "Menu leftovers"). Point it at our two tracks, or remove the missing entries.
+- **Credits:** add the line from 11a, in the Credits screen's existing font and style (ASCII only).
+- **Cleanup:** delete the unused placeholder `Assets/Content/Audio/card-take-click.wav` (+ `.meta`) after a GUID check.
+- **Tests (EditMode):**
+  - Each event plays its clip (extend `CallAudioTests`).
+  - The emergency bell repeats while the call waits and stops when it is taken or ends, or the game pauses.
+  - Ticks play only in the last 10 s, and faster near 0.
+  - Talking blips are capped, have a stable pitch per caller, and nothing plays for spaces.
+  - Page turns don't repeat the same clip twice in a row.
+  - The pause button plays the switch, not the click as well.
+  - No new audio source lacks an `AudioChannelSource`.
+- **Playtest:** a busy board for 3 minutes sounds lively, not noisy; an emergency feels urgent; Options' volume cords change every new sound.
+
+### Step 11c: Main visual feedback (D60)
+**Who:** one agent at high effort. Independent of 11b; if 11b's stamp event exists, reuse it.
+
+- **V1: rolling counter.** `MoneyCounterView` already has reels (`reels[i]`). When the shown cents change, each changed reel rolls: the old digit slides up and out and the new one comes in from below, about 0.15 s, clipped to the reel window.
+  - Only the reels that changed move. When many digits change at once (a big fine or purchase), they all roll together.
+  - The coin flight's target and the exact amount (`label.text`) stay as they are.
+  - A soft brightening of the plate when money comes in.
+  - No allocations per frame: build strings only when the cents change.
+- **V2: fines.** On `FineApplied`: the plaque shakes (a few px, about 0.3 s) and flashes red, and 3–5 coins fly from the counter to the missed card and fade. Reuse `IncomeCoinsView` with the direction reversed. The red "-$X" popup stays.
+- **V3: emergencies.**
+  - While an emergency waits, its card wobbles gently (about ±2°). In the last `urgentSeconds` it shakes harder, in step with the ring's pulse.
+  - A small red warning lamp flashes while any emergency waits. Put it where it covers no jack, label, card or book: for example on the caller panel's frame or the board's top frame. Build it from the existing `LampGlowGraphic`/`CircleGraphic` until Mia draws one.
+  - Both freeze while paused.
+- **V4: card arrival.** A new card slides in from the left edge of the caller panel with a small overshoot (about 0.35 s), then shakes briefly as its bell rings.
+  - It must fit `CallQueueView`'s slide-up and the stamp hold (D52): a call that waits for a stamp still appears only after that stamp leaves.
+  - The card can be clicked as soon as it is visible.
+- **V5: wrong number.** The card shakes "no" (three horizontal swings, about 0.4 s), both jacks flash red for about 0.5 s, and a small spark of a few UI stars appears at the plug. The flash must hand back to whatever the jack showed before: the 10b caller lamp, halos, the green connected jacks and closed-jack dimming.
+- **V6: connection.** A flash ring expands from both jacks when a circuit closes.
+  - A cord wiggle only if `CableController` offers a cheap, safe way to do it; otherwise skip it and say so in the report.
+- **V13: the stamp and the badge.** On an emergency card the "New order!" stamp must not hide the EMERGENCY badge or the countdown ring. Move it for emergencies, or leave it out there because the badge already says so; say which in the report. Remove the row from Plan §8.
+- **Tests (EditMode):**
+  - Reels roll only for changed digits, end on the exact amount, and allocate nothing per frame while idle.
+  - The fine shake and coins start on `FineApplied`.
+  - The emergency wobble runs only while waiting and freezes on pause.
+  - Arrival keeps the stamp-hold order.
+  - The wrong-number flash restores each jack's previous look.
+  - Every new graphic has `raycastTarget` off and sits on a canvas that doesn't overlap the book.
+- **Screenshots:** a roll mid-way, a fine, an emergency card with the lamp, a wrong number, a connection ring.
+
+### Step 11d: Extra visual feedback (D60)
+**Who:** one agent at high effort, after 11c (it reuses 11c's effects).
+
+- **V7: live earnings.** Every few seconds (serialized), a small coin or "+¢" rises from each connected card, with the soft coin tick (S5b, from 11a). At most a few per second across all cards, and nothing while on hold or paused. It is cosmetic: it pays nothing.
+- **V8: finished call.** After the "Paid" stamp, the card slides out to the left instead of fading, and a coin burst flies to the counter. This is cosmetic: the counter doesn't jump. Keep the stamp hold (D52).
+- **V9: shop.**
+  - On `UpgradeBought`, the bought button punches (scale up about 12% and back) with a sparkle burst.
+  - Board growth: the newly opened jacks light up in a wave over about 0.6 s.
+  - A new cord drops into its tray spot with a bounce.
+  - A new caller slot fades and scales in.
+- **V10: goal.** While the mystery upgrade is affordable, its button shimmers (a moving highlight). The first `GoalAffordable` also pulses the shop panel once. Drive it from the goal's progress, never from an id.
+- **V11: wall clock.** A small clock on the wall above or beside the board, drawn with UI shapes until Mia draws one.
+  - It shows game time: 9:00 plus one clock minute per game second, from `CareerStats` seconds played. It wraps at 12 hours and stops on pause.
+  - It covers no jack, card, shop or book, and takes no clicks.
+- **V12: caller reactions.** A happy bounce of the portrait when a call connects, and a short shake with a red tint on a wrong number. Real happy and cross faces need Mia's art: add a Plan §8 row asking for them.
+- **V14:** a sparkle on the "Quick! +X¢" popup.
+- **Tests:**
+  - Earnings coins are capped, stop on hold and pause, and change no money.
+  - The finished slide keeps the stamp-hold order.
+  - The wave lights only the newly opened jacks.
+  - The shimmer follows affordability.
+  - The clock's time comes from seconds played and stops on pause.
+  - Every new graphic has `raycastTarget` off.
+- **Playtest:** the game feels alive and readable, and nothing distracts from finding the jack.
 
 ### Step 12: Mobile and Web polish (outline)
 - **Layout:**

@@ -21,8 +21,11 @@
 | 10. Tutorial | done | ✅ 2026-10-20 (33 min + 28 min fix + 21 min fix) | ✅ 638/638 tests, scope clean | ✅ | a418ade, 1911348 |
 | 10b. Faster lookup | done | ✅ 2026-10-20 (20 min + 15 + 20 + 19 min fixes) | ✅ 671/671 tests, scope clean | ✅ | c412194 |
 | 10c. Quick-connect tip | done | ✅ 2026-10-21 (14 min) | ✅ 697/697 tests, scope clean | ✅ | 845a1b3 |
-| 10d. Static fonts | done | ✅ 2026-10-22 (26 min) | ✅ 705/705 tests, scope clean | ✅ | |
-| 11. Sound and feel | not started | | | | |
+| 10d. Static fonts | done | ✅ 2026-10-22 (26 min) | ✅ 705/705 tests, scope clean | ✅ | ed0e2ad |
+| 11a. Gather the sounds | not started | | | | |
+| 11b. Wire the sounds | not started | | | | |
+| 11c. Main visual feedback | not started | | | | |
+| 11d. Extra visual feedback | not started | | | | |
 | 12. Mobile and Web polish | not started | | | | |
 | 13. Balance | not started | | | | |
 
