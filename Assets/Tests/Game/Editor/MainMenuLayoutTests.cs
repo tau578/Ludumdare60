@@ -7,7 +7,6 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.TextCore.LowLevel;
 using UnityEngine.UI;
 
 namespace Switchboard.Game.Tests
@@ -143,10 +142,9 @@ namespace Switchboard.Game.Tests
                     Assert.That(label.fontSizeMax, Is.EqualTo(18f), button.name);
                     Assert.That(label.margin, Is.EqualTo(Vector4.zero), button.name);
                     Assert.That(label.text, Is.EqualTo(label.text.Trim()), button.name);
-                    // The menu font is dynamic, so its glyphs come from the source file, not the saved atlas.
-                    Assert.That(FontEngine.LoadFontFace(label.font.sourceFontFile), Is.EqualTo(FontEngineError.Success), button.name);
-                    foreach (char c in label.text)
-                        Assert.That(FontEngine.TryGetGlyphIndex(c, out uint glyph) && glyph != 0, Is.True, button.name + " '" + c + "'");
+                    // The menu draws from the static copy of the font (10d), so every character must be in its saved atlas.
+                    Assert.That(label.font.atlasPopulationMode, Is.EqualTo(AtlasPopulationMode.Static), button.name);
+                    Assert.That(label.font.HasCharacters(label.text), Is.True, button.name + " '" + label.text + "'");
                 }
                 Assert.That(Panel(menu).Find("New_Game_Button").GetComponentInChildren<TMP_Text>(true).text, Is.EqualTo("New Game"));
                 Assert.That(Panel(menu).Find("Quit_Game_Button").GetComponentInChildren<TMP_Text>(true).text, Is.EqualTo("Quit"));

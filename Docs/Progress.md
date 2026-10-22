@@ -21,7 +21,7 @@
 | 10. Tutorial | done | ✅ 2026-10-20 (33 min + 28 min fix + 21 min fix) | ✅ 638/638 tests, scope clean | ✅ | a418ade, 1911348 |
 | 10b. Faster lookup | done | ✅ 2026-10-20 (20 min + 15 + 20 + 19 min fixes) | ✅ 671/671 tests, scope clean | ✅ | c412194 |
 | 10c. Quick-connect tip | done | ✅ 2026-10-21 (14 min) | ✅ 697/697 tests, scope clean | ✅ | 845a1b3 |
-| 10d. Static fonts | not started | | | | |
+| 10d. Static fonts | done | ✅ 2026-10-22 (26 min) | ✅ 705/705 tests, scope clean | ✅ | |
 | 11. Sound and feel | not started | | | | |
 | 12. Mobile and Web polish | not started | | | | |
 | 13. Balance | not started | | | | |
@@ -4921,3 +4921,89 @@ Follow-ups:
 - `Docs/EconomyFile.md` still says `startingCords` is 2 to 6 and the game starts on 3×3 in a few places (the loader allows 1 to 6 since `7312e43`); not touched here.
 - The tip pill covers the caller's name plate for about a second; if that bothers the lead in the playtest, it could move left or right of the portrait, or rise from the fee popup after it.
 - The tutorial's first call can earn the tip if the player is quick; the tutorial says nothing about it (as the brief asked).
+
+### Step 10d report: 2026-10-22
+Result: done
+
+Playable now: the game looks the same, but every text in Sergei's two fonts (Della Respira, Boecklins Universe) now uses the **Static** copies. The dynamic font files are no longer used, so a Play session or a test run doesn't change any font file in git any more. A Play run from `MainMenu`, then New Game, Start over, the tutorial, a connected call, the shop (a cord bought) and the open book, followed by `AssetDatabase.SaveAssets`, left `git status` with no font, material or settings changes.
+
+How to test:
+1. Play `MainMenu`: the title, buttons, Options, Credits and the New Game confirm panel look as before.
+2. New Game: the tutorial hint, Skip, the shop's titles and prices, the book's "Tab" label and the pause menu read as before. The hint is a few pixels narrower now (see deviation 2).
+3. Stop Play, press Ctrl+S, run `git status`: no `Assets/Fonts/...` file changes.
+
+What changed:
+- **Every reference switched (YAML swap, GUID and material sub-asset):** Della Respira SDF (`cf26e9e7…`, material `2296427347578434457`) became Della Respira SDF Static (`c945699b…`, its own material `-6622960670381128455`), and Boecklins Universe SDF (`b9031aec…`, material `8616984818015709328`) became Boecklins Universe SDF Static (`7d2b11d5…`, material `6586746045872767144`). 33 references in total. No text had a material preset or a per-text material override.
+  - `MainMenu.unity` (28 lines): direct texts `MainMenu/MainTitle` (Boecklins), `Continue_Text`, `New_Game_Text`, `NewGameMenu/ConfirmPanel/Plate/Message`, `Start_Over_Text`, `Cancel_Text`; and prefab-instance overrides on `StartMenu` (font and material each) for `Options_Text`, `Credits_Text`, `Quit_Game_Text`, `OptionsMenu/Options_Text` (Boecklins), `OptionsMenu/Back_Button_Text`, `CreditsMenu/Credits_Text` (Boecklins), `Credits_Text_2` and `CreditsMenu/Back_Button_Text`. That's 11 Della texts and 3 Boecklins texts.
+  - `PhoneBook.prefab`: `ClosedBook/BookShortcut/Label` ("Tab"), font and material.
+  - `UpgradeShopPanel.prefab`: `UpgradeShopSkin.font`, which the skin gives to every runtime shop label (titles, the hidden descriptions, prices).
+  - `GameUI.prefab`: `VictorySequenceView.titleFont` (Boecklins) and `bodyFont` (Della), which make the victory screen's labels at runtime.
+  - The pause menu and the tutorial's hint and Skip labels already used the Static fonts.
+  - Re-checked by GUID across `Assets` and `ProjectSettings` (scenes, prefabs, `.asset`, `.mat`, the menu package under `Assets/Tools`). The menu package's own prefabs use LiberationSans, and no code loads the dynamic fonts (only `WebBuild`'s snapshot list, left as it was). After the swap, `AssetDatabase.GetDependencies` of both build scenes, every prefab and every Resources asset no longer includes the dynamic fonts.
+- **Character audit:** every string these fonts can show is printable ASCII.
+  - Menu labels and credits, "Start a new game? Your money and upgrades will be lost.", "Tab", the pause labels, all 14 tutorial texts, "Skip tutorial".
+  - Shop: "More Cables", "More Clients", "More Profit", "??????????", "Owned", "MAX", the upgrade names and descriptions from `Economy.json`, and prices from `MoneyFormat.Dollars` ("$", digits, ",", ".").
+  - Victory: "Thank you for / connecting us!", "Main Menu", "Keep Playing".
+  - The "¢" texts (card badges and earnings, fee and tip popups, the money plaque, fine and spend popups, stamps) all use LiberationSans, which has "¢". So **no glyph was added**: the Static atlases and glyph tables are unchanged (95 glyphs each, and every glyph's metrics equal a fresh TMP rasterization of the same TTF at the same settings).
+  - "×" (dev panel) and "§" (WebBuild) are IMGUI or editor-only.
+  - `Book.json` is ASCII. The book's rows don't use TMP at all: they are legacy UI `Text` drawing straight from the TTFs, which never writes into a file.
+- **Kerning added to the Static assets.** The first "after" screenshots showed the menu and credits spaced slightly wider ("T arbaev"): the dynamic fonts fetch kerning pairs from the TTF as they draw, but the Static copies (made in the test and font fix pass) had none. I generated the pairs with TMP's own code: a throwaway in-memory dynamic font from the same TTF (90 pt, padding 9, SDFAA, 1024), all 95 characters added, then TMP's `UpdateFontFeaturesForNewlyAddedGlyphs`. I kept the pairs between the 95 Static glyphs (Della Respira 1695, Boecklins 98) and wrote them into each Static asset's `m_FontFeatureTable.m_GlyphPairAdjustmentRecords`.
+  - All 306 pairs in the committed dynamic Della file match these values exactly.
+  - The lookup flags are 0: TMP's GPOS path leaves uninitialised values there, the dynamic file holds random numbers too.
+  - The git diff of both Static assets is only that list (one `[]` line replaced). The glyph table, character table, atlas and material are untouched, and the throwaway font, atlas and material were destroyed.
+  - After this, the menu screenshot is pixel-identical to "before", and the credits differ in 50 faint pixels.
+- **Static materials:** they already held TMP's recalculated `_ScaleRatioA` 0.9 / `_ScaleRatioC` 0.73125 on disk (saved with Step 10c, `845a1b3`). After both Play runs they were not dirty, and the save left them unchanged, so nothing needed saving.
+
+Created:
+- `Assets/Tests/Game/Editor/StaticFontTests.cs` (+ `.meta`)
+
+Changed:
+- `Assets/Scenes/MainMenu.unity`, `Assets/Prefabs/UI/PhoneBook.prefab`, `Assets/Prefabs/UI/UpgradeShopPanel.prefab`, `Assets/Prefabs/Game/GameUI.prefab`: font and material references only (see above).
+- `Assets/Fonts/DellaRespira/Della Respira SDF Static.asset`, `Assets/Fonts/BoecklinsUniverse/Boecklins Universe SDF Static.asset`: kerning pairs only. GUIDs and settings kept.
+- `Assets/Tests/Game/Editor/MainMenuLayoutTests.cs`: `EveryMenuLabelIsCentredInItsButtonAndInTheFont` checked glyphs through the dynamic font's source TTF (`FontEngine.LoadFontFace(label.font.sourceFontFile)`). A Static asset has no source file reference, so the test now checks that the font is Static and `HasCharacters(label.text)`. The unused `UnityEngine.TextCore.LowLevel` using was removed.
+- Docs: `Docs/Plan.md` (§4 "Dynamic TMP fonts" row marked historical, with the new rule; §8 "Web build leftovers": the font restore is a safety net only), `CLAUDE.md` ("Web build" step 2), `Docs/Design.md` (4.3 text glyphs line), `Docs/Progress.md` (this report). The orchestrator's two doc lines are kept.
+- Not changed: the dynamic font files (left in place, unused, unchanged in git), `WebBuild.cs` and `WebBuildTests.cs`, `Final.unity`, `TimeManager.asset`, `ProjectSettings.asset`.
+
+Scene and prefab changes: only the references listed above. Sizes, colours, outlines and layout are untouched, and `Final.unity` has no change.
+
+Tests: 705/705 EditMode (was 697; 8 new in `StaticFontTests`):
+- `NothingInTheGameReferencesTheDynamicFonts`: `GetDependencies` of the build scenes, every prefab and every Resources asset.
+- `EveryLabelInOurFontsIsStaticAndHasItsCharacters`: every TMP text in the build scenes and every prefab whose font is under `Assets/Fonts` is Static, its material draws from its own font's atlas, and the atlas has all its characters.
+- `FontsSetFromCodeAreStatic`: the shop skin, the victory title and the victory body.
+- `TheShopsTextsAreInItsStaticFont`: fixed titles plus every `Economy.json` name, description and price.
+- `TheTutorialTextsAreInTheHintsStaticFont`: every `TutorialTexts` field as serialised in `GameUI`.
+- `TheBooksEntriesAreInTheStaticFont`: name, profession, address and jack.
+- `TheStaticFontsKeepTheirKerning` (2 cases).
+- Characters are checked with `TMP_FontAsset.HasCharacters(text, out List<char>)` (checked with `unity_reflect`), after rich-text tags and line breaks are stripped.
+
+Console: clean (only Unity's "Ignoring depth surface ... memoryless" lines in Play Mode); cleared at the end.
+
+Screenshots (1920×1080 in `Temp/Captures/`; frames driven by `EditorApplication.Step`):
+- Before the switch: `step-10d-before-menu`, `-credits`, `-tutorial` (New Game start, hint and shop), `-card` (Nora Ellis connected: "+25¢" fee and "Quick! +5¢"), `-book` (open book), `-victory` (the last frame of the victory screen).
+- After the switch, made through the real flow (Menu > New Game > Start over): `step-10d-after-menu`, `-credits`, `-newgame-confirm`, `-tutorial` (also `step-10d.png`), `-card`, `-book`, `-shop` (after buying the first cord: "$3.00" and the "-$0.25" popup), `-victory`.
+- Pixel comparison, before vs after: menu 0 px, credits 50 faint px, victory 22 faint px, book 2 px. Tutorial and card differ only in the hint bubble (now kerned, see deviation 2) and in animation timing.
+
+Housekeeping:
+- **The lead's keys:** `operator.save` (200 chars), `operator.save.backup` (201) and `Switchboard.AudioPatch.v1` (62) were kept in SessionState and in a scratchpad copy. They were restored exactly after each Play run (string-compared with the copy: identical), and the SessionState keys are erased. The scratchpad copy stays in the session scratchpad only.
+- **Fonts:** after the "before" run (still on the dynamic fonts), the dynamic fonts were emptied in memory and cleared of dirty flags (`ClearFontAssetData(true)` plus `ClearDirty` on font, atlas and material), with nothing force-reimported. Nothing on disk had changed. During the "after" runs the dynamic fonts were never drawn: no text referenced them, their in-memory glyph counts stayed at the committed 4 and 2, and they stayed clean.
+- The editor is idle, out of Play Mode, with `Final.unity` active and not dirty. `Time.timeScale` is 1. Every stepper removed itself, the throwaway font objects were destroyed, and the console is cleared. Nothing is staged, committed or pushed.
+
+Deviations from Design/Plan:
+1. **No "¢" in the Static atlases.** The orchestrator expected "¢" might be needed, but none of the switched texts can show it (every money text uses LiberationSans), so the atlases were not regenerated. If a future label in these fonts needs "¢", regenerate with font features on.
+2. **The Static assets gained kerning pairs.** It wasn't in the brief, but without them the switch changed the spacing of the menu and credits ("T arbaev"), and the brief asks for the same look. A side effect: the labels that already used the Static fonts (the pause menu, the tutorial hint and Skip) are now kerned too. They look like the menu's text, and the hint bubble is about 4 px narrower. `TutorialSpotlightTests` and `GamePauseMenuTests` still pass.
+3. **`MainMenuLayoutTests`' glyph check changed** (see Changed), because Static assets have no source-file reference.
+
+Follow-ups:
+- The dynamic files `Della Respira SDF.asset` and `Boecklins Universe SDF.asset` are now unused; deleting them is the lead's call. `WebBuild`'s font snapshot and `WebBuildTests`' list of the four font paths would then need updating.
+- The book's rows (legacy `Text` with the TTFs) and the volume panels (`VolumeCablePanel`, `MasterVolumeCableSlider`, `SwitchboardPanel` also reference the TTFs) don't use TMP. They never dirty files, so nothing is needed.
+- The Della Static asset's diff is large (about 25k added lines of pair records); it is plain data in one block.
+
+#### Step 10d verification (orchestrator, 2026-10-22)
+- 705/705 EditMode tests pass on a fresh run; the console is clean. The run left no font, material or settings file changed.
+- `git status` matches the report: the four scene and prefab files, the two Static font assets, `MainMenuLayoutTests.cs`, the new `StaticFontTests.cs` (+ `.meta`) and the docs. Every changed line in `MainMenu.unity` and the three prefabs is a font reference (dynamic GUID to Static GUID); the Static font diffs only fill `m_GlyphPairAdjustmentRecords` (1695 and 98 kerning pairs), with no glyph, atlas or material change.
+- Screenshots checked (`step-10d-after-menu`, `-credits`, `-shop`): the title, menu buttons, credits and shop labels and prices draw normally, with nothing missing.
+- Accepted deviation: kerning added to the Static assets so the menu keeps its spacing. Side effect: the pause menu and tutorial hint, already on the Static fonts, are now kerned too (the hint bubble is about 4 px narrower).
+
+#### Step 10d playtest (lead, 2026-10-22)
+- OK. After the lead's Play session `git status` showed no dynamic font file (`Della Respira SDF.asset`, `Boecklins Universe SDF.asset`) and no material or settings file: Play Mode no longer writes font files.
+

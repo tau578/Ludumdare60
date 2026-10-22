@@ -2839,8 +2839,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Switchboard.Game.VictorySequenceView
   frameSprite: {fileID: 21300000, guid: 9284c3100b2a404eb96c63627f070695, type: 3}
   buttonSprite: {fileID: -2685616445599167871, guid: 0eff5eab467df4362b2f7d5f120b41b5, type: 3}
-  titleFont: {fileID: 11400000, guid: b9031aec38e6f0c45ae0813ea73cead0, type: 2}
-  bodyFont: {fileID: 11400000, guid: cf26e9e72ccdc6f479c8b7c2001883a4, type: 2}
+  titleFont: {fileID: 11400000, guid: 7d2b11d5fb507429a9a4fdd0335c9fe3, type: 2}
+  bodyFont: {fileID: 11400000, guid: c945699ba85e042f1adf81c370d111c7, type: 2}
   portraits:
   - {fileID: -3528310941345610784, guid: f1165ce58b3149e488092261ba6f7544, type: 3}
   - {fileID: 7311596053533559507, guid: 2a98d4e6e4b018a45959ce7f4cdd9262, type: 3}

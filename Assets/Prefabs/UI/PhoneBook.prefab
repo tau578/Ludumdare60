@@ -8812,8 +8812,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Tab
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: cf26e9e72ccdc6f479c8b7c2001883a4, type: 2}
-  m_sharedMaterial: {fileID: 2296427347578434457, guid: cf26e9e72ccdc6f479c8b7c2001883a4, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: c945699ba85e042f1adf81c370d111c7, type: 2}
+  m_sharedMaterial: {fileID: -6622960670381128455, guid: c945699ba85e042f1adf81c370d111c7, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
