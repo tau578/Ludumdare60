@@ -12,7 +12,7 @@ namespace Switchboard.Content
     /// </summary>
     public static class ContentValidator
     {
-        /// <summary>The team's board in Final.unity: rows A to F, columns 1 to 6.</summary>
+        /// <summary>The board in Final.unity: rows A to F, columns 1 to 6.</summary>
         public static List<string> BoardJacks()
         {
             BoardSize board = BoardSize.Full;

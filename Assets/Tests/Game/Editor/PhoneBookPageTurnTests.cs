@@ -336,7 +336,7 @@ namespace Switchboard.Game.Tests
                 Assert.That(cursor.PageTurnDirection, Is.EqualTo(-1));
                 Canvas.ForceUpdateCanvases();
                 var row = opened.GetComponentInChildren<PhoneBookContactRow>();
-                // Only the corner folds turn pages (Sergei, 2c0d99d); over a row the hand points, and a click closes the book.
+                // Only the corner folds turn pages (2c0d99d); over a row the hand points, and a click closes the book.
                 input.ProcessPointer(row.transform.position, false);
                 Assert.That(input.CursorMode, Is.EqualTo(CableCursorMode.Pointing));
                 Assert.That(cursor.PageTurnDirection, Is.Zero);

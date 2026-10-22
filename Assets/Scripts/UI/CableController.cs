@@ -35,6 +35,17 @@ namespace Switchboard.UI
         private Canvas secondPlugCanvas;
         private Canvas wireCanvas;
         private int wireOrder = SwitchboardUISorting.Wire;
+        private CableMotion wireMotion;
+        private System.Action<float> wiggleStep;
+        private System.Action<float> joltStep;
+        private float wiggleAmplitude;
+        private float joltAmplitude;
+        private float joltSeconds;
+        private int joltSeed;
+        private const float WiggleTravel = 2f;
+        // The jolt jumps to a new kink this often, so it reads as jerky rather than as a wave.
+        private const float JoltStepSeconds = .03f;
+        private const float JoltWaveLengths = 3.5f;
         public uint InsertionRevision { get; private set; }
         public SocketView LastInsertionAnchor { get; private set; }
         public bool LastInsertionWasManual { get; private set; }
@@ -48,6 +59,11 @@ namespace Switchboard.UI
         public StoredCableView TrayView => trayCableView;
         public bool IsPointerVisible => pointerInside && Phase != CablePhase.Connected;
         public int WireSortingOrder => wireOrder;
+        public CableGraphic Wire => wire;
+        /// <summary>The wire's own animation (the connection wiggle or the wrong-number jolt); null until one plays.</summary>
+        public CableMotion WireMotion => wireMotion;
+        public bool IsWiggling => wireMotion != null && wireMotion.IsPlaying && !IsJolting;
+        public bool IsJolting { get; private set; }
         // Layers are canvases, so they are only added in scene objects, never in prefab assets.
         private bool Layered => gameObject.scene.IsValid();
         private CableConnection<SocketView> Connection => connection ??
@@ -180,6 +196,75 @@ namespace Switchboard.UI
 
         public void PlayBlockedFeedback() => PlaySound(blockedSound, 1f, 0.18f);
 
+        /// <summary>
+        /// A wave runs along the wire and dies away over <paramref name="seconds"/> (D60, V6). The plugs stay where
+        /// they are, and when it ends the wire hangs exactly as before.
+        /// </summary>
+        public void PlayWiggle(float amplitude, float seconds)
+        {
+            if (!CanMoveWire(amplitude, seconds)) return;
+            wiggleAmplitude = amplitude;
+            wireMotion.Play(seconds, wiggleStep ??= StepWiggle);
+        }
+
+        /// <summary>
+        /// A wrong number shorts the line (D60): the wire jerks into tight, irregular kinks that jump every few hundredths
+        /// of a second and die out over <paramref name="seconds"/>, unlike the wiggle's smooth wave. The plugs stay where
+        /// they are, and when it ends the wire hangs exactly as before.
+        /// </summary>
+        public void PlayJolt(float amplitude, float seconds)
+        {
+            if (!CanMoveWire(amplitude, seconds)) return;
+            joltAmplitude = amplitude;
+            joltSeconds = seconds;
+            joltSeed = Random.Range(1, 1 << 20);
+            wireMotion.Play(seconds, joltStep ??= StepJolt);
+            IsJolting = wireMotion.IsPlaying;
+        }
+
+        private bool CanMoveWire(float amplitude, float seconds)
+        {
+            if (wire == null || !wire.enabled || amplitude == 0 || seconds <= 0) return false;
+            if (wireMotion == null) wireMotion = GetComponent<CableMotion>();
+            if (wireMotion == null) wireMotion = CableMotion.AddTo(gameObject);
+            // A motion still running ends now (its last step resets the wire) before the new one starts.
+            wireMotion.Finish();
+            return true;
+        }
+
+        private void StepWiggle(float t)
+        {
+            if (wire == null) return;
+            float fade = (1 - t) * (1 - t);
+            if (t >= 1) wire.SetWave(0, 0);
+            else wire.SetWave(wiggleAmplitude * fade, t * WiggleTravel);
+        }
+
+        private void StepJolt(float t)
+        {
+            if (t >= 1) IsJolting = false;
+            if (wire == null) return;
+            if (t >= 1)
+            {
+                wire.SetWave(0, 0);
+                return;
+            }
+            // Held between jumps, so the wire snaps from kink to kink instead of gliding.
+            int jump = Mathf.FloorToInt(t * joltSeconds / JoltStepSeconds);
+            float size = .45f + .55f * Noise(jump * 2);
+            float side = (jump & 1) == 0 ? 1f : -1f;
+            float fade = (1 - t) * Mathf.Sqrt(1 - t);
+            wire.SetWave(joltAmplitude * size * side * fade, Noise(jump * 2 + 1), JoltWaveLengths);
+        }
+
+        // A repeatable 0..1 value per jump, so a jolt allocates nothing and draws the same each frame of a jump.
+        private float Noise(int index)
+        {
+            uint h = (uint)joltSeed * 374761393u + (uint)index * 668265263u;
+            h = (h ^ (h >> 13)) * 1274126177;
+            return ((h ^ (h >> 16)) & 0xFFFF) / 65535f;
+        }
+
         /// <summary>Rank 0 is the oldest wire; every wire lies over every resting plug (lead, 2026-10-20).</summary>
         public void SetStackRank(int rank)
         {
@@ -252,6 +337,7 @@ namespace Switchboard.UI
 
         private void OnDisable()
         {
+            if (wireMotion != null) wireMotion.Finish();
             if (connection != null)
             {
                 if (connection.FirstSocket != null) connection.FirstSocket.Release(this);

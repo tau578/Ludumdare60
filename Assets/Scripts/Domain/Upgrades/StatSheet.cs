@@ -12,7 +12,7 @@ namespace Switchboard.Domain
         public const double BaseIncomeMultiplier = 1;
         public const int DefaultStartingCords = 2;
 
-        // All the team's cord tray holds (5b).
+        // All the cord tray holds (5b).
         public const int MaxCords = 6;
 
         // At most four calls can be open, including the final board upgrade.

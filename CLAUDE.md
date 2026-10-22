@@ -54,17 +54,17 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
   4. Resolve conflicts carefully, and re-run the tests.
 - **Known conflict spots:**
   - `ProjectSettings/EditorBuildSettings.asset`: keep the order MainMenu (0), Final (1).
-  - Untracked `.meta` files that Unity generated locally for files a teammate committed without metas. Remove ours and take theirs.
+  - Untracked `.meta` files that Unity generated locally for files committed upstream without metas. Remove the local ones and keep the committed ones.
   - Duplicate imports, for example TextMeshPro. Compare GUIDs, then keep theirs.
 - **Unity can re-save scenes:** the test runner can re-save an open scene in a newer format with no real changes, as happened with `SampleScene.unity`. Discard such format-only changes instead of committing them.
 
-## Team
-**No ownership split (D48, lead 2026-10-18).** The whole team works on the whole project together. There are no owners, read-only folders, coordinated changes or approval lists, and nothing needs to be asked about or reported to a teammate before changing it. Any step may change any file it needs (cord, board, book, shop, menu, scenes, prefabs), as long as its brief names the files and its report lists them. Prefer extending an existing component over building a second one.
+## One shared project
+**All one work (D48, lead 2026-10-18; restated 2026-10-22).** Nothing in the project belongs to anyone, and anyone may edit any part. There are no owners, read-only folders or approval lists, and nothing needs to be asked about or reported to a teammate before changing it. **The docs, code comments and reports never name anyone as the owner or maker of a part** (no "X's code", "his book", "her art"); say "the cord code", "the book", "the art". Any step may change any file it needs (cord, board, book, shop, menu, scenes, prefabs), as long as its brief names the files and its report lists them. Prefer extending an existing component over building a second one.
 
 Teammates still push to `main`, so pre-flight always merges first (see the git rules).
 
-- **Config files are everyone's (lead, 2026-10-21).** `Assets/Configs/Economy.json` (D39; guide `Docs/EconomyFile.md`), `Calls.json` (D51) and `Book.json` (D53; guide `Docs/BookFile.md`) are edited by hand by anyone, steps included, along with their guides; never ask a teammate before changing them or treat a past author's choice as needing sign-off. Keep them human-readable (one entry per line), keep validator messages plain, and keep the book's format and `contactsPerPage`. The book sorts itself (services first, then names A–Z), so the file's order doesn't matter.
-- **Mia** makes the art (`Assets/Sprites/`, `Assets/Fonts/`).
+- **Config files are everyone's (lead, 2026-10-21).** `Assets/Configs/Economy.json` (D39; guide `Docs/EconomyFile.md`), `Calls.json` (D51) and `Book.json` (D53; guide `Docs/BookFile.md`) are edited by hand by anyone, steps included, along with their guides; never ask anyone before changing them or treat an earlier choice as needing sign-off. Keep them human-readable (one entry per line), keep validator messages plain, and keep the book's format and `contactsPerPage`. The book sorts itself (services first, then names A–Z), so the file's order doesn't matter.
+- **Art** lives in `Assets/Sprites/` and fonts in `Assets/Fonts/`. Art commits can arrive without `.meta` files or with stale slices: generate the metas, and compare each PNG's size with its sprite rect (Plan §8).
 
 ## Architecture in brief (details in Design.md §4–§7)
 - **Scene flow (D38).** `MainMenu` → `Final`. The menu loads the next build index. `Final.unity` (formerly `Level.unity`, same GUID) is the one game scene: the board prefabs plus `Game.prefab` and `GameUI.prefab` instances.
@@ -74,13 +74,13 @@ Teammates still push to `main`, so pre-flight always merges first (see the git r
   - The Game layer (`Assets/Scripts/Game/`) is in **Assembly-CSharp on purpose**: asmdefs can't reference Assembly-CSharp, where the cord, board and UI code lives.
   - Tests: `Switchboard.Domain.Tests` (EditMode).
 - **Integration with the cord code:**
-  - **`CordBridge`** observes his `CableController`s every `LateUpdate`, reading only public members (Design §3). It reports plugs and circuits to `OperatorDesk`, and returns cords to the tray with his `TryRemove`.
+  - **`CordBridge`** observes the `CableController`s every `LateUpdate`, reading only public members (Design §3). It reports plugs and circuits to `OperatorDesk`, and returns cords to the tray with `CableController.TryRemove`.
   - `GameInstaller` finds the views and the board's objects in its own scene **by component type**. The only name lookups are `CallerQueuePanel` (the caller slots) and `UpgradeShopPanel/HeaderSlot` (the money plaque).
 - **Composition root:** `GameInstaller`. No singletons, statics with state, service locators, or `FindObjectOfType`.
 - **Communication:** views call verbs (`OperatorDesk.TryTake`), services raise C# events, and values that change every frame are polled in `LateUpdate`.
 - **UI:**
-  - Our `GameUI.prefab` is a Screen Space Overlay canvas (sorting order 10, 1920×1080 Expand), laid over the board's `SwitchboardCanvas`.
-  - Anything not meant to be clicked has `raycastTarget` off, because his cord input takes the topmost hit. His book is also at sorting order 10, so nothing of ours may overlap it.
+  - `GameUI.prefab` is a Screen Space Overlay canvas (sorting order 10, 1920×1080 Expand), laid over the board's `SwitchboardCanvas`.
+  - Anything not meant to be clicked has `raycastTarget` off, because the cord input takes the topmost hit. The book is also at sorting order 10, so nothing on `GameUI` may overlap it.
   - The money counter fills `HeaderSlot`. The call in hand shows as a speech bubble to the right of the caller's portrait. Cards sit over the caller slots.
 - **Data:** every call (caller name, portrait, message, jacks, pay) is hand-written in `Assets/Configs/Calls.json` (D51) and played from the queues in `Economy.json` (D52). The book reads `Book.json` (D53): name, profession, address and jack, every entry from the start; the rules never read it. Names are English.
 

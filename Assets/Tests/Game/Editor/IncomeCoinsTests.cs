@@ -39,9 +39,9 @@ namespace Switchboard.Game.Tests
                 Assert.That(label.text, Is.EqualTo(MoneyFormat.Dollars(100)));
                 wallet.Earn(50);
                 counter.FlyIncomeFrom((RectTransform)portrait.transform);
-                coins.Tick(.53f);
+                coins.Tick(coins.TravelSeconds * .8f);
                 Assert.That(coins.IsFlying, Is.True, "The second reward must finish its own flight.");
-                coins.Tick(.4f);
+                coins.Tick(coins.TravelSeconds);
                 Invoke(counter, "RefreshBalance");
                 Assert.That(coins.IsFlying, Is.False);
                 Assert.That(label.text, Is.EqualTo(MoneyFormat.Dollars(350)));

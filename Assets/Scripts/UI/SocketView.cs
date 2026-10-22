@@ -38,6 +38,9 @@ namespace Switchboard.UI
         public void SetLamp(SocketLamp lamp) => Graphic.SetLamp(lamp);
         public void FlareLamp() => Graphic.FlareLamp();
         public SocketLamp Lamp => Graphic.Lamp;
+        /// <summary>D60: a ring when a call connects here (V6), a red flash on a wrong number (V5).</summary>
+        public void PlayConnectRing() => Graphic.PlayConnectRing();
+        public void FlashWrongNumber(bool spark) => Graphic.FlashWrongNumber(spark);
 
         public bool TryOccupy(CableController cable)
         {

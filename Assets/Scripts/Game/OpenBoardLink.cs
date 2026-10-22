@@ -6,7 +6,7 @@ using Switchboard.UI;
 namespace Switchboard.Game
 {
     /// <summary>
-    /// Pushes the open part of the board (D42, D49) to the team's sockets and the caller panel whenever the stats
+    /// Pushes the open part of the board (D42, D49) to the board's sockets and the caller panel whenever the stats
     /// change. The lamps follow their sockets by themselves. The book always lists everyone (D53).
     /// </summary>
     internal sealed class OpenBoardLink : IDisposable

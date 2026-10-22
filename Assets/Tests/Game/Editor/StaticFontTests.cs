@@ -15,7 +15,7 @@ using UnityEngine.SceneManagement;
 namespace Switchboard.Game.Tests
 {
     /// <summary>
-    /// Step 10d: the game draws Sergei's fonts only from their static copies. A dynamic TMP font writes every new
+    /// Step 10d: the game draws its two TTF fonts (Boecklins Universe, Della Respira) only from their static copies. A dynamic TMP font writes every new
     /// letter into its own file in the editor, so one reference to it brings back thousands of changed lines per Play.
     /// </summary>
     public sealed class StaticFontTests
@@ -117,7 +117,7 @@ namespace Switchboard.Game.Tests
         }
 
         // The book's rows draw straight from the TTF (legacy Text), but Book.json stays inside the static set too, so
-        // any of our labels can show a name from it.
+        // any game label can show a name from it.
         [Test]
         public void TheBooksEntriesAreInTheStaticFont()
         {

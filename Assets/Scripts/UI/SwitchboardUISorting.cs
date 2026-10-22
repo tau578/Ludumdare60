@@ -12,6 +12,8 @@ namespace Switchboard.UI
         // One order per cord above the board's resting plugs (lead, 2026-10-20); the top one stays below the book.
         public const int Wire = 1;
         public const int Book = 10;
+        // A wrong number's short circuit at a jack: over every wire and resting plug, still under the book (D60).
+        public const int Spark = Book - 1;
         // Over the book and GameUI so it can dim them, under the Goal dialog, the pause menu and the hand (D57).
         public const int Tutorial = 14;
         public const int Cursor = 20;

@@ -14,6 +14,8 @@ namespace Switchboard.Game
     /// A view of one hand-written call (Design 5.4, D51): the portrait with the caller's name under it, ringing while
     /// it waits, its own message in a speech bubble while it is in hand, the cord's colour and the money earned while
     /// connected or on hold, then a stamp. Emergencies also get their badge, their accent and a countdown ring.
+    /// D60 (11c): a new card slides in and shakes as its bell rings (V4); a waiting emergency wobbles, harder in its
+    /// last seconds (V3); a wrong number shakes the card "no" (V5). Emergencies show no "New order!" stamp (V13).
     /// </summary>
     public sealed class CallCardView : MonoBehaviour, IPointerClickHandler
     {
@@ -68,6 +70,26 @@ namespace Switchboard.Game
         [SerializeField, FormerlySerializedAs("newOrderPopSeconds"), Min(.05f)] private float stampPopSeconds = .38f;
         [SerializeField, FormerlySerializedAs("newOrderOvershoot"), Range(1, 1.4f)] private float stampOvershoot = 1.16f;
         [SerializeField, Min(.01f)] private float stampExitSeconds = .22f;
+
+        [Header("Motion (D60)")]
+        [SerializeField, Min(.05f), Tooltip("A new card's slide in from the caller panel's edge.")] private float arrivalSeconds = .55f;
+        [SerializeField, Min(.05f), Tooltip("The shake as a new card's bell rings, after it lands.")] private float ringShakeSeconds = .45f;
+        [SerializeField, Min(0)] private float ringShakeDegrees = 5f;
+        [SerializeField, Min(.05f), Tooltip("A wrong number's \"no\": three sideways swings.")] private float wrongShakeSeconds = .4f;
+        [SerializeField, Min(0)] private float wrongShakePixels = 12f;
+        [SerializeField, Min(0), Tooltip("A waiting emergency's gentle wobble.")] private float wobbleDegrees = 2f;
+        [SerializeField, Min(0)] private float wobblesPerSecond = 1.2f;
+        [SerializeField, Min(0), Tooltip("The wobble in the last urgent seconds, in step with the ring's pulse.")]
+        private float urgentWobbleDegrees = 5f;
+        private CanvasGroup cardGroup;
+        private float arrivalTime = -1;
+        private float arrivalDistance;
+        private float ringShakeTime = -1;
+        private float wrongShakeTime = -1;
+        // Game time since the card showed: it stops while the game is paused, and so do the wobble and the ring's pulse.
+        private float gameClock;
+        private float appliedAngle;
+        private float appliedAlpha = 1;
         private RectTransform stampRect;
         private CanvasGroup stampGroup;
         private StampExitAnimation stampExit;
@@ -78,6 +100,7 @@ namespace Switchboard.Game
         private bool showingStamp;
         private CallState shownStampState;
         private float stampPopTime = -1;
+        private bool stampAnnounced;
         private Sprite defaultPortrait;
         private Color earningsColor;
         private Color rateOutlineColor;
@@ -99,6 +122,25 @@ namespace Switchboard.Game
 
         /// <summary>Raised after the status stamp's display time and exit animation finish.</summary>
         public event Action<CallCardView> Finished;
+
+        /// <summary>Raised on the first frame a stamp pops ("New order!", "Paid", "Wrong number!"...), for its thunk (11b).</summary>
+        public event Action<CallCardView> StampShown;
+
+        /// <summary>Where the queue rests the card; the motion offset is added on top (D60).</summary>
+        public Vector2 RestPosition { get; set; }
+        /// <summary>This frame's slide or shake, in the card's parent space, added to <see cref="RestPosition"/>.</summary>
+        public Vector2 MotionOffset { get; private set; }
+        /// <summary>This frame's tilt in degrees: the ring shake plus an emergency's wobble.</summary>
+        public float MotionAngle => appliedAngle;
+        public bool IsArriving => arrivalTime >= 0;
+        public bool IsRingShaking => ringShakeTime >= 0;
+        public bool IsShakingNo => wrongShakeTime >= 0;
+        /// <summary>An emergency still waiting for its connection: its response timer runs (D09).</summary>
+        public bool IsWaitingEmergency => Call != null && Call.HasResponseTime &&
+            (Call.State == CallState.Incoming || Call.State == CallState.Taken || Call.State == CallState.Connecting);
+        public bool IsUrgent => IsWaitingEmergency && Call.ResponseSecondsLeft <= urgentSeconds;
+        public float UrgentSeconds => urgentSeconds;
+        public bool IsStampShowing => stamp != null && stamp.activeSelf;
 
         public Call Call { get; private set; }
         public RectTransform PortraitRect => portrait != null ? portrait.rectTransform : (RectTransform)transform;
@@ -131,6 +173,7 @@ namespace Switchboard.Game
             ResetStamp();
             finishedRaised = false;
             StopPress();
+            ResetMotion();
             Refresh();
         }
 
@@ -185,6 +228,12 @@ namespace Switchboard.Game
 
             if (state == CallState.Incoming)
             {
+                // V13: an emergency's badge and countdown ring already say it is new, and the stamp would hide them.
+                if (Call.HasResponseTime)
+                {
+                    DismissStamp();
+                    return;
+                }
                 ShowStamp(state);
                 stampLabel.text = "New order!";
                 stampLabel.color = stampOutline.effectColor = newOrderInk;
@@ -205,7 +254,11 @@ namespace Switchboard.Game
                 stampTimeLeft = 0;
                 return;
             }
-            if (!endingStampExit && ShowStamp(state)) stampTimeLeft = stampSeconds;
+            if (!endingStampExit && ShowStamp(state))
+            {
+                stampTimeLeft = stampSeconds;
+                if (Call.EndReason == CallEndReason.WrongConnection) wrongShakeTime = 0;
+            }
             RefreshStamp();
         }
 
@@ -251,9 +304,108 @@ namespace Switchboard.Game
             // Let its stamp finish independently, without delaying the new call.
             DismissStamp();
             StopPress();
+            ResetMotion();
             feePopup.Hide();
             if (tipPopup != null) tipPopup.Hide();
             gameObject.SetActive(false);
+        }
+
+        /// <summary>A new card slides in from <paramref name="distance"/> to the left, then shakes as its bell rings (V4).</summary>
+        public void PlayArrival(float distance)
+        {
+            if (Call == null) return;
+            arrivalDistance = Mathf.Max(0, distance);
+            arrivalTime = 0;
+            ringShakeTime = -1;
+            TickMotion(0, 0);
+        }
+
+        /// <summary>
+        /// Moves the card's motion on: <paramref name="gameSeconds"/> is game time (0 while paused, so the wobble
+        /// freezes), <paramref name="uiSeconds"/> real time for the short one-off moves. Update drives it.
+        /// </summary>
+        public void TickMotion(float gameSeconds, float uiSeconds)
+        {
+            if (Call == null) return;
+            gameClock += gameSeconds;
+            Vector2 offset = Vector2.zero;
+            float angle = 0;
+            float alpha = 1;
+            if (arrivalTime >= 0)
+            {
+                arrivalTime += uiSeconds;
+                float t = Mathf.Clamp01(arrivalTime / arrivalSeconds);
+                offset.x -= arrivalDistance * (1 - EaseOutBack(t));
+                alpha = Mathf.Clamp01(t / .35f);
+                if (t >= 1)
+                {
+                    arrivalTime = -1;
+                    ringShakeTime = 0;
+                }
+            }
+            else if (ringShakeTime >= 0)
+            {
+                ringShakeTime += uiSeconds;
+                float t = ringShakeTime / ringShakeSeconds;
+                if (t >= 1) ringShakeTime = -1;
+                else angle += ringShakeDegrees * Mathf.Sin(t * Mathf.PI * 8) * (1 - t);
+            }
+            if (wrongShakeTime >= 0)
+            {
+                wrongShakeTime += uiSeconds;
+                float t = wrongShakeTime / wrongShakeSeconds;
+                if (t >= 1) wrongShakeTime = -1;
+                else offset.x += wrongShakePixels * Mathf.Sin(t * Mathf.PI * 6) * (1 - t);
+            }
+            angle += Wobble();
+            MotionOffset = offset;
+            ApplyMotion(angle, alpha);
+        }
+
+        // In the last seconds the wobble follows the countdown ring's pulse, as the ring does, on the same clock.
+        private float Wobble()
+        {
+            if (!IsWaitingEmergency) return 0;
+            return IsUrgent
+                ? urgentWobbleDegrees * Mathf.Sin(gameClock * urgentPulsesPerSecond * Mathf.PI * 2f)
+                : wobbleDegrees * Mathf.Sin(gameClock * wobblesPerSecond * Mathf.PI * 2f);
+        }
+
+        // Writes only on a change, so a still card costs nothing.
+        private void ApplyMotion(float angle, float alpha)
+        {
+            if (angle != appliedAngle)
+            {
+                appliedAngle = angle;
+                transform.localRotation = Quaternion.Euler(0, 0, angle);
+                // The bubble stays upright so its text is easy to read.
+                if (speechBubble != null) speechBubble.transform.localRotation = Quaternion.Euler(0, 0, -angle);
+            }
+            if (alpha != appliedAlpha && cardGroup != null)
+            {
+                appliedAlpha = alpha;
+                cardGroup.alpha = alpha;
+            }
+        }
+
+        private void ResetMotion()
+        {
+            arrivalTime = ringShakeTime = wrongShakeTime = -1;
+            gameClock = 0;
+            MotionOffset = Vector2.zero;
+            appliedAngle = 0;
+            appliedAlpha = 1;
+            transform.localRotation = Quaternion.identity;
+            if (speechBubble != null) speechBubble.transform.localRotation = Quaternion.identity;
+            if (cardGroup != null) cardGroup.alpha = 1;
+        }
+
+        // Out past the slot and back: a small overshoot.
+        private static float EaseOutBack(float t)
+        {
+            const float c1 = 1.7f, c3 = c1 + 1;
+            float u = t - 1;
+            return 1 + c3 * u * u * u + c1 * u * u;
         }
 
         public void OnPointerClick(PointerEventData eventData)
@@ -266,6 +418,8 @@ namespace Switchboard.Game
         {
             if (initialized) return;
             initialized = true;
+            cardGroup = GetComponent<CanvasGroup>();
+            if (cardGroup == null) cardGroup = gameObject.AddComponent<CanvasGroup>();
             AddCallerDecorations();
             defaultPortrait = portrait.sprite;
             stampRect = (RectTransform)stamp.transform;
@@ -377,6 +531,7 @@ namespace Switchboard.Game
         private void Update()
         {
             if (Call == null) return;
+            TickMotion(Time.deltaTime, Mathf.Min(Time.unscaledDeltaTime, .05f));
             if (pressTime >= 0) AnimatePress();
             if (typing.IsTyping) TypeOn();
             if (stampPopTime >= 0) AnimateStamp();
@@ -425,7 +580,7 @@ namespace Switchboard.Game
             }
             if (urgent)
             {
-                float wave = 0.5f + 0.5f * Mathf.Sin(Time.time * urgentPulsesPerSecond * Mathf.PI * 2f);
+                float wave = 0.5f + 0.5f * Mathf.Sin(gameClock * urgentPulsesPerSecond * Mathf.PI * 2f);
                 Color hot = urgentRingColor;
                 responseRing.color = new Color(hot.r, hot.g, hot.b, 0.55f + 0.45f * wave);
                 responseRing.rectTransform.localScale = Vector3.one * (1f + 0.04f * wave);
@@ -441,6 +596,11 @@ namespace Switchboard.Game
 
         private void AnimateStamp()
         {
+            if (!stampAnnounced)
+            {
+                stampAnnounced = true;
+                StampShown?.Invoke(this);
+            }
             // Bound loading hitches so the first visible frames still show the pop.
             stampPopTime += Mathf.Min(Time.unscaledDeltaTime, .05f);
             float t = Mathf.Clamp01(stampPopTime / Mathf.Max(.05f, stampPopSeconds));
@@ -467,6 +627,7 @@ namespace Switchboard.Game
             stamp.SetActive(true);
             stampGroup.alpha = 1;
             stampPopTime = 0;
+            stampAnnounced = false;
             stamp.transform.localScale = stampScale * .05f;
             return true;
         }

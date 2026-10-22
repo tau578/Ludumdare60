@@ -76,6 +76,7 @@ namespace Switchboard.Game
                     "(startingClientSlots or an extra_clients clientSlots). Lower the file's values or add slots to the panel.", config);
             callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, Session.Penalties, callerSlots, PortraitOf,
                 cordBridge.ColorOf, config.CardStyleFor, syncBoard: cordBridge.Synchronize, counter: moneyCounter);
+            EmergencyLampView.Create(BoardLamps(scene, sockets), Session.Calls);
             PhoneBookView bookView = FindSingle<PhoneBookView>(scene);
             boardLink = new OpenBoardLink(sockets, callQueue, Session.Stats, Session.Board);
             shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene), moneyCounter);
@@ -147,6 +148,16 @@ namespace Switchboard.Game
             if (found.Count == 1) return found[0];
             Debug.LogError($"GameInstaller needs exactly one {typeof(T).Name} in the scene '{scene.name}', but found {found.Count}.", this);
             return null;
+        }
+
+        // The board's row and column lamps share the jacks' canvas; the volume patch's lamps don't (D60, V3).
+        private static List<SwitchboardLampView> BoardLamps(Scene scene, List<SocketView> sockets)
+        {
+            var lamps = LevelScene.FindAll<SwitchboardLampView>(scene);
+            Canvas board = sockets.Count > 0 && sockets[0] != null ? sockets[0].GetComponentInParent<Canvas>(true) : null;
+            lamps.RemoveAll(lamp => board == null || lamp.GetComponentInParent<Canvas>(true) == null ||
+                lamp.GetComponentInParent<Canvas>(true).rootCanvas != board.rootCanvas);
+            return lamps;
         }
 
         private static List<string> BoardJacks(List<SocketView> sockets)

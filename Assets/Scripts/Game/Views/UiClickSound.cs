@@ -3,7 +3,7 @@ using UnityEngine;
 namespace Switchboard.Game
 {
     /// <summary>
-    /// A short UI click. Its volume follows the team's Sfx slider through their AudioChannelSource
+    /// A short UI click. Its volume follows the Sfx slider through its AudioChannelSource
     /// on the same object, so only the pitch is set here.
     /// </summary>
     [RequireComponent(typeof(AudioSource))]

@@ -3,24 +3,35 @@ using UnityEngine;
 
 namespace Switchboard.Game
 {
-    /// <summary>Short UI-only reward flights, independent of a card's lifetime and pool slot.</summary>
+    /// <summary>
+    /// Short UI-only coin flights, independent of a card's lifetime and pool slot: income flies from a card to the
+    /// counter, and a fine's coins fly the other way, from the counter to the missed card, fading out (D60, V2).
+    /// </summary>
     public sealed class IncomeCoinsView : MonoBehaviour
     {
         private sealed class Coin
         {
             public RectTransform Rect;
             public Vector2 StartScreen;
+            public RectTransform Target;
             public float Age;
             public int Index;
+            public bool Away;
         }
 
-        private const float TravelSeconds = .65f;
+        [SerializeField, Min(.1f), Tooltip("How long one coin takes from start to target, either way (11c playtest: slower).")]
+        private float travelSeconds = 1f;
         private const float StaggerSeconds = .055f;
         private readonly List<Coin> coins = new List<Coin>();
         private RectTransform area;
-        private RectTransform destination;
         private Canvas canvas;
-        public bool IsFlying => coins.Count > 0;
+        private int incoming;
+        /// <summary>Income coins still on their way; the counter holds a rise until they land. Fine coins don't count.</summary>
+        public bool IsFlying => incoming > 0;
+        /// <summary>Any coin in the air, either way.</summary>
+        public bool HasCoins => coins.Count > 0;
+        public int AwayCount => coins.Count - incoming;
+        public float TravelSeconds => travelSeconds;
 
         public static IncomeCoinsView Create(Transform owner)
         {
@@ -41,41 +52,46 @@ namespace Switchboard.Game
             return view;
         }
 
-        public void Fly(RectTransform portrait, RectTransform target)
+        public void Fly(RectTransform portrait, RectTransform target) => Launch(portrait, target, 4, false);
+
+        /// <summary>A fine: coins leave the counter and fly to the missed card, fading as they go (V2).</summary>
+        public void FlyAway(RectTransform counter, RectTransform card, int count) =>
+            Launch(counter, card, Mathf.Clamp(count, 1, 5), true);
+
+        private void Launch(RectTransform from, RectTransform to, int count, bool away)
         {
-            destination = target;
-            Vector2 start = ScreenCentre(portrait);
-            for (int i = 0; i < 4; i++)
+            if (from == null || to == null) return;
+            Vector2 start = ScreenCentre(from);
+            for (int i = 0; i < count; i++)
             {
-                var go = new GameObject("Coin", typeof(RectTransform), typeof(IncomeCoinGraphic));
+                var go = new GameObject(away ? "Fine coin" : "Coin", typeof(RectTransform), typeof(IncomeCoinGraphic));
                 var rect = (RectTransform)go.transform;
                 rect.SetParent(area, false);
                 rect.sizeDelta = new Vector2(24, 24);
                 rect.localScale = Vector3.zero;
                 go.GetComponent<IncomeCoinGraphic>().raycastTarget = false;
-                coins.Add(new Coin { Rect = rect, StartScreen = start, Age = -i * StaggerSeconds, Index = i });
+                coins.Add(new Coin { Rect = rect, StartScreen = start, Target = to, Age = -i * StaggerSeconds, Index = i, Away = away });
+                if (!away) incoming++;
             }
         }
 
         // Called by the counter before deciding whether its number may advance this frame.
         public void Tick(float dt)
         {
-            if (destination == null) { Clear(); return; }
             Camera camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(area, ScreenCentre(destination), camera, out Vector2 end);
             for (int i = coins.Count - 1; i >= 0; i--)
             {
                 Coin coin = coins[i];
                 coin.Age += dt;
-                if (coin.Age >= TravelSeconds)
+                if (coin.Age >= travelSeconds || coin.Target == null)
                 {
-                    Release(coin.Rect.gameObject);
-                    coins.RemoveAt(i);
+                    RemoveAt(i);
                     continue;
                 }
                 if (coin.Age < 0) continue;
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(area, ScreenCentre(coin.Target), camera, out Vector2 end);
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(area, coin.StartScreen, camera, out Vector2 start);
-                float t = coin.Age / TravelSeconds;
+                float t = coin.Age / travelSeconds;
                 float progress = t * t * (3 - 2 * t);
                 float arc = Mathf.Sin(Mathf.PI * t);
                 // The first portrait and money plate are close to the top edge: bow into the screen.
@@ -86,7 +102,17 @@ namespace Switchboard.Game
                 float spin = .45f + .55f * Mathf.Abs(Mathf.Cos(t * Mathf.PI * 3 + coin.Index * .5f));
                 coin.Rect.localScale = new Vector3(scale * spin, scale, 1);
                 coin.Rect.localRotation = Quaternion.Euler(0, 0, 15 * Mathf.Sin(t * Mathf.PI * 2));
+                // Money lost: the coins fade away over the second half of the flight.
+                if (coin.Away) coin.Rect.GetComponent<CanvasRenderer>().SetAlpha(t < .5f ? 1f : 1f - (t - .5f) / .5f);
             }
+        }
+
+        private void RemoveAt(int index)
+        {
+            Coin coin = coins[index];
+            if (coin.Rect != null) Release(coin.Rect.gameObject);
+            if (!coin.Away) incoming--;
+            coins.RemoveAt(index);
         }
 
         private static Vector2 ScreenCentre(RectTransform rect)
@@ -101,6 +127,7 @@ namespace Switchboard.Game
             foreach (Coin coin in coins)
                 if (coin.Rect != null) Release(coin.Rect.gameObject);
             coins.Clear();
+            incoming = 0;
         }
 
         private void OnDisable() => Clear();

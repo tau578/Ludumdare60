@@ -8,7 +8,7 @@ using UnityEngine.SceneManagement;
 namespace Switchboard.Game
 {
     /// <summary>
-    /// Mirrors the team's cords into the domain through their public members only (Design 3 and 4.5).
+    /// Mirrors the cords into the domain through their public members only (Design 3 and 4.5).
     /// The cord input runs in Update, so LateUpdate sees its result in the same frame.
     /// </summary>
     [DefaultExecutionOrder(-50)]
@@ -24,6 +24,16 @@ namespace Switchboard.Game
         private IReadOnlyList<Color> extraColors = new Color[0];
         private readonly List<Color> deferredColors = new List<Color>();
         private int added;
+        // The cord whose closed circuit the desk is judging right now, so a wrong number knows its jacks (V5).
+        private int judging = -1;
+        [SerializeField, Min(0), Tooltip("How far the connection wiggle swings the wire, in canvas pixels (V6).")]
+        private float wiggleAmplitude = 12f;
+        [SerializeField, Min(.05f), Tooltip("How long the connection wiggle takes to die away (V6).")]
+        private float wiggleSeconds = .5f;
+        [SerializeField, Min(0), Tooltip("How far the wrong-number jolt kinks the wire, in canvas pixels; smaller than the wiggle (V5).")]
+        private float joltAmplitude = 7f;
+        [SerializeField, Min(.05f), Tooltip("How long the wrong-number jolt takes to die out (V5).")]
+        private float joltSeconds = .35f;
 
         public int CordCount => cables.Length;
         public event System.Action<CableController> CableAdded;
@@ -54,7 +64,7 @@ namespace Switchboard.Game
                 Debug.LogError($"CordBridge needs exactly one CableInputController in the scene '{scene.name}' to add cords, but found {inputs.Count}.", this);
         }
 
-        /// <summary>Adds cords through the team's cord input until there are <paramref name="total"/> (5b).</summary>
+        /// <summary>Adds cords through the cord input until there are <paramref name="total"/> (5b).</summary>
         public void EnsureCords(int total)
         {
             if (input == null) return;
@@ -108,8 +118,38 @@ namespace Switchboard.Game
             calls.CallEnded -= OnCallEnded;
         }
 
-        private void OnCallChanged(CallStateChangedArgs _) => RefreshCallHighlights();
-        private void OnCallEnded(CallEndedArgs _) => RefreshCallHighlights();
+        private void OnCallChanged(CallStateChangedArgs e)
+        {
+            RefreshCallHighlights();
+            if (e.To == CallState.Connected && e.Call.Cord is CordId cord) PlayConnectRings(CableAt(cord));
+        }
+
+        private void OnCallEnded(CallEndedArgs e)
+        {
+            RefreshCallHighlights();
+            if (e.Reason == CallEndReason.WrongConnection && judging >= 0 && judging < cables.Length)
+                FlashWrongNumber(cables[judging]);
+        }
+
+        // D60 (V6): a ring expands from both jacks and a wave runs along the wire when a circuit closes on a call,
+        // resumes included.
+        private void PlayConnectRings(CableController cable)
+        {
+            if (cable == null || cable.Phase != CablePhase.Connected) return;
+            if (cable.FirstSocket != null) cable.FirstSocket.PlayConnectRing();
+            if (cable.SecondSocket != null) cable.SecondSocket.PlayConnectRing();
+            cable.PlayWiggle(wiggleAmplitude, wiggleSeconds);
+        }
+
+        // D60 (V5): both jacks of the wrong circuit flash red, the line shorts where the plug just went in, and the
+        // wire jolts.
+        private void FlashWrongNumber(CableController cable)
+        {
+            SocketView anchor = cable.LastInsertionAnchor;
+            if (cable.FirstSocket != null) cable.FirstSocket.FlashWrongNumber(cable.FirstSocket != anchor);
+            if (cable.SecondSocket != null) cable.SecondSocket.FlashWrongNumber(cable.SecondSocket != anchor);
+            if (cable.Phase == CablePhase.Connected) cable.PlayJolt(joltAmplitude, joltSeconds);
+        }
 
         private void RefreshCallHighlights()
         {
@@ -216,7 +256,9 @@ namespace Switchboard.Game
             {
                 JackId? manualAnchor = !now.SameInsertions(before) && now.LastInsertionWasManual && now.LastInsertionAnchor != null
                     ? Jack(now.LastInsertionAnchor) : (JackId?)null;
-                desk.OnCircuitClosed(cord, Jack(now.First), Jack(now.Second), manualAnchor);
+                judging = index;
+                try { desk.OnCircuitClosed(cord, Jack(now.First), Jack(now.Second), manualAnchor); }
+                finally { judging = -1; }
             }
         }
 

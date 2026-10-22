@@ -66,7 +66,7 @@ namespace Switchboard.Domain
             SyncWaitingCalls();
         }
 
-        // The same pair closing again is the team's restore and resumes an on-hold call without a second fee.
+        // The same pair closing again is the cord's restore and resumes an on-hold call without a second fee.
         // Any other pair cuts the on-hold call off, and the cord's new circuit is judged as a fresh one (D07).
         public void OnCircuitClosed(CordId cord, JackId a, JackId b, JackId? manualAnchor = null)
         {

@@ -7,7 +7,7 @@ namespace Switchboard.Game
     /// <summary>
     /// The main menu's save-aware buttons (D55, lead's 9a playtest). Without a save Continue is hidden and New Game
     /// starts at once; with a save Continue comes first and New Game asks before it deletes the whole save (career
-    /// included). The visible buttons are re-spaced evenly so a hidden one leaves no gap. Sergei's Menu can't see this
+    /// included). The visible buttons are re-spaced evenly so a hidden one leaves no gap. The menu package's Menu can't see this
     /// layer, so the buttons are wired in MainMenu.unity. Quit shows only where Application.Quit works: not on Web.
     /// </summary>
     public sealed class NewGameMenu : MonoBehaviour

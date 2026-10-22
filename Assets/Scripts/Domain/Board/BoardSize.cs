@@ -8,7 +8,7 @@ namespace Switchboard.Domain
     /// </summary>
     public readonly struct BoardSize : IEquatable<BoardSize>
     {
-        /// <summary>The team's board in Final.unity is 6 by 6 (rows A to F, columns 1 to 6), the only fixed limit.</summary>
+        /// <summary>The board in Final.unity is 6 by 6 (rows A to F, columns 1 to 6), the only fixed limit.</summary>
         public const int MaxSide = 6;
 
         public static readonly BoardSize Full = new BoardSize(MaxSide, MaxSide);

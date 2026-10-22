@@ -10,7 +10,7 @@ using UnityEngine.UI;
 namespace Switchboard.Game
 {
     /// <summary>
-    /// Every live call has a card over one of the team's caller slots, in arrival order (Design 4.3, 5.4).
+    /// Every live call has a card over one of the caller slots, in arrival order (Design 4.3, 5.4).
     /// When a card leaves, the cards below it slide up. Ended cards keep their slot while the stamp shows, so a call
     /// the queue fills in at once (D52) waits for that stamp before its card appears.
     /// Only the open slots take cards (D49); closed slot artwork is hidden without changing the layout.
@@ -24,6 +24,8 @@ namespace Switchboard.Game
         private float slideSpeed = 14f;
         [SerializeField] private Sprite callerFrame;
         [SerializeField] private UiClickSound takeSound;
+        [SerializeField, Min(0), Tooltip("How far left of its slot a new card starts its slide, in card widths (D60, V4).")]
+        private float arrivalWidths = .75f;
 
         private readonly List<CallCardView> pool = new List<CallCardView>();
         private readonly List<CallCardView> shown = new List<CallCardView>();
@@ -241,6 +243,9 @@ namespace Switchboard.Game
             card.Show(call, portraitOf?.Invoke(call.Request.Script), cordColorOf, style, earnings?.CurrentMultiplier ?? 1);
             shown.Add(card);
             SnapToSlot(card, shown.Count - 1);
+            // V4: it slides in from the caller panel's edge; it is clickable at once.
+            card.PlayArrival(slotSize.x * arrivalWidths);
+            ((RectTransform)card.transform).localPosition = card.RestPosition + card.MotionOffset;
             DrawUpperCardsOnTop();
             OrderShown?.Invoke(card);
         }
@@ -285,8 +290,15 @@ namespace Switchboard.Game
 
         private void OnQuickConnectTipPaid(QuickConnectTipPaidArgs e) => CardOf(e.Call)?.ShowQuickConnectTip(e.Cents);
 
-        // "Missed -$2.00" names the amount actually taken, which is known only once the fine lands.
-        private void OnFineApplied(FineAppliedArgs e) => CardOf(e.Call)?.RefreshStamp();
+        // "Missed -$2.00" names the amount actually taken, which is known only once the fine lands; the coins taken fly
+        // from the counter to the missed card (D60, V2).
+        private void OnFineApplied(FineAppliedArgs e)
+        {
+            CallCardView card = CardOf(e.Call);
+            if (card == null) return;
+            card.RefreshStamp();
+            if (moneyCounter != null) moneyCounter.FlyFineTo(card.PortraitRect, e.TakenCents);
+        }
 
         private void OnCardClicked(CallCardView clicked)
         {
@@ -327,7 +339,7 @@ namespace Switchboard.Game
             return null;
         }
 
-        // The slots are laid out by the team's layout group, possibly a frame late, so keep following them.
+        // The slots are laid out by the caller panel's layout group, possibly a frame late, so keep following them.
         private void LateUpdate()
         {
             if (slots.Length == 0) return;
@@ -339,8 +351,11 @@ namespace Switchboard.Game
                 var rect = (RectTransform)shown[i].transform;
                 Vector2 target = slotCentres[Mathf.Min(i, slots.Length - 1)];
                 if (moved) rect.sizeDelta = slotSize;
-                Vector2 now = rect.localPosition;
-                rect.localPosition = (now - target).sqrMagnitude < 0.25f ? target : Vector2.Lerp(now, target, blend);
+                // The slide between slots moves the resting place; the card's own motion rides on top (D60).
+                Vector2 now = shown[i].RestPosition;
+                Vector2 rest = (now - target).sqrMagnitude < 0.25f ? target : Vector2.Lerp(now, target, blend);
+                shown[i].RestPosition = rest;
+                rect.localPosition = rest + shown[i].MotionOffset;
             }
         }
 
@@ -349,7 +364,8 @@ namespace Switchboard.Game
             MeasureSlots();
             var rect = (RectTransform)card.transform;
             rect.sizeDelta = slotSize;
-            rect.localPosition = slotCentres[Mathf.Min(index, slots.Length - 1)];
+            card.RestPosition = slotCentres[Mathf.Min(index, slots.Length - 1)];
+            rect.localPosition = card.RestPosition;
         }
 
         private bool MeasureSlots()

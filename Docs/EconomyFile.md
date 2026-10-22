@@ -5,7 +5,7 @@ Two files are yours. You edit them by hand, and the game reads them every time i
 - `Assets/Configs/Calls.json`: every call in the game, written out one by one.
 - `Assets/Configs/Economy.json`: the starting money and cords, the board, **which calls play in which order** (the call queues), and everything the shop sells.
 
-The phone book, `Assets/Configs/Book.json`, is yours too; it has its own guide: [BookFile.md](BookFile.md).
+The phone book, `Assets/Configs/Book.json`, has its own guide: [BookFile.md](BookFile.md).
 
 Keep both readable: one entry per line, in the order you want the player to meet them.
 

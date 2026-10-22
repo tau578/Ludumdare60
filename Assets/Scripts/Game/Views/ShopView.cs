@@ -7,7 +7,7 @@ using UnityEngine;
 namespace Switchboard.Game
 {
     /// <summary>
-    /// Drives the team's 4 shop buttons (D41): the top 3 follow <see cref="ShopShelf"/>, the bottom one is the
+    /// Drives the 4 shop buttons (D41): the top 3 follow <see cref="ShopShelf"/>, the bottom one is the
     /// secret with its savings fill. Money and the fill are polled; a button is redrawn only when its state changes.
     /// </summary>
     public sealed class ShopView : MonoBehaviour
@@ -33,7 +33,7 @@ namespace Switchboard.Game
         private bool shownHighlight;
         private bool stale;
 
-        /// <param name="found">The team's shop buttons in the scene; exactly 4 are expected.</param>
+        /// <param name="found">The shop buttons in the scene; exactly 4 are expected.</param>
         public bool Bind(UpgradeService service, ShopShelf offers, GoalProgress savings, Wallet money, List<UpgradeSlotView> found,
             MoneyCounterView counter = null)
         {

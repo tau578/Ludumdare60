@@ -59,7 +59,7 @@ Ground rules:
    - Stable string ids.
    - Explicit enum values.
    - Never write to ScriptableObjects at runtime.
-   - Our assets go only under `Assets/Content/` and `Assets/Prefabs/Game/`.
+   - New game assets go under `Assets/Content/` and `Assets/Prefabs/Game/`.
 8. **Use Unity MCP for every project change:** scripts, assets, prefabs, scenes, build settings and tests.
    - Files that MCP can't create, such as `.asmdef` and `.jslib`, may be written with file tools. Run `refresh_unity` afterwards.
    - **C# edits may also be made with file tools.** In Step 1b, MCP `apply_text_edits` corrupted three edits. After file edits, always compile through MCP (`refresh_unity`) and read the console.
@@ -98,21 +98,21 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Play Mode smoke test | `manage_editor` `play` → `read_console` a few times, take a screenshot → `manage_editor` `stop` |
 | Screenshot | `manage_camera` `screenshot` with `include_image: true` and `output_folder: "Temp/Captures"`. Temp is git-ignored; never save screenshots under `Assets/`. Take screenshots while Play Mode is paused or being stepped: captures during free-running play can come out blank. |
 | Play Mode while Unity is in the background | Run In Background is off, so Play Mode stops advancing whenever Unity isn't the front window. Step 1 learned this. To drive frames:<br>1. From `execute_code`, add a self-removing `EditorApplication.update` callback that calls `EditorApplication.Step()`.<br>2. Optionally set `Time.captureDeltaTime`, for example to 0.05.<br>3. Set it back to 0 afterwards.<br>**Never set `Application.runInBackground` in the editor: it writes PlayerSettings.**<br>`Time.captureDeltaTime` seemed to have no effect while stepping. To speed up long calls, set `Time.timeScale` temporarily and reset it to 1 afterwards.<br>`GameObject.Find` also returns inactive objects, so check `activeInHierarchy`. |
-| Simulate input (cards, buttons, cords) | `execute_code` runs outside the player loop, where `Screen` has the size of an editor view, so raycasts made from it miss.<br>1. Queue a one-shot `Canvas.willRenderCanvases` handler.<br>2. Inside it, run the clicks, using EventSystem raycasts or `CableInputController.ProcessPointer(screenPosition, true)`. The team built that method for integration checks.<br>3. Pass results back through `SessionState`, and remove the handler and its keys afterwards. |
+| Simulate input (cards, buttons, cords) | `execute_code` runs outside the player loop, where `Screen` has the size of an editor view, so raycasts made from it miss.<br>1. Queue a one-shot `Canvas.willRenderCanvases` handler.<br>2. Inside it, run the clicks, using EventSystem raycasts or `CableInputController.ProcessPointer(screenPosition, true)`. That method exists for integration checks.<br>3. Pass results back through `SessionState`, and remove the handler and its keys afterwards. |
 | `execute_code` quirks (2a) | It compiles with CodeDom (C# 6): no local functions, and `Object` is ambiguous, so write `UnityEngine.Object`. |
 | Keyboard in Play Mode (2a) | The project uses `PointersAndKeyboardsRespectGameViewFocus`, so simulated keys (e.g. F1) don't reach Play Mode unless the Game view has focus. Call the action through the same method the key uses, and leave the real key press to the lead's playtest. |
 | Screenshot names (2a) | `manage_camera screenshot` adds "-1" to the name instead of overwriting an existing file. Delete the old file first if the name matters. |
 | Nested canvas sorting in a prefab (2b) | To give a child its own sorting order inside a prefab (e.g. the halo's order 9), set `m_OverrideSorting` through `SerializedObject`. `manage_prefabs` and the `overrideSorting` setter leave it off, because inside prefab contents the nested canvas counts as a root canvas. |
 | Game view size (3) | Set it with `PlayModeWindow.SetCustomRenderingResolution`, for example 1280×720 or 844×390, and set it back to 1920×1080 afterwards. Each new size stays in the Game view's size list as an editor preference, not a project file. |
-| Tests on Assembly-CSharp types (3) | `Assets/Tests/Editor/` (the cable tests' asmdef) can't see Assembly-CSharp types such as `PhoneBookView`. Put such tests in our `Assets/Tests/Game/Editor/`, which has no asmdef and compiles into Assembly-CSharp-Editor. |
+| Tests on Assembly-CSharp types (3) | `Assets/Tests/Editor/` (the cable tests' asmdef) can't see Assembly-CSharp types such as `PhoneBookView`. Put such tests in `Assets/Tests/Game/Editor/`, which has no asmdef and compiles into Assembly-CSharp-Editor. |
 | Dev panel (2a) | F1 or the "Dev" button, just left of the pause button in the play area's top-right corner (since the 2026-10-20 cleanup it follows the play area, not the screen; since 9a pass 3 it opens as a row along the top edge): + $10, Call now, Emergency now (4), Speed ×5/×1, Show/Hide times, Clear calls. Editor and development builds only. Its IMGUI clicks also reach the cord input as "empty space" clicks. |
 | Format-only re-saves (4) | Test runs and Play Mode can re-save `ProjectSettings/TimeManager.asset` (as well as `SampleScene.unity`) with only format changes. Discard them with `git checkout -- <file>` and mention it in the report. |
 | Layout in prefab editing (5a) | Unity's layout groups don't run while a prefab is edited from code, so an editor menu that resizes children must set their `sizeDelta` directly (as `Update Upgrade Shop Buttons` does). |
-| Disabled buttons (5a) | Setting `Button.interactable = false` applies the button's grey, half-transparent disabled tint and changes the shop's look. To make a button inert, ignore the click in our view and dim it ourselves. |
+| Disabled buttons (5a) | Setting `Button.interactable = false` applies the button's grey, half-transparent disabled tint and changes the shop's look. To make a button inert, ignore the click in the view and dim the button in code. |
 | Book row clicks (10b) | Rows have no raycast target: the open book's art takes the click, and `PhoneBookView.OnPointerClick` finds the row under it (`RowAt`, after the page corners), marks its jack (`JackPicked`) and closes. In tests call `book.OnPointerClick` with a `PointerEventData` at the row's centre; in Play Mode use EventSystem raycasts inside a `Canvas.willRenderCanvases` handler. Pulling a cord's only plug out sends it back to the tray, so a test that replugs must take a tray cord again. **Hover (10b fix 1):** the cord input passes its top hit's position to `PhoneBookView.HoverAt` each frame (no new raycast target); in tests call `input.ProcessTarget(book.OpenBookRect.gameObject, null, rowCentre, false)`. In Play Mode the real pointer clears it every frame (Unity unfocused hides the pointers), so disable `CableInputController` for the captured frame and call `book.HoverAt` directly. |
 | Buying in Play Mode (5a) | Connect a call through `OperatorDesk.OnCircuitClosed` to check fees and pay without plugging cords; the dev panel's "+ $100" and "Reset upgrades" call `GameSession` methods directly. |
 | Art merges (6) | Re-exported images can keep a slice bigger than the new texture, and Unity then drops the sprite with no console message. Compare PNG sizes (`sips -g pixelWidth -g pixelHeight`) with the `.meta` rects, or load the path with `AssetDatabase.LoadAssetAtPath<Sprite>` and check it isn't null. |
-| Dynamic TMP fonts (merge; **historical since 10d**) | **Since Step 10d nothing in the game uses the two dynamic fonts** (`StaticFontTests` guards it): every text in Sergei's fonts uses `… SDF Static`, which hold the 95 printable ASCII characters and the TTFs' kerning pairs (1695 for Della Respira, 98 for Boecklins). Play and test runs no longer touch the font files. A new text in these fonts takes the Static asset; a character outside printable ASCII needs a regenerated Static atlas (same TTF, 90 pt, padding 9, SDFAA, 1024×1024, **with font features**, or the kerning is lost and the text spaces out). The dynamic files stay in the repo, unused. What follows is the pre-10d history. Test and Play runs fill glyphs and kerning pairs into Sergei's dynamic font assets (`Boecklins Universe SDF.asset`, `Della Respira SDF.asset`) and change `_ScaleRatioA`/`_ScaleRatioC` in the two `SDF Static` materials, in memory; the next save (Ctrl+S, a scene save, `AssetDatabase.SaveAssets`) writes them out: thousands of changed lines. No TMP setting prevents it ("Clear Dynamic Data On Build" is already on for both fonts; it clears only at build time and when the editor quits). Discard them with `git checkout -- <file>` like `TimeManager.asset`, and mention it; **never commit them** (team rule since the 2026-10-20 cleanup). After a Play Mode check, `EditorUtility.ClearDirty` on the atlas textures and static materials stops a later save writing them. **Never force-reimport a dynamic font or its atlas, and never `ClearDirty` only the atlas** (2026-10-20): that left the in-memory glyph table pointing at blank atlas areas, and the menu and shop text rendered with letters missing until the orchestrator reset them. To tidy up after a run, discard the files with `git checkout --` and call `TMP_FontAsset.ClearFontAssetData(true)` on each dynamic font, then `EditorUtility.ClearDirty` on the font, its atlas and its material; the committed files are empty (1×1 atlas) and refill as text is drawn. |
+| Dynamic TMP fonts (merge; **historical since 10d**) | **Since Step 10d nothing in the game uses the two dynamic fonts** (`StaticFontTests` guards it): every text in the two display fonts uses `… SDF Static`, which hold the 95 printable ASCII characters and the TTFs' kerning pairs (1695 for Della Respira, 98 for Boecklins). Play and test runs no longer touch the font files. A new text in these fonts takes the Static asset; a character outside printable ASCII needs a regenerated Static atlas (same TTF, 90 pt, padding 9, SDFAA, 1024×1024, **with font features**, or the kerning is lost and the text spaces out). The dynamic files stay in the repo, unused. What follows is the pre-10d history. Test and Play runs fill glyphs and kerning pairs into the dynamic font assets (`Boecklins Universe SDF.asset`, `Della Respira SDF.asset`) and change `_ScaleRatioA`/`_ScaleRatioC` in the two `SDF Static` materials, in memory; the next save (Ctrl+S, a scene save, `AssetDatabase.SaveAssets`) writes them out: thousands of changed lines. No TMP setting prevents it ("Clear Dynamic Data On Build" is already on for both fonts; it clears only at build time and when the editor quits). Discard them with `git checkout -- <file>` like `TimeManager.asset`, and mention it; **never commit them** (team rule since the 2026-10-20 cleanup). After a Play Mode check, `EditorUtility.ClearDirty` on the atlas textures and static materials stops a later save writing them. **Never force-reimport a dynamic font or its atlas, and never `ClearDirty` only the atlas** (2026-10-20): that left the in-memory glyph table pointing at blank atlas areas, and the menu and shop text rendered with letters missing until the orchestrator reset them. To tidy up after a run, discard the files with `git checkout --` and call `TMP_FontAsset.ClearFontAssetData(true)` on each dynamic font, then `EditorUtility.ClearDirty` on the font, its atlas and its material; the committed files are empty (1×1 atlas) and refill as text is drawn. |
 | Capturing a blink phase (10b fix 1) | The jack lamps blink on `Time.unscaledTime`. To screenshot a blink's high or low point, step frames from an `EditorApplication.update` callback that checks `SocketGraphic.LampGraphic.CurrentAlpha` after each `Step()` and removes itself once the alpha passes the threshold; Play Mode stays paused, so the capture shows that frame. With Unity in the background the editor updates about once a second, so allow a minute. **Stepped frames advance `Time.unscaledTime` only a few hundredths of a second each** (10b fix 2), so a timed effect such as the 0.8 s hover flare lasts dozens of steps: step until `IsFlaring` is false before a capture that shouldn't show it. To show the flare, disable `CableInputController`, call `ProcessTarget(card, null, pos, false)` and `CallerJackLights.Refresh()`, then capture without stepping. |
 | Driving a held cord and waiting on steps (10b fix 3) | **Disabling `CableInputController` forgets the cord in hand** (`OnDisable` clears it): re-enable it before `ProcessTarget` on a jack, and `OnEnable` finds the held cord again. To wait for a stepper without polling, let its last callback write a marker file in the scratchpad (`System.IO.File.WriteAllText`) and wait in Bash with `until [ -f <file> ]; do sleep 1; done` (a bare `sleep` is blocked). Deleting the lead's save for a New Game run can be refused by the permission check: keep a copy in SessionState **and** a scratchpad file first, and say so in the call. |
 | Tutorial arrow placement (10b fix 3) | `TutorialSpotlight.PlaceArrow` picks its target and direction from where the hint and holes are **going** (`goals`, the hint's goal position), never from their sliding positions, and then rides on the sliding hole. Deciding from sliding values made a jack's diagonal arrow flip up and down for about two seconds, because the hint ends level with the jack and their height difference crossed zero while both slid. `TutorialSpotlightTests.EveryStepsArrowKeepsItsSideAndGlidesStraightToItsPlace` (pulse set to 0) catches any return of it. |
@@ -122,13 +122,13 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Saves in tests (9a) | EditMode tests run `GameInstaller.Start`, so anything that reads or writes PlayerPrefs there touches the lead's real save. `GameInstaller` opens the save only when `Application.isPlaying`; `SaveIsolationTests` guards it. Play Mode checks write `operator.save` and `operator.save.backup`: delete both at the end. |
 | Missing JSON fields (5c) | `JsonUtility.FromJson` keeps field initializers for fields the file leaves out, also inside nested objects in arrays. Use a marker initializer (NaN, or a named `Unset` constant) to tell "missing" from 0. |
 | Web cursor checks (9b fix) | To see what Unity sends to the page, serve a patched framework through CDP `Fetch` (for example, log every `_JS_Cursor_SetShow`), and watch the canvas `style` with a MutationObserver. Imitate itch's iframe with a host page on a second port. Restart `http.server` after every build, because the build deletes and recreates `Builds/Web`. |
-| Real-file tests check rules, not numbers (test and font fix) | The designer balances `Economy.json`, `Calls.json` and `Book.json` at any time (lead, 2026-10-19). A test that reads the real files checks a rule (the file loads with no problems, chains grow, pools fit their boards, every call's jacks and caller are in the book, services come first) and reads every expected value from the loaded file: never a count, size, id, name or price. Mechanics that need a certain shape (several book spreads, a given cord count) build their own sample data. |
+| Real-file tests check rules, not numbers (test and font fix) | `Economy.json`, `Calls.json` and `Book.json` are rebalanced at any time (lead, 2026-10-19). A test that reads the real files checks a rule (the file loads with no problems, chains grow, pools fit their boards, every call's jacks and caller are in the book, services come first) and reads every expected value from the loaded file: never a count, size, id, name or price. Mechanics that need a certain shape (several book spreads, a given cord count) build their own sample data. |
 | Web builds (9b) | Run `Tools/Switchboard/Build Web` through `EditorApplication.delayCall` plus `EditorApplication.ExecuteMenuItem` from `execute_code`, so the MCP call returns at once; then watch `~/Library/Logs/Unity/Editor.log` for the "Build Web:" line. With Unity in the background the delayCall can start late. The first build switches the editor to Web (about 5 min of reimport); the editor stays on Web. Every build rewrites `Assets/Settings/UniversalRP.asset`, `Assets/UniversalRenderPipelineGlobalSettings.asset`, the two dynamic fonts and `preloadedAssets` in `ProjectSettings.asset`; since the 2026-10-20 cleanup `WebBuild` puts them (and `TimeManager.asset`) back itself (`WebBuild.RestoredFiles`). Still check `git status` after a build (`Docs/WebBuild.md`). |
 | Checking a Web build (9b) | No Chrome extension was connected in 9b; on 2026-10-20 it was connected, but its Chrome couldn't reach the agent's `http.server` (the browser's offline page for 127.0.0.1 and localhost). So drive headless Chrome (`--headless=new`, `--remote-debugging-port`, a throwaway `--user-data-dir`, SwiftShader if WebGL fails) with a dependency-free Node script over the DevTools protocol (Node 26 has `WebSocket`). Serve `Builds/Web` with `python3 -m http.server`. Call `Emulation.setDeviceMetricsOverride` in every CDP session (the real headless viewport is 1280×633). Clear `localStorage` from a same-origin static page, because reloading the running game saves again through `pagehide`. |
 
 ## 5. Definition of done (every step)
-- [ ] The project compiles. The console has no errors and no new warnings from our code.
-- [ ] All EditMode tests pass: the team's existing tests plus new tests for every new rule.
+- [ ] The project compiles. The console has no errors and no new warnings from the project's code.
+- [ ] All EditMode tests pass: the existing tests plus new tests for every new rule.
 - [ ] A 10-second Play Mode smoke test in `Final.unity` shows no errors or exceptions. The screenshot is saved to `Temp/Captures/step-NN.png`.
 - [ ] Every changed scene and prefab is saved, with no missing references.
 - [ ] `Final.unity` plays directly and from `MainMenu` (Start), and nothing in `Final` changed beyond what the brief needs.
@@ -163,7 +163,7 @@ Follow-ups: <ideas, debts, questions>
 
 ## 8. Open items
 
-Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs anyone's approval. These are known issues and to-dos a step can pick up; the step that fixes one removes it.
+Since D48 (lead, 2026-10-18) the project is one shared work, so nothing here needs anyone's approval. These are known issues and to-dos a step can pick up; the step that fixes one removes it.
 
 | Item | Notes | Planned |
 |---|---|---|
@@ -173,12 +173,11 @@ Since D48 (lead, 2026-10-18) there is no ownership split, so nothing here needs 
 | A–Z tabs are hidden | `OpenBook/LetterTabs` is inactive in `PhoneBook.prefab` (lead, 2026-10-18); the code, objects and tests stay. `Tools/Switchboard/Update Phone Book Tabs` rebuilds them active, so untick them again after running it. | |
 | Loose scene objects | `SwitchboardCanvas` and `EventSystem` are loose in `Final.unity`; making them prefabs would keep scene merges small. | optional |
 | Sound effects | Ring, alarm, coins, paid, fine, hang-up: find them or generate them. Planned in detail as S1–S16 (Step 11 overview): Kenney packs and ElevenLabs. | 11a |
-| Art imports | Mia has no Unity, so her re-exports keep the old slices: `caller-04`/`05` (5b) and `caller-06`/`07`/`08` (6) came back at 190×190 with 191×191 slices, and Unity dropped them silently (all fixed to 190×190 in the `.meta`). After every art merge, compare each changed PNG's size with its `.meta` sprite rect. `Assets/Sprites/board/caller.png` (229×190, slice 190×191) has no sprite for the same reason; nothing uses it yet. `3ca8bc9` (9b fix): `caller-02` came back at 190×190 with a 191-high slice (fixed to 190×190). `police.png` is 191×191 with a 190×186 slice that cuts off the top 5 rows; full size or not is for the lead or Mia. | check after art merges |
-| Closed caller-slot covers (6) | Closed slots are hidden since Sergei's `041fb90` (Step 6's dark discs are gone). A cover-plate drawing from Mia could show them as closed. | when art exists |
+| Art imports | Art re-exported outside Unity keeps the old slices: `caller-04`/`05` (5b) and `caller-06`/`07`/`08` (6) came back at 190×190 with 191×191 slices, and Unity dropped them silently (all fixed to 190×190 in the `.meta`). After every art merge, compare each changed PNG's size with its `.meta` sprite rect. `Assets/Sprites/board/caller.png` (229×190, slice 190×191) has no sprite for the same reason; nothing uses it yet. `3ca8bc9` (9b fix): `caller-02` came back at 190×190 with a 191-high slice (fixed to 190×190). `police.png` is 191×191 with a 190×186 slice that cuts off the top 5 rows; full size or not is for the lead. | check after art merges |
+| Closed caller-slot covers (6) | Closed slots are hidden since `041fb90` (Step 6's dark discs are gone). A cover-plate drawing could show them as closed. | when art exists |
 | Unused random helpers (7) | `IRandom`, `SeededRandom`, `RandomExtensions` and `FloatRange` in `Domain/Common` have no users since the spawner went. Delete them, or keep `IRandom` if a later step needs randomness. | cleanup, any step |
-| "New order!" stamp over the emergency badge (7) | While a call rings, the stamp hides half the EMERGENCY badge and most of the countdown ring. This predates Step 7. | 11c (V13) |
 | Menu leftovers (9a fix) | The Options and Credits "Go back" buttons keep the old 24/20 label sizes (big, slightly low). The menu package's `Music_randomizer` (in `StartMenu.prefab` and `Music_randomizer.prefab`) points at two tracks never committed (`a84ac8ff…`, `e974b80e…`, since `3522d9a`), so it plays nothing; in the Web build it is the likely source of one "Trying to get length of sound which is not loaded yet" console line (9b; still there, as a plain log line, in the 2026-10-20 build with the new loading cover). | `Music_randomizer` in 11b (S16); the labels in 12 |
-| Pointer on external displays (9b) | The game draws its own hand again (lead, 2026-10-19), and `SystemPointer` hides the system pointer: only on a change, with a transparent 1×1 image in browsers (`SystemPointer.jslib`, which also re-hides it if Unity rewrites the canvas cursor while starting up). Sergei's PNG system-pointer hands (`d79421d`) were set aside because a system pointer doesn't shrink with the window. **It depends on the monitor:** on the MacBook's built-in screen every version tried was steady in Chrome and the editor. On the lead's external display (120–140 Hz), Chrome flickers the pointer by itself, and the editor loses custom pointers. Safari is fine. Not fixed yet: when the mouse leaves itch's frame, the drawn hand stays at the frame's edge (fix pass 1 had a rule for this, since discarded). | check other machines in 12 |
+| Pointer on external displays (9b) | The game draws its own hand again (lead, 2026-10-19), and `SystemPointer` hides the system pointer: only on a change, with a transparent 1×1 image in browsers (`SystemPointer.jslib`, which also re-hides it if Unity rewrites the canvas cursor while starting up). PNG system-pointer hands (`d79421d`) were set aside because a system pointer doesn't shrink with the window. **It depends on the monitor:** on the MacBook's built-in screen every version tried was steady in Chrome and the editor. On the lead's external display (120–140 Hz), Chrome flickers the pointer by itself, and the editor loses custom pointers. Safari is fine. Not fixed yet: when the mouse leaves itch's frame, the drawn hand stays at the frame's edge (fix pass 1 had a rule for this, since discarded). | check other machines in 12 |
 | `SlowGuidePulse` material in EditMode tests | The guide's hidden book-glow material is freed only in `OnDestroy`, which EditMode tests don't run, so each test run leaves 2 materials in editor memory. Free it in `OnDisable` too, or in the test teardown. | cleanup, any step |
 | Web build leftovers (9b) | Done in the 2026-10-20 cleanup: `WebBuild` saves, snapshots the URP asset, the URP global settings, the two dynamic fonts and `TimeManager.asset`, builds, and writes back whatever changed (in a `finally`), then puts `preloadedAssets` back. **Confirmed by the Step 10 build (2026-10-20, itch #2168670): `git status` was clean afterwards.** **Gap fixed (2026-10-21):** `WebBuild` now snapshots the two dynamic fonts and the two `SDF Static` materials from disk *before* its save, restores them, and empties the fonts in memory afterwards; the next real build should confirm `git status` stays clean. **Since Step 10d the font part is a safety net only:** nothing in the game uses the dynamic fonts and the Static materials already hold TMP's own `_ScaleRatio` values, so a build has nothing font-related to restore; the snapshot code and `WebBuildTests` stay, harmless. Still open: a "Build Web (Dev)" menu would put the dev panel in a phone build. | Dev menu in Step 12 |
 
@@ -189,16 +188,16 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | # | Step | Playable result |
 |---|---|---|
 | 1 | First call: take it, patch it, get paid | One call at a time, end to end, with live money |
-| 1b | Connection fee, Sergei's book, layout | Fee on connect; the real phone book shows our people; no overlaps |
+| 1b | Connection fee, the phone book, layout | Fee on connect; the real phone book shows the game's people; no overlaps |
 | 2a | Queue, callbacks, dev panel | Several callers, swapping, callbacks, a dev panel |
 | 2b | Hold and resume | Pulled plugs put calls on hold; restore resumes |
 | 3 | Phone book tabs, 36 people, real cards | Find anyone fast with A–Z tabs; the whole board in use; readable cards in every state |
 | 4 | Emergencies and fines | Timed emergency calls and fair fines |
-| 5a | Economy file, shop, income, secret goal | `Economy.json` drives Sergei's shop; income upgrades; the secret fills as a savings bar |
+| 5a | Economy file, shop, income, secret goal | `Economy.json` drives the shop; income upgrades; the secret fills as a savings bar |
 | 5b | Extra wires and the Notepad | Buy cords and the Notepad (changes to the cord input and the book) |
-| 5c | Calls and pacing into `Economy.json` | The designer tunes the whole economy in one file |
+| 5c | Calls and pacing into `Economy.json` | The whole economy is tuned in one file |
 | 6 | Board growth (built as "7a") | Start on 3×3; buy 4×4, 5×5, 6×6 |
-| 7 | Hand-written calls | The designer's `Calls.json` and call queues replace random calls; 2 slots at the start |
+| 7 | Hand-written calls | Hand-written `Calls.json` and call queues replace random calls; 2 slots at the start |
 | 8 | The new phone book | `Book.json`: name, profession, address, jack; everyone listed from the start |
 | 9a | Saves and touch input | Progress survives a restart; New game; taps work |
 | 9b | First Web build on itch.io | Plays in a browser, and progress survives a reload and a new upload |
@@ -221,12 +220,12 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 **Goal.** The core loop end to end, one call at a time, on the new architecture.
 
 **Playable result.**
-- Press Play in `Game.unity`. The team's board and cords appear unchanged.
+- Press Play in `Game.unity`. The board and cords appear unchanged.
 - A call rings in the top caller slot.
 - You take the call, look up the two jacks in a simple list, and patch them.
 - Money counts up live until the call ends. The cord then returns to the tray and the next call rings.
 
-**Before launch.** Complete the coordination item for Step 1 (§8).
+**Before launch.** Complete the pre-flight (§2).
 
 **Build**
 1. **Assemblies and folders** (Design §4.1):
@@ -308,23 +307,23 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 7. Take the next call and patch a wrong jack on purpose. You see "Wrong number!", the cord bounces back, and no money is paid.
 8. With no call taken, patch any two jacks. The cord bounces back with the blocked sound.
 9. During a call, click one of its plugs. The call ends ("Cut off"), and payment stops at that moment.
-10. Open `Level.unity` on its own and press Play. Sergei's cord sandbox works exactly as before.
+10. Open `Level.unity` on its own and press Play. The cord sandbox works exactly as before.
 
 **Out of scope:** several waiting calls, callbacks, on hold, the real book, emergencies, upgrades, saves, new sounds.
 
 ---
 
-### Step 1b: Connection fee, Sergei's book, layout fixes
+### Step 1b: Connection fee, the phone book, layout fixes
 
-**Goal.** Add the connection fee (D32), show our directory in Sergei's phone book (D30, D31), and fix the overlaps found in the Step 1 playtest.
+**Goal.** Add the connection fee (D32), show the game's directory in the phone book (D30, D31), and fix the overlaps found in the Step 1 playtest.
 
 **Playable result.**
 - A ringing card shows "10¢ + 5¢/s".
 - Connecting it correctly adds the fee at once, with a "+10¢" popup, then money rises per second. The "Paid" stamp includes the fee.
-- Sergei's phone book lists our 12 people with their jacks, in English. Our temporary Directory button and list are gone.
-- The money counter sits above Sergei's upgrade panel, and nothing of ours overlaps his UI.
+- The phone book lists the 12 people with their jacks, in English. The temporary Directory button and list are gone.
+- The money counter sits above the upgrade panel, and nothing on GameUI overlaps the shop UI.
 
-**Before launch.** Tell Sergei that `PhoneBook.json` now holds the game's caller data, with English names. **Recommended effort:** high.
+**Recommended effort:** high. `PhoneBook.json` now holds the game's caller data, with English names.
 
 **Build**
 1. **Fee: domain and content.**
@@ -336,8 +335,8 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 2. **Fee: UI.**
    - The card's rate badge shows fee plus rate.
    - A "+10¢" popup on connection: simple, pooled or reused, fading over about 1 s, near the money counter or the card.
-3. **One people file** (D31). No change to Sergei's code is needed.
-   - Rewrite `Assets/Configs/PhoneBook.json` with our 12 people in English: the names from Step 1, their jacks, and portraits `caller-01`…`caller-12`. Keep his format and add fields:
+3. **One people file** (D31). No change to the book code is needed.
+   - Rewrite `Assets/Configs/PhoneBook.json` with the 12 people in English: the names from Step 1, their jacks, and portraits `caller-01`…`caller-12`. Keep the format and add fields:
      `{ "name": "Ada Moss", "socket": "C3", "portrait": "caller-01", "type": "type.regular", "rate": 0, "fee": 0 }`.
      Keep `contactsPerPage`, and keep the contacts sorted by surname, since the book shows them in file order.
    - `GameConfig` references that `TextAsset` and holds a portrait list (sprite name → `Sprite`).
@@ -349,11 +348,11 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
      - name not empty
    - Add an EditMode test that validates the real file.
    - Delete the Step 1 assets under `Assets/Content/People`, `Assets/Content/Callers` and `PhoneDirectory.asset`, and the `PersonDefinition`, `CallerDefinition`, `PhoneDirectoryDefinition` and `DirectoryEntry` classes. Keep `CallerTypeDefinition` and `GameConfig`. Domain stays on its interfaces.
-   - Sergei's book then shows the same people our calls use, because it reads the same file.
+   - The book then shows the same people the calls use, because it reads the same file.
 
 4. **Layout.**
-   - Remove our `DirectoryListView`, the Directory button and the D-key toggle, from both the prefab and the code.
-   - Move the money counter to the top of the right-hand column, above Sergei's `UpgradeShopPanel`, with no overlap.
+   - Remove `DirectoryListView`, the Directory button and the D-key toggle, from both the prefab and the code.
+   - Move the money counter to the top of the right-hand column, above the `UpgradeShopPanel`, with no overlap.
    - **Replace the ticket with a speech bubble** next to the caller's card in the left caller column, pointing at the portrait.
      - It shows "Florence Abbott" / "wants Ada Moss" while the call is in hand, and "On the line" once connected.
      - It must not cover the board or other slots' cards.
@@ -373,10 +372,10 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 **Playtest script (you)**
 1. Start from `MainMenu`: Play, then Start. You land in the game, and the board, cords and book appear.
 2. A ringing card shows a fee and a rate, e.g. "10¢ + 5¢/s".
-3. Take it and open Sergei's book. It lists our English names with jacks, and both names from the ticket are in it.
+3. Take it and open the book. It lists the English names with jacks, and both names from the ticket are in it.
 4. Patch correctly. Money jumps by the fee with a "+10¢" popup, then rises per second. The stamp at the end includes the fee.
 5. A wrong patch adds no money.
-6. Nothing of ours overlaps the upgrade panel or the book. The money counter sits above the upgrade panel.
+6. Nothing on GameUI overlaps the upgrade panel or the book. The money counter sits above the upgrade panel.
 7. Taking a call shows a speech bubble next to the caller's portrait on the left, with who's calling and who they want.
 
 **Out of scope:** everything in Step 2.
@@ -444,13 +443,13 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 
 **Playable result.**
 - Pull one plug of a connected call: its card shows "On hold" and its earnings freeze.
-- Click empty space: the team's restore snaps the plug back, and the call resumes.
+- Click empty space: the cord code's restore snaps the plug back, and the call resumes.
 - Plug the pulled end into another jack, or send the cord back to the tray: the call is cut off ("Cut off").
 
 **Build**
 - **OnHold (Design 5.1):**
   - `OperatorDesk.OnCircuitOpened` on a bound cord puts its call OnHold (instead of cutting it off). Pay and the duration timer pause.
-  - The same pair closing again resumes the call. This is the team's restore, reported by `CordBridge` as `OnCircuitClosed` on the same pair while the cord is still bound to the on-hold call. It is not judged as a new circuit, and the connection fee is not paid again.
+  - The same pair closing again resumes the call. This is the cord code's restore, reported by `CordBridge` as `OnCircuitClosed` on the same pair while the cord is still bound to the on-hold call. It is not judged as a new circuit, and the connection fee is not paid again.
   - The pulled plug going into another jack: the on-hold call ends as DisconnectedEarly, and the new circuit is judged against the call in hand (or refused if none).
   - The cord going back to the tray: DisconnectedEarly.
 - **Card states:** "On hold" on the card. Stamps "Paid", "Wrong number!" and "Cut off", using only glyphs in the static font atlas (Design 4.3).
@@ -492,28 +491,28 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 - `Tools/Switchboard/Validate Content` reports problems in `PhoneBook.json`; the same checks run as an EditMode test.
 
 **Build**
-- **Book tabs (D34, coordinated change to Sergei's book, approved by the lead 2026-10-18).**
-  - Approved files: `Assets/Scripts/UI/PhoneBookView.cs`, `PhoneBookPageView.cs` and `PhoneBookContactRow.cs` if needed, a new tab component in `Assets/Scripts/UI/` if needed, `Assets/Editor/PhoneBookBuilder.cs`, and `Assets/Prefabs/UI/PhoneBook.prefab`. Nothing else of his.
-  - Match his style exactly (namespace `Switchboard.UI`, uGUI `Text` like his rows, his builder pattern). Keep his public API working: `IsOpen`, `CurrentSpreadIndex`, `NextSpread`, `PreviousSpread`, `Toggle`, `SetOpen`, `ReloadContacts`.
+- **Book tabs (D34, approved by the lead 2026-10-18).**
+  - Approved files: `Assets/Scripts/UI/PhoneBookView.cs`, `PhoneBookPageView.cs` and `PhoneBookContactRow.cs` if needed, a new tab component in `Assets/Scripts/UI/` if needed, `Assets/Editor/PhoneBookBuilder.cs`, and `Assets/Prefabs/UI/PhoneBook.prefab`. Nothing else.
+  - Match the existing style exactly (namespace `Switchboard.UI`, uGUI `Text` like the rows, the builder pattern). Keep the public API working: `IsOpen`, `CurrentSpreadIndex`, `NextSpread`, `PreviousSpread`, `Toggle`, `SetOpen`, `ReloadContacts`.
   - Add a public `ShowLetter(char)` (or similar) and keep the tabs as a thin view over it, so it can be tested and reused.
-  - Tabs sit on the open book's edge, inside his book canvas, so nothing of ours overlaps the book (both are at sorting order 10).
-  - Add the tabs in the prefab through his builder's own code path, or by editing the prefab directly. **Don't run `Update Phone Book Directory`**: it points at a missing `Assets/Settings/PhoneBook.json`. Don't run anything that marks `Level.unity` dirty, and never save it.
+  - Tabs sit on the open book's edge, inside the book canvas, so nothing on GameUI overlaps the book (both are at sorting order 10).
+  - Add the tabs in the prefab through the builder's own code path, or by editing the prefab directly. **Don't run `Update Phone Book Directory`**: it points at a missing `Assets/Settings/PhoneBook.json`. Don't run anything that marks `Level.unity` dirty, and never save it.
   - Keyboard arrows and swipe flipping: only if they're small, using `Pointer.current` / `Keyboard.current`; otherwise list them as follow-ups.
 - **36 people (D35).**
-  - Add 24 people to `Assets/Configs/PhoneBook.json` so every jack A1–F6 is used exactly once. Keep Sergei's format, `contactsPerPage` (6) and the surname sort order. Names follow Design §6.3: 1920s–40s English names, unique surnames, no famous people. Spread surnames across the alphabet so most tabs are live.
-  - Portraits: reuse `caller-01`…`caller-12`, each three times, until Mia draws more. All 36 use `type.regular` with no overrides.
+  - Add 24 people to `Assets/Configs/PhoneBook.json` so every jack A1–F6 is used exactly once. Keep the format, `contactsPerPage` (6) and the surname sort order. Names follow Design §6.3: 1920s–40s English names, unique surnames, no famous people. Spread surnames across the alphabet so most tabs are live.
+  - Portraits: reuse `caller-01`…`caller-12`, each three times, until more are drawn. All 36 use `type.regular` with no overrides.
   - Check that the book shows 3 spreads and the spawner uses the larger pool.
-- **Cards (ours: `CallCardView`, `GameUI.prefab`).**
+- **Cards (`CallCardView`, `GameUI.prefab`).**
   - Restyle every state from Design §5.4 to match the caller panel: waiting (halo, rate and fee badge, "Calling again"), in hand (bubble with names), connected and on hold (cord ring, earnings, "On the line" / "On hold"), ended (stamps "Paid $X", "Wrong number!", "Cut off").
   - Use TextMeshPro and only glyphs in the static atlas. Keep the halo's nested canvas at sorting order 9 (Step 2b), so badges stay readable. Don't add raycast targets except the card portrait.
   - Check readability with screenshots at 1920×1080, 1280×720 and a phone-sized landscape view (e.g. 844×390).
 - **`ContentValidator` (Design §6.3, adapted to D31).**
-  - Content assembly code plus an editor menu item `Tools/Switchboard/Validate Content` (in `Assets/Scripts/Game/Editor/` or another folder of ours; `Assets/Editor/` is Sergei's).
+  - Content assembly code plus an editor menu item `Tools/Switchboard/Validate Content` (in `Assets/Scripts/Game/Editor/` or another game folder, not `Assets/Editor/`).
   - It checks `PhoneBook.json` and the caller types: unique names and surnames, unique person ids, every socket a real jack (A–F × 1–6) used once, every portrait sprite exists, every type id exists, rate and fee ≥ 0, ranges min ≤ max, and each type has enough possible recipients.
   - Reuse the error collection that `PeopleFileLoader` already does instead of duplicating it.
 
 **Tests**
-- `ShowLetter`: jumps to the right spread, ignores letters with no surname, and works on the first and last spread. If it lives in Sergei's assembly, put the test next to his `CableConnectionTests` in `Assets/Tests/Editor/` (approved as part of this change); otherwise in ours.
+- `ShowLetter`: jumps to the right spread, ignores letters with no surname, and works on the first and last spread. If it lives in the cord code's assembly, put the test next to `CableConnectionTests` in `Assets/Tests/Editor/` (approved as part of this change); otherwise in `Assets/Tests/Game/Editor/`.
 - The validator: the real file passes, and broken samples (duplicate socket, unknown jack, missing portrait, unknown type, duplicate surname) are each reported.
 - The spawner and busy rule still behave with 36 people (one test is enough).
 
@@ -557,8 +556,8 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
    - The services go **first**, in this order: Police, Fire Brigade, Doctor. A service entry looks like this, with no portrait, type, rate or fee:
      `{ "name": "Police", "socket": "C4", "tags": ["emergency-service"] }`
    - The people keep their exact format. Don't add a `tags` field to them; a missing `tags` means none.
-   - Keep `contactsPerPage` 6 and the surname order for the people. Sergei's book reads only `name` and `socket` and ignores the other fields. Single-word names are fine for his parser.
-   - The designer edits this file by hand. Keep one entry per line, as now.
+   - Keep `contactsPerPage` 6 and the surname order for the people. The book reads only `name` and `socket` and ignores the other fields. Single-word names are fine for the parser.
+   - This file is edited by hand. Keep one entry per line, as now.
 2. **Content: loader and catalog.**
    - `PeopleFileContact` gets `tags` (a string array). Domain `IPerson.Tags` is filled from it.
    - Services go into the directory (so their jacks connect) but get **no** caller record, so they never ring.
@@ -607,8 +606,8 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 7. **Idle guard (D16).**
    - Add `IdleGuard` in Domain, ticked from `GameSession.Tick` before the spawner. `ReportInput()` resets it. It is idle after `idleTimeoutSeconds`, a new `PacingProfile` field (default 60; set it in `Default.asset`).
    - While idle, types that carry a fine (either fine > 0) neither spawn nor ring as callbacks. Regular calls continue.
-   - The Game layer reports input: any pointer press or pointer move, or any key press, through the new Input System (`Pointer.current`, `Keyboard.current`), with no per-frame allocations. Put it in `GameLoopRunner` or a small component of ours. Don't touch Sergei's input code.
-8. **Cards and feedback (ours: `CallCardView`, `CallQueueView`, `GameUI.prefab`).**
+   - The Game layer reports input: any pointer press or pointer move, or any key press, through the new Input System (`Pointer.current`, `Keyboard.current`), with no per-frame allocations. Put it in `GameLoopRunner` or a small game component. Don't touch the input code.
+8. **Cards and feedback (`CallCardView`, `CallQueueView`, `GameUI.prefab`).**
    - **Emergency card:** the type's badge text ("EMERGENCY") and accent on the card, plus a countdown ring around the portrait. Use a radial-filled `Image`, polled in `LateUpdate` with a change check; it gets more urgent in the last 10 s, through a colour shift or a pulse.
      - The ring shows only for types with a response time, and hides once connected.
      - Not colour alone (Design §5.4): the badge text and the ring carry the meaning.
@@ -629,7 +628,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
     - An "Emergency now" button.
     - "Show times" also shows the response seconds left.
     - "Clear calls" must not fine anyone (it uses `Cleared`).
-11. **Sergei's book: unchanged (D36).** Don't edit `PhoneBookView`. His `ShowLetter` takes the first name whose last word starts with the letter, so with the services first, "P" would jump to Police on spread 1. The tabs are hidden (lead, 2026-10-18), so leave it, and list it as a follow-up for when they're re-shown. The `OpenBook/LetterTabs` object stays inactive. Don't run his builder menus.
+11. **The book: unchanged (D36).** Don't edit `PhoneBookView`. Its `ShowLetter` takes the first name whose last word starts with the letter, so with the services first, "P" would jump to Police on spread 1. The tabs are hidden (lead, 2026-10-18), so leave it, and list it as a follow-up for when they're re-shown. The `OpenBook/LetterTabs` object stays inactive. Don't run the builder menus.
 
 **Tests** (`Switchboard.Domain.Tests`, plus Content tests where they already live)
 - The response timer:
@@ -676,7 +675,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 - type weights by progress and emergencies arriving later in a session (Step 7)
 - upgrades (Step 5)
 - re-showing the A–Z tabs
-- the 5-versus-6 caller window layout (Sergei)
+- the 5-versus-6 caller window layout
 
 ---
 
@@ -685,14 +684,14 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 **Goal.** One playable scene, `Assets/Scenes/Final.unity`, made of prefab instances, so the team can work in parallel without scene merge conflicts. MainMenu → Start lands in it. **Recommended effort:** high.
 
 **Background.**
-- Sergei's first attempt (`1c20569`) pasted standalone, prefab-less copies of our `Game` and `GameUI` into `Level.unity`. Later `GameUI.prefab` changes (Step 4) therefore never reached the scene, and MainMenu still loaded `Game.unity`. It was reverted in `cdc5876`.
+- A first attempt (`1c20569`) pasted standalone, prefab-less copies of `Game` and `GameUI` into `Level.unity`. Later `GameUI.prefab` changes (Step 4) therefore never reached the scene, and MainMenu still loaded `Game.unity`. It was reverted in `cdc5876`.
 - The lead decided (2026-10-18) on one scene built from prefabs, named `Final`: "the scene is shared, prefabs are owned".
 
 **Approved changes** (lead, 2026-10-18):
 - Rename `Assets/Scenes/Level.unity` to `Final.unity`, edit it, and save it.
 - Edit `ProjectSettings/EditorBuildSettings.asset`.
 - Delete `Assets/Scenes/Game.unity`.
-- Nothing else of Sergei's: not his prefabs or scripts, and not `MainMenu.unity`. Never save `MainMenu.unity`.
+- Nothing else: not the board prefabs or scripts, and not `MainMenu.unity`. Never save `MainMenu.unity`.
 
 **Build**
 1. **Rename inside Unity** (`AssetDatabase.MoveAsset`, or `manage_asset` move) so the GUID is kept: `Level.unity` → `Final.unity`.
@@ -702,16 +701,16 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
    - Report what was applied, and drop the noise.
 4. **`GameInstaller` in one scene.**
    - Drop the additive loading and the `levelScene` field.
-   - Find the views (`MoneyCounterView`, `CallQueueView`, and anything else it needs) and the board objects in its own scene (`gameObject.scene`) by component type, through `LevelScene`. Log a clear error if one is missing or appears twice; Sergei's reverted version shows the idea.
-   - No serialized references between `Game.prefab` and `GameUI.prefab`, or between them and Sergei's prefabs, because scene-level override links are exactly what breaks.
+   - Find the views (`MoneyCounterView`, `CallQueueView`, and anything else it needs) and the board objects in its own scene (`gameObject.scene`) by component type, through `LevelScene`. Log a clear error if one is missing or appears twice; the reverted version shows the idea.
+   - No serialized references between `Game.prefab` and `GameUI.prefab`, or between them and the board prefabs, because scene-level override links are exactly what breaks.
    - Keep the name lookups `CallerQueuePanel` and `UpgradeShopPanel/HeaderSlot`.
 5. **`Final.unity`:**
-   - Add a `Game.prefab` instance and a `GameUI.prefab` instance at the root, with no overrides beyond the root's position and name. Move nothing of Sergei's and delete nothing of Sergei's.
+   - Add a `Game.prefab` instance and a `GameUI.prefab` instance at the root, with no overrides beyond the root's position and name. Move or delete nothing of the board.
    - Exactly one camera and one EventSystem, which `Level` already provides.
    - Save it.
 6. **Build list:** `MainMenu` (0), `Final` (1). `Game.unity` is removed from the list and deleted; `SampleScene` stays off the list.
-7. **Loose objects report.** List every root object in `Final` that is not a prefab instance, with a one-line suggestion each. These are Sergei's to turn into prefabs; don't change them.
-8. **Stale references.** Search our code, tests and editor tools for "Level" or "Game.unity" scene-name references and update them. Leave Sergei's code alone, and report anything of his that names a scene.
+7. **Loose objects report.** List every root object in `Final` that is not a prefab instance, with a one-line suggestion each. Turning them into prefabs is a separate task; don't change them.
+8. **Stale references.** Search the game code, tests and editor tools for "Level" or "Game.unity" scene-name references and update them. Leave the board and menu code alone, and report any of it that names a scene.
 
 **Checks**
 - EditMode tests all pass.
@@ -727,20 +726,20 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 1. Open `MainMenu.unity`, press Play, then Start. You land on the board with calls ringing, and there are no errors in the console.
 2. Play through an emergency: the ring, the "EMERGENCY" badge, the fine popup.
 3. Open `Final.unity` directly and press Play: the same game.
-4. In the Hierarchy of `Final`, our objects are two blue prefab entries, `Game` and `GameUI`.
+4. In the Hierarchy of `Final`, the game's objects are two blue prefab entries, `Game` and `GameUI`.
 
-**Out of scope:** turning Sergei's loose objects into prefabs (list them only), Step 5 work, touch input.
+**Out of scope:** turning the loose scene objects into prefabs (list them only), Step 5 work, touch input.
 
 ---
 
 ### Step 5a: Economy file, shop, income upgrades and the secret goal
 
-**Goal.** The designer's `Economy.json` drives a working shop on Sergei's upgrade panel. Income upgrades raise earnings, and the secret upgrade's button fills as a savings bar; buying it shows "To be continued". **Recommended effort:** high.
+**Goal.** `Economy.json` drives a working shop on the upgrade panel. Income upgrades raise earnings, and the secret upgrade's button fills as a savings bar; buying it shows "To be continued". **Recommended effort:** high.
 
 **Playable result.**
 - The right-hand panel's 4 buttons now show real offers, with a name, a one-line description and a price.
   - The top button sells "Better rates" (×1.5, $8.00).
-  - The next 2 buttons keep Sergei's "+" placeholder look and can't be clicked. Wires and Notepad fill them in 5b.
+  - The next 2 buttons keep the "+" placeholder look and can't be clicked. Wires and Notepad fill them in 5b.
   - The bottom button is the secret ("???", $250.00). It fills from the bottom as money is saved.
 - An offer you can't afford is dimmed and can't be clicked.
 - Buying deducts the price; "-$8.00" pops up by the money counter in a neutral ink (not the fine red). The button then shows the next entry in the chain (×2.0 for $20, then ×3.0 for $50). Once the chain is bought out, the button goes back to the placeholder look.
@@ -751,22 +750,22 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 - **D39 and D40:** one hand-edited file, `Assets/Configs/Economy.json`. 5a builds only its `upgrades` section and the types `extra_income` and `secret`. Values set the result, chains follow file order, there's no skipping, and costs are in cents.
 - **D41:** a pinned secret button at the bottom, with 3 rotating buttons above it driven by `ShopShelf`.
 - **D43:** the placeholder prices listed below.
-- **D44:** the button texts and the savings fill live inside Sergei's button prefab, as a coordinated change. The files are listed below.
+- **D44:** the button texts and the savings fill live inside the shop button prefab. The files are listed below.
 - The old plan of `UpgradeDefinition`, levels, `StatModifier` and `UpgradeEffect` is dropped. Don't build it.
 - D15 stays open. The secret's only effect is the "To be continued" panel.
 
-**Approved coordinated changes** (Sergei's files, D44). Only these, and only for the button texts and the fill:
-- `Assets/Scripts/UI/UpgradeSlotView.cs`: new, in his folder and his style (sealed, `[SerializeField] private`, no comments beyond the why).
+**Shop button changes** (D44). Only these, and only for the button texts and the fill:
+- `Assets/Scripts/UI/UpgradeSlotView.cs`: new, in `Assets/Scripts/UI/` and its style (sealed, `[SerializeField] private`, no comments beyond the why).
 - `Assets/Editor/UpgradeShopPanelBuilder.cs`:
   - Its button-creation code builds the new parts.
   - A new menu `Tools/Switchboard/Update Upgrade Shop Buttons` upgrades the existing prefabs in place, like Step 3's `Update Phone Book Tabs`.
 - `Assets/Prefabs/UI/UpgradePlaceholderButton.prefab`. Keep its name; it is nested 4 times in the panel.
 - `Assets/Prefabs/UI/UpgradeShopPanel.prefab`.
-- Keep `HeaderSlot` and its position exactly as they are; our money counter lives there.
-- Don't touch any other file of his, `Final.unity`'s loose objects, or `MainMenu.unity`.
+- Keep `HeaderSlot` and its position exactly as they are; the money counter lives there.
+- Don't touch any other file, `Final.unity`'s loose objects, or `MainMenu.unity`.
 
 **Build**
-1. **`Assets/Configs/Economy.json`** (new; the designer's file). Use one entry per line, readable, in this order:
+1. **`Assets/Configs/Economy.json`** (new; hand-edited). Use one entry per line, readable, in this order:
    ```json
    {
      "upgrades": [
@@ -778,7 +777,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
    }
    ```
    Keep the names short enough for the button. Check them on screen and shorten if needed, but keep the ids. Reference the file from `GameConfig` through a new `economyFile` `TextAsset`, as with `peopleFile`.
-2. **`Docs/EconomyFile.md`** (new): a short guide for the designer, in plain English.
+2. **`Docs/EconomyFile.md`** (new): a short guide, in plain English.
    - Cover the sections, the common fields, each type's fields and whether it is built yet, the chain rule, "values set", and cents.
    - Explain that ids are never renamed once released.
    - Show how to run `Tools/Switchboard/Validate Content`, with an example message.
@@ -808,29 +807,29 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
      - `GoalAffordable` is raised the first time progress reaches 1, checked in `Tick`.
      - `GoalPurchased` is raised on buying the secret. Afterwards `Progress` reads 1.
    - Build all of these in `GameSession` and add them to the tick order where needed, keeping Design 4.4's order (goal check last). No allocations or LINQ per tick.
-5. **Sergei's button: `UpgradeSlotView`** (coordinated, his folder).
+5. **The shop button: `UpgradeSlotView`** (D44, `Assets/Scripts/UI/`).
    - Inside each `UpgradeButton_NN`:
-     - a title label, a description label and a price label (TextMeshPro with LiberationSans SDF, like our money plaque; `raycastTarget` off)
+     - a title label, a description label and a price label (TextMeshPro with LiberationSans SDF, like the money plaque; `raycastTarget` off)
      - a vertical fill `Image` behind the content, hidden unless set (`raycastTarget` off)
      - the existing "+" `PlaceholderIcon`, shown only in the empty state
-   - Public API, small and in his naming style:
+   - Public API, small and in the existing naming style:
      - `Show(title, description, price, bool affordable)`
      - `ShowEmpty()`
      - `SetFill(float)` (0 hides the fill)
      - `SetHighlight(bool)`
-     - `event Action Clicked`, wired to his `Button`
+     - `event Action Clicked`, wired to the `Button`
    - The button stays a raycast target. Nothing new may block it, and nothing outside the button's rect becomes a raycast target.
    - Layout:
      - Keep 4 buttons inside the 236×860 panel, below the untouched `HeaderSlot`.
      - The buttons may grow up to the plaque's width (204) and be re-spaced, as long as everything fits the panel.
      - Text must be readable at a 1280×720 Game view; check with a screenshot.
-   - Colours: match his panel (greens and greys). The price may use the money counter's gold.
-6. **Our `ShopView`** (`Assets/Scripts/Game/Views/`, on `GameUI.prefab`):
+   - Colours: match the panel (greens and greys). The price may use the money counter's gold.
+6. **`ShopView`** (`Assets/Scripts/Game/Views/`, on `GameUI.prefab`):
    - `GameInstaller` finds it with `FindSingle`. `ShopView` finds the `UpgradeSlotView`s by type in the scene: expect exactly 4, ordered top to bottom. Log a clear error otherwise.
    - Binding: slots 1–3 follow `ShopShelf`, and slot 4 is the secret.
    - States:
      - **Affordable:** normal, and a click calls `UpgradeService.TryBuy`.
-     - **Too expensive:** dimmed, and a click does nothing beyond Sergei's button feel. Don't add a fine-style sound.
+     - **Too expensive:** dimmed, and a click does nothing beyond the button's own feel. Don't add a fine-style sound.
      - **Empty:** the placeholder look.
      - **Secret:** `SetFill(progress)`, polled in `LateUpdate` with a change check. Highlighted when affordable; "Owned" after purchase.
    - Affordability changes as money changes: poll the balance with a change check, and allocate nothing per frame.
@@ -913,7 +912,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 
 ### Step 5b: Extra wires and the Notepad (D23, D40, D43, D44)
 
-**Goal.** Two new upgrade types from `Economy.json`, sold on Sergei's shop buttons: `extra_wires` adds cords to his tray while the game runs, and `notepad` lets a tap on a phone book entry note that person's jack on the call in hand. Both need small coordinated changes to Sergei's cord input and book. **Recommended effort:** high.
+**Goal.** Two new upgrade types from `Economy.json`, sold on the shop buttons: `extra_wires` adds cords to the tray while the game runs, and `notepad` lets a tap on a phone book entry note that person's jack on the call in hand. Both need small changes to the cord input and the book. **Recommended effort:** high.
 
 **Playable result.**
 - The shop shows "Better rates" on top, "Extra cord / 4 cords / $5.00" in the second button and "Notepad / ... / $3.00" in the third. The secret is still at the bottom.
@@ -926,7 +925,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 - **Prices (D43):** 4, 5 and 6 cords for $5, $8 and $13. The Notepad costs $3. The game starts with 3 cords, set by a new `GameConfig` field `startingCords` = 3.
 - **`wires` sets the total** (D40). Values in the chain must grow, be above `startingCords`, and be at most 6, which is all the tray holds.
 - **New cords are added while the game runs** by copying an existing cord and its tray slot. `Final.unity` and `CableTray.prefab` don't change.
-- **The three new cord colours** are presentation, so they live in our `GameConfig` (`extraCordColors`) and are passed to Sergei's `AddCable`. Use green, violet and ivory, clearly different from his red, blue and yellow and from the emergency red. Check them in a screenshot.
+- **The three new cord colours** are presentation, so they live in `GameConfig` (`extraCordColors`) and are passed to `AddCable`. Use green, violet and ivory, clearly different from the red, blue and yellow and from the emergency red. Check them in a screenshot.
 - **Notepad scope** (lead, 2026-10-18; **replaced after the merge by D46**: a tap notes the jack on every accepted call still waiting to connect that the person is part of, including duplicates):
   - It notes only the caller or the person wanted on the **call in hand**.
   - A tap on anyone else, or with no call in hand, does nothing: no message, no sound, and the book stays open.
@@ -935,7 +934,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 - **Deleting the `notepad` entry from the file removes the feature.** Nothing in code names its id.
 - **Dev "Reset upgrades"** keeps cords already added (a cord can't be removed safely mid-call) and turns row taps back off. Say so in the report.
 
-**Approved coordinated changes** (Sergei's files, D44; the lead approved exactly these on 2026-10-18):
+**Cord input and book changes** (D44; the lead approved exactly these on 2026-10-18):
 - **`Assets/Scripts/UI/CableInputController.cs`:**
   - New `public CableController AddCable(Color color)`, plus a constant `MaxCables = 6`. It:
     - copies the last cable in its list under the same parent, named `Cable_NN`
@@ -948,7 +947,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
     - The cord preview scales down with the spacing, and the hit area is narrowed so neighbours don't overlap.
     - **With 3 cords the positions and sizes must equal today's** (−270, 0, 270; 252×94.5; preview scale 0.45).
     - Put the spacing maths in a small public static method so an EditMode test can check it.
-  - Nothing else in the file changes. Keep his style.
+  - Nothing else in the file changes. Keep the existing style.
 - **`Assets/Scripts/UI/PhoneBookContactRow.cs`:**
   - A full-row hit area (a transparent `Image` on the row root, assigned in `Configure`, with `raycastTarget` off by default).
   - `SetTappable(bool)`, which turns that raycast on or off.
@@ -960,8 +959,8 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
   - `public bool ContactTapsEnabled { get; set; }`, off by default and passed to both pages
   - Page turns (corners, arrow keys, tabs) stay unchanged.
 - **`Assets/Prefabs/UI/PhoneBook.prefab`:** both `ContactTemplate` rows get the transparent `Image` (`raycastTarget` off), assigned to the row. Edit the prefab directly (`manage_prefabs` or `PrefabUtility.LoadPrefabContents` from `execute_code`). **Don't run `Update Phone Book Tabs` or any phone book menu.** `OpenBook/LetterTabs` must stay inactive; check this in the diff.
-- **`Assets/Editor/PhoneBookBuilder.cs`:** `DirectoryPage` builds the same hit area on `ContactTemplate`, so a future rebuild by Sergei keeps it. Change nothing else, and don't run the menu.
-- Don't touch any other file of his: `CableController`, `StoredCableView`, `CableBuilder`, `CableTrayBuilder`, `CableTray.prefab`, `Final.unity`'s loose objects or `MainMenu.unity`. If one of them turns out to be unavoidable, stop and report the exact change.
+- **`Assets/Editor/PhoneBookBuilder.cs`:** `DirectoryPage` builds the same hit area on `ContactTemplate`, so a future rebuild keeps it. Change nothing else, and don't run the menu.
+- Don't touch any other file: `CableController`, `StoredCableView`, `CableBuilder`, `CableTrayBuilder`, `CableTray.prefab`, `Final.unity`'s loose objects or `MainMenu.unity`. If one of them turns out to be unavoidable, stop and report the exact change.
 
 **Build**
 1. **`Assets/Configs/Economy.json`:** add these entries after `income_3`, one per line, keeping the secret last:
@@ -1013,7 +1012,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
      - Check that the longest names with jacks still fit the bubble, and shrink the jack text slightly if needed.
 6. **Dev panel:** no new buttons. "Reset upgrades" behaves as described in the decisions.
 
-**Tests** (`Switchboard.Domain.Tests`, plus Content tests where they live; Sergei-type tests in `Assets/Tests/Game/Editor/`)
+**Tests** (`Switchboard.Domain.Tests`, plus Content tests where they live; Assembly-CSharp tests in `Assets/Tests/Game/Editor/`)
 - **`StatSheet`:**
   - `Cords` is `StartingCords` with nothing bought.
   - It is the last bought value, set and not stacked (4 then 5 gives 5).
@@ -1032,7 +1031,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
   - `extra_clients` still reports Step 7. Replace the 5a test that used `extra_wires` as the "not ready" example.
   - Each message names the entry and the fix.
 - **Shelf with the real file:** `income_1`, `wires_1`, `notepad`. After the notepad is bought, slot 3 goes empty and slots 1 and 2 don't move.
-- **Sergei-type tests** (`Assets/Tests/Game/Editor/`):
+- **Assembly-CSharp tests** (`Assets/Tests/Game/Editor/`):
   - Tray spacing: 3 slots give today's positions, and 4–6 slots fit the usable width with no overlap.
   - `PhoneBookView` raises `ContactTapped` with the row's name and socket when a row is clicked with taps on.
   - With taps off, the row's hit area isn't a raycast target.
@@ -1057,7 +1056,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 5. Before buying the Notepad: open the book and tap a name. The book closes, as before.
 6. Buy the Notepad. Take a call, open the book and tap the caller's name: their jack appears in the bubble, e.g. "Ada Moss (C3)". Tap the wanted person: their jack appears too. The book stays open.
 7. Tap someone else: nothing happens. Swap to another call and back: the notes are still there.
-8. Known issue (Sergei's code, not changed): tapping a book row while holding a cord drops the cord back in the tray.
+8. Known issue (cord input, not changed): tapping a book row while holding a cord drops the cord back in the tray.
 9. Open `Economy.json`, set `wires_2`'s `wires` to 4, and run `Tools/Switchboard/Validate Content`. You get a plain message about the chain. Undo the change.
 
 **Out of scope:**
@@ -1065,7 +1064,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 - more than 6 cords
 - notes for people not on the call in hand
 - re-showing the A–Z tabs
-- keeping a held cord when a button or row is clicked (Sergei's call)
+- keeping a held cord when a button or row is clicked (a cord-input decision)
 - moving calls and pacing into the file (5c)
 - saving purchases (6)
 - board growth (7)
@@ -1073,7 +1072,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
 
 ### Step 5c: Calls, pacing and starting money into `Economy.json` (D39, D47)
 
-**Goal.** The designer tunes the whole economy in one file. Each call type's money and timing values, the pacing, the starting money and the starting cords move from Unity assets into `Assets/Configs/Economy.json`. The game plays **exactly** as before. Only presentation (card badge and accent) stays in Unity. **Recommended effort:** high.
+**Goal.** The whole economy is tuned in one file. Each call type's money and timing values, the pacing, the starting money and the starting cords move from Unity assets into `Assets/Configs/Economy.json`. The game plays **exactly** as before. Only presentation (card badge and accent) stays in Unity. **Recommended effort:** high.
 
 **Playable result.**
 - Press Play: nothing looks or plays differently. Regular calls ring about every 8 s (the first after 2 s), pay 5–15¢ on connect plus 3–8¢/s for 15–30 s. Emergencies (red badge) still have the 30 s ring, the $2 and $1 fines, and at most one at a time.
@@ -1088,7 +1087,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
   - `PacingProfile.cs`, `Assets/Content/Pacing/Default.asset` and the `Pacing` folder are deleted. The file's pacing uses the domain's existing `PacingSettings`.
 - **Ranges are objects:** `"rateCentsPerSecond": { "min": 3, "max": 8 }`.
 - **Type ids stay `type.regular` and `type.emergency`.** `PhoneBook.json` references them in each contact's `type`, and that shared file doesn't change. (Upgrade ids keep their `a-z0-9_` rule; call ids keep the `type.` style, an accepted difference.)
-- **The display name moves into the file as `name`**, so a designer can add a new call type without any Unity asset. A type with no matching card-style asset gets plain cards, with no message. A card-style asset whose id isn't in the file gets a validator message.
+- **The display name moves into the file as `name`**, so anyone can add a new call type without any Unity asset. A type with no matching card-style asset gets plain cards, with no message. A card-style asset whose id isn't in the file gets a validator message.
 - **Per-contact `rate` and `fee` overrides stay in `PhoneBook.json`**, unchanged.
 
 **The file after this step** (one entry per line; key order as shown; values are today's, from `Regular.asset`, `Emergency.asset`, `Default.asset` and `GameConfig.asset`):
@@ -1104,7 +1103,7 @@ Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 1
   "upgrades": [ ...unchanged... ]
 }
 ```
-The field names are a proposal. Rename one only if it reads clearly better to a designer, and say so in the report.
+The field names are a proposal. Rename one only if it reads clearly better in the file, and say so in the report.
 
 **How it fits together:**
 - **Domain unchanged.** It already reads through `ICallerType`, `IPacingProfile` and `IGameContent`. If a domain change looks necessary, stop and report.
@@ -1114,7 +1113,7 @@ The field names are a proposal. Rename one only if it reads clearly better to a 
   - `GameContent` takes these values from the economy catalog, not from `GameConfig`.
   - `GameConfig.CardStyleOf(typeId)` keeps working from the style assets.
 - **The wires checks** use the file's `startingCords`.
-- **`startingCords` may be 3 to 6.** Sergei's tray has 3 built-in cords, and removing cords isn't supported, so below 3 gets a message and falls back to 3. Above 3, the extra cords should appear at start the same way bought cords do. Check how `CordBridge`/`GameInstaller` sync cords to `StatSheet` (the installer's "scene has N cords" warning must not fire for 4–6). If that doesn't come for free, keep 3–6 valid in the validator, stop short of new wiring, and report.
+- **`startingCords` may be 3 to 6.** The tray has 3 built-in cords, and removing cords isn't supported, so below 3 gets a message and falls back to 3. Above 3, the extra cords should appear at start the same way bought cords do. Check how `CordBridge`/`GameInstaller` sync cords to `StatSheet` (the installer's "scene has N cords" warning must not fire for 4–6). If that doesn't come for free, keep 3–6 valid in the validator, stop short of new wiring, and report.
 - **Missing values must not silently become 0.** `JsonUtility` gives 0/false/null for a missing field (check whether field initializers survive `FromJson`, with a test).
   - Required in each call entry, with a plain message if missing: `id`, `name`, `spawnWeight`, `rateCentsPerSecond`, `feeCents`, `durationSeconds`. A call entry with a problem is left out, like an upgrade.
   - The rest may be left out and mean "off": no response time, no fines, no callbacks, no limit, no tag, and `callbackDelaySeconds` 20–40. `EconomyFile.md` says so.
@@ -1129,7 +1128,7 @@ The field names are a proposal. Rename one only if it reads clearly better to a 
   - `baseIntervalSeconds` at least 0.1, and the other pacing values not negative (as the old asset's `Min`/`Range` attributes did)
   
   The people checks (unknown `type` in `PhoneBook.json`, enough recipients per type) stay in `ContentValidator`, fed the file's types. A message that used to say "GameConfig's caller types" now points at the file.
-- **Sergei's persistent wiring (D45)** in `OperatorDesk`/`CallService` reads call types only through `ICallerType`. The orchestrator checked: `OperatorDesk` touches none of the moving fields. Confirm it for `CallService` and note it in the report.
+- **Persistent wiring (D45)** in `OperatorDesk`/`CallService` reads call types only through `ICallerType`. The orchestrator checked: `OperatorDesk` touches none of the moving fields. Confirm it for `CallService` and note it in the report.
 - **Dev panel** "<type> now" labels use `DisplayName`, which now comes from the file's `name`.
 
 **Prove it plays the same** (the 5c notes):
@@ -1138,13 +1137,13 @@ The field names are a proposal. Rename one only if it reads clearly better to a 
 - Loader tests: the full sample parses; each required field missing gives its message; min > max; a negative fine; a duplicate id; no type with weight; jitter out of range; `startingCords` 2 and 7; a card-style id not in the file; a `PhoneBook.json` type not in the file; a file with no `calls` section (one message, and no calls ring). The wires checks use the file's `startingCords`: with `startingCords` 4, `wires_1` = 4 is reported.
 - `Fakes.cs` keeps working (its fakes implement the domain interfaces), so existing domain tests shouldn't change.
 
-**Files this step may change** (all ours):
+**Files this step may change:**
 - `Assets/Scripts/Content/*`: `EconomyFileData`, `EconomyFileLoader`, `EconomyCatalog`, `GameConfig`, `GameContent`, `CallerTypeDefinition`, `ContentValidator`, `PeopleFileLoader` (only if its signature needs it), plus a new `CallTypeRecord`. Delete `PacingProfile.cs`.
 - `Assets/Scripts/Game/` (`GameInstaller`, `DevPanel`, the validator menu) only as needed.
 - `Assets/Content/` assets, as described above.
 - `Assets/Configs/Economy.json` (keep the upgrades exactly as they are).
 - Tests in `Assets/Tests/Domain/`.
-- `Docs/EconomyFile.md`: a new "Calls", "Pacing" and "Starting money and cords" section each, written for the designer, with examples and the validator's messages. Mark the sections "Yes (5c)" and drop "Until Step 5c...". Explain cents vs. seconds, what each pacing value does in plain words (for example, `loadFactor`: "each waiting call beyond the free cords stretches the gap by this share"), that `spawnWeight` is relative (5 vs 1 means five regular calls for each emergency), and that the per-person `rate`/`fee` in `PhoneBook.json` still override a type's.
+- `Docs/EconomyFile.md`: a new "Calls", "Pacing" and "Starting money and cords" section each, in plain words, with examples and the validator's messages. Mark the sections "Yes (5c)" and drop "Until Step 5c...". Explain cents vs. seconds, what each pacing value does in plain words (for example, `loadFactor`: "each waiting call beyond the free cords stretches the gap by this share"), that `spawnWeight` is relative (5 vs 1 means five regular calls for each emergency), and that the per-person `rate`/`fee` in `PhoneBook.json` still override a type's.
 
 No team-owned file changes. `Final.unity` and the prefabs shouldn't need to change: say so if they do.
 
@@ -1190,12 +1189,12 @@ No team-owned file changes. `Final.unity` and the prefabs shouldn't need to chan
   - The services stay first in `PhoneBook.json`.
   - The starting nine are then Arthur Hollis A1, Mabel Dunmore A2, Mildred Stanhope A3, Lillian Yardley B1, Irene Godfrey B2, Gertrude Rook B3, Bernard Quigley C1, Reginald Underhill C2 and Ada Moss C3.
 - **Pacing curves and the tutorial are Step 7b**, not this step.
-- **No ownership split (D48).** Change the board, lamp, socket, cord-input, caller-panel and phone-book code directly where needed. List every changed file in the report.
+- **One shared project (D48).** Change the board, lamp, socket, cord-input, caller-panel and phone-book code directly where needed. List every changed file in the report.
 
 **The board is controlled from `Economy.json`** (lead, 2026-10-18). Every board value comes from the file, and nothing about sizes is hard-coded:
 - the starting board size and the starting caller slots
 - each upgrade's board size, caller slots, price, name and description
-- how many board upgrades there are: the designer adds or removes `extra_clients` lines, with no code change
+- how many board upgrades there are: `extra_clients` lines can be added or removed with no code change
 - where people and services sit: `PhoneBook.json`, so who joins at which size follows from their jacks
 
 No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests outside test fixtures. The only fixed limit is the physical board in `Final.unity` (6×6 sockets) and the 6 caller slots in the scene. The game reads those from the scene; the validator uses the known 6×6 board (`ContentValidator.BoardJacks`) and 6 slots, and reports a size beyond them.
@@ -1209,9 +1208,9 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 { "id": "board_2", "type": "extra_clients", "name": "Bigger board", "description": "5x5, 5 callers", "costCents": 2500, "boardSize": { "cols": 5, "rows": 5 }, "clientSlots": 5 },
 { "id": "board_3", "type": "extra_clients", "name": "Bigger board", "description": "6x6, 6 callers", "costCents": 6000, "boardSize": { "cols": 6, "rows": 6 }, "clientSlots": 6 },
 ```
-- **Prices** are placeholders ($10, $25, $60) for the designer to tune.
+- **Prices** are placeholders ($10, $25, $60) to tune.
 - **Use "x", not "×"** in texts, unless the glyph is confirmed in the static LiberationSans atlas.
-- **Where the entries go:** after `notepad`, before `secret`. Since the shop shows the first 3 chains in file order, "Bigger board" appears once a chain sells out: the $3 Notepad, usually. The designer can reorder the lines.
+- **Where the entries go:** after `notepad`, before `secret`. Since the shop shows the first 3 chains in file order, "Bigger board" appears once a chain sells out: the $3 Notepad, usually. The lines can be reordered.
 - **`cols` and `rows`:** columns are 1–6 and rows are A–F. The open area is always the top-left rectangle: rows A to the `rows`-th letter, and columns 1 to `cols`.
 - **Validator rules,** in plain words like the others:
   - `startingBoard` and each `boardSize` are 1–6 per side. Along the chain, neither side shrinks and at least one grows. The first entry is bigger than `startingBoard`.
@@ -1271,14 +1270,14 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 
 **Out of scope:**
 - pacing curves and the tutorial (7b)
-- cover-plate art (only if Mia draws it)
+- cover-plate art (only if it gets drawn)
 - animations and sounds for opening jacks (8)
 - saving (6)
 - balancing prices (10)
 
 ### Step 7: Hand-written calls and call queues (D51, D52, D54)
 
-**Goal.** The designer writes every call by hand in a new `Assets/Configs/Calls.json`, and `Economy.json` decides which calls play, in which order, at each board size. Random calls, call types, callbacks, the idle guard, the call timer and the Notepad go away. The phone book stays as it is (`PhoneBook.json`) until Step 8. Built before saves and the Web build (Step 9) (lead, 2026-10-18). **Recommended effort:** high.
+**Goal.** Every call is written by hand in a new `Assets/Configs/Calls.json`, and `Economy.json` decides which calls play, in which order, at each board size. Random calls, call types, callbacks, the idle guard, the call timer and the Notepad go away. The phone book stays as it is (`PhoneBook.json`) until Step 8. Built before saves and the Web build (Step 9) (lead, 2026-10-18). **Recommended effort:** high.
 
 **Playable result.**
 - **Start.** Press Play: the 3×3 board from Step 6 and **2** caller slots, both filled at once with the first two calls of `startPool`.
@@ -1294,8 +1293,8 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
   - the queue switches to that upgrade's `stagePool`, starting from its first call
   - calls already on cards finish normally
 
-**Decisions** (designer and lead, 2026-10-18; D51, D52, D54):
-- **`Calls.json`** (new, the designer's file, one call per line):
+**Decisions** (lead, 2026-10-18; D51, D52, D54):
+- **`Calls.json`** (new, hand-written, one call per line):
   ```json
   {
     "calls": [
@@ -1304,7 +1303,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
     ]
   }
   ```
-  - The field names adapt the designer's draft to the file style used in `Economy.json`:
+  - The field names adapt the first draft to the file style used in `Economy.json`:
     - `fullname` → `name`
     - `duration` → `durationSeconds`
     - `connectIncome` → `connectCents`
@@ -1312,15 +1311,15 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
     - `responceTime` → `responseTimeSeconds`
     - `penaltyCents` stays as it is
   - **All money is in cents.** `centsPerSecond` may have decimals (the wallet carries fractions); `connectCents` and `penaltyCents` are whole cents.
-  - **Jacks are labels** such as `"C3"`: a row letter A–F, then a column 1–6, as on the board and in the book (designer: "from 1 and a").
+  - **Jacks are labels** such as `"C3"`: a row letter A–F, then a column 1–6, as on the board and in the book (the draft: "from 1 and a").
   - **`icon`** is a portrait sprite name, as `portrait` is in `PhoneBook.json` today (`caller-01` … `caller-12`, `police`).
   - **`emergency`** defaults to false. `responseTimeSeconds` and `penaltyCents` are used only for emergencies.
 - **`Economy.json`:**
   - **New `startPool`:** a list of call ids, the queue for a new game.
   - **Each `extra_clients` entry gains a `stagePool`:** the queue once that entry is bought. Values set the result (D40): the queue is the last bought `extra_clients`'s `stagePool`, or `startPool`.
-  - **`startingClientSlots` becomes 2** (lead), and the board upgrades' `clientSlots` become 3, 4 and 5 (placeholders for the designer).
+  - **`startingClientSlots` becomes 2** (lead), and the board upgrades' `clientSlots` become 3, 4 and 5 (placeholders).
   - **Removed:** the `calls` section (call types), the `pacing` section and the `notepad` entry. If an old file still has them, the validator says plainly that they're no longer used.
-  - **Names:** camelCase like the rest of the file: `startPool`, `stagePool` (the designer wrote `start_pool`, `stage_pool`; tell him in `EconomyFile.md`).
+  - **Names:** camelCase like the rest of the file: `startPool`, `stagePool` (the draft had `start_pool`, `stage_pool`; say so in `EconomyFile.md`).
 - **The queue (D52):**
   - **Slots.** Each open caller slot holds one call. Whenever a slot is free and the queue has a call, the next call appears in it **at once**: at the start, when a call ends, and when an upgrade opens a slot. There is no spawn timer.
   - **Order.** Calls play in pool order and loop back to the first. Success or wrong number doesn't change the order.
@@ -1379,7 +1378,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 - **Across files:** every jack used by a call has someone listed on it in the phone book, or the player can't find it. Until Step 8 that's `PhoneBook.json`.
 - **Missing values must not silently become 0** (the 5c lesson, Plan §4).
 
-**Shipped content** (placeholders the designer replaces):
+**Shipped content** (placeholders, to be replaced):
 - Write `Calls.json` from today's people and jacks in `PhoneBook.json`, with portraits as there.
 - `startPool`: about 8 calls among the starting nine (A1–C3), no emergencies.
 - `board_1`'s `stagePool`: about 10 calls on 4×4, 2 of them emergencies to the Doctor (D4).
@@ -1405,7 +1404,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
   - `ResetUpgrades` returns to `startPool`
 - **Emergency:** the countdown; a miss fines `penaltyCents`, not multiplied; no fine for a wrong patch or a cut-off.
 - **Connection rule:** the call's own jacks, in either order.
-- **Cleanup:** remove the tests of deleted systems and list them in the report. Adapt Sergei's `MergedSystemsTests`, `FirstOrderGuideTests` and `CallAudioTests` to hand-written calls without weakening them.
+- **Cleanup:** remove the tests of deleted systems and list them in the report. Adapt `MergedSystemsTests`, `FirstOrderGuideTests` and `CallAudioTests` to hand-written calls without weakening them.
 
 **Files this step may change:**
 - `Assets/Scripts/Domain/**`, `Assets/Scripts/Content/**`
@@ -1414,7 +1413,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 - `Assets/Configs/Calls.json` (new) and `Economy.json`
 - `GameConfig.asset` and the two card-style assets
 - tests
-- `Docs/EconomyFile.md`: a "Calls.json" section and a "Call queues" section for the designer, with examples and the validator's messages. Remove the "Calls", "Pacing" and "Notepad" sections. Explain cents vs. seconds and jack labels, and that the book is only for looking things up.
+- `Docs/EconomyFile.md`: a "Calls.json" section and a "Call queues" section, with examples and the validator's messages. Remove the "Calls", "Pacing" and "Notepad" sections. Explain cents vs. seconds and jack labels, and that the book is only for looking things up.
 
 `PhoneBook.json` doesn't change. `Final.unity` and the prefabs shouldn't need to; say so if they do.
 
@@ -1434,7 +1433,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 - the tutorial (10)
 - sounds (11)
 - balancing (13)
-- writing the real call list (the designer)
+- writing the real call list
 
 ### Step 8: The new phone book (D53)
 
@@ -1445,7 +1444,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 - **Each row** shows name, profession, address and, last, the jack.
 - **Looking up a call** ("Connect me with Ada Moss") still works: find her by surname, read her jack, patch it.
 
-**Decisions** (designer and lead, 2026-10-18; D53):
+**Decisions** (lead, 2026-10-18; D53):
 - **Format** (one entry per line):
   ```json
   {
@@ -1456,10 +1455,10 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
     ]
   }
   ```
-  - `contactsPerPage` is optional (default 6); the designer's draft left it out.
-  - `jack` is the column the designer forgot ("let's do it last column"), a label as in `Calls.json`.
+  - `contactsPerPage` is optional (default 6); the first draft left it out.
+  - `jack` is the column the first draft left for later ("let's do it last column"), a label as in `Calls.json`.
   - Several entries may share a jack, like a household line ("BELLAMY, Frank" and "BELLAMY, Miss Rose" at the same address).
-- **Order:** the book sorts itself. Services first, in file order; then everyone else by `name`, alphabetically and ignoring case. The designer writes "SURNAME, First", so this is the real-directory order of D50. The file's order doesn't matter.
+- **Order:** the book sorts itself. Services first, in file order; then everyone else by `name`, alphabetically and ignoring case. The file writes "SURNAME, First", so this is the real-directory order of D50. The file's order doesn't matter.
 - **All entries show from the start.** Remove Step 6's book filter: `SetVisibleSockets` and `OpenBoardLink`'s book part. The board itself still grows.
 - **Letter lookup:** `HasLetter`/`ShowLetter` go by the first letter of `name`. The A–Z tabs stay hidden.
 - **Text in English.** Check that every glyph the shipped file uses is in the book's fonts.
@@ -1470,7 +1469,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 - `GameConfig` references `Book.json` instead.
 - **Layout:**
   - Show four columns, Name, Profession, Address, Jack, readable at 1920×1080 and at 1280×720 (Plan §4, Game view size).
-  - If four don't fit on Sergei's page, put profession and address on a smaller second line under the name, and keep the jack as the last column.
+  - If four don't fit on the page, put profession and address on a smaller second line under the name, and keep the jack as the last column.
   - Keep page turning, the hand cursor and the guide's book glow working.
   - Drop the rows' unused tap image (`PhoneBookContactRow.tapArea` in `PhoneBook.prefab`), left over from the Notepad (D54).
   - Include screenshots of both sizes.
@@ -1481,7 +1480,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
   - duplicate names
   - every call's `from` and `to` jack in `Calls.json` has at least one book entry (moved here from Step 7's interim check, `ContentValidator.ValidateCallJacks`)
   - `profession` and `address` may be empty
-- **Shipped `Book.json`:** convert today's 36 contacts with their jacks. Write names as "SURNAME, First" and keep the three services. Professions and addresses are English placeholders in period style, families sharing an address now and then. The designer replaces them.
+- **Shipped `Book.json`:** convert today's 36 contacts with their jacks. Write names as "SURNAME, First" and keep the three services. Professions and addresses are English placeholders in period style, families sharing an address now and then. They are placeholders to be replaced.
 - **Docs:** a "Book.json" section in `Docs/EconomyFile.md` (or a sibling `Docs/BookFile.md` linked from it). The orchestrator updates the CLAUDE.md lines that name `PhoneBook.json`.
 
 **Tests:**
@@ -1505,7 +1504,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 - portraits in the book
 - the A–Z tabs (stay hidden)
 - saves (9)
-- the real book content (the designer)
+- the real book content
 
 ### Step 9a: Saves and touch input (D25, D28, D55)
 
@@ -1524,11 +1523,11 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
   - the bought upgrade ids, the secret among them
   - the queue position (below)
   - career stats in their own `career` section, apart from the run data (5.10): lifetime earned cents, calls connected, fines paid in cents, seconds played
-- **Not saved:** live calls, cords and plugs, the call in hand, the shop shelf and the stats (both rebuilt from the ids). Each session starts with an empty board (D25). There are no settings or tutorial flags yet: Sergei's volume patch keeps its own PlayerPrefs key until 9b, and the tutorial is Step 10. `JsonUtility` keeps defaults for fields a file leaves out, so later steps can add fields without a migration.
+- **Not saved:** live calls, cords and plugs, the call in hand, the shop shelf and the stats (both rebuilt from the ids). Each session starts with an empty board (D25). There are no settings or tutorial flags yet: the volume patch keeps its own PlayerPrefs key until 9b, and the tutorial is Step 10. `JsonUtility` keeps defaults for fields a file leaves out, so later steps can add fields without a migration.
 - **Queue resume (D55): replay unfinished calls.**
   - The saved position is the pool index of the oldest live call (in arrival order) that came from the current pool. With no such call, it is the queue's own `Position`.
   - On load the slots fill from there. A call finished out of order may play once more; that's accepted.
-  - A position outside the current pool (the designer shortened it) starts the pool at 0.
+  - A position outside the current pool (the pool was shortened) starts the pool at 0.
   - Live calls from an older pool (still on cards after a board purchase) don't count.
 - **New game (D55):**
   - A "New game" button in the main menu, under Continue and in the same style, visible only while a save exists.
@@ -1564,7 +1563,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 
     Capture only on these occasions, never per frame.
   - `CordBridge.EnsureCords` and `OpenBoardLink` already read `StatSheet`, so restored wires and board sizes should need no extra code. Check it.
-  - **The New game button:** a Game component in `MainMenu.unity`. Sergei's `Menu` is in the `MenuTemplates` asmdef, which can't see the Game layer, so the button's logic is ours and is wired in the scene. Check that the menu font has every glyph of the new texts.
+  - **The New game button:** a Game component in `MainMenu.unity`. The menu's `Menu` is in the `MenuTemplates` asmdef, which can't see the Game layer, so the button's logic is in the Game layer and is wired in the scene. Check that the menu font has every glyph of the new texts.
 - **Touch** (D28, Plan §8):
   - `CableInputController.Update` reads `Pointer.current` (`position`, `press.wasPressedThisFrame`) instead of `Mouse.current`. A tap is a click; the click-to-pick, click-to-plug model stays. On a `Touchscreen`, hide the hand cursor and hover-only effects while no finger is down.
   - Do the same in `VolumeCablePanel` and `MenuHandCursor` (the menu's volume patch).
@@ -1575,7 +1574,7 @@ No constant such as 3×3, "rows A–C" or "3 slots" may appear in code or tests 
 **Files the step may change:**
 - `GameSession`, `Wallet`, `UpgradeService`, `CallQueue`, `GoalProgress`
 - `GameInstaller`, `DevPanel`, `Game.prefab`
-- `MainMenu.unity`, Sergei's `Menu.cs`, `CableInputController`, `VolumeCablePanel`, `MenuHandCursor`
+- `MainMenu.unity`, `Menu.cs`, `CableInputController`, `VolumeCablePanel`, `MenuHandCursor`
 - new files under `Domain/Save/`, `Content/` and `Game/`, plus tests
 - `Docs/EconomyFile.md`: one line saying bought ids are saved, so ids must never be renamed
 
@@ -1653,7 +1652,7 @@ Asked at the 9a playtest and built before 9b, so the first Web build has it. **R
 
 ### Step 9b: First Web build on itch.io (D26, D55)
 
-> **Done 2026-10-19** (`709be9d`; reports in Progress.md). Our two cursor fixes were discarded; Sergei brings his hardware-cursor fix onto main (§8).
+> **Done 2026-10-19** (`709be9d`; reports in Progress.md). The step's two cursor fixes were discarded; a hardware-cursor fix comes onto main separately (§8).
 
 **Goal.** The game plays in a browser from the itch Draft page. Saves and the volume patch live in the browser's `localStorage`, so they survive a reload, a closed tab and a new upload. Every new version is one menu click (`Tools/Switchboard/Build Web`) and one command (`butler push`). **Recommended effort:** high.
 
@@ -1689,7 +1688,7 @@ Asked at the 9a playtest and built before 9b, so the first Web build has it. **R
   - A string returned to C# is allocated the way Unity 6's docs say (`_malloc` plus `stringToUTF8`, or `stringToNewUTF8`); arguments are read with `UTF8ToString`. Check the current API with `unity_docs` before writing it.
   - The C# side declares the imports only under `UNITY_WEBGL && !UNITY_EDITOR`, so the editor and the tests never touch them.
 - **`SaveStorage.Create()` stays the single switch point.** In Web players it returns `BrowserStorage` when the probe works, and otherwise `PlayerPrefsStorage` with **one** warning per page load (keep that flag in the `.jslib`, or in one documented static; no other statics with state). In the editor and desktop builds it returns `PlayerPrefsStorage`, as today. A write that fails later (for example a full quota) logs one warning and doesn't crash.
-- **`AudioVolumeSettings`** (Sergei's, `Assets/Scripts/UI/`, Assembly-CSharp) reads and writes its patch through `SaveStorage.Create()` instead of `PlayerPrefs`, same key and same JSON. It reads at `SubsystemRegistration`, before any scene loads; check that the `.jslib` call works that early in a Web player, and otherwise read at the first use. Add a small seam (for example an internal `Load(ISaveStorage)` and `Save(ISaveStorage)`) so a test can use an in-memory storage.
+- **`AudioVolumeSettings`** (`Assets/Scripts/UI/`, Assembly-CSharp) reads and writes its patch through `SaveStorage.Create()` instead of `PlayerPrefs`, same key and same JSON. It reads at `SubsystemRegistration`, before any scene loads; check that the `.jslib` call works that early in a Web player, and otherwise read at the first use. Add a small seam (for example an internal `Load(ISaveStorage)` and `Save(ISaveStorage)`) so a test can use an in-memory storage.
 - **Saving when the page is hidden.** Phones kill hidden tabs, and a hidden tab runs no frames, so `Autosave`'s 10 s check and `OnApplicationFocus` may never run. The `.jslib` listens for `visibilitychange` (when the page becomes hidden) and `pagehide`, and calls `Autosave.SaveNow()` **synchronously inside the event**: a function-pointer callback (`makeDynCall` and a `[MonoPInvokeCallback]` static method) or Unity's `SendMessage`, whichever Unity 6's docs support best. `Autosave` registers when it binds a session and unregisters in `Stop` and `OnDestroy`. The one static the callback needs is the documented exception; say what you chose in the report.
 - **The template** lives at `Assets/WebGLTemplates/Operator/` (Unity's required place for templates). Player Settings' template is `PROJECT:Operator`.
 - **`Tools/Switchboard/Build Web`** (`Assets/Scripts/Game/Editor/`, next to `ContentValidatorMenu`):
@@ -1763,13 +1762,13 @@ Asked at the 9a playtest and built before 9b, so the first Web build has it. **R
 ### Step 10: Tutorial: a spotlight guide for the first call (D57)
 **Decisions (lead, 2026-10-20, D57):**
 - **New game only.** The tutorial (the one-call start, the first-call guide, the shop's first-cord pulse) runs only when no save was loaded. Continue never shows it. No save flag: a new game that hasn't saved yet is simply a new game again.
-- **Spotlight instead of pulses.** Sergei's pulses blend into the art. The guide now dims the whole screen (about 55% dark) with soft holes around the current target(s), plus a short text hint and an arrow next to the hole. The holes slide between steps. It **replaces** the pulses (portrait, book glow, cord pulse) instead of stacking on them.
+- **Spotlight instead of pulses.** The earlier pulses blend into the art. The guide now dims the whole screen (about 55% dark) with soft holes around the current target(s), plus a short text hint and an arrow next to the hole. The holes slide between steps. It **replaces** the pulses (portrait, book glow, cord pulse) instead of stacking on them.
 - **Clicks pass through** the dark layer: it is visual only (`raycastTarget` off everywhere except the Skip button), so the player can never get stuck.
 - **A "Skip tutorial" button** ends the guide at once (the one-call start may still finish dealing as it does today).
 
 **What exists (read first):**
 - `Assets/Scripts/Game/FirstOrderGuideSequence.cs`: plain-C# stages `WaitingForOrder, Portrait, TaskText, Book, ReadingBook, Cables, Complete, Cancelled`. Keep it as the step logic; extend it if a stage is missing (e.g. a final "Connected" stage).
-- `Assets/Scripts/Game/FirstOrderGuide.cs` (Sergei): drives the pulses (`SlowGuidePulse`, the book glow, the cord pulse, the portrait halo). Today it runs on the first call of *every* session, Continue included.
+- `Assets/Scripts/Game/FirstOrderGuide.cs`: drives the pulses (`SlowGuidePulse`, the book glow, the cord pulse, the portrait halo). Today it runs on the first call of *every* session, Continue included.
 - `GameInstaller` builds `GameSession(..., save?.Data, tutorial: true)`; `GameSession`/`CallQueue` apply the one-call start only when `save == null`. Use the same "no save loaded" fact for the guide and the shop pulse (one place decides; pass it in from `GameInstaller`).
 - The ShopView pulse on the first extra-cord upgrade: also new game only.
 
@@ -1809,7 +1808,7 @@ A wrong number, a hang-up or the call ending mid-tutorial should not leave the g
    - The call in hand's caller jack glows steadily and clearly brighter, so the player can tell which light belongs to the card they took.
    - A light goes out when a plug sits in that jack for that call, or when the call ends or connects.
    - Several calls may share a caller jack (the same person calling twice); it lights while any of them waits.
-   - Use or extend the existing socket visuals (`SocketView`/`SocketGraphic` highlight, `SocketHaloGraphic`, the board's row/column lamps); pick what reads best and doesn't clash with the cord colours or the "occupied" look. Nothing new for Mia unless it's clearly needed.
+   - Use or extend the existing socket visuals (`SocketView`/`SocketGraphic` highlight, `SocketHaloGraphic`, the board's row/column lamps); pick what reads best and doesn't clash with the cord colours or the "occupied" look. No new art unless it's clearly needed.
 2. **Clicking a row in the open book marks that jack.**
    - A click on a contact row puts a steady "marked" glow on that row's jack on the board and closes the book in the same click (today a click on the open book closes it, so the row click replaces that for rows).
    - One mark at a time. The mark clears when a plug goes into that jack, another row is clicked, or another call is taken.
@@ -1844,7 +1843,7 @@ A wrong number, a hang-up or the call ending mid-tutorial should not leave the g
 ### Step 10b, fix pass 2: clear lights, one-jack-at-a-time tutorial, tray spots (D58)
 1. **Lights contrast.** Waiting callers: a faint, slow glimmer (peak around 0.25–0.3 alpha, a slow period), so the board stays busy but quiet. The call in hand: full brightness, fast blink, a bigger halo, unmistakable at a glance. The book mark stays steady. **Hover flare:** pointing at a ringing (or accepted, not in hand) card makes its caller jack flare briefly to full brightness, without taking the card; no raycast target added if the card already takes the pointer; mouse only (touch has no hover). Keep the constants together for tuning.
 2. **Tutorial step 7 in two parts:** 7a lights only the caller's blinking jack ("Plug one end into the caller's blinking jack."); after that plug, 7b lights only the marked jack ("Now plug the other end into the jack you found."). Mandatory blocking as before; later steps renumber.
-3. **Tray spots.** The tray has fixed spots. A cord returning to the tray takes the first free spot from the left; no fixed spot per cord, never two cords in one spot. Bought cords also take the first free spot. Sergei's tray layout (`CableInputController.LayoutTray`, `StoredCableView`) is the place; keep `CordBridge` and the tests working.
+3. **Tray spots.** The tray has fixed spots. A cord returning to the tray takes the first free spot from the left; no fixed spot per cord, never two cords in one spot. Bought cords also take the first free spot. The tray layout (`CableInputController.LayoutTray`, `StoredCableView`) is the place; keep `CordBridge` and the tests working.
 - Tests for each.
 
 ### Step 10b, fix pass 3: only the taken call blinks; steady tutorial arrows (D58)
@@ -1855,13 +1854,13 @@ A wrong number, a hang-up or the call ending mid-tutorial should not leave the g
 ### Step 10c: Quick-connect tip (D59)
 **Scope (lead, 2026-10-21):** the quick-connect tip only. The Operator's notebook is on hold while the lead decides; don't build it.
 - **Rule (domain):** when a call connects within `quickConnectSeconds` of being taken (the moment its card is accepted, `CallState.Taken`), it pays `quickConnectTipCents` once, on top of the connection fee. Time comes only from `GameSession.Tick` (so pause stops it). A call that connects again after a hold doesn't pay a second tip. Decide whether More Profit multiplies the tip like the fee (say which; simplest is a flat amount).
-- **Data:** two new top-level fields in `Economy.json`, `quickConnectSeconds` and `quickConnectTipCents`. Add both lines to the designer's file with sensible starting values (e.g. 5 s and 5 cents), keep the file's one-entry-per-line style, validate them with plain messages (missing: default and a gentle note; negative: error), and document them in `Docs/EconomyFile.md`.
+- **Data:** two new top-level fields in `Economy.json`, `quickConnectSeconds` and `quickConnectTipCents`. Add both lines to the file with sensible starting values (e.g. 5 s and 5 cents), keep the file's one-entry-per-line style, validate them with plain messages (missing: default and a gentle note; negative: error), and document them in `Docs/EconomyFile.md`.
 - **Feedback:** a small "Quick! +X¢" popup near the card or the money plaque when the tip is paid, reusing the existing money popups/coins (`IncomeCoinsView`, the spend/fee popups) rather than a new system; `raycastTarget` off; plain ASCII plus "¢".
 - **Tutorial:** none. The tutorial's first call will rarely qualify; that's fine.
 - **Tests:** the rule (inside and outside the window, pause, hold and reconnect, a call that auto-connects on take), the loader and validator, and the popup appearing.
 
 ### Step 10d: Static fonts, so Play Mode stops changing font files (lead, 2026-10-21)
-**Why.** `Della Respira SDF.asset` and `Boecklins Universe SDF.asset` are TextMeshPro *dynamic* fonts (TMP's default when Sergei imported them in `deb792b`, not a design choice). They draw each letter into their atlas the first time it's shown, and in the editor that writes into the font files, so every Play session leaves ~38k changed lines in git, and a careless reset once left the menu with missing letters (Plan §4 "Dynamic TMP fonts"). Static copies already exist (`… SDF Static.asset`, printable ASCII) and the pause menu uses them. Goal: **nothing in the game uses the dynamic fonts any more**, so they never change.
+**Why.** `Della Respira SDF.asset` and `Boecklins Universe SDF.asset` are TextMeshPro *dynamic* fonts (TMP's default when they were imported in `deb792b`, not a design choice). They draw each letter into their atlas the first time it's shown, and in the editor that writes into the font files, so every Play session leaves ~38k changed lines in git, and a careless reset once left the menu with missing letters (Plan §4 "Dynamic TMP fonts"). Static copies already exist (`… SDF Static.asset`, printable ASCII) and the pause menu uses them. Goal: **nothing in the game uses the dynamic fonts any more**, so they never change.
 
 **Where the dynamic fonts are used today** (by GUID): `Della Respira SDF` in `MainMenu.unity`, `Assets/Prefabs/UI/PhoneBook.prefab`, `Assets/Prefabs/UI/UpgradeShopPanel.prefab` and `Assets/Prefabs/Game/GameUI.prefab`; `Boecklins Universe SDF` in `MainMenu.unity` and `GameUI.prefab`. Re-check with a GUID search (scenes, prefabs, materials, the menu package under `Assets/Tools/`, and any font asset set from code) before changing anything.
 
@@ -1876,7 +1875,7 @@ A wrong number, a hang-up or the call ending mid-tutorial should not leave the g
 **Size:** small, one agent at high effort. No gameplay change.
 
 ### Step 11: Sound and feel (D60): overview
-The lead took every item on the orchestrator's list (2026-10-22), split into four small steps. The numbers **S1–S16** (sounds) and **V1–V14** (visuals) are the list's, and every brief below uses them.
+The lead took every item on the orchestrator's list (2026-10-22), split into four small steps. The numbers **S1–S16** (sounds) and **V1–V14** (visuals) are the list's, and every brief below uses them. The full suggestion list, with what each moment does now and the sourcing research, is in [SoundAndFeel.md](SoundAndFeel.md).
 
 **Already in the game** (don't rebuild): a ring per new order, card take, cash register on the first connection, relay on resume, hold latch, wrong-number buzz, the connection babble, receiver down on every end, plug in/out, book open/close/flip, shop buy/can't afford/secret, menu clicks, the volume cords, the victory wire clicks, one music track. The visuals that exist: card press squash, stamps with pop and exit, typed speech, the emergency countdown ring with its urgent pulse, fee and tip popups, fee coins flying to the counter, green connected jacks, the blinking caller jack, the fine and spend popups, the tutorial spotlight, the victory scene. The Step 3 placeholder `Assets/Content/Audio/card-take-click.wav` is already replaced by `CardTake.wav` and unused.
 
@@ -1912,7 +1911,7 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
 | V9 | Shop: the bought button punches with a sparkle; new jacks light up in a wave; a new cord drops into the tray with a bounce; a new caller slot opens | 11d |
 | V10 | The mystery upgrade shimmers while affordable, and the shop pulses once when it first becomes affordable | 11d |
 | V11 | A wall clock showing game time (stops on pause) | 11d |
-| V12 | Caller faces react (happy when connected, cross on a wrong number). Needs Mia's art; until then a portrait bounce and a red tint | 11d |
+| V12 | Caller faces react (happy when connected, cross on a wrong number). Needs new art; until then a portrait bounce and a red tint | 11d |
 | V13 | The "New order!" stamp no longer hides the EMERGENCY badge and countdown (Plan §8) | 11c |
 | V14 | A sparkle on the "Quick! +X¢" tip popup | 11d |
 
@@ -1921,7 +1920,7 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
 - **Volume channels.** Every new source has an `AudioChannelSource`: effects on `Sfx`, the ambience and music on `Music`.
 - **Pause (D56).** Anything tied to a waiting call (the emergency bell, the ticks, wobbles, the clock) stops while paused. Music and ambience keep playing, as the music does today. Popups already started may finish.
 - **Web.** Single thread, no per-frame allocations or LINQ in per-frame code, and audio starts after the first tap (already handled). Loops must be gapless: import loops from WAV or OGG, never MP3 (MP3 adds silence at the ends).
-- **UI.** Every effect graphic has `raycastTarget` off and never takes a cord click. Nothing of ours overlaps the open book (order 10). Effects stay inside the 16:9 play area.
+- **UI.** Every effect graphic has `raycastTarget` off and never takes a cord click. Nothing on GameUI overlaps the open book (order 10). Effects stay inside the 16:9 play area.
 - **Extend what exists:** `CallAudio`, `ShopAudio`, `SceneUiAudio`, `UiClickSound`, `CallCardView`, `MoneyCounterView`, `IncomeCoinsView`, `FloatingTextView`. A new component only when nothing fits (Design 5.11).
 
 ### Step 11a: Gather the sounds (D60)
@@ -1945,7 +1944,7 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
 **Done when:** every slot from S1 to S16 that needs a new file has a pick the lead approved, the picks are in `Assets/Audio/`, `Docs/AudioSources.md` lists them, and the credit balance is noted in the Progress report.
 
 ### Step 11b: Wire the sounds (D60)
-**Who:** one agent at high effort. **Needs 11a's picks.**
+**Who:** one agent at high effort. **Needs 11a's picks.** Runs after 11c (lead, 2026-10-22). **From 11c:** `CallCardView.StampShown(CallCardView)` fires on the first visible frame of every stamp pop: use it for the S4 thunk. Emergencies get no "New order!" stamp (V13), so their arrival has no thunk; the S1 bell covers it. `EmergencyLampView` (the red lamp and its EMERGENCY sign) lights while any emergency waits: start and stop the S1 bell on the same signal.
 
 - **S1 and S2: emergencies.**
   - In `CallAudio`, an emergency (`Call.HasResponseTime`) rings its own bell when it arrives instead of the pitched-up normal ring. It rings again every few seconds (serialized interval, about 6 s) while it is still waiting (not yet taken), and stops once it is taken, connected, missed or cleared.
@@ -1969,7 +1968,7 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
 - **S16: music and ambience.**
   - The ambience loop plays in `Final` on the Music channel at a low volume.
   - `BackgroundMusic` alternates the two tracks with a short fade.
-  - Fix the menu's `Music_randomizer`: it points at two tracks that were never committed (Plan §8 "Menu leftovers"). Point it at our two tracks, or remove the missing entries.
+  - Fix the menu's `Music_randomizer`: it points at two tracks that were never committed (Plan §8 "Menu leftovers"). Point it at the game's two tracks, or remove the missing entries.
 - **Credits:** add the line from 11a, in the Credits screen's existing font and style (ASCII only).
 - **Cleanup:** delete the unused placeholder `Assets/Content/Audio/card-take-click.wav` (+ `.meta`) after a GUID check.
 - **Tests (EditMode):**
@@ -1983,7 +1982,7 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
 - **Playtest:** a busy board for 3 minutes sounds lively, not noisy; an emergency feels urgent; Options' volume cords change every new sound.
 
 ### Step 11c: Main visual feedback (D60)
-**Who:** one agent at high effort. Independent of 11b; if 11b's stamp event exists, reuse it.
+**Who:** one agent at high effort. Independent of 11b. **Built before 11b** (lead, 2026-10-22), while the lead picks the 11a sounds, so 11b doesn't exist yet: where a visual is timed to the stamp pop, add a plain C# event on `CallCardView` (for example `StampShown`) that 11b's stamp thunk will reuse.
 
 - **V1: rolling counter.** `MoneyCounterView` already has reels (`reels[i]`). When the shown cents change, each changed reel rolls: the old digit slides up and out and the new one comes in from below, about 0.15 s, clipped to the reel window.
   - Only the reels that changed move. When many digits change at once (a big fine or purchase), they all roll together.
@@ -1993,7 +1992,7 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
 - **V2: fines.** On `FineApplied`: the plaque shakes (a few px, about 0.3 s) and flashes red, and 3–5 coins fly from the counter to the missed card and fade. Reuse `IncomeCoinsView` with the direction reversed. The red "-$X" popup stays.
 - **V3: emergencies.**
   - While an emergency waits, its card wobbles gently (about ±2°). In the last `urgentSeconds` it shakes harder, in step with the ring's pulse.
-  - A small red warning lamp flashes while any emergency waits. Put it where it covers no jack, label, card or book: for example on the caller panel's frame or the board's top frame. Build it from the existing `LampGlowGraphic`/`CircleGraphic` until Mia draws one.
+  - A small red warning lamp flashes while any emergency waits. Put it where it covers no jack, label, card or book: for example on the caller panel's frame or the board's top frame. Build it from the existing `LampGlowGraphic`/`CircleGraphic` until one is drawn.
   - Both freeze while paused.
 - **V4: card arrival.** A new card slides in from the left edge of the caller panel with a small overshoot (about 0.35 s), then shakes briefly as its bell rings.
   - It must fit `CallQueueView`'s slide-up and the stamp hold (D52): a call that waits for a stamp still appears only after that stamp leaves.
@@ -2019,13 +2018,13 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
 - **V9: shop.**
   - On `UpgradeBought`, the bought button punches (scale up about 12% and back) with a sparkle burst.
   - Board growth: the newly opened jacks light up in a wave over about 0.6 s.
-  - A new cord drops into its tray spot with a bounce.
+  - A new cord drops into its tray spot with a bounce. Use `CableMotion` (added in 11c fix 1, also used by `CableController.PlayWiggle`) rather than a new animation path.
   - A new caller slot fades and scales in.
 - **V10: goal.** While the mystery upgrade is affordable, its button shimmers (a moving highlight). The first `GoalAffordable` also pulses the shop panel once. Drive it from the goal's progress, never from an id.
-- **V11: wall clock.** A small clock on the wall above or beside the board, drawn with UI shapes until Mia draws one.
+- **V11: wall clock.** A small clock on the wall above or beside the board, drawn with UI shapes until one is drawn.
   - It shows game time: 9:00 plus one clock minute per game second, from `CareerStats` seconds played. It wraps at 12 hours and stops on pause.
   - It covers no jack, card, shop or book, and takes no clicks.
-- **V12: caller reactions.** A happy bounce of the portrait when a call connects, and a short shake with a red tint on a wrong number. Real happy and cross faces need Mia's art: add a Plan §8 row asking for them.
+- **V12: caller reactions.** A happy bounce of the portrait when a call connects, and a short shake with a red tint on a wrong number. Real happy and cross faces need new art: add a Plan §8 row for them.
 - **V14:** a sparkle on the "Quick! +X¢" popup.
 - **Tests:**
   - Earnings coins are capped, stop on hold and pause, and change no money.

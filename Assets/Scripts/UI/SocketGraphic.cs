@@ -33,6 +33,9 @@ namespace Switchboard.UI
         private SocketHaloGraphic halo;
         private SocketLamp lamp;
         private SocketLampGraphic lampGraphic;
+        private SocketFlashGraphic ringFlash;
+        private SocketFlashGraphic wrongFlash;
+        private SocketFlashGraphic shortFlash;
         public bool IsHighlighted => highlighted;
         public bool IsBlockedHighlight => blockedHighlight;
         public bool IsDimmed => dimmed;
@@ -41,6 +44,58 @@ namespace Switchboard.UI
         public SocketLamp Lamp => lamp;
         public bool IsLampShowing => lampGraphic != null && lampGraphic.gameObject.activeSelf;
         public SocketLampGraphic LampGraphic => lampGraphic;
+        /// <summary>The connection ring (V6); null until the first one plays.</summary>
+        public SocketFlashGraphic RingFlash => ringFlash;
+        /// <summary>The wrong-number flash (V5); null until the first one plays.</summary>
+        public SocketFlashGraphic WrongFlash => wrongFlash;
+        /// <summary>The wrong number's short circuit at the plug (V5); null until the first one plays.</summary>
+        public SocketFlashGraphic ShortCircuit => shortFlash;
+        public bool IsShorting => shortFlash != null && shortFlash.IsPlaying;
+
+        /// <summary>A circuit closed on a call here: a ring expands from the jack (D60, V6).</summary>
+        public void PlayConnectRing()
+        {
+            if (!isActiveAndEnabled || dimmed) return;
+            ringFlash = Flash(ringFlash, "Socket connect ring");
+            ringFlash.Play(SocketFlashKind.ConnectRing);
+        }
+
+        /// <summary>
+        /// A wrong number here: a red flash, and with <paramref name="spark"/> a short circuit where the plug went in
+        /// (D60, V5). The short circuit draws on its own layer over the plugs and wires, still under the book.
+        /// </summary>
+        public void FlashWrongNumber(bool spark)
+        {
+            if (!isActiveAndEnabled || dimmed) return;
+            wrongFlash = Flash(wrongFlash, "Socket wrong flash");
+            wrongFlash.Play(SocketFlashKind.WrongNumber);
+            if (!spark) return;
+            bool created = shortFlash == null;
+            shortFlash = Flash(shortFlash, "Socket short circuit");
+            if (created && gameObject.scene.IsValid()) SwitchboardUISorting.SetLayer(shortFlash.gameObject, SwitchboardUISorting.Spark);
+            shortFlash.Play(SocketFlashKind.ShortCircuit);
+        }
+
+        // Its own child, over the halo and the lamp, so it hands the jack back unchanged when it ends.
+        private SocketFlashGraphic Flash(SocketFlashGraphic existing, string name)
+        {
+            if (existing != null)
+            {
+                existing.transform.SetAsLastSibling();
+                return existing;
+            }
+            var child = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
+            child.hideFlags = HideFlags.DontSave;
+            child.layer = gameObject.layer;
+            var rect = (RectTransform)child.transform;
+            rect.SetParent(transform, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.sizeDelta = Vector2.zero;
+            var flash = child.AddComponent<SocketFlashGraphic>();
+            flash.raycastTarget = false;
+            return flash;
+        }
 
         public void SetLamp(SocketLamp value)
         {
@@ -208,6 +263,9 @@ namespace Switchboard.UI
             if (!dimmed) callConnected = false;
             if (halo != null) halo.gameObject.SetActive(false);
             if (lampGraphic != null) lampGraphic.gameObject.SetActive(false);
+            if (ringFlash != null) ringFlash.Stop();
+            if (wrongFlash != null) wrongFlash.Stop();
+            if (shortFlash != null) shortFlash.Stop();
             base.OnDisable();
         }
 
@@ -222,6 +280,12 @@ namespace Switchboard.UI
             {
                 if (Application.isPlaying) Destroy(lampGraphic.gameObject);
                 else DestroyImmediate(lampGraphic.gameObject);
+            }
+            foreach (SocketFlashGraphic flash in new[] { ringFlash, wrongFlash, shortFlash })
+            {
+                if (flash == null) continue;
+                if (Application.isPlaying) Destroy(flash.gameObject);
+                else DestroyImmediate(flash.gameObject);
             }
             base.OnDestroy();
         }

@@ -46,7 +46,7 @@ namespace Switchboard.Game.Tests
         private Text Label(string side, int row, string label) =>
             Page(side).Find($"Entries/Contact_{row:00}/{label}").GetComponent<Text>();
 
-        // Book.json is the designer's (he balances it at any time), so the expected rows come from the loader.
+        // Book.json is edited by hand at any time, so the expected rows come from the loader.
         [Test]
         public void TheRealBookShowsEveryEntryInTheLoadersOrder()
         {
