@@ -24,7 +24,7 @@
 | 10d. Static fonts | done | ✅ 2026-10-22 (26 min) | ✅ 705/705 tests, scope clean | ✅ | ed0e2ad |
 | 11a. Gather the sounds | building | | | | |
 | 11b. Wire the sounds | not started | | | | |
-| 11c. Main visual feedback | playtesting | ✅ 2026-10-22 (25 min + 13 + 29 + 15 + 16 + 17 + 19 + 23 min fixes) | ✅ 744/744 tests, scope clean | | abbd5f1 (passes 1–2) |
+| 11c. Main visual feedback | done | ✅ 2026-10-22 (25 min + 13 + 29 + 15 + 16 + 17 + 19 + 23 min fixes) | ✅ 744/744 tests, scope clean | ✅ | abbd5f1, 0deb398 |
 | 11d. Extra visual feedback | not started | | | | |
 | L1. Pressure and the queue fix | not started | | | | |
 | L2. Days | not started | | | | |
@@ -5811,4 +5811,16 @@ Follow-ups (docs, for the orchestrator):
   - The game and mock-up C match closely: a brass plate set into the wood, dark engraved letters, and red light on the plate while lit.
   - The "6" is unlit in every shot.
 - **The lead waited about 23 minutes.** The orchestrator stopped further tuning. Lesson: small visual changes need a lighter routine, and colours the lead can tune in the Inspector.
+
+#### Step 11c committed (orchestrator, 2026-11-08)
+- **Commits:**
+  - `0deb398`: fix passes 4–7, the style guide and the loop-redesign docs.
+  - `76f0c83`: merge of the three art commits from `origin/main`.
+  - `e770df1`: Unity's metas for the 26 new images and folders. Every slice fits; `caller-frame` was auto-sliced into two pieces, to re-slice when it gets wired in.
+  - A test fix, then this note. Nothing is pushed.
+- **A test broke after the art merge:** `VictorySequenceTests.CityUsesEveryPortraitOnceAndConnectionsAnimateInSeparatePairs` compared the victory city with every sprite in `Assets/Sprites/callers`. The new `caller-frame`, `fire` and `hospital` art landed there.
+  - With the lead's yes, the test now compares the city with its own portrait list, police included.
+  - The victory scene keeps its 13 portraits; it goes away in the loop redesign (D65).
+  - 744/744 again.
+  - Lesson: run the tests before committing anything after a merge.
 

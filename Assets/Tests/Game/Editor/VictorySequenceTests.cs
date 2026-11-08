@@ -98,9 +98,10 @@ namespace Switchboard.Game.Tests
         {
             goalPanel.PreviewVictory();
             var images = view.PresentationCanvas.GetComponentsInChildren<Image>(true).Where(i => i.name == "Portrait").ToArray();
-            var allPortraits = AssetDatabase.FindAssets("t:Sprite", new[] { "Assets/Sprites/callers" })
-                .SelectMany(g => AssetDatabase.LoadAllAssetsAtPath(AssetDatabase.GUIDToAssetPath(g)).OfType<Sprite>()).ToArray();
-            Assert.That(images.Select(i => i.sprite), Is.EquivalentTo(allPortraits), "every portrait, including police, appears exactly once");
+            // The city's own portrait list, not the whole callers folder, so new caller art can't break this test.
+            var portraits = (Sprite[])typeof(VictorySequenceView).GetField("portraits", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(view);
+            Assert.That(portraits.Any(p => p != null && p.name == "police_0"), Is.True, "police is one of the city's portraits");
+            Assert.That(images.Select(i => i.sprite), Is.EquivalentTo(portraits), "every portrait, including police, appears exactly once");
             Assert.That(images.All(i => i.sprite != null), Is.True);
             Assert.That(images.Select(i => i.sprite).Distinct().Count(), Is.EqualTo(images.Length));
             var links = (int[,])typeof(VictorySequenceView).GetField("Links", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null);
