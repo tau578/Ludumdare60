@@ -1977,6 +1977,17 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
   - `DisconnectedEarly`: the line click and busy tone.
   - The stamp thunk (S4) plays when each stamp pops, timed to the pop: a hook in `CallCardView`'s stamp, through an event the audio listens to, not audio code inside the view.
 - **S7:** the desk bell on `EarningsService.QuickConnectTipPaid`.
+- **From 11a's picks (2026-11-08):**
+  - The files are in `Assets/Audio/Sfx/` and listed in `Docs/AudioSources.md`.
+  - S8 has **three voices** (`CallerVoiceA/B/C`): give each caller one, stable from its id, so characters sound different. Play short windows (about 0.1–0.15 s) at random offsets in the 2 s clip, with tiny fades, rather than cutting syllables.
+  - S13 uses **`bookFlip2` only** (the lead's pick), with no alternation.
+  - S9 and S15 were for the mystery upgrade and the victory, which D65 removes: wire them to whatever the redesign's rewards become, or leave them unused.
+  - S4 has one thunk: vary its pitch.
+  - S11 uses the new `Sfx/JackBlocked.wav` (the lead's pick), not the old `Cable/PlugBlocked.wav`.
+  - S14 uses `Sfx/PauseOpen.wav` and `Sfx/PauseClose.wav`.
+  - S16 has **three ambience loops** (`Music/AmbienceExchange`, `AmbienceRain`, `AmbienceOffice`; seamless 20 s WAVs): play one at a time, rotating or picked per day.
+  - The music rotates **four tracks**: `DancingInSmoke`, `SwingBabySwing`, `FootTappersClub` and the current `Bring Back the Swing`. Point the menu's `Music_randomizer` at them too.
+  - Credits: ElevenLabs is required. The Pixabay artists (Evolving Vibes, mcanden, kaazoom) need no credit, but the game already credits the first.
 - **S8: caller talking.** Fill `CallCardView.OnCharacterShown`: a syllable every 2–3 visible letters (skip spaces), with a pitch fixed per caller (derived from the caller's id, so it is stable) and a cap per second. Only the card whose bubble types plays; pause stops it.
 - **S9:** the "ta-da" on `GoalAffordable`.
 - **S10:** in `ShopAudio`, upgrade-specific sounds by the upgrade's effect (board growth, extra cord, extra caller slot), falling back to the purchase sound. Pick by effect type, never by an id.

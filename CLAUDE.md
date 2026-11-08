@@ -17,7 +17,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 3. `Docs/Design.md`: the source of truth for game rules, architecture and decisions D01–D59. The game follows the docs. If the code or a brief disagrees with it, stop and ask the lead; don't improvise, and don't change either side on your own.
 4. `Docs/StyleGuide.md`: **before any visual work** (effects, popups, lamps, signs, UI). It covers the look and materials (matte, frosted, never glossy), the palette and what each colour means, the feedback language (bad never looks like a reward), the fonts and their contrast, motion timings, layers, and a checklist.
 
-**Next step:** see the first row in `Docs/Progress.md` that isn't "done". Steps 1–10d are done and **11c** (main visual feedback) is built; its fix passes 4–6 are uncommitted and go in first. **Next is the loop redesign, steps L1–L9** (Design §12, Plan §9): L1 pressure and the queue fix, L2 days, L3 score and streak, L4 and L5 stakes, L6 unlocks and the wall, L7 chores, L8 nerves, L9 narrative between days. They come before 11b (wire the sounds; 11a's candidates wait on the lead's picks), 11d, 12 and 13 (D74: no deadline, the loop before polish). Before launching an L-step, confirm its numbers (Design §12.13) with the lead. The Operator's notebook (D59) is on hold. Steps were renumbered on 2026-10-18 to follow the build order; older reports and commits use the old numbers.
+**Next step:** see the first row in `Docs/Progress.md` that isn't "done". Steps 1–10d are done and **11c** (main visual feedback) is built; its fix passes 4–6 are uncommitted and go in first. **Next is the loop redesign, steps L1–L9** (Design §12, Plan §9): L1 pressure and the queue fix, L2 days, L3 score and streak, L4 and L5 stakes, L6 unlocks and the wall, L7 chores, L8 nerves, L9 narrative between days. They come before 11b (wire the sounds; 11a is done and the files are in `Assets/Audio/`, listed in `Docs/AudioSources.md`), 11d, 12 and 13 (D74: no deadline, the loop before polish). Before launching an L-step, confirm its numbers (Design §12.13) with the lead. The Operator's notebook (D59) is on hold. Steps were renumbered on 2026-10-18 to follow the build order; older reports and commits use the old numbers.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).
@@ -125,7 +125,8 @@ When the lead asks for a new build or to publish, the main session can do this d
 - **ElevenLabs sound effects:**
   - The lead's key is in `ELEVENLABS_API_KEY` (set in `~/.zshrc`). A session that started before it existed reads it inside one command: `zsh -c 'source ~/.zshrc >/dev/null 2>&1; …'`.
   - **Never print, log or write the key** (no `env`, no `set -x`, not in files or docs).
-  - The lead is on the free plan: about 10,000 credits a month, and 40 credits per second of sound. The Credits screen names elevenlabs.io.
+  - The lead is on the free plan: about 10,000 credits a month (resets on the 15th). In practice a second of sound costs about 9–10 credits. The Credits screen names elevenlabs.io.
+  - Helper scripts are in `Builds/SoundTools/` (`el.py` generates, never printing the key; `level.py` trims and levels). Not in the session scratchpad, which gets cleaned.
 - **Kenney packs** are CC0.
 - Candidates go to `Builds/SoundCandidates/` (git-ignored). The lead's picks go into `Assets/Audio/`, and each one is listed in `Docs/AudioSources.md`.
 

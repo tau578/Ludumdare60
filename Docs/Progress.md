@@ -22,7 +22,7 @@
 | 10b. Faster lookup | done | ✅ 2026-10-20 (20 min + 15 + 20 + 19 min fixes) | ✅ 671/671 tests, scope clean | ✅ | c412194 |
 | 10c. Quick-connect tip | done | ✅ 2026-10-21 (14 min) | ✅ 697/697 tests, scope clean | ✅ | 845a1b3 |
 | 10d. Static fonts | done | ✅ 2026-10-22 (26 min) | ✅ 705/705 tests, scope clean | ✅ | ed0e2ad |
-| 11a. Gather the sounds | building | | | | |
+| 11a. Gather the sounds | done | ✅ 2026-11-08 | ✅ 23 sounds and 3 tracks imported, console clean | ✅ lead picked | |
 | 11b. Wire the sounds | not started | | | | |
 | 11c. Main visual feedback | done | ✅ 2026-10-22 (25 min + 13 + 29 + 15 + 16 + 17 + 19 + 23 min fixes) | ✅ 744/744 tests, scope clean | ✅ | abbd5f1, 0deb398 |
 | 11d. Extra visual feedback | not started | | | | |
@@ -5823,4 +5823,37 @@ Follow-ups (docs, for the orchestrator):
   - The victory scene keeps its 13 portraits; it goes away in the loop redesign (D65).
   - 744/744 again.
   - Lesson: run the tests before committing anything after a merge.
+
+#### Step 11a: round 1 picks imported, round 2 out (orchestrator, 2026-11-08)
+- **The lead's round 1 picks:**
+  - Picked: S1 el-v2, S2 el-v3, S3a el-v1, S3b el-v2, S4 el-v4, S5 el-v2, S5b el-v2, S6 el-v2, S7 el-v3, S10a el-v2, S10b el-v1, S10c el-v2, S12 el-v1, S15 el-v1.
+  - S8: all three voices, one per kind of character.
+  - S13: `bookFlip2` only, already in the game.
+  - Retry: S9, S11, S14a (softer, like a thocky keyboard click), S14b and S16a (more loops).
+  - S16b: the three tracks in `Builds/SoundCandidates/music`.
+- **Imported:** 17 WAVs in `Assets/Audio/Sfx/`, trimmed and levelled to a -1 dBFS peak: `EmergencyBell`, `ClockTick`, `MissedSting`, `CoinsAway`, `StampThunk`, `CoinJingle`, `CoinTick`, `CutOff`, `TipBell`, `CallerVoiceA/B/C`, `BoardGrowth`, `CordIntoTray`, `SlotOpen`, `PencilTick`, `Fanfare`. Unity imported them with no console messages. Nothing is committed.
+- **`Docs/AudioSources.md`:**
+  - It lists every clip with its source, licence and ElevenLabs prompt.
+  - The project's Kenney book and interface sounds are byte-identical to the pack files.
+  - 20 older effects have no recorded source.
+- **Round 2:** 18 new ElevenLabs clips, two of them replacing near-silent duds, are on `Builds/SoundCandidates/round2.html` with the three music tracks.
+- **Credits:** 8,188 left of 10,000 (resets 2026-11-15).
+  - Generating costs about 9–10 credits per second of sound, not the 40 once assumed.
+  - The helper and the levelling tool are now in `Builds/SoundTools/` (git-ignored), because the session scratchpad was cleaned.
+- **The redesign changes some slots' jobs:**
+  - S9 was "mystery affordable" and S15 the victory fanfare; both are removed by D65, so the clips can serve unlocks or rewards.
+  - S10 waits on the shop's fate (D66).
+
+#### Step 11a: round 2 picks imported, 11a done (orchestrator, 2026-11-08)
+- **The lead's round 2 picks:**
+  - S11 el-v4, S14a el-v2, S14b el-v4.
+  - S16a: three ambience loops (v4, v5, v1).
+  - S16b: all four tracks (the three downloads plus the current one).
+  - S9 is left for the loop redesign, along with whatever else changes with it.
+- **Imported:**
+  - Effects: `Sfx/JackBlocked.wav`, `Sfx/PauseOpen.wav`, `Sfx/PauseClose.wav`.
+  - Ambience: `Music/AmbienceExchange.wav`, `Music/AmbienceRain.wav` and `Music/AmbienceOffice.wav`, kept as exact 20 s WAV loops (levelled, not trimmed, so they stay seamless).
+  - Music: `Music/DancingInSmoke.mp3` (mcanden), `Music/SwingBabySwing.mp3` and `Music/FootTappersClub.mp3` (kaazoom), all from Pixabay.
+  - Unity imported them with no console messages. `Docs/AudioSources.md` lists them all.
+- **11a is done:** 20 effects, 3 ambience loops and 3 music tracks are in `Assets/Audio/`; S9 is deferred. Nothing is committed. Wiring is 11b, which waits until after the loop redesign (D74).
 
