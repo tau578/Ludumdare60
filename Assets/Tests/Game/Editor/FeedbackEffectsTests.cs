@@ -566,28 +566,237 @@ namespace Switchboard.Game.Tests
         }
 
         [Test]
-        public void TheEmergencySignIsDarkUntilAnEmergencyWaitsThenFlashesWithTheLampAndFreezesOnPause()
+        public void TheLampIsTheBoardsOwnBulbTintedRedAndItsGlowFollowsTheFlash()
         {
             var lamp = All<EmergencyLampView>().Single();
-            Assert.That(lamp.Sign, Is.Not.Null, "a sign beside the lamp");
+            Canvas board = Socket("A1").GetComponentInParent<Canvas>().rootCanvas;
+            SwitchboardLampView[] numbers = All<SwitchboardLampView>().Where(l => l.GetComponentInParent<Canvas>().rootCanvas == board).ToArray();
+            Assert.That(numbers.Select(n => n.BulbOff).Distinct().Count(), Is.EqualTo(1), "setup: the number lamps share one bulb");
+            Assert.That(lamp.Bulb.sprite, Is.SameAs(numbers[0].BulbOff), "the board's unlit bulb art");
+            Assert.That(lamp.LitBulb.sprite, Is.SameAs(numbers[0].BulbOn), "the board's lit bulb art");
+            StringAssert.EndsWith("bulb-02.png", AssetDatabase.GetAssetPath(lamp.Bulb.sprite));
+            StringAssert.EndsWith("bulb-01.png", AssetDatabase.GetAssetPath(lamp.LitBulb.sprite));
+            Assert.That(lamp.GetComponentsInChildren<Image>(true).Select(i => i.sprite).Distinct(),
+                Is.EquivalentTo(new[] { lamp.Bulb.sprite, lamp.LitBulb.sprite }), "no other art: no bezel");
+
+            // Tinted red: muted, not pure red, darker unlit than lit.
+            Color dark = lamp.Bulb.color, lit = lamp.LitBulb.color;
+            foreach (Color tint in new[] { dark, lit })
+            {
+                Assert.That(tint.r, Is.GreaterThan(tint.g * 2).And.GreaterThan(tint.b * 2), "red");
+                Assert.That(tint.g + tint.b, Is.GreaterThan(.2f), "a warm, muted red, not #FF0000");
+            }
+            Assert.That(Luma(dark), Is.LessThan(Luma(lit)), "dull while unlit, and the unlit art is darker still");
+            Assert.That(lamp.InnerGlow.rectTransform.rect.width, Is.LessThan(lamp.LitBulb.rectTransform.rect.width * .75f),
+                "lit from inside: the inner light is brightest in the middle");
+            Assert.That(lamp.Glow.rectTransform.rect.width, Is.GreaterThan(lamp.Bulb.rectTransform.rect.width * 1.2f)
+                .And.LessThan(lamp.Bulb.rectTransform.rect.width * 1.8f), "a soft glow on the frame, not a big bloom");
+            int Order(Component part) => part.transform.GetSiblingIndex();
+            Assert.That(Order(lamp.Glow), Is.LessThan(Order(lamp.Bulb)));
+            Assert.That(Order(lamp.Bulb), Is.LessThan(Order(lamp.LitBulb)), "the lit bulb fades in over the dark one");
+            Assert.That(Order(lamp.LitBulb), Is.LessThan(Order(lamp.InnerGlow)));
+            Assert.That(Order(lamp.InnerGlow), Is.LessThan(Order(lamp.Sign)), "the plate is drawn last: the lamp's light never tints it");
+
+            Graphic[] lights = { lamp.LitBulb, lamp.InnerGlow, lamp.Glow, lamp.SignGlow, lamp.SignWash };
+            lamp.Tick(.1f);
+            Assert.That(lamp.IsWarning, Is.False);
+            Assert.That(lamp.Bulb.canvasRenderer.GetAlpha(), Is.EqualTo(1), "the dark bulb always shows");
+            foreach (Graphic light in lights) Assert.That(light.canvasRenderer.GetAlpha(), Is.Zero, light.name + " is off while unlit");
+
+            Call emergency = AddCall("C1", "D2", emergency: true, response: 30, penalty: 100);
+            float lowest = 1, highest = 0;
+            for (int i = 0; i < 12; i++)
+            {
+                lamp.Tick(.05f);
+                foreach (Graphic light in lights) Assert.That(light.canvasRenderer.GetAlpha(), Is.EqualTo(lamp.Brightness), light.name);
+                Assert.That(lamp.Bulb.canvasRenderer.GetAlpha(), Is.EqualTo(1));
+                lowest = Mathf.Min(lowest, lamp.Brightness);
+                highest = Mathf.Max(highest, lamp.Brightness);
+            }
+            // 12 steps of 0.05 s cover more than one 0.5 s flash, and step 5 lands on its dark point exactly.
+            Assert.That(highest, Is.GreaterThan(.95f));
+            Assert.That(lowest, Is.LessThan(.05f));
+            float frozen = lamp.Glow.canvasRenderer.GetAlpha();
+            lamp.Tick(0);
+            Assert.That(lamp.Glow.canvasRenderer.GetAlpha(), Is.EqualTo(frozen), "frozen on pause");
+            Assert.That(() => lamp.Tick(.01f), UnityEngine.TestTools.Constraints.Is.Not.AllocatingGCMemory(), "a flash frame allocates nothing");
+
+            Assert.That(session.Calls.Take(emergency.Id), Is.True);
+            Assert.That(session.Calls.Connect(emergency.Id), Is.True);
+            lamp.Tick(.1f);
+            foreach (Graphic light in lights) Assert.That(light.canvasRenderer.GetAlpha(), Is.Zero, light.name + " is dark once it is connected");
+        }
+
+        private static float Luma(Color c) => .2126f * c.r + .7152f * c.g + .0722f * c.b;
+
+        // WCAG 2 relative luminance and contrast ratio (StyleGuide §5).
+        private static float Luminance(Color c)
+        {
+            Func<float, float> linear = v => v <= .04045f ? v / 12.92f : Mathf.Pow((v + .055f) / 1.055f, 2.4f);
+            return .2126f * linear(c.r) + .7152f * linear(c.g) + .0722f * linear(c.b);
+        }
+
+        private static float Contrast(Color a, Color b)
+        {
+            float la = Luminance(a), lb = Luminance(b);
+            return (Mathf.Max(la, lb) + .05f) / (Mathf.Min(la, lb) + .05f);
+        }
+
+        // A layer of colour `over` with alpha `alpha` on `under`, blended as in gamma or in linear space.
+        private static Color Over(Color under, Color over, float alpha, bool linear) => linear
+            ? Color.Lerp(under.linear, over.linear, alpha).gamma
+            : Color.Lerp(under, over, alpha);
+
+        private static List<UIVertex> MeshOf(Graphic graphic)
+        {
+            var helper = new VertexHelper();
+            graphic.GetType().GetMethod("OnPopulateMesh", BindingFlags.Instance | BindingFlags.NonPublic, null,
+                new[] { typeof(VertexHelper) }, null).Invoke(graphic, new object[] { helper });
+            var vertices = new List<UIVertex>();
+            helper.GetUIVertexStream(vertices);
+            helper.Dispose();
+            return vertices;
+        }
+
+        private static Color Hsv(Color c)
+        {
+            Color.RGBToHSV(c, out float h, out float s, out float v);
+            return new Color(h, s, v);
+        }
+
+        private static float HueDegreesApart(float a, float b)
+        {
+            float apart = Mathf.Abs(a - b) * 360;
+            return Mathf.Min(apart, 360 - apart);
+        }
+
+        private const string SignFontPath = "Assets/Fonts/DellaRespira/Della Respira SDF Static.asset";
+
+        [Test]
+        public void TheSignIsABrassPlateSetIntoTheFrameWithEngravedLettersAndRedLightWhileAnEmergencyWaits()
+        {
+            var lamp = All<EmergencyLampView>().Single();
+            Assert.That(lamp.Sign, Is.Not.Null, "a plate under the lamp");
+            Assert.That(lamp.Sign.GetComponentsInChildren<Image>(true), Is.Empty, "drawn, no sprite");
+            LabelStripGraphic plate = lamp.SignPlate;
+            Assert.That(plate.Part, Is.EqualTo(LabelStripGraphic.Layer.Plate));
+            Assert.That(lamp.SignWash.Part, Is.EqualTo(LabelStripGraphic.Layer.Wash));
+            Assert.That(lamp.SignGlow.Part, Is.EqualTo(LabelStripGraphic.Layer.Halo));
+            foreach (LabelStripGraphic layer in new[] { plate, lamp.SignWash, lamp.SignGlow })
+                Assert.That(layer.rectTransform.rect, Is.EqualTo(lamp.Sign.rect), layer.name + " lines up with the plate's box");
+            Assert.That(plate.Mounting, Is.EqualTo(LabelStripGraphic.Mount.Recessed), "set into the frame, not stuck on it");
+
+            // Matte brass, lit from above, in a thin darker brass rim.
+            Color top = plate.FaceTop, bottom = plate.FaceBottom, rim = plate.Rim;
+            Assert.That(top, Is.EqualTo((Color)LabelStripGraphic.BrassTop));
+            Assert.That(bottom, Is.EqualTo((Color)LabelStripGraphic.BrassBottom));
+            Assert.That(rim, Is.EqualTo((Color)LabelStripGraphic.BrassRim));
+            foreach (Color brass in new[] { top, bottom, rim })
+                Assert.That(brass.r > brass.g && brass.g > brass.b * 1.5f && brass.r > brass.b * 2, Is.True, "brass: " + brass);
+            Assert.That(Luma(top), Is.GreaterThan(Luma(bottom)), "lighter on top");
+            Assert.That(Luminance(top), Is.LessThan(.45f), "a mid brass, far from the old light ivory");
+            Assert.That(Luma(rim), Is.LessThan(Luma(bottom) * .75f), "the rim is a darker brass");
+            float height = lamp.Sign.rect.height;
+            Assert.That(plate.RimWidth, Is.GreaterThan(0).And.LessThan(height * .08f), "thin");
+
+            List<UIVertex> mesh = MeshOf(plate);
+            Rect box = lamp.Sign.rect, face = plate.Face;
+            Func<UIVertex, Color32, bool> coloured = (v, c) => v.color.r == c.r && v.color.g == c.g && v.color.b == c.b;
+            // Recessed: everything lies on the plate, nothing falls on the wood.
+            Assert.That(plate.DrawnRect, Is.EqualTo(box), "no drop shadow");
+            Assert.That(mesh.All(v => v.position.x >= box.xMin - 1e-3f && v.position.x <= box.xMax + 1e-3f &&
+                v.position.y >= box.yMin - 1e-3f && v.position.y <= box.yMax + 1e-3f), Is.True, "nothing drawn outside the plate");
+            Assert.That(mesh.Any(v => coloured(v, LabelStripGraphic.BrassRim) && v.color.a == 255), Is.True, "the rim is drawn");
+            // The face is shaded from bottom to top of the box: a vertex's colour is its gradient's colour at its height.
+            Assert.That(mesh.Any(v =>
+            {
+                Color want = Color.Lerp(bottom, top, Mathf.InverseLerp(box.yMin, box.yMax, v.position.y));
+                Color got = v.color;
+                return v.position.y > box.center.y && Mathf.Abs(got.r - want.r) + Mathf.Abs(got.g - want.g) + Mathf.Abs(got.b - want.b) < .01f && got.a > .99f;
+            }), Is.True, "the face is drawn");
+            // A soft inner shadow under the top edge: dark and low alpha at the face's top, fading out downwards.
+            Color32 shade = LabelStripGraphic.InnerShadow;
+            Assert.That(shade.a, Is.LessThan(160));
+            Assert.That(Luma(shade), Is.LessThan(.15f));
+            List<UIVertex> shadow = mesh.Where(v => coloured(v, shade)).ToList();
+            Assert.That(shadow.Where(v => v.color.a == shade.a).All(v => Mathf.Approximately(v.position.y, face.yMax)) &&
+                shadow.Any(v => v.color.a == shade.a), Is.True, "the inner shadow is darkest at the face's top edge");
+            Assert.That(shadow.Where(v => v.color.a == 0).All(v => Mathf.Approximately(v.position.y, face.yMax - plate.InnerShadowDepth)) &&
+                shadow.Any(v => v.color.a == 0), Is.True, "and fades out downwards");
+            Assert.That(plate.InnerShadowDepth, Is.LessThan(height * .2f), "a soft edge, not a dark band");
+            // A faint light line along the bottom edge.
+            Color32 light = LabelStripGraphic.InnerLight;
+            List<UIVertex> lit = mesh.Where(v => coloured(v, light)).ToList();
+            Assert.That(lit, Is.Not.Empty, "the bottom edge catches a little light");
+            Assert.That(lit.All(v => v.position.y <= box.yMin + height * .1f), Is.True, "only along the bottom");
+            Assert.That(light.a, Is.LessThanOrEqualTo(51), "faint");
+            // Matte: no light vertex but that faint line, and nothing lighter than the face's top.
+            Assert.That(mesh.Where(v => v.color.a > 0 && v.color.a < 255 && !coloured(v, light)).All(v => Luma(v.color) < .2f), Is.True,
+                "no gloss, no light glints");
+            Assert.That(mesh.Where(v => v.color.a == 255).All(v => Luma(v.color) <= Luma(top) + .001f), Is.True, "no hard highlight");
+
+            // The lettering: Della Respira capitals, engraved: dark letters with a faint light edge just below them.
+            var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(SignFontPath);
             TMP_Text[] labels = lamp.Sign.GetComponentsInChildren<TMP_Text>(true);
-            Assert.That(labels.Length, Is.EqualTo(2), "a dark and a lit lettering");
+            TMP_Text edge = lamp.SignEdgeLabel, quiet = lamp.SignLabel, bright = lamp.SignLitLabel;
+            Assert.That(labels, Is.EquivalentTo(new[] { edge, quiet, bright }), "the light edge, the quiet and the lit letters");
             foreach (TMP_Text label in labels)
             {
                 Assert.That(label.text, Is.EqualTo("EMERGENCY"));
-                Assert.That(label.font, Is.Not.Null);
-                Assert.That(label.font.atlasPopulationMode, Is.EqualTo(TMPro.AtlasPopulationMode.Static), "a static font");
+                Assert.That(label.font, Is.SameAs(font), "Della Respira, its static atlas");
                 Assert.That(label.font.HasCharacters(label.text), Is.True);
+                Assert.That(label.fontSize, Is.EqualTo(quiet.fontSize), "one size");
+                Assert.That(label.fontSharedMaterial, Is.SameAs(lamp.SignMaterial), "one thickened copy of the font's material");
+                Assert.That(label.raycastTarget, Is.False);
             }
-            TMP_Text dark = labels.Single(l => l.name == "Sign text"), lit = labels.Single(l => l.name == "Sign lit text");
+            // Thin strokes at this size never reach their colour, so the lettering's own material copy thickens them a
+            // little; the font's shared material stays as it is.
+            Material letterMaterial = lamp.SignMaterial;
+            Assert.That(letterMaterial, Is.Not.Null.And.Not.SameAs(font.material));
+            Assert.That(AssetDatabase.Contains(letterMaterial), Is.False, "made at run time, not an asset");
+            Assert.That(letterMaterial.shader, Is.SameAs(font.material.shader));
+            Assert.That(letterMaterial.mainTexture, Is.SameAs(font.material.mainTexture), "the font's own atlas");
+            Assert.That(letterMaterial.GetFloat(ShaderUtilities.ID_FaceDilate), Is.EqualTo(EmergencyLampView.SignLetterWeight));
+            Assert.That(EmergencyLampView.SignLetterWeight, Is.GreaterThan(0).And.LessThanOrEqualTo(.4f), "a little heavier, not bold");
+            Assert.That(font.material.GetFloat(ShaderUtilities.ID_FaceDilate), Is.Zero, "the shared font material is untouched");
+            Color edgeColour = edge.color;
+            Assert.That(edgeColour, Is.EqualTo((Color)EmergencyLampView.SignEngraveEdge));
+            Assert.That(Luma(edgeColour), Is.GreaterThan(.85f), "a light edge");
+            Assert.That(edgeColour.r >= edgeColour.g && edgeColour.g > edgeColour.b, Is.True, "warm");
+            Assert.That(edgeColour.a, Is.InRange(.2f, .5f), "at low alpha");
+            Vector2 down = quiet.rectTransform.anchoredPosition - edge.rectTransform.anchoredPosition;
+            Assert.That(down.x, Is.Zero);
+            Assert.That(down.y, Is.EqualTo(.6f * lamp.BulbSize / 44).Within(1e-4f), "just below the letters: 0.6 units at 44");
+            Assert.That(bright.rectTransform.anchoredPosition, Is.EqualTo(quiet.rectTransform.anchoredPosition));
+
+            // One dark brown-red family, quiet and lit: no switch to ivory or white.
+            Assert.That(quiet.color, Is.EqualTo((Color)EmergencyLampView.SignQuiet));
+            Assert.That(bright.color, Is.EqualTo((Color)EmergencyLampView.SignLit));
+            Color quietHsv = Hsv(quiet.color), brightHsv = Hsv(bright.color);
+            Assert.That(HueDegreesApart(quietHsv.r, brightHsv.r), Is.LessThan(15), "one hue family in both states");
+            foreach (Color hsv in new[] { quietHsv, brightHsv })
+            {
+                Assert.That(HueDegreesApart(hsv.r, 0), Is.LessThan(15), "a red");
+                Assert.That(hsv.g, Is.GreaterThan(.6f), "not a grey or a white");
+                Assert.That(hsv.b, Is.LessThan(.35f), "dark, cut into the metal");
+            }
+            int Order(Component part) => part.transform.GetSiblingIndex();
+            Assert.That(Order(lamp.SignGlow), Is.LessThan(Order(plate)), "the glow is round the plate, under it");
+            Assert.That(Order(plate), Is.LessThan(Order(lamp.SignWash)), "the red wash lies on the face");
+            Assert.That(Order(lamp.SignWash), Is.LessThan(Order(edge)), "and under the lettering");
+            Assert.That(Order(edge), Is.LessThan(Order(quiet)), "the light edge peeks out under the letters");
+            Assert.That(Order(quiet), Is.LessThan(Order(bright)), "the lit letters fade in over the quiet ones");
 
             lamp.Tick(.1f);
             Assert.That(lamp.IsWarning, Is.False);
-            Assert.That(lamp.SignBrightness, Is.Zero, "unlit while nothing waits");
-            Assert.That(dark.canvasRenderer.GetAlpha(), Is.EqualTo(1), "the dark lettering stays readable");
-            Assert.That(lit.canvasRenderer.GetAlpha(), Is.Zero);
+            Assert.That(lamp.SignBrightness, Is.Zero, "quiet while nothing waits");
+            Assert.That(quiet.canvasRenderer.GetAlpha(), Is.EqualTo(1), "the engraved letters always show");
+            Assert.That(edge.canvasRenderer.GetAlpha(), Is.EqualTo(1), "and their light edge");
+            Assert.That(plate.canvasRenderer.GetAlpha(), Is.EqualTo(1), "and so does the plate");
+            Assert.That(bright.canvasRenderer.GetAlpha(), Is.Zero);
+            Assert.That(lamp.SignWash.canvasRenderer.GetAlpha(), Is.Zero, "no red light while quiet");
 
-            Call normal = AddCall("A1", "B2");
+            AddCall("A1", "B2");
             lamp.Tick(.1f);
             Assert.That(lamp.SignBrightness, Is.Zero, "a normal call doesn't light it");
 
@@ -596,14 +805,19 @@ namespace Switchboard.Game.Tests
             for (int i = 0; i < 12; i++)
             {
                 lamp.Tick(.05f);
-                Assert.That(lamp.SignBrightness, Is.EqualTo(.35f + .65f * lamp.Brightness).Within(1e-5f), "in step with the lamp");
-                Assert.That(lit.canvasRenderer.GetAlpha(), Is.EqualTo(lamp.SignBrightness));
+                Assert.That(lamp.SignBrightness, Is.EqualTo(EmergencyLampView.SignLitFloor + (1 - EmergencyLampView.SignLitFloor) * lamp.Brightness).Within(1e-5f), "in step with the lamp");
+                Assert.That(bright.canvasRenderer.GetAlpha(), Is.EqualTo(lamp.SignBrightness));
+                Assert.That(lamp.SignWash.canvasRenderer.GetAlpha(), Is.EqualTo(lamp.Brightness), "the red light on the plate flashes with the bulb");
+                Assert.That(lamp.SignGlow.canvasRenderer.GetAlpha(), Is.EqualTo(lamp.Brightness), "and so does the light round it");
+                Assert.That(edge.canvasRenderer.GetAlpha(), Is.EqualTo(1));
                 lowest = Mathf.Min(lowest, lamp.SignBrightness);
                 highest = Mathf.Max(highest, lamp.SignBrightness);
             }
             Assert.That(highest, Is.GreaterThan(.9f), "lit");
             Assert.That(highest - lowest, Is.GreaterThan(.4f), "and flashing");
-            Assert.That(lowest, Is.GreaterThanOrEqualTo(.35f), "never dark while it waits");
+            Assert.That(lowest, Is.EqualTo(EmergencyLampView.SignLitFloor).Within(1e-4f), "step 5 lands on the flash's dim end");
+            Assert.That(((Color)EmergencyLampView.SignWashTint).a, Is.EqualTo(.14f).Within(.01f), "a red wash of about 14% at full flash");
+            Assert.That(() => lamp.Tick(.01f), UnityEngine.TestTools.Constraints.Is.Not.AllocatingGCMemory(), "a flash frame allocates nothing");
 
             float paused = lamp.SignBrightness;
             lamp.Tick(0);
@@ -613,37 +827,310 @@ namespace Switchboard.Game.Tests
             Assert.That(session.Calls.Take(emergency.Id), Is.True);
             Assert.That(session.Calls.Connect(emergency.Id), Is.True);
             lamp.Tick(.1f);
-            Assert.That(lamp.SignBrightness, Is.Zero, "dark again once it is connected");
-            Assert.That(lit.canvasRenderer.GetAlpha(), Is.Zero);
+            Assert.That(lamp.SignBrightness, Is.Zero, "quiet again once it is connected");
+            Assert.That(bright.canvasRenderer.GetAlpha(), Is.Zero);
+            Assert.That(lamp.SignWash.canvasRenderer.GetAlpha(), Is.Zero);
+        }
+
+        // The frame art behind the board's top frame, read from its file (the import isn't readable).
+        private Texture2D FrameArt(out RectTransform panel)
+        {
+            Image frame = All<Image>().Single(i => i.name == "SwitchboardPanel" && i.sprite != null && i.sprite.name == "board_matte");
+            panel = frame.rectTransform;
+            var art = new Texture2D(2, 2);
+            art.LoadImage(System.IO.File.ReadAllBytes(AssetDatabase.GetAssetPath(frame.sprite)));
+            return art;
+        }
+
+        /// <summary>The frame's colour round the lamp, measured from the frame art (board_matte.png).</summary>
+        private static readonly Color32 FrameColour = new Color32(133, 92, 66, 255);
+
+        private static Color32 ArtAt(Texture2D art, RectTransform panel, Vector2 world)
+        {
+            Rect area = WorldRect(panel);
+            int x = Mathf.Clamp(Mathf.FloorToInt((world.x - area.xMin) / area.width * art.width), 0, art.width - 1);
+            int y = Mathf.Clamp(Mathf.FloorToInt((world.y - area.yMin) / area.height * art.height), 0, art.height - 1);
+            return art.GetPixel(x, y);
+        }
+
+        private static bool IsPlainFrame(Color32 c, Color32 frame) =>
+            Mathf.Abs(c.r - frame.r) < 24 && Mathf.Abs(c.g - frame.g) < 24 && Mathf.Abs(c.b - frame.b) < 24 && c.a > 200;
+
+        // The sign's letters as drawn: the glyphs themselves, not the font's line box.
+        private static Rect LetteringRect(EmergencyLampView lamp)
+        {
+            Rect all = Rect.zero;
+            bool first = true;
+            foreach (TMP_Text label in lamp.Sign.GetComponentsInChildren<TMP_Text>(true))
+            {
+                Rect glyphs = GlyphRect(label);
+                all = first ? glyphs : Rect.MinMaxRect(Mathf.Min(all.xMin, glyphs.xMin), Mathf.Min(all.yMin, glyphs.yMin),
+                    Mathf.Max(all.xMax, glyphs.xMax), Mathf.Max(all.yMax, glyphs.yMax));
+                first = false;
+            }
+            return all;
+        }
+
+        // TMP grows each glyph's box by its material's padding (the room a dilated face may need); take it off, so this
+        // is the glyph's own outline.
+        private static Rect GlyphRect(TMP_Text label)
+        {
+            label.ForceMeshUpdate();
+            float padding = ShaderUtilities.GetPadding(label.fontSharedMaterial, label.extraPadding, false) * label.fontSize /
+                label.font.faceInfo.pointSize;
+            float xMin = float.MaxValue, yMin = float.MaxValue, xMax = float.MinValue, yMax = float.MinValue;
+            for (int i = 0; i < label.textInfo.characterCount; i++)
+            {
+                TMP_CharacterInfo character = label.textInfo.characterInfo[i];
+                if (!character.isVisible) continue;
+                xMin = Mathf.Min(xMin, character.bottomLeft.x);
+                yMin = Mathf.Min(yMin, character.bottomLeft.y);
+                xMax = Mathf.Max(xMax, character.topRight.x);
+                yMax = Mathf.Max(yMax, character.topRight.y);
+            }
+            Vector3 min = label.transform.TransformPoint(new Vector3(xMin + padding, yMin + padding)),
+                max = label.transform.TransformPoint(new Vector3(xMax - padding, yMax - padding));
+            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+        }
+
+        private static Rect WorldRectOf(Transform space, Rect local)
+        {
+            Vector3 min = space.TransformPoint(local.min), max = space.TransformPoint(local.max);
+            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
         }
 
         [Test]
-        public void TheEmergencySignCoversNothingAtAnyBoardSizeAndTakesNoClicks()
+        public void TheBulbIsHalfItsOldSizeFromOneSerializedValueAndItsLightsScaleWithIt()
+        {
+            var installer = All<GameInstaller>().Single();
+            float serialized = new SerializedObject(installer).FindProperty("emergencyLampSize").floatValue;
+            Assert.That(serialized, Is.EqualTo(44).And.EqualTo(88f / 2), "half of fix pass 4's 88 units");
+            Assert.That(EmergencyLampView.DefaultBulbSize, Is.EqualTo(serialized));
+            var lamp = All<EmergencyLampView>().Single();
+            Assert.That(lamp.BulbSize, Is.EqualTo(serialized), "the game passes its serialized value");
+
+            // Measured on the board: the number lamps' bulbs are 96 board units.
+            Canvas board = Socket("A1").GetComponentInParent<Canvas>().rootCanvas;
+            SwitchboardLampView number = All<SwitchboardLampView>().First(l => l.GetComponentInParent<Canvas>().rootCanvas == board);
+            RectTransform numberBulb = number.GetComponentsInChildren<Image>(true).First(i => i.sprite == number.BulbOff).rectTransform;
+            float unit = WorldRect(numberBulb).width / 96f;
+            Assert.That(WorldRect(lamp.Bulb.rectTransform).width / unit, Is.EqualTo(44).Within(.01f));
+            Assert.That(WorldRect(lamp.LitBulb.rectTransform).width / unit, Is.EqualTo(44).Within(.01f));
+            Assert.That(WorldRect(lamp.Glow.rectTransform).width / unit, Is.EqualTo(44 * EmergencyLampView.GlowScale).Within(.01f), "the glow scales with it");
+            Assert.That(WorldRect(lamp.InnerGlow.rectTransform).width / unit, Is.LessThan(44 * .75f).And.GreaterThan(44 * .4f), "and so does the inner light");
+            Assert.That(WorldRect((RectTransform)lamp.transform).width / unit, Is.EqualTo(44).Within(.01f), "the lamp's own box is the bulb");
+        }
+
+        [Test]
+        public void ThePlateAndItsLetteringAreMeasuredInBulbsSoTheyScaleWithTheBulb()
+        {
+            var installer = All<GameInstaller>().Single();
+            SerializedProperty serialized = new SerializedObject(installer).FindProperty("emergencySign");
+            var lamp = All<EmergencyLampView>().Single();
+            EmergencyLampView.SignProportions proportions = lamp.Proportions;
+            Assert.That(proportions.Width, Is.EqualTo(serialized.FindPropertyRelative("width").floatValue), "the game passes its serialized ratios");
+            Assert.That(proportions.Height, Is.EqualTo(serialized.FindPropertyRelative("height").floatValue));
+            Assert.That(proportions.CapHeight, Is.EqualTo(serialized.FindPropertyRelative("capHeight").floatValue));
+            Assert.That(proportions.Gap, Is.EqualTo(serialized.FindPropertyRelative("gap").floatValue));
+            Assert.That(proportions.Width, Is.InRange(2f, 2.6f), "a plate 2 to 2.6 bulbs wide");
+            Assert.That(proportions.CapHeight, Is.InRange(.22f, .36f), "capitals about a third of the bulb");
+            Assert.That(proportions.Height, Is.GreaterThan(proportions.CapHeight * 1.6f), "room round the letters");
+
+            Canvas board = Socket("A1").GetComponentInParent<Canvas>().rootCanvas;
+            SwitchboardLampView[] boardLamps = All<SwitchboardLampView>().Where(l => l.GetComponentInParent<Canvas>().rootCanvas == board).ToArray();
+            RectTransform numberBulb = boardLamps[0].GetComponentsInChildren<Image>(true).First(i => i.sprite == boardLamps[0].BulbOff).rectTransform;
+            float unit = WorldRect(numberBulb).width / 96f;
+            var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(SignFontPath);
+            EmergencyLampView other = EmergencyLampView.Create(boardLamps, session.Calls, font, 30, proportions);
+            try
+            {
+                foreach (EmergencyLampView each in new[] { lamp, other })
+                {
+                    float size = each.BulbSize;
+                    Invoke(each, "Follow");
+                    Canvas.ForceUpdateCanvases();
+                    Rect sign = WorldRect(each.Sign), bulb = WorldRect(each.Bulb.rectTransform);
+                    Assert.That(sign.width / unit, Is.EqualTo(proportions.Width * size).Within(.01f), size + ": the plate's width");
+                    Assert.That(sign.height / unit, Is.EqualTo(proportions.Height * size).Within(.01f), size + ": its height");
+                    Assert.That(sign.center.x, Is.EqualTo(bulb.center.x).Within(.01f * unit), size + ": centred under the bulb");
+                    Assert.That((bulb.yMin - sign.yMax) / unit, Is.EqualTo(proportions.Gap * size).Within(.01f), size + ": a gap under it");
+                    float engraved = (GlyphRect(each.SignLabel).yMin - GlyphRect(each.SignEdgeLabel).yMin) / unit;
+                    Assert.That(engraved, Is.EqualTo(EmergencyLampView.SignEngraveDepth * size).Within(.01f), size + ": the light edge's offset follows the bulb");
+                    foreach (TMP_Text label in new[] { each.SignEdgeLabel, each.SignLabel, each.SignLitLabel })
+                    {
+                        label.ForceMeshUpdate();
+                        float wanted = EmergencyLampView.FontSizeFor(font, proportions.CapHeight * size);
+                        Assert.That(label.fontSize, Is.EqualTo(wanted).Within(1e-3f), size + ": the font size for the capitals' height, not shrunk");
+                        // "EMERGENCY" has no descender; only the round C and G overshoot a little.
+                        float drawn = GlyphRect(label).height / unit;
+                        Assert.That(drawn, Is.EqualTo(proportions.CapHeight * size).Within(proportions.CapHeight * size * .1f), size + ": cap height");
+                    }
+                    Rect face = WorldRectOf(each.SignPlate.transform, each.SignPlate.Face);
+                    Rect letters = LetteringRect(each);
+                    Assert.That(face.Contains(letters.min) && face.Contains(letters.max), Is.True, size + ": the letters sit on the face");
+                    Assert.That(letters.center.y, Is.EqualTo(face.center.y).Within(.08f * face.height), size + ": in its middle");
+                    Assert.That(letters.width, Is.GreaterThan(face.width * .75f), size + ": and fill most of it");
+                }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(other.gameObject); }
+        }
+
+        [Test]
+        public void TheSignsLettersReadAtFourAndAHalfToOneOnTheDrawnPlateQuietAndAtEveryPointOfTheFlash()
         {
             var lamp = All<EmergencyLampView>().Single();
-            Assert.That(lamp.Sign.GetComponentsInChildren<Graphic>(true).All(g => !g.raycastTarget), Is.True, "takes no clicks");
+            LabelStripGraphic plate = lamp.SignPlate;
+            Color quiet = lamp.SignLabel.color, bright = lamp.SignLitLabel.color, wash = lamp.SignWash.color;
+            Color washColour = new Color(wash.r, wash.g, wash.b, 1);
+            Assert.That(plate.color, Is.EqualTo(Color.white), "setup: the plate draws its own colours");
+            // The face runs from the darker bottom to the lighter top; a letter's contrast lies between the two, and the
+            // darkest brass is the plate's own bottom colour (the face starts a rim's width above it).
+            Color[] faces = { plate.FaceBottom, plate.FaceTop };
+            // The inner shadow darkens only the band under the top edge: it must end above the letters.
+            Rect letters = LetteringRect(lamp);
+            Rect shadowed = Rect.MinMaxRect(plate.Face.xMin, plate.Face.yMax - plate.InnerShadowDepth, plate.Face.xMax, plate.Face.yMax);
+            Assert.That(letters.yMax, Is.LessThan(WorldRectOf(plate.transform, shadowed).yMin), "the inner shadow lies above the letters");
+            Action<float, float, string> readable = (washAlpha, brightAlpha, when) =>
+            {
+                foreach (bool linear in new[] { false, true })
+                foreach (Color face in faces)
+                {
+                    Color under = Over(face, washColour, washAlpha, linear);
+                    Color ink = Over(quiet, bright, brightAlpha, linear);
+                    Assert.That(Contrast(ink, under), Is.GreaterThanOrEqualTo(4.5f),
+                        when + (linear ? " (linear)" : " (gamma)") + ": " + ink + " on " + under);
+                }
+            };
+
+            lamp.Tick(.1f);
+            Assert.That(lamp.SignWash.canvasRenderer.GetAlpha(), Is.Zero, "setup: no wash while quiet");
+            readable(0, lamp.SignLitLabel.canvasRenderer.GetAlpha(), "quiet");
+
+            // The real flash, as drawn: the wash and the lit letters at each step, the dim end included (step 5 lands
+            // on it exactly, so nothing depends on chance).
+            Call emergency = AddCall("C1", "D2", emergency: true, response: 30, penalty: 100);
+            float dimmest = 1, fullest = 0;
+            for (int i = 0; i < 12; i++)
+            {
+                lamp.Tick(.05f);
+                float washAlpha = wash.a * lamp.SignWash.canvasRenderer.GetAlpha();
+                float brightAlpha = lamp.SignLitLabel.canvasRenderer.GetAlpha();
+                readable(washAlpha, brightAlpha, "flash step " + i);
+                dimmest = Mathf.Min(dimmest, lamp.SignBrightness);
+                fullest = Mathf.Max(fullest, lamp.Brightness);
+            }
+            Assert.That(dimmest, Is.EqualTo(EmergencyLampView.SignLitFloor).Within(1e-4f), "the dim end was checked");
+            Assert.That(fullest, Is.GreaterThan(.99f), "and the full flash, with the full red wash");
+            // And every point between, by the flash's own rule.
+            for (int step = 0; step <= 20; step++)
+            {
+                float brightness = step / 20f;
+                readable(wash.a * brightness, EmergencyLampView.SignLitFloor + (1 - EmergencyLampView.SignLitFloor) * brightness,
+                    "brightness " + brightness);
+            }
+            Assert.That(wash.a, Is.GreaterThan(.05f), "the red light shows on the plate");
+            Assert.That(session.Calls.Take(emergency.Id), Is.True);
+        }
+
+        [Test]
+        public void TheLampItsGlowAndTheSignCoverNothingAtAnyBoardSizeAndTakeNoClicks()
+        {
+            var lamp = All<EmergencyLampView>().Single();
+            Assert.That(lamp.GetComponentsInChildren<Graphic>(true).All(g => !g.raycastTarget), Is.True, "takes no clicks");
             Canvas board = Socket("A1").GetComponentInParent<Canvas>().rootCanvas;
             Assert.That(lamp.Sign.GetComponentInParent<Canvas>().rootCanvas, Is.SameAs(board), "on the board, under the book");
             Rect play = WorldRect((RectTransform)board.transform);
             SocketView[] sockets = All<SocketView>();
             SwitchboardLampView[] labels = All<SwitchboardLampView>().Where(l => l.GetComponentInParent<Canvas>().rootCanvas == board).ToArray();
             Assert.That(labels.Length, Is.GreaterThanOrEqualTo(12), "setup: the row and column lamps");
-            for (int side = 3; side <= BoardSize.MaxSide; side++)
+            SpeechBubbleGraphic[] bubbles = All<SpeechBubbleGraphic>();
+            Assert.That(bubbles.Length, Is.GreaterThan(0), "setup: the speech bubble");
+            RectTransform numberBulb = labels[0].GetComponentsInChildren<Image>(true).First(i => i.sprite == labels[0].BulbOff).rectTransform;
+            float unit = WorldRect(numberBulb).width / 96f;
+            // The bulb art's visible disc is 105 of its 121 pixels.
+            float numberRadius = WorldRect(numberBulb).width * 105f / 121f * .5f;
+            Texture2D art = FrameArt(out RectTransform panel);
+            try
             {
-                var size = new BoardSize(side, side);
-                foreach (SocketView socket in sockets) socket.SetOpen(size.Contains(socket.Address));
-                Canvas.ForceUpdateCanvases();
-                Invoke(lamp, "Follow");
-                Rect sign = WorldRect(lamp.Sign);
-                Assert.That(play.Contains(sign.min) && play.Contains(sign.max), Is.True, side + ": inside the play area");
-                Assert.That(sign.Overlaps(WorldRect((RectTransform)lamp.transform)), Is.False, side + ": beside the lamp, not over it");
-                foreach (SocketView socket in sockets)
-                    Assert.That(sign.Overlaps(WorldRect((RectTransform)socket.transform, .8f)), Is.False, side + ": " + socket.Address);
-                foreach (SwitchboardLampView label in labels)
-                    Assert.That(sign.Overlaps(WorldRect((RectTransform)label.transform, .8f)), Is.False, side + ": " + label.name);
-                foreach (CallCardView card in All<CallCardView>())
-                    Assert.That(sign.Overlaps(WorldRect((RectTransform)card.transform)), Is.False, side + ": " + card.name);
+                for (int side = 3; side <= BoardSize.MaxSide; side++)
+                {
+                    var size = new BoardSize(side, side);
+                    foreach (SocketView socket in sockets) socket.SetOpen(size.Contains(socket.Address));
+                    Canvas.ForceUpdateCanvases();
+                    Invoke(lamp, "Follow");
+                    Rect lampArea = WorldRect((RectTransform)lamp.transform);
+                    Rect sign = WorldRect(lamp.Sign);
+                    Rect plate = WorldRectOf(lamp.SignPlate.transform, lamp.SignPlate.DrawnRect);
+                    Rect signGlow = WorldRectOf(lamp.SignGlow.transform, lamp.SignGlow.DrawnRect);
+                    Rect glowSquare = WorldRect(lamp.Glow.rectTransform);
+                    Assert.That(signGlow.Contains(plate.min) && signGlow.Contains(plate.max), Is.True, side + ": the glow reaches round the plate");
+                    Assert.That(signGlow.width, Is.LessThan(sign.width * 1.3f), side + ": a little round it, not a bloom");
+                    foreach (Rect part in new[] { lampArea, sign, signGlow, glowSquare })
+                        Assert.That(play.Contains(part.min) && part.max.x <= play.xMax && part.max.y <= play.yMax, Is.True, side + ": inside the play area");
+                    Assert.That(sign.yMax, Is.LessThan(WorldRect(lamp.Bulb.rectTransform).yMin), side + ": the sign is under the bulb");
+
+                    // The frame round the lamp is the colour the plain-frame check compares with.
+                    float r = 0, g = 0, b = 0;
+                    int samples = 0;
+                    for (int i = 0; i <= 20; i++)
+                    for (int j = 0; j <= 6; j++)
+                    {
+                        Color32 c = ArtAt(art, panel, new Vector2(sign.xMin + sign.width * i / 20, sign.yMin + sign.height * j / 6));
+                        r += c.r; g += c.g; b += c.b;
+                        samples++;
+                    }
+                    Assert.That(new[] { r / samples, g / samples, b / samples },
+                        Is.EqualTo(new float[] { FrameColour.r, FrameColour.g, FrameColour.b }).Within(8), "the frame's colour under the plate");
+
+                    // On the plain frame: the plate and its glow, plus 2 units, keep clear of the gold
+                    // curl, the frame's lines and the jacks' panel.
+                    Rect around = new Rect(signGlow.xMin - 2 * unit, signGlow.yMin - 2 * unit, signGlow.width + 4 * unit, signGlow.height + 4 * unit);
+                    for (int i = 0; i <= 60; i++)
+                    for (int j = 0; j <= 16; j++)
+                    {
+                        var at = new Vector2(around.xMin + around.width * i / 60, around.yMin + around.height * j / 16);
+                        Assert.That(IsPlainFrame(ArtAt(art, panel, at), FrameColour), Is.True,
+                            side + ": the sign touches the frame's art at " + at);
+                    }
+                    Vector2 bulbCentre = WorldRect(lamp.Bulb.rectTransform).center;
+                    float bulbRadius = WorldRect(lamp.Bulb.rectTransform).width * 105f / 121f * .5f;
+                    for (int i = 0; i < 24; i++)
+                    for (int ring = 0; ring <= 2; ring++)
+                    {
+                        float angle = i * Mathf.PI / 12, reach = bulbRadius * ring / 2 + (ring == 2 ? 2 * unit : 0);
+                        var at = bulbCentre + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * reach;
+                        Assert.That(IsPlainFrame(ArtAt(art, panel, at), FrameColour), Is.True,
+                            side + ": the bulb touches the frame's art at " + at);
+                    }
+
+                    // The glow is a disc of light that fades to nothing at its edge, so the disc is what must stay clear.
+                    Vector2 centre = glowSquare.center;
+                    float radius = glowSquare.width * .5f;
+                    Action<Rect, string> clear = (other, what) =>
+                    {
+                        Assert.That(lampArea.Overlaps(other), Is.False, side + ": the lamp over " + what);
+                        Assert.That(signGlow.Overlaps(other), Is.False, side + ": the sign or its glow over " + what);
+                        var nearest = new Vector2(Mathf.Clamp(centre.x, other.xMin, other.xMax), Mathf.Clamp(centre.y, other.yMin, other.yMax));
+                        Assert.That(Vector2.Distance(nearest, centre), Is.GreaterThan(radius), side + ": the glow over " + what);
+                    };
+                    foreach (SocketView socket in sockets) clear(WorldRect((RectTransform)socket.transform, .8f), socket.Address);
+                    foreach (CallCardView card in All<CallCardView>()) clear(WorldRect((RectTransform)card.transform), card.name);
+                    foreach (SpeechBubbleGraphic bubble in bubbles) clear(WorldRect(bubble.rectTransform), "the bubble");
+                    // The number lamps are round: nothing of the sign may come within 3 units of their visible discs.
+                    foreach (SwitchboardLampView label in labels)
+                    {
+                        Vector2 lampCentre = WorldRect((RectTransform)label.transform).center;
+                        var nearest = new Vector2(Mathf.Clamp(lampCentre.x, signGlow.xMin, signGlow.xMax), Mathf.Clamp(lampCentre.y, signGlow.yMin, signGlow.yMax));
+                        Assert.That(Vector2.Distance(nearest, lampCentre), Is.GreaterThan(numberRadius + 3 * unit), side + ": the sign by " + label.name);
+                        Assert.That(Vector2.Distance(bulbCentre, lampCentre), Is.GreaterThan(numberRadius + bulbRadius + 3 * unit), side + ": the bulb by " + label.name);
+                        Rect labelRect = WorldRect((RectTransform)label.transform, .8f);
+                        Assert.That(lampArea.Overlaps(labelRect), Is.False, side + ": the lamp over " + label.name);
+                        nearest = new Vector2(Mathf.Clamp(centre.x, labelRect.xMin, labelRect.xMax), Mathf.Clamp(centre.y, labelRect.yMin, labelRect.yMax));
+                        Assert.That(Vector2.Distance(nearest, centre), Is.GreaterThan(radius), side + ": the glow over " + label.name);
+                    }
+                }
             }
+            finally { UnityEngine.Object.DestroyImmediate(art); }
         }
 
         private static string Look(SocketGraphic socket)

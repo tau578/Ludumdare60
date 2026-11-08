@@ -24,8 +24,17 @@
 | 10d. Static fonts | done | ✅ 2026-10-22 (26 min) | ✅ 705/705 tests, scope clean | ✅ | ed0e2ad |
 | 11a. Gather the sounds | building | | | | |
 | 11b. Wire the sounds | not started | | | | |
-| 11c. Main visual feedback | playtesting | ✅ 2026-10-22 (25 min + 13 + 29 min fixes) | ✅ 740/740 tests, scope clean | | |
+| 11c. Main visual feedback | playtesting | ✅ 2026-10-22 (25 min + 13 + 29 + 15 + 16 + 17 + 19 + 23 min fixes) | ✅ 744/744 tests, scope clean | | abbd5f1 (passes 1–2) |
 | 11d. Extra visual feedback | not started | | | | |
+| L1. Pressure and the queue fix | not started | | | | |
+| L2. Days | not started | | | | |
+| L3. Score and streak | not started | | | | |
+| L4. Stakes within the day | not started | | | | |
+| L5. Stakes across days | not started | | | | |
+| L6. Unlocks and the wall | not started | | | | |
+| L7. Chores | not started | | | | |
+| L8. Nerves | not started | | | | |
+| L9. Narrative between days | not started | | | | |
 | 12. Mobile and Web polish | not started | | | | |
 | 13. Balance | not started | | | | |
 
@@ -5335,4 +5344,471 @@ Follow-ups (docs, for the orchestrator):
   - The sign is lit under the lamp and readable.
   - The sparks show a white flash, a blue-white zigzag arc, thin streaks and later a dark puff, with no stars or gold. They read as a zap.
   - At real size they are still small (streaks of about 20 px at 1080p). Whether they are obvious enough is for the lead's playtest.
+
+#### Step 11c playtest, rounds 3 and 4 (lead, 2026-10-22)
+- **Round 3:**
+  - Fixes committed first: 11c with fix passes 1–2 is `abbd5f1` (local).
+  - The lead found the lamp flat and sent a photo of a red emergency-door lamp.
+  - Fix pass 3 built a glossy glass lamp (`GlassLampGraphic`: metal bezel, domed lens with a hot core, Fresnel ridges, a white glint, red light spill; 742/742).
+- **Round 4:**
+  - **The lead:** "i like the new one. but i think it feels off."
+  - **The orchestrator's reading:** it was a different style from the board.
+    - The board's number lamps are frosted, matte glass with a thin art-nouveau rim, in muted greys, with ornate numbers.
+    - The new lamp was clear glossy glass with a white glint and a plain machined rim, in the most saturated colours on screen, with a plain sans-serif sign on a black plate.
+  - **Kept aside:** at the lead's request the glossy lamp is on the local branch `step-11c-lamp-glossy-glass` (`e914ff8`, with its report and tests). `main` goes on without it.
+  - **Fix pass 4 (the lead agreed):** a board-style lamp. It uses the board's own lamp art tinted red, has a frosted inner glow with no glint and a soft warm glow on the frame, and "EMERGENCY" sits in the board's ornate font, set into the frame with no plate.
+  - **A second reference** (a caged industrial bulkhead lamp) is kept in the session scratchpad for later, for a hand-drawn lamp in the board's style.
+
+### Step 11c fix pass 4 report: 2026-10-22
+Result: done
+
+Playable now: the emergency lamp is a sibling of the board's number lamps. It uses their own frosted bulb art, tinted red: a dull, deep red disc with the same thin filigree rim while nothing waits. While an emergency waits it glows a warm red from inside, brightest in the middle, with a soft red glow on the frame around it. "EMERGENCY" is cut into the frame under it in the board's own lettering (Boecklins Universe, the font of the board's numbers), with no plate: dark warm brown while unlit, warm glowing red and flashing with the lamp while an emergency waits.
+
+How to test (Continue or New Game, Unity in front):
+1. With no emergency waiting, look right of column 6: a dull, deep red frosted bulb the size of the number bulbs, and under it "EMERGENCY" in dark brown letters cut into the wood.
+2. Pick up a cord and hover a jack in column 6: its number lamp lights cream with a soft glow. Compare with step 3: the same kind of light, in red.
+3. Wait for an emergency (Dev, "Emergency now"). The bulb flashes twice a second between dark red and a warm glowing red, with a soft red glow on the frame. The lettering turns red and flashes with it, never fully dark while the emergency waits. Pause: both freeze. Connect the emergency: both go dark.
+4. Grow the board (shop or Dev, "Open board"): the lamp and sign stay put and cover no jack or number lamp.
+
+Created: none.
+
+Changed:
+- `Assets/Scripts/Game/Views/EmergencyLampView.cs`: rebuilt in the board's style.
+  - **Bulb:** two `Image`s with the board's own sprites, taken at runtime from the last column's `SwitchboardLampView` (no copied art): `bulb-02` tinted dull red (unlit, always shown) and `bulb-01` tinted warm red (lit), faded in over it by `Brightness`. A small feathered `LampGlowGraphic` inside (0.62 of the bulb) makes the middle the hottest part. No glint, bezel or plate.
+  - **Glow:** a `LampGlowGraphic` 1.45 bulbs wide (the number lamps' glow is 1.46), red, alpha = `Brightness`; it lies over the sign, so the light falls on the lettering.
+  - **Sign:** three TMP labels in `Boecklins Universe SDF Static` (ASCII): a faint light edge 1.3 units lower (the groove's lit lower edge, so the letters read as cut into the frame), the dark brown lettering (always shown) and the red lettering (alpha = `SignBrightness`, floor 0.35 as before), plus a faint stretched red glow behind them (alpha = `Brightness`).
+  - **Size and place:** the bulb is 88 board units (the number bulbs are 96), 0.82 of a column step right of the last column number and 7 units higher; the 124×28 sign sits under it, on the frame strip above the jacks' panel. The lamp now takes the board's scale (the board is scaled about 0.88 at 1080p), so it grows and shrinks with the board.
+  - Flashing only sets `CanvasRenderer` alphas (no mesh rebuilds, no allocations; tested). Timing (2 flashes/s, cosine, starts lit), pause freeze and "dark once connected" are unchanged.
+  - New members: `Bulb`, `LitBulb`, `InnerGlow`, `Glow`, `SignLabel`, `SignLitLabel`, `SignGlow`, `GlowScale`. `Create` takes the sign's font.
+- `Assets/Scripts/UI/SwitchboardLampView.cs`: read-only `BulbOff`/`BulbOn`, so the emergency lamp reuses the board's bulb art.
+- `Assets/Scripts/Game/GameInstaller.cs`: a serialized `emergencySignFont`, passed to `EmergencyLampView.Create`.
+- `Assets/Prefabs/Game/Game.prefab`: `emergencySignFont` = `Boecklins Universe SDF Static`. Saving the prefab also dropped a stale `randomSeed: 0` line (no such field in `GameInstaller` any more) and wrote `CordBridge`'s four fix-pass-2 fields with their code defaults (12, 0.5, 7, 0.35): no behaviour change.
+- `Assets/Tests/Game/Editor/FeedbackEffectsTests.cs`: see Tests.
+- `Docs/Progress.md`: this report.
+
+Scene and prefab changes: `Game.prefab` (above). `Final.unity` is unchanged and not dirty.
+
+Tests: 741/741 EditMode (740 − 2 replaced + 3):
+- New `TheLampIsTheBoardsOwnBulbTintedRedAndItsGlowFollowsTheFlash`: the bulbs are the number lamps' own `BulbOff`/`BulbOn` sprites (`bulb-02.png`, `bulb-01.png`) and the lamp has no other art; both tints are a warm, muted red (not #FF0000), the unlit one darker; the inner light is smaller than the bulb; the glow is 1.2–1.8 bulbs; draw order (sign, glow, dark bulb, lit bulb, inner light); unlit, every light layer's alpha is 0 and the dark bulb's is 1; while an emergency waits each light's alpha equals `Brightness` (12 steps of 0.05 s land exactly on the flash's dark point, so it can't fail by chance), freezes on pause, allocates nothing per frame, and is 0 once connected.
+- Replaced `TheEmergencySignIsDarkUntilAnEmergencyWaitsThenFlashesWithTheLampAndFreezesOnPause`: the sign has no `Image` (no plate); its three labels read "EMERGENCY" in `Boecklins Universe SDF Static`; dark brown unlit, red lit; the flash and pause checks as before.
+- Replaced `TheEmergencySignCoversNothingAtAnyBoardSizeAndTakesNoClicks` with `TheLampItsGlowAndTheSignCoverNothingAtAnyBoardSizeAndTakeNoClicks`: the bulb is 0.8–1.05 of a number bulb; for boards 3×3 to 6×6 the lamp, its glow, the sign and the sign's glow stay inside the play area; the sign is under the bulb, not over it; the lamp, sign and sign glow overlap no jack, row or column lamp, card or speech bubble, and the glow disc reaches none of them; nothing takes clicks.
+
+Console: clean (no errors or warnings after compiling, the tests and the Play runs).
+
+Screenshots (`Temp/Captures/`, 1920×1080, Play Mode in `Final` on the lead's save, frames driven by `EditorApplication.Step`; for the three state shots the game loop, the lamp's own `LateUpdate` and column 6's lamp view were switched off for the captured frame, with column 6's number lamp set lit for comparison):
+- `step-11c-fix4.png`: the 12 s smoke run (an emergency waiting, no errors).
+- `step-11c-fix4-unlit.png`: no emergency (the lamp unbound): the dull red frosted bulb and the dark brown cut lettering, beside the lit cream "6".
+- `step-11c-fix4-lit.png`: full brightness: warm red, hottest in the middle, a soft glow on the frame, red lettering.
+- `step-11c-fix4-mid-flash.png`: brightness 0.5 (`Tick(0.125)`).
+- `step-11c-fix4-closeup.png`: unlit, mid-flash and lit side by side, 2× and at real size, each beside the lit column-6 lamp, to compare the styles.
+- `step-11c-fix4-phone.png`: the lit lamp at 844×390.
+
+Deviations from the brief:
+1. **The bulb is 88 units, not the number lamps' 96** (92%), and sits 7 units higher than the numbers. The frame strip right of column 6 is about 115×110 units between the "6" and the frame's gold curl; a full-size bulb would leave no room for the sign under it.
+2. **Sign size: readable at 1080p, not on a phone.** The free strip fits "EMERGENCY" about 124 units wide, so its capitals are about 12 px tall at 1080p, and about 4–5 px at 844×390 (`step-11c-fix4-phone.png`), where it reads only as a red mark under the lamp. At that size the caller names, card badges and shop labels are just as small, so phone text belongs to Step 12. Making the sign phone-readable would need a different place (for example on the wall above the board) or a different board layout: a call for the lead.
+3. The lettering's "cut into the frame" look is a faint light edge under the dark letters; the static font's shared material isn't changed (no runtime material).
+
+Follow-ups (docs, for the orchestrator):
+- Design 5.11 / the 11c status row: the emergency lamp now uses the board's bulb art (`bulb-02`/`bulb-01`, tinted red) with a soft glow, and the sign is cut into the frame in Boecklins Universe (no plate); the glossy lamp stays only on `step-11c-lamp-glossy-glass`.
+- Plan Step 12: add the emergency sign (and the other small board text) to the phone-readability checks.
+- Plan Step 11b: unchanged; the S1 bell can still start and stop on `EmergencyLampView.IsWarning`.
+- Housekeeping:
+  - The lead's `operator.save` and `.backup` were kept in SessionState and a scratchpad copy, then restored exactly after the Play runs (string-compared; the runs had changed them). The SessionState keys are erased.
+  - `Time.timeScale` is 1, every stepper removed itself, the editor isn't paused, the components switched off for captures are back on, and the Game view is back at 1920×1080 (844×390 stays in its size list, an editor preference).
+  - No `TimeManager.asset`, `SampleScene.unity` or font re-saves this time. The editor is idle, out of Play Mode and compiled, with `Final.unity` active and saved.
+
+#### Step 11c fix pass 4 verification (orchestrator, 2026-10-22)
+- **Scope:** the changed files are `EmergencyLampView.cs`, `SwitchboardLampView.cs` (read-only `BulbOff`/`BulbOn`), `GameInstaller.cs`, `Game.prefab`, `FeedbackEffectsTests.cs` and the report.
+  - The `Game.prefab` diff is exactly as reported: `emergencySignFont` set, a stale `randomSeed` line dropped, and `CordBridge`'s four wiggle and jolt values written at their code defaults.
+- **Tests:** 741/741 EditMode, re-run by the orchestrator. The console is clean.
+- **Close-up checked:**
+  - The red lamp sits beside the lit "6" as the same kind of frosted disc, at about the same size.
+  - The sign is in the numbers' own art-nouveau font, cut into the frame with no plate.
+  - The lit red glow matches the number lamps' cream glow in softness.
+  - The red tint hides most of the bulb's thin filigree rim. It is a candidate for the playtest, or for a hand-drawn red bulb later.
+- **Open (for Step 12):** the sign is about 12 px tall at 1080p and unreadable at 844×390. Readable phone text needs the Step 12 layout work.
+
+#### Step 11c playtest, round 5 (lead, 2026-10-22)
+- **Liked:** the new board style, the colours and the sign's font.
+- **Rework:**
+  - The sign's text is almost unreadable: its colour is too close to the frame behind it.
+  - The bulb is too big. Make it 1/2 or 1/3 of its current size: half by default, with a capture at a third for the lead to compare.
+  - The freed space lets the sign's text grow.
+
+
+### Step 11c fix pass 5 report: 2026-10-22
+Result: done
+
+Playable now: the emergency bulb is half its old size (44 board units, one serialized value) and sits level with the column numbers, centred over the sign. "EMERGENCY" is bigger and clearly readable in both states. It sits lower on the frame strip, on its widest free part, and runs from under the curve of the "6" to just short of the gold curl. Unlit, the letters are ivory with a near-black edge all round. Lit, they turn a bright warm red inside the same dark edge and flash with the lamp. At the dim end of the flash they stay a warm salmon, never dark.
+
+How to test (Continue or New Game, Unity in front):
+1. With no emergency waiting, look right of column 6: a small dull red bulb level with the numbers, and under it "EMERGENCY" in ivory letters with a dark edge, easy to read on the brown frame.
+2. Wait for an emergency (Dev, "Emergency now"). The bulb flashes red with its soft glow, and the lettering flashes between bright red and a warm salmon, always readable. Pause: both freeze. Connect the emergency: both go back to unlit.
+3. Grow the board (shop or Dev, "Open board"): the lamp and sign stay put, touching neither the "6" nor the gold curl, and never the jacks' panel.
+4. To try the third size: on `Game.prefab`'s `GameInstaller`, set "Emergency Lamp Size" to 29.33. Its glow and inner light follow, and the sign doesn't move.
+
+Created: none.
+
+Changed:
+- `Assets/Scripts/Game/Views/EmergencyLampView.cs`:
+  - **Bulb size:** `Create` takes the size (`DefaultBulbSize` = 44, replacing the fixed `Diameter` = 88). The bulb, lit bulb, inner light (0.62×) and glow (1.45×) all scale from it, and so does the lamp's own box. New read-only `BulbSize`.
+  - **Placement:** fixed offsets in board units from the last column number's centre, scaled with the board as before. The bulb is at (+99.5, 0): level with the numbers. The sign's box is at (+99.5, −46.5) and measures 139×23. The lamp now follows only the last column lamp; the old "previous column" step and the `StepAcross`/`RaiseAbove`/`SignDrop` values are gone.
+  - **How the sign's place was found:** the free area was measured from the frame art (`board_matte.png`, mapped to the board's units). The frame strip is widest at its bottom, where the gold curl bends away. Its box is the biggest one-line box that keeps 3 units from the curl and from the gold line above the jacks' panel, and 4 units from the visible disc of the "6" bulb (it tucks under that bulb's curve).
+  - **Lettering:** `SignFontSize` is 21 (fix pass 4 auto-sized to about 19.3 in a 124-wide box). The capitals are about 13 px tall at 1080p, against about 12 before. Higher up the strip, the "6" and the curl leave only about 118 units of width, so the text couldn't grow there.
+  - **Colours** (WCAG contrast; the frame behind the letters, `FrameColour`, is #855C42, measured as the art's average under the sign, and matches the capture):
+    - Unlit `SignUnlit`, ivory (246,236,214): **4.96:1 on the frame**.
+    - Edge `SignEdge`, near-black espresso (24,12,8): 3.29:1 on the frame.
+    - Lit `SignLit`, warm red (255,86,58): **6.07:1 against the edge**, 1.84:1 against the bare frame.
+    - Dim end of the flash, the red at its floor over the ivory, (250,188,167): **11.7:1 against the edge**, 3.56:1 against the frame.
+  - **Edge:** eight copies of the lettering, moved 1.6 board units out in eight directions, drawn under the letters and always shown (`SignEdgeLabels`). They replace the faint light "cut" edge. No material is created or changed.
+  - **Flash:** `SignLitFloor` (now public) goes from 0.35 to 0.45, so the lit sign stays red-tinged at the flash's dim end. The sign's glow is 1.2× the sign's height (was 1.5×), so it stays on the frame strip. The bulb's and glow's colours, the font, the flash timing, pause freezing and the allocation-free alpha fades are unchanged.
+- `Assets/Scripts/Game/GameInstaller.cs`: new `[SerializeField, Min(1)] emergencyLampSize` (default `EmergencyLampView.DefaultBulbSize`), passed to `EmergencyLampView.Create`.
+- `Assets/Prefabs/Game/Game.prefab`: `emergencyLampSize: 44` on `GameInstaller` (one added line; checked by loading the prefab in Unity).
+- `Assets/Tests/Game/Editor/FeedbackEffectsTests.cs`: see Tests.
+- `Docs/Progress.md`: this report.
+
+Scene and prefab changes: `Game.prefab` (above). `Final.unity` is unchanged and not dirty.
+
+Tests: 743/743 EditMode (741 + 2 new):
+- New `TheBulbIsHalfItsOldSizeFromOneSerializedValueAndItsLightsScaleWithIt` checks:
+  - the prefab's `emergencyLampSize` is 44 = 88 / 2, equals `DefaultBulbSize`, and is the lamp's `BulbSize`;
+  - measured on the board (number bulbs = 96 units), the bulb and lit bulb are 44 units, the glow is 44 × 1.45, the inner light is between 0.4 and 0.75 of the bulb, and the lamp's box is 44.
+- New `TheSignsLettersReadClearlyOnTheFrameUnlitAndAtEveryPointOfTheFlash` checks:
+  - `FrameColour` matches the frame art's average under the sign (±6 per channel);
+  - with its own WCAG formula: unlit ivory ≥ 4.5 on the frame;
+  - black stays under 4.5 on the frame, which is why the edge is needed;
+  - lit red ≥ 4.5 against the edge, ivory ≥ 4.5 against the edge, and the edge ≥ 3 against the frame;
+  - the flash's dimmest point, found by ticking 12 × 0.05 s (step 5 lands exactly on the dim end, so nothing depends on chance), is the floor; the colour shown there, blended in both gamma and linear space, is ≥ 4.5 against the edge and still warm; and so are 11 points from the dim end to full.
+- Rewritten `TheLampItsGlowAndTheSignCoverNothingAtAnyBoardSizeAndTakeNoClicks`, checked for each board from 3×3 to 6×6:
+  - the drawn letters, edge included (from the TMP meshes), fit the sign's box and fill at least 96% of its width;
+  - the lamp, glow, sign and sign glow stay inside the play area, and the sign is under the bulb;
+  - **every sample of the frame art under the sign's box plus 2 units, and under the bulb's disc plus 2 units, is plain frame colour**, so neither touches the gold curl, the frame's lines or the jacks' panel;
+  - the sign and the bulb keep at least 3 units clear of every number lamp's visible disc;
+  - the lamp, the sign, the sign's glow and the glow disc keep clear of every jack, card and the speech bubble, and nothing takes clicks.
+  - To check the art test isn't vacuous, the sign was moved 6.5 units right on purpose: the test failed ("the sign touches the frame's art"), and the move was then reverted.
+- Updated `TheEmergencySignIsDarkUntilAnEmergencyWaitsThenFlashesWithTheLampAndFreezesOnPause` checks:
+  - 10 labels (eight for the edge, ivory, red), all in `Boecklins Universe SDF Static`;
+  - the colours are the constants;
+  - the edge offsets are all `SignEdgeWidth` and balanced, the edge sits under the letters, and red sits over ivory;
+  - the edge and the ivory always show;
+  - while flashing, the red follows `SignLitFloor + (1 − floor) × Brightness` and reaches the floor exactly at the dim end.
+
+Console: clean after compiling and the test runs. Taking screenshots in Play Mode logged two engine warnings, "Ignoring depth surface load/store action as it is memoryless". They come from Unity's capture, not the project's code; the console was cleared afterwards.
+
+Screenshots (`Temp/Captures/`, 1920×1080, Play Mode in `Final` on the lead's save, frames driven by `EditorApplication.Step`). For the state shots, the game loop, the lamp's own `LateUpdate` and column 6's lamp view were switched off for the captured frame, with the "6" set lit for comparison:
+- `step-11c-fix5.png`: the 12 s smoke run (an emergency waiting, no errors).
+- `step-11c-fix5-unlit.png`: no emergency (the lamp unbound).
+- `step-11c-fix5-lit.png`: full brightness.
+- `step-11c-fix5-dim-end.png`: the flash's dim end (lamp dark, sign at its 0.45 floor).
+- `step-11c-fix5-closeup.png`: unlit, dim end and lit, side by side, at 2× and at real size, each beside the lit "6".
+- `step-11c-fix5-third.png`: the bulb at a third (29.3 units), unlit and lit, at 2× and at real size, with the half-size lit lamp on the right for comparison. Its source frames are `step-11c-fix5-third-unlit-full.png` and `step-11c-fix5-third-lit-full.png`. The size was changed on the running lamp only, then set back to 44; the serialized value stays 44.
+- **Readability at real size (1080p):** the ivory unlit lettering and the red lit lettering both read at a glance, letter by letter. The dark edge keeps the red letters' shapes crisp on the brown, and the dim end is a readable salmon.
+
+Deviations from the brief:
+1. **The lit colour's 4.5:1 is measured against the dark edge, not the bare frame.** The frame behind the letters (#855C42) is mid-brown, and its luminance limits every colour. Pure black reaches only 3.6:1 on it, so no "near-black espresso" can reach 4.5. A red would need a luminance of about 0.80 (a pale peach), which no longer reads as red. So the lit letters use the fallback the brief allows: a dark edge round every letter. The test checks the lit red, and the dim end of the flash, against that edge (6.1:1 and 11.7:1), plus the edge against the frame (3.3:1). Only the unlit ivory meets 4.5:1 against the frame directly (4.96:1). Against the bare frame, the lit red is 1.84:1 and the dim end 3.56:1. The edge is what makes them readable.
+2. **Unlit is light ivory, not a dark brown.** This follows from point 1: it is the brief's own second example, "a light cream like the lit number lamps".
+3. **The text grew about 8–10% (size 21, caps about 13 px at 1080p), not more.** "EMERGENCY" on one line is limited by width. The widest free part of the frame is its bottom, about 139 units between the "6" bulb's curve and the curl, against 124 before. Any bigger and it would touch the "6", the curl or the panel line, which the new art test forbids. More would need a narrower or tighter-set lettering (negative spacing would run the dark edges together) or a different spot: a call for the lead.
+4. The sign starts under the lower right of the "6" bulb's curve (about 4 units clear of its visible disc). It is no longer entirely right of the "6", because that is where the strip is widest.
+
+Follow-ups (docs, for the orchestrator):
+- Design 5.11 and the 11c status row should say: the emergency bulb is 44 units, one serialized value (`GameInstaller.emergencyLampSize`), level with the column numbers. The sign is ivory with a dark edge, red when lit (floor 0.45), and sits on the bottom of the frame strip.
+- Plan §4 cheat sheet, a possible lesson: "Frame art checks: load the sprite's PNG with `Texture2D.LoadImage` (the import isn't readable) and sample it under a graphic, to prove the graphic sits on plain frame (`FeedbackEffectsTests.FrameArt`)."
+- For the lead: half size (default) or a third (`step-11c-fix5-third.png`)? Changing the size is the one prefab value; the sign doesn't move.
+- Housekeeping:
+  - The lead's `operator.save` and `.backup` were kept in SessionState and in a scratchpad copy. The runs changed them, and they were restored exactly afterwards (string-compared). The SessionState keys are erased.
+  - `Time.timeScale` is 1, every stepper removed itself, the editor isn't paused, and the components switched off for captures are back on. The Game view stayed at 1920×1080.
+  - No `TimeManager.asset`, `SampleScene.unity` or font re-saves.
+  - `CLAUDE.md` (modified) and `Docs/StyleGuide.md` (untracked) show in `git status`. This pass didn't touch them; they were changed outside it.
+  - The editor is idle, out of Play Mode and compiled, with `Final.unity` active and saved.
+
+#### Step 11c fix pass 5 verification (orchestrator, 2026-10-22)
+- **Scope:** the changed files are `EmergencyLampView.cs`, `GameInstaller.cs` (`emergencyLampSize`), `Game.prefab` (`emergencyLampSize: 44`), `FeedbackEffectsTests.cs` and the report, plus fix pass 4's files. `CLAUDE.md`, `Design.md`, `Plan.md` and the new `StyleGuide.md` are the orchestrator's.
+- **Tests:** 743/743 EditMode, re-run by the orchestrator. The console is clean.
+- **Close-ups checked:**
+  - The bulb is half its old size, level with the numbers.
+  - "EMERGENCY" reads clearly at real size: ivory with a near-black edge when unlit, warm red when lit, salmon at the dim end.
+  - The third-size capture (`step-11c-fix5-third.png`) is there for the lead to compare.
+  - Observation: the font's art-nouveau "M" has three stems and could be misread at a glance.
+- **Contrast:** the lit red reaches 4.5:1 against its dark edge, not the bare frame, where no red can reach it. The style guide now says an edge counts as the text's background.
+
+#### Step 11c playtest, round 6 (lead, 2026-10-22)
+- **The bulb at half size is good.**
+- **The sign needs rework:**
+  - Its font (Boecklins Universe, with its three-stem "M") is bad.
+  - White when quiet but red when triggered "looks very off".
+  - It is too big now: its size should follow the bulb's.
+- **The lead's choices** (from the orchestrator's options):
+  - An **ivory label strip with a thin brass rim**, like the label strips on real switchboards. The letters keep one red hue: dark red when quiet, bright red with a red glow over the strip when triggered. The frame's colour stays.
+  - The font is **Della Respira**.
+
+
+### Step 11c fix pass 6 report: 2026-10-22
+Result: done
+
+Playable now: the bulb is unchanged (44 units, level with the numbers). Under it, "EMERGENCY" now sits on a small ivory label strip with a thin brass rim and a soft shadow, like the label strips beside a real switchboard's lamps. The letters are Della Respira capitals in one red. While nothing waits they are a dark oxblood. While an emergency waits they turn a brighter red of the same hue, and a soft red light falls on the strip and just round it, flashing with the bulb. The strip and its letters are sized from the bulb, so changing the bulb's size scales the sign with it.
+
+How to test (Continue or New Game, Unity in front):
+1. With no emergency waiting, look right of column 6: the small dull red bulb, and centred under it a cream strip with a brass edge reading "EMERGENCY" in dark red. Compare it with the "6": it should look like part of the same board.
+2. Wait for an emergency (Dev, "Emergency now"). The bulb flashes. The letters brighten to a clear red and back, never darker than a mid red while it waits, and a soft red light pulses on and round the strip. Pause: everything freezes. Connect the emergency: back to quiet.
+3. Grow the board (shop or Dev, "Open board"): the lamp and strip stay put, clear of the "6", the gold curl and the jack panel.
+4. Optional: on `Game.prefab`'s `GameInstaller`, change "Emergency Lamp Size" (e.g. 36). The strip, its lettering and the gap shrink with it. "Emergency Sign" holds the four ratios (width, height, cap height, gap, in bulb sizes).
+
+Created:
+- `Assets/Scripts/Game/Views/LabelStripGraphic.cs` (+ `.meta`): a drawn label strip, a `MaskableGraphic` with three layers that share one box:
+  - `Plate`: a soft contact shadow (dark, alpha 120/255, dropped 6% of the height, fading out over 12%); a dark-brown hairline; a brass rim lighter on top (`#B8A648` to `#7C6E1A`, the gold line's family); and an ivory face shaded from paper `#F3E9CF` at the top to `#E4D8BA` at the bottom (light from above).
+  - `Wash`: the face only, in the graphic's colour (the red light on the strip).
+  - `Halo`: a soft ring round the strip, eased out (full, then 30% at 45% of its reach, then nothing).
+  - Every measure is a share of the box height (corner 14%, rim 7.5%, hairline 2.5%, halo 18%), so the strip scales as a whole. It is matte: no gloss, no highlight line. The mesh is built once; flashing only sets alphas.
+
+Changed:
+- `Assets/Scripts/Game/Views/EmergencyLampView.cs`: the sign is rebuilt.
+  - **Layout from the bulb:** new `[Serializable] SignProportions` (width 2.6, height 0.56, cap height 0.25, gap 0.16, in bulb sizes). The strip is centred under the bulb, `gap × bulb` below its box. At 44 that is 114.4 × 24.6 units, with 7 units of gap. `FontSizeFor(font, capHeight)` turns the cap height into a TMP size from the font's own `capLine` (Della Respira: 72 of 90, so 13.75 at 44). Autosize stays on only as a guard against ratios that ask for more letters than the strip holds. The label box is twice the strip's height, so only the width can shrink it. Letters are centred on their own geometry (`VerticalAlignmentOptions.Geometry`).
+  - **Lettering:** two labels, `SignLabel` (quiet, always shown) and `SignLitLabel` (faded in by `SignBrightness`), in the font passed in, now `Della Respira SDF Static`. The Boecklins lettering, the eight dark edge copies, `SignUnlit`/`SignEdge`/`SignEdgeWidth`/`SignEdgeLabels`, `FrameColour`, the fixed `SignOffset`/`SignSize`/`SignFontSize` and the old elliptical sign glow are removed.
+  - **Colours** (one hue, 358°, and saturation 0.86; only the value changes):
+    - `SignQuiet` (98,14,17), a dark oxblood.
+    - `SignLit` (166,23,28).
+    - The wash `SignWashTint` is (232,74,52) at alpha 31/255 (12%). The halo is (255,84,52) at alpha 150/255.
+  - **Flash:** `SignLitFloor` goes from 0.45 to 0.35. The wash and halo alphas are `Brightness`. The timing, pause freeze, "dark once connected" and the allocation-free alpha fades are unchanged.
+  - **Draw order:** the sign is now drawn last, after the bulb and its glow, so the lamp's light never tints the strip and the letters are read against the strip alone. Inside the sign the order is halo, plate, wash, quiet letters, lit letters.
+  - New members: `SignPlate`, `SignWash`, `SignGlow` (now the halo), `Proportions`, `SignSize` (now a property), `FontSizeFor`, `SignPadding`.
+- `Assets/Scripts/Game/GameInstaller.cs`: new `[SerializeField] emergencySign` (`EmergencyLampView.SignProportions`), passed to `Create`. The font field's tooltip now says Della Respira.
+- `Assets/Prefabs/Game/Game.prefab`: `emergencySignFont` is now `Della Respira SDF Static` (guid `c945699b…`). There is a new `emergencySign` block (2.6 / 0.56 / 0.25 / 0.16). `emergencyLampSize` stays 44.
+- `Assets/Tests/Game/Editor/FeedbackEffectsTests.cs`: see Tests.
+- `Docs/Progress.md`: this report.
+
+Scene and prefab changes: `Game.prefab` (above). `Final.unity` is unchanged and not dirty.
+
+**How the reds were picked** (WCAG relative luminance, computed in a script and checked by the tests): the worst case is the full flash, with the bright letters on the darkest part of the face (`#E4D8BA`) under the full 12% red wash.
+- (166,23,28) reaches 4.73:1 there (gamma blend; linear is higher). A brighter red of the same hue, (174,24,29), drops to 4.5:1 with a 10% wash, so 166 keeps a small margin.
+- Quiet (98,14,17) is 9.3:1 on the face.
+- The dim end (letters at 35% of the way from quiet to lit, no wash) is about 7:1.
+
+Tests: 744/744 EditMode (743 − 5 replaced + 6):
+- Updated `TheLampIsTheBoardsOwnBulbTintedRedAndItsGlowFollowsTheFlash`: the strip is drawn after the bulb's light, and the wash and halo follow `Brightness`. The rest is as before.
+- New `TheSignIsAnIvoryStripWithABrassRimAndOneRedThatBrightensWhileAnEmergencyWaits` (replaces the old sign test):
+  - **Strip:** the plate, wash and halo layers line up with the strip's box. The face is light, warm and lighter on top. The rim is brass, lighter on top and thin (under 12% of the height).
+  - **Plate mesh** (checked through `OnPopulateMesh`): the hairline, rim and face are drawn with their gradients. The shadow shows under the strip, fades out and falls down more than it reaches up. No light semi-transparent vertices (no gloss).
+  - **Lettering:** exactly two labels, both "EMERGENCY" in `Della Respira SDF Static`, with no edge copies. The quiet and lit colours are less than 1.5° apart in hue and 0.02 apart in saturation, red, the lit one at least 1.5× brighter, and the quiet one dark (value under 0.45).
+  - **Order and flash:** the draw order is checked. The flash follows the lamp, the wash flashes with the bulb, the dim end is reached exactly, a flash frame allocates nothing, and the sign freezes on pause and goes quiet once the emergency is connected.
+- New `TheSignsLettersReadAtFourAndAHalfToOneOnTheDrawnStripQuietAndAtEveryPointOfTheFlash` (replaces the old contrast test):
+  - The strip is checked as actually drawn: the face's top and bottom colours, plus the wash at its real renderer alpha × tint alpha. The letters are the quiet colour with the lit colour over it at its real alpha. Both are blended in gamma and in linear space.
+  - It must reach ≥ 4.5:1 while quiet, at each of 12 real flash steps (step 5 lands exactly on the dim end, so nothing depends on chance), and at 21 points of the flash's own rule from dim to full.
+  - Quiet is also > 7:1.
+- New `TheStripAndItsLetteringAreMeasuredInBulbsSoTheyScaleWithTheBulb`:
+  - The game passes the prefab's ratios, which are in the brief's range (width 2–2.6, cap height 0.22–0.36).
+  - Checked for the game's lamp at 44 and for a second lamp built at 30, both measured in board units:
+    - the strip's width and height are ratio × bulb;
+    - it is centred under the bulb with a gap of `gap × bulb`;
+    - the font size gives the cap height without autosize shrinking it, and the drawn glyphs (from `textInfo`) are cap height × bulb ±10%;
+    - the letters sit on the face, centred, and fill at least 75% of its width.
+- Kept `TheBulbIsHalfItsOldSizeFromOneSerializedValueAndItsLightsScaleWithIt`.
+- Rewritten `TheLampItsGlowAndTheSignCoverNothingAtAnyBoardSizeAndTakeNoClicks`, checked for each board from 3×3 to 6×6:
+  - the halo's drawn box contains the plate with its shadow, and is under 1.3× the strip's width;
+  - everything stays inside the play area, and the strip is under the bulb;
+  - the art under the strip averages the frame colour;
+  - **every frame-art sample under the halo's box plus 2 units, and under the bulb's disc plus 2 units, is plain frame**;
+  - the halo box and the bulb keep 3 units clear of every number lamp's disc;
+  - the lamp, the sign with its halo and the glow disc keep clear of every jack, card and the speech bubble, and nothing takes clicks.
+- The frame colour constant moved from the view into the test, since only the placement check uses it.
+
+Console: clean after compiling and the test runs. Taking screenshots logged Unity's own "Ignoring depth surface load/store action as it is memoryless" twice (from the capture, not the project's code); cleared afterwards.
+
+Screenshots (`Temp/Captures/`, 1920×1080, Play Mode in `Final` on the lead's save, frames driven by `EditorApplication.Step`). For the state shots, the game loop, the lamp's own `LateUpdate` and the "6" lamp view were switched off for the captured frame, with the "6" set lit for comparison:
+- `step-11c-fix6.png`: the smoke run, 12 s of game time (an emergency waiting, `Time.timeScale` 3, reset to 1), no errors.
+- `step-11c-fix6-quiet.png`: no emergency (the lamp unbound).
+- `step-11c-fix6-triggered.png`: full flash.
+- `step-11c-fix6-dim-end.png`: the flash's dim end (`Tick(0.25)`: bulb dark, letters at the 0.35 floor, no wash).
+- `step-11c-fix6-closeup.png`: quiet, dim end and triggered side by side, at 2× (top) and real size (bottom), each beside the lit "6".
+
+**Readability and balance at real size (1080p):** the board is scaled 0.88, so the strip is about 101 × 22 px, the capitals about 9.7 px tall, and the bulb 39 px.
+- "EMERGENCY" reads at a glance in all three states. Della Respira's plain capitals (two-stem "M") are clearer at this size than the old lettering.
+- The quiet oxblood reads as dark red on cream. The triggered red is clearly brighter, and the soft red light round the strip makes the change obvious without a hue jump.
+- The strip is 2.6 bulbs wide and a little over half a bulb tall. It sits centred under the bulb with a small gap, which balances the small bulb.
+
+**StyleGuide §9 checklist:**
+1. **Reuse:** the board has no label strip, so the strip is drawn, using the board's own palette: paper and lamp cream for the face, the gold line for the rim, the frame's dark-brown outline.
+2. **Materials:** matte and soft: a vertical gradient lit from above, no glint or highlight line, a soft shadow falling down.
+3. **Colours:** alarm red for urgent, one hue in both states.
+4. **Motion:** the bulb's flash, 2 per second, on game time.
+5. **Text:** Della Respira capitals; contrast measured at ≥ 4.5:1 in every state (4.73 worst, 9.3 quiet).
+6. **Behaviour:** freezes on pause, no clicks, covers nothing at 3×3 to 6×6.
+7. **Side by side** (`step-11c-fix6-closeup.png`): next to the lit "6", the cream strip reads as a sibling of the cream lamp face, and the brass rim matches the frame's gold curls. The red belongs to the lamp. It reads as a fitting on the frame, not a pasted-on panel.
+
+Deviations from the brief:
+1. **The capitals are a quarter of the bulb (11 units), not a third.** Della Respira's "EMERGENCY" is about 9 cap heights wide. A strip at most 2.6 bulbs wide (114 units) leaves about 105 units for the letters inside the rim and padding, which holds caps of about 11.6 units at most. A third of the bulb (14.7 units) would need a strip about 3.2 bulbs wide. 0.25 keeps a little air at the ends. The ratio is one prefab value, so the lead can try 0.27 (autosize then trims it to fit) or widen the strip.
+2. **The triggered red is (166,23,28), slightly short of the brightest possible.** The 4.5:1 limit on the lit, washed strip allows up to about (174,24,29) with a 10% wash. 166 with a 12% wash keeps a small margin (4.73:1) and a visible red light on the strip.
+
+Follow-ups (docs, for the orchestrator):
+- **Design 11c status row:** fix pass 6 put "EMERGENCY" on an ivory label strip with a brass rim and soft shadow (`LabelStripGraphic`), in Della Respira capitals, in one red: dark oxblood quiet, brighter red with a soft red light on and round the strip while lit (floor 0.35). The strip and lettering are sized from the bulb by `GameInstaller.emergencySign` (2.6 / 0.56 / 0.25 / 0.16 bulbs).
+- **StyleGuide:**
+  - §5's font table: Boecklins is no longer used by the EMERGENCY sign; it now uses Della Respira (about 13.75 units, `#620E11` quiet / `#A6171C` lit).
+  - §5's "dark edge" rule describes the old sign. A light label strip is now the example of how to make text readable on the mid-brown frame.
+  - §2 could add: "Small signs on the frame sit on an ivory label strip with a brass rim (`LabelStripGraphic`)."
+- **Plan §4 cheat sheet,** two possible lessons:
+  - TMP's `textBounds` is the font's line box (here 18.8 units for 11-unit capitals). Measure drawn glyphs from `textInfo.characterInfo` (`bottomLeft`/`topRight`).
+  - With autosize on, a label box shorter than the font's line height shrinks the text even when the width fits.
+- For the lead: the cap-height ratio is the one value to try if the letters should be bigger (point 1 above).
+- Housekeeping:
+  - The lead's `operator.save` and `.backup` (and `Switchboard.AudioPatch.v1`) were kept in SessionState and a scratchpad copy. The runs changed the two saves; all three were restored exactly afterwards (string-compared), and the SessionState keys are erased.
+  - `Time.timeScale` is 1, every stepper removed itself, and the editor isn't paused. The components switched off for captures were in Play Mode only.
+  - The Game view is at 1920×1080.
+  - No `TimeManager.asset`, `SampleScene.unity` or font re-saves.
+  - The editor is idle, out of Play Mode and compiled, with `Final.unity` active and saved. The console is cleared.
+  - `CLAUDE.md`, `Design.md`, `Plan.md` and `StyleGuide.md` weren't touched by this pass.
+
+#### Step 11c fix pass 6 verification (orchestrator, 2026-10-22)
+- **Scope:** the new `LabelStripGraphic.cs` (+ `.meta`), `EmergencyLampView.cs`, `GameInstaller.cs`, `FeedbackEffectsTests.cs` and `Game.prefab` changed.
+  - The prefab's sign font is now Della Respira SDF Static, and a new `emergencySign` block holds the ratios 2.6 / 0.56 / 0.25 / 0.16.
+- **Tests:** 744/744 EditMode, re-run by the orchestrator. The console is clean.
+- **Close-up checked:**
+  - An ivory strip with a brass rim, centred under the half-size bulb, with Della Respira capitals.
+  - One red hue: dark oxblood when quiet, a brighter red with a red light on and round the strip when lit.
+  - It reads at real size.
+- **Colour note:** the letters' red is a crimson (hue 358°), not the bulb's orange-red. Under the orchestrator's proposed colour families (alarm = orange-red, error = crimson), the sign's letters would move to a dark orange-red that still reaches 4.5:1 on the ivory. That waits on the lead's answer.
+
+### Playtest and redesign (lead, 2026-10-25 to 2026-11-08)
+- **Playtest (2026-10-25, a friend and the lead):** no point and no motivation; boring soon after the first connection; people call while already on a call; callers never leave, so no pressure; emergencies don't feel like it; the mystery upgrade is forgotten after the tutorial and not rewarding when bought; nobody wants more money; the calls' stories feel random and aren't worth reading.
+- **Direction (lead, 2026-11-07):** no exhibition and no deadline; the fun loop before polish. The busy operator is the heart, cosy the skin, incremental demoted, the narrative between days. The mystery upgrade and the victory animation are thrown out. Rewards on a wall (operator of the week, frames); failure loud and funny; real stakes; a playtester's chores (register lever, punch clock, pneumatic mail, wiping the glass, an intercom for the electrician); nerves with coffee, a cigarette and the flask.
+- **Written down (orchestrator, 2026-11-08):** Design §1 and §12 and D61–D74; Plan §9 steps L1–L9, before 11b, 11d, 12 and 13; CLAUDE.md. The numbers to confirm are in Design §12.13. 11c's fix passes 4–6 are still uncommitted and go in first. The build order is L1 → L9, then 11b, 11d, 12, 13.
+
+#### Step 11c playtest, round 7 (lead, 2026-11-08)
+- **The ivory label strip looks out of place: too bright.** Next to the grey (unlit) "6" it is the only light thing on the frame, so it reads whiter than it is, and its drop shadow makes it sit on the wood like a sticker.
+- **Mock-ups:** the orchestrator mocked five options over a real capture with the "6" unlit (`Builds/StyleChoices/sign-options.html`, git-ignored). A first version wrongly showed a lit "6", because the agents' captures light column 6 for comparison.
+- **The lead's choice: C, a brass plate with engraved letters.** It uses the frame's own brass, recessed into the wood, with dark engraved letters. While lit, red light falls on the plate and round it. Fix pass 7 builds it.
+- **Not merged yet:** three art-only commits on `origin/main` (`1dd256b`, `34d41ca`, `99b5f6f`: sprites and `RawArt/title.png`). They go in with the 11c commit, when the lead asks.
+
+
+### Step 11c fix pass 7 report: 2026-11-08
+Result: done
+
+Playable now: the ivory strip under the emergency bulb is replaced by option C. It is now a matte brass plate set into the frame, with "EMERGENCY" engraved in it in dark brown-red Della Respira capitals. The size, place and bulb-based sizing are unchanged. While an emergency waits, the letters stay dark: red light falls on the plate (a 14% red wash) and softly round it, flashing with the bulb. There is no drop shadow any more: the plate is sunk into the wood, with a soft shadow under its top edge and a faint light line along its bottom edge.
+
+How to test (Continue or New Game, Unity in front):
+1. With no emergency waiting, look right of the grey (unlit) "6". You should see the small dull red bulb, and under it a small brass plate with a darker rim and dark engraved "EMERGENCY". It should read as part of the frame's brass, not as a light sticker.
+2. Wait for an emergency card. The bulb flashes, red light pulses on and round the plate, and the letters stay dark and readable. Pause: everything freezes. Connect the emergency: back to quiet.
+3. Grow the board (shop or Dev, "Open board"): the lamp and plate stay put, clear of the "6", the gold curl and the jack panel.
+
+Created: none.
+
+Changed:
+- `Assets/Scripts/Game/Views/LabelStripGraphic.cs` (still untracked from fix pass 6), extended rather than replaced:
+  - New `Mount { Recessed = 0, Raised = 1 }` and serialized `mount`, `faceTop`, `faceBottom` and `rim`, with properties `Mounting`, `FaceTop`, `FaceBottom` and `Rim`. The defaults are brass: `BrassTop` `#C6A95E`, `BrassBottom` `#A88A42`, `BrassRim` `#6E5A1E`.
+  - **Recessed** (the default) draws a solid darker rim (5% of the height) and the face gradient. Two layers lie on the face, both inside the rim:
+    - `InnerShadow`: a band under the top edge, (28,18,6) at alpha 140/255, fading to nothing over 12% of the height.
+    - `InnerLight`: a faint line along the bottom edge, (255,240,210) at alpha 46/255 (18%), 4% of the height.
+  - Nothing is drawn outside the box: `DrawnRect` is the box itself.
+  - **Raised** keeps fix pass 6's hairline and drop shadow, now with the serialized colours.
+  - The corner ratio went from 0.14 to 0.09, as the mock-up's 2 px radius.
+  - The ivory constants `FillTop`/`FillBottom`/`RimTop`/`RimBottom` and static `FillAt` are gone; there is a new instance method `FaceAt`.
+  - `Outline` reuses a buffer instead of a new array on every rebuild.
+- `Assets/Scripts/Game/Views/EmergencyLampView.cs`:
+  - **Colours:** `SignQuiet` (58,20,12) `#3A140C` and `SignLit` (72,11,13) `#480B0D`; `SignWashTint` is (232,84,58) at alpha 36/255 (14%). The halo, bulb, flash rule, `SignLitFloor` 0.35, timing and pause freeze are unchanged.
+  - **Engraved edge:** a new label, `SignEdgeLabel`, is an offset copy of the lettering, always shown and drawn under the letters. Its colour is `SignEngraveEdge` (255,240,200) at alpha 89/255 (35%). It sits `SignEngraveDepth` (0.6/44 bulb) below them, so 0.6 units at 44, and it scales with the bulb.
+  - **Thicker strokes (see Deviations):** the three labels share `SignMaterial`, one copy of the font's own material, made once per lamp. It sets `_FaceDilate` = `SignLetterWeight` (0.3) and is destroyed in `OnDestroy`. The shared font material is never touched.
+  - The plate is set to `Mount.Recessed`. Comments and tooltips say "plate" instead of "strip".
+- `Assets/Scripts/Game/GameInstaller.cs`: the `emergencySign` tooltip says "plate" (one word).
+- `Assets/Tests/Game/Editor/FeedbackEffectsTests.cs`: see Tests.
+- `Docs/Progress.md`: this report.
+
+Scene and prefab changes: none. `Game.prefab` keeps fix pass 6's values (font Della Respira SDF Static, lamp size 44, ratios 2.6 / 0.56 / 0.25 / 0.16). `Final.unity` is unchanged and not dirty.
+
+**Contrast** (WCAG; the darkest face colour is the plate's bottom colour `#A88A42`, darker than anything actually under the glyphs):
+
+| State | Gamma blend | Linear blend |
+|---|---|---|
+| Quiet | 4.96:1 | 4.96:1 |
+| Dim end (letters 35% lit, no wash) | 4.92:1 | 4.90:1 |
+| Full flash (lit letters, full 14% red wash) | 4.63:1 | 4.73:1 |
+| Top of the face, full flash | 6.4:1 | 6.6:1 |
+
+- The inner shadow ends above the letters (checked by a test), so it never darkens what is behind them.
+- The mock-up's own numbers were 5.0:1 quiet and 4.6:1 lit, so the lead's colours were kept as given.
+- In the real-size capture, the darkest letter pixels are (59,22,13) quiet and (73,13,13) lit, the letter colours themselves.
+
+Tests: 744/744 EditMode (the same count; three tests rewritten or extended):
+- **Rewritten** `TheSignIsABrassPlateSetIntoTheFrameWithEngravedLettersAndRedLightWhileAnEmergencyWaits` (replaces the ivory-strip test):
+  - The layers line up, and the plate is recessed.
+  - The face and rim are the brass constants. They are brass in hue, the face is lighter on top and mid-dark (luminance under 0.45), and the rim is darker and thin (under 8% of the height).
+  - From the real mesh (`OnPopulateMesh`):
+    - Every vertex lies inside the plate, and `DrawnRect` is the box, so there is no drop shadow.
+    - The rim and the shaded face are drawn.
+    - The inner shadow is darkest exactly at the face's top edge and fades out exactly at its depth (under 20% of the height).
+    - The light line lies only along the bottom, at alpha 20% or less.
+    - It is matte: no light semi-transparent vertex except that line, and no opaque vertex lighter than the face's top.
+  - The lettering is exactly three labels: edge, quiet and lit, all "EMERGENCY" in Della Respira SDF Static, one size, no clicks.
+    - All three share one runtime copy of the font's material (not an asset, same shader and atlas) with `_FaceDilate` 0.3 (0.4 or less), and the shared font material's dilate is still 0.
+    - The edge is light, warm and at low alpha, 0.6 units straight below at 44.
+  - Quiet and lit are one hue family: under 15° apart, both red, saturated and dark (value under 0.35).
+  - The draw order is checked: halo, plate, wash, edge, quiet, lit.
+  - The flash follows the bulb, the halo and wash follow `Brightness`, and the edge always shows. The wash is about 14%. A flash frame allocates nothing, it freezes on pause, and it goes quiet once the emergency is connected.
+- **Rewritten** `TheSignsLettersReadAtFourAndAHalfToOneOnTheDrawnPlateQuietAndAtEveryPointOfTheFlash`:
+  - It reads the face colours from the drawn plate (`FaceBottom`/`FaceTop`) and checks that the inner shadow ends above the glyphs.
+  - Then ≥ 4.5:1 in gamma and linear blending: quiet, at 12 real flash steps (step 5 lands exactly on the dim end, and the full flash with full wash is reached), and at 21 points of the flash rule.
+- **Extended** `ThePlateAndItsLetteringAreMeasuredInBulbsSoTheyScaleWithTheBulb` (renamed from `TheStrip…`): it checks the edge label's offset at 44 and at 30, and that the edge label keeps the cap height.
+  - The glyph helper now takes off the material's padding, which TMP adds round each glyph box and which grows with the dilate. Without that, the box measured 12.8 for 11-unit capitals.
+- Unchanged and passing:
+  - `TheLampItsGlowAndTheSignCoverNothingAtAnyBoardSizeAndTakeNoClicks`: 3×3 to 6×6, plain frame under the halo plus 2 units, no clicks. Only its wording changed.
+  - `TheLampIsTheBoardsOwnBulbTintedRedAndItsGlowFollowsTheFlash`.
+  - `TheBulbIsHalfItsOldSize…`.
+- Baseline before the change: 744/744.
+
+Console: clean after compiling and the test runs. The captures logged Unity's own "Ignoring depth surface load/store action as it is memoryless" twice (from the capture, not the project's code); cleared afterwards.
+
+Screenshots (`Temp/Captures/`, 1920×1080, Play Mode in `Final` on the lead's save, frames driven by `EditorApplication.Step`). **Column 6 is unlit in every shot, as in normal play.** Only the emergency lamp's own `LateUpdate` was switched off for the state shots, which were set through its real `Bind`/`Tick`:
+- `step-11c-fix7.png`: the smoke run, 12 s of game time with an emergency card waiting (`Time.timeScale` 3, reset to 1). No errors or warnings.
+- `step-11c-fix7-quiet.png`: no emergency (`Bind(null)`).
+- `step-11c-fix7-triggered.png`: full flash.
+- `step-11c-fix7-dim-end.png`: `Tick(0.25)`, so the bulb is dark, the letters are at the 0.35 floor and there is no wash.
+- `step-11c-fix7-closeup.png`: quiet, dim end and triggered at 2×; under them, option C's quiet and alarm panels from `sign-options.html` (rendered with headless Chrome, same crop and zoom); and the three game states at real size.
+
+**How close it is to option C:**
+- **Very close.** The plate's size, place, brass colours, darker rim, corner and dark engraved capitals match the mock-up side by side.
+- The first build had TMP's thin strokes at about 10 px. They never reached their colour (darkest pixel (75,49,33)), so the letters looked grey-olive and much lighter than the mock-up's. The 0.3 dilate fixes that: now the letters reach `#3A140C` and look as heavy as the mock-up's browser text.
+- **Small differences:**
+  - The game's red halo is a little tighter and crisper than the mock-up's blurred CSS shadow.
+  - The red wash shows a touch less warm orange on the plate than in the mock-up.
+  - The inner shadow and the light line are subtler at real size (both are about 1 px).
+- **At real size (1080p):** the plate is about 101 × 22 px with capitals about 9.7 px tall. It reads at a glance in all three states and sits quietly next to the grey "6".
+
+**StyleGuide §9 checklist:**
+1. **Reuse:** the frame's own brass (the gold line's family) for the plate; the board's bulb art for the lamp.
+2. **Materials:** matte brass, a soft gradient lit from above, recessed. No gloss, glint or hard highlight; only a faint 18% light line on the bottom edge.
+3. **Colours:** alarm red only as light (the wash and halo); the letters are dark brown-red in both states.
+4. **Motion:** the bulb's 2 flashes per second, on game time.
+5. **Text:** Della Respira capitals; contrast measured at ≥ 4.5:1 in every state (4.63 worst).
+6. **Behaviour:** freezes on pause, takes no clicks, covers nothing at 3×3 to 6×6, stays on plain frame.
+7. **Side by side:** `step-11c-fix7-closeup.png`, next to the grey "6" and against the mock-up.
+
+Deviations from the brief:
+1. **The letters are slightly thickened (SDF `_FaceDilate` 0.3)** through one material copy made once per lamp (StyleGuide §5 allows "a material instance made once"). Without it, Della Respira's strokes at about 10 px never reach the brief's colour, and the letters looked much lighter than option C. The value is one constant, `EmergencyLampView.SignLetterWeight`.
+2. **The quiet and lit letters are 12° apart in hue** (`#3A140C` at 10°, `#480B0D` at 358°), the brief's own values. The brief asks for "the same hue family", so the test allows up to 15°. StyleGuide §5's stricter "brightness, not hue" wording (the fix pass 6 test held them under 1.5°) no longer fits this sign; see Follow-ups.
+
+Follow-ups (docs, for the orchestrator):
+- **Design 11c status row:** fix pass 7 replaced the ivory strip with a recessed matte brass plate:
+  - face `#C6A95E` to `#A88A42`, rim `#6E5A1E`, an inner shadow under the top edge and a faint light line along the bottom, no drop shadow;
+  - engraved Della Respira capitals, `#3A140C` quiet and `#480B0D` lit, with a light edge 0.6 units below and strokes dilated 0.3;
+  - while lit, a 14% red wash plus the halo.
+- **StyleGuide:**
+  - §2's table row and §5's "text on the frame wood" rule still describe the ivory strip. They could say: small signs on the frame are brass plates set into the wood, with engraved dark letters (`LabelStripGraphic`, `Mount.Recessed`); the alarm shows as light on the plate, not as a brighter letter colour.
+  - §5's font table gives the old sign colours (`#620E11`/`#A6171C`); now it is `#3A140C`/`#480B0D`.
+  - The rule "a state change changes brightness, not hue" could note that this sign shows its state through light on the plate, with the letters in one dark red-brown family.
+  - A possible §5 rule: Della Respira under about 12 px needs a slight dilate (a material copy) to reach its colour.
+- **Plan §4 cheat sheet, two possible lessons:**
+  - TMP's `characterInfo` glyph boxes include the material's padding, which grows with `_FaceDilate`. Take off `ShaderUtilities.GetPadding(material, extraPadding, false) × fontSize / pointSize` to measure the glyph's own outline.
+  - The `scratchpad` path of this session was a PNG file, not a folder (left by the mock-up work), so this pass used the sibling folder `…/764b5af7-…/fix7/`.
+- **Housekeeping:**
+  - The lead's `operator.save`, `operator.save.backup` and `Switchboard.AudioPatch.v1` were kept in SessionState and in scratchpad copies. The two Play Mode runs changed the two saves; all three were restored exactly after each run (string-compared), and the SessionState keys are erased.
+  - `Time.timeScale` is 1, every stepper removed itself, and the editor isn't paused. The lamp component switched off for captures was in Play Mode only. The Game view is at 1920×1080.
+  - No `TimeManager.asset`, `SampleScene.unity` or font re-saves.
+  - The editor is idle, out of Play Mode and compiled, with `Final.unity` active and saved. The console is cleared.
+  - `Builds/` was only read: the mock-up was rendered to the scratchpad.
+  - `CLAUDE.md`, `Design.md`, `Plan.md` and `StyleGuide.md` weren't touched by this pass.
+
+#### Step 11c fix pass 7 verification (orchestrator, 2026-11-08)
+- **Scope:** `LabelStripGraphic.cs`, `EmergencyLampView.cs`, `GameInstaller.cs` (a tooltip word) and `FeedbackEffectsTests.cs` changed. No scene or prefab changed.
+- **Tests:** 744/744 EditMode, re-run by the orchestrator. The console is clean.
+- **Close-up checked** (`step-11c-fix7-closeup.png`):
+  - The game and mock-up C match closely: a brass plate set into the wood, dark engraved letters, and red light on the plate while lit.
+  - The "6" is unlit in every shot.
+- **The lead waited about 23 minutes.** The orchestrator stopped further tuning. Lesson: small visual changes need a lighter routine, and colours the lead can tune in the Inspector.
 

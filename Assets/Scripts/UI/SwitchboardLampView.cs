@@ -29,6 +29,10 @@ namespace Switchboard.UI
 
         public bool IsLit { get; private set; }
         public bool IsDimmed => dimmed;
+        /// <summary>The frosted bulb art while dark; the emergency lamp reuses it, tinted red.</summary>
+        public Sprite BulbOff => bulbOff;
+        /// <summary>The frosted bulb art while lit.</summary>
+        public Sprite BulbOn => bulbOn;
 
         public void ConfigureGlow(Graphic halo, Color tint)
         {

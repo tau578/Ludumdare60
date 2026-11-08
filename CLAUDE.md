@@ -6,7 +6,7 @@ A casual telephone switchboard-operator game:
 - Connected calls pay a one-off connection fee plus a per-second rate.
 - Wrong connections make the caller hang up; the same call returns only when the queue comes round to it (D52).
 - A missed emergency brings a fine, but money never drops below 0 and there is no lose condition.
-- The player buys upgrades and saves for a final "mystery upgrade" (the `secret` entry) whose effect is still undecided.
+- Today the player buys upgrades in a shop and saves for a `secret` entry. **The loop redesign (Design §12, D61–D74; Plan §9 steps L1–L9) removes the mystery upgrade and the victory scene (D65)** and makes the busy operator the heart: shifts with a day card, patience and 30 s emergencies, a score with streaks, stakes (burnt cords, complaints, quotas, fired), chores, nerves, a wall of frames, and the story between days.
 - The economy is driven by the hand-edited `Assets/Configs/Economy.json` (D39, D40): one-time upgrade entries in chains, values that set the result, costs in cents.
 
 Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile browsers, hosted on itch.io (D26), mouse and touch through the new Input System. Team repo: `github.com/tau578/Ludumdare60`, branch `main`. Teammates push often.
@@ -15,8 +15,9 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 1. `Docs/Progress.md`: status table (what's done, what's next), step reports, and verification and playtest notes.
 2. `Docs/Plan.md`: the step workflow (§1), pre-flight (§2), rules for agents (§3), Unity MCP cheat sheet (§4), definition of done (§5), launch prompt (§6), report format (§7), open items (§8) and the step briefs (§9).
 3. `Docs/Design.md`: the source of truth for game rules, architecture and decisions D01–D59. The game follows the docs. If the code or a brief disagrees with it, stop and ask the lead; don't improvise, and don't change either side on your own.
+4. `Docs/StyleGuide.md`: **before any visual work** (effects, popups, lamps, signs, UI). It covers the look and materials (matte, frosted, never glossy), the palette and what each colour means, the feedback language (bad never looks like a reward), the fonts and their contrast, motion timings, layers, and a checklist.
 
-**Next step:** see the first row in `Docs/Progress.md` that isn't "done". Steps 1–10d are done, the latest being **10** (the spotlight tutorial, D57), **10b** (faster lookup: the call in hand's caller jack blinks, a book-row click marks a jack, D58) and **10c** (the quick-connect tip, D59), all on `main`. **10d** (all text on the static fonts, so Play Mode stops changing font files) is done too. Next is **Step 11 (sound and feel, D60)**, split into **11a** (gather the sounds: the orchestrator directly, with the lead picking), **11b** (wire them), **11c** and **11d** (visual feedback); briefs in Plan §9. After that come 12 (mobile and Web polish) and 13 (balance). The Operator's notebook (D59) is on hold for the lead. Steps were renumbered on 2026-10-18 to follow the build order; older reports and commits use the old numbers.
+**Next step:** see the first row in `Docs/Progress.md` that isn't "done". Steps 1–10d are done and **11c** (main visual feedback) is built; its fix passes 4–6 are uncommitted and go in first. **Next is the loop redesign, steps L1–L9** (Design §12, Plan §9): L1 pressure and the queue fix, L2 days, L3 score and streak, L4 and L5 stakes, L6 unlocks and the wall, L7 chores, L8 nerves, L9 narrative between days. They come before 11b (wire the sounds; 11a's candidates wait on the lead's picks), 11d, 12 and 13 (D74: no deadline, the loop before polish). Before launching an L-step, confirm its numbers (Design §12.13) with the lead. The Operator's notebook (D59) is on hold. Steps were renumbered on 2026-10-18 to follow the build order; older reports and commits use the old numbers.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).
@@ -132,7 +133,8 @@ When the lead asks for a new build or to publish, the main session can do this d
 Known issues and to-dos, such as touch input in the cord code, held cords dropping on button clicks, stale editor-menu paths and the hidden A–Z tabs, are listed in `Docs/Plan.md` §8. A step that fixes one removes it there.
 
 ## Open decisions (Design §10)
-- D15: what the mystery upgrade does.
-- D27: currency scale and target playtime.
+- D27: the pace: shift length, patience, emergency time, quotas, bonuses and pay per day. The full list of numbers to confirm is Design §12.13; each L-step's brief carries its own.
+- D66 and D68 need the lead's yes on two points: the shop panel's fate and cutting the income multipliers; firing after three warnings.
+- D15 is closed: the mystery upgrade is removed (D65).
 
 Don't assume answers to these; ask the lead when a step needs them.

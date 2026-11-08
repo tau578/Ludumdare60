@@ -194,9 +194,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Switchboard.Game.GameInstaller
   config: {fileID: 11400000, guid: c5aba281cd01a4b56bb83aeb592c9e0f, type: 2}
-  randomSeed: 0
   cordBridge: {fileID: 6887427904266438933}
   loopRunner: {fileID: 7817064870213045183}
+  emergencySignFont: {fileID: 11400000, guid: c945699ba85e042f1adf81c370d111c7, type: 2}
+  emergencyLampSize: 44
+  emergencySign:
+    width: 2.6
+    height: 0.56
+    capHeight: 0.25
+    gap: 0.16
 --- !u!114 &7817064870213045183
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -221,6 +227,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9afc2dea5f42e45b3b13c086410de6fc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Switchboard.Game.CordBridge
+  wiggleAmplitude: 12
+  wiggleSeconds: 0.5
+  joltAmplitude: 7
+  joltSeconds: 0.35
 --- !u!114 &6006077353831290730
 MonoBehaviour:
   m_ObjectHideFlags: 0

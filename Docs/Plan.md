@@ -49,6 +49,7 @@ Ground rules:
    - Types are small and focused.
    - Comments are few, and only explain why.
    - Use expression-bodied members where they read well.
+   - **Visual style:** anything the player sees follows [StyleGuide.md](StyleGuide.md): materials, palette, the feedback language, fonts with measured contrast, motion timings, and its checklist (§9). Reuse the board's own art where something similar exists.
 6. **Domain rules.**
    - No `UnityEngine`.
    - Time only through `Tick(dt)` or `IGameClock`.
@@ -122,6 +123,9 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Saves in tests (9a) | EditMode tests run `GameInstaller.Start`, so anything that reads or writes PlayerPrefs there touches the lead's real save. `GameInstaller` opens the save only when `Application.isPlaying`; `SaveIsolationTests` guards it. Play Mode checks write `operator.save` and `operator.save.backup`: delete both at the end. |
 | Missing JSON fields (5c) | `JsonUtility.FromJson` keeps field initializers for fields the file leaves out, also inside nested objects in arrays. Use a marker initializer (NaN, or a named `Unset` constant) to tell "missing" from 0. |
 | Web cursor checks (9b fix) | To see what Unity sends to the page, serve a patched framework through CDP `Fetch` (for example, log every `_JS_Cursor_SetShow`), and watch the canvas `style` with a MutationObserver. Imitate itch's iframe with a host page on a second port. Restart `http.server` after every build, because the build deletes and recreates `Builds/Web`. |
+| TMP letter height and weight (11c fix 7) | Measure letter heights without the text renderer's padding (`ShaderUtilities.GetPadding` × fontSize / pointSize). Thin fonts such as Della Respira under about 12 px never reach their colour; thicken the strokes with one material copy made once and destroyed with its owner, and never change the shared font material. |
+| TMP measuring (11c fix 6) | `textBounds` is the font's line box, not the drawn letters: measure glyphs with `textInfo.characterInfo`. With autosize on, a label box shorter than the line height shrinks the text even when the width fits. |
+| Checking a graphic sits on plain art (11c fix 5) | To prove a new graphic covers only plain frame (no curl, lamp or panel line), load the sprite's PNG with `Texture2D.LoadImage` in the test and sample the pixels under the graphic's box. See `FeedbackEffectsTests.FrameArt`. Measure text contrast in a test, too (WCAG relative luminance, StyleGuide §5). |
 | Real-file tests check rules, not numbers (test and font fix) | `Economy.json`, `Calls.json` and `Book.json` are rebalanced at any time (lead, 2026-10-19). A test that reads the real files checks a rule (the file loads with no problems, chains grow, pools fit their boards, every call's jacks and caller are in the book, services come first) and reads every expected value from the loaded file: never a count, size, id, name or price. Mechanics that need a certain shape (several book spreads, a given cord count) build their own sample data. |
 | Web builds (9b) | Run `Tools/Switchboard/Build Web` through `EditorApplication.delayCall` plus `EditorApplication.ExecuteMenuItem` from `execute_code`, so the MCP call returns at once; then watch `~/Library/Logs/Unity/Editor.log` for the "Build Web:" line. With Unity in the background the delayCall can start late. The first build switches the editor to Web (about 5 min of reimport); the editor stays on Web. Every build rewrites `Assets/Settings/UniversalRP.asset`, `Assets/UniversalRenderPipelineGlobalSettings.asset`, the two dynamic fonts and `preloadedAssets` in `ProjectSettings.asset`; since the 2026-10-20 cleanup `WebBuild` puts them (and `TimeManager.asset`) back itself (`WebBuild.RestoredFiles`). Still check `git status` after a build (`Docs/WebBuild.md`). |
 | Checking a Web build (9b) | No Chrome extension was connected in 9b; on 2026-10-20 it was connected, but its Chrome couldn't reach the agent's `http.server` (the browser's offline page for 127.0.0.1 and localhost). So drive headless Chrome (`--headless=new`, `--remote-debugging-port`, a throwaway `--user-data-dir`, SwiftShader if WebGL fails) with a dependency-free Node script over the DevTools protocol (Node 26 has `WebSocket`). Serve `Builds/Web` with `python3 -m http.server`. Call `Emulation.setDeviceMetricsOverride` in every CDP session (the real headless viewport is 1280×633). Clear `localStorage` from a same-origin static page, because reloading the running game saves again through `pagehide`. |
@@ -134,6 +138,7 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 - [ ] `Final.unity` plays directly and from `MainMenu` (Start), and nothing in `Final` changed beyond what the brief needs.
 - [ ] Every changed file is listed in the report; nothing unrelated was rewritten.
 - [ ] The report is in `Docs/Progress.md`, including any deviations from Design.md.
+- [ ] New visuals pass the StyleGuide checklist (§9), and the report includes a screenshot of each one next to its neighbours.
 
 ## 6. Launch prompt (orchestrator → agent)
 Launch the agent with the Agent tool (`subagent_type: general-purpose`) at **`effort: "high"`**, unless the lead asks otherwise.
@@ -181,6 +186,10 @@ Since D48 (lead, 2026-10-18) the project is one shared work, so nothing here nee
 | `SlowGuidePulse` material in EditMode tests | The guide's hidden book-glow material is freed only in `OnDestroy`, which EditMode tests don't run, so each test run leaves 2 materials in editor memory. Free it in `OnDisable` too, or in the test teardown. | cleanup, any step |
 | Web build leftovers (9b) | Done in the 2026-10-20 cleanup: `WebBuild` saves, snapshots the URP asset, the URP global settings, the two dynamic fonts and `TimeManager.asset`, builds, and writes back whatever changed (in a `finally`), then puts `preloadedAssets` back. **Confirmed by the Step 10 build (2026-10-20, itch #2168670): `git status` was clean afterwards.** **Gap fixed (2026-10-21):** `WebBuild` now snapshots the two dynamic fonts and the two `SDF Static` materials from disk *before* its save, restores them, and empties the fonts in memory afterwards; the next real build should confirm `git status` stays clean. **Since Step 10d the font part is a safety net only:** nothing in the game uses the dynamic fonts and the Static materials already hold TMP's own `_ScaleRatio` values, so a build has nothing font-related to restore; the snapshot code and `WebBuildTests` stay, harmless. Still open: a "Build Web (Dev)" menu would put the dev panel in a phone build. | Dev menu in Step 12 |
 
+| Queue skips callers only (bug) | `CallQueue.TakeNext` skips a script only when its caller's name has a live call, so a recipient on the line can ring, and a call to a busy jack sits unconnectable on its card (D52 "busy lines wait"). Playtesters read both as bugs (2026-10-25). | L1 (D63) |
+| Mystery upgrade and victory scene to remove | The `secret` entry, `GoalProgress`, the savings fill, the "To be continued" dialog, `VictorySequenceView` and `VictoryTownGraphic` are thrown out (D65). Harmless until then. | L6 |
+| Art for the wall and the chores | Frames (week, month, feats), a brass plaque, a warning slip, the clock and calendar faces, desk items (plant, mug, cat photo, radio), the punch clock, the intercom, the pneumatic tube and capsule, the register lever, the cup, the cigarette and the flask (with a coffee and cough-syrup pair, D70). Placeholder shapes until drawn. | L2–L8 |
+
 Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `UpgradeShopPanel/HeaderSlot`, or update `GameInstaller` with the rename. `Book.json` keeps its format and `contactsPerPage`; the book sorts itself (D53), so the file's order doesn't matter.
 
 ## 9. Steps
@@ -205,11 +214,20 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 11a | Gather the sounds | Kenney and ElevenLabs candidates; the lead picks; picks imported |
 | 11b | Wire the sounds | Emergency bell and ticks, end-of-call cues, stamps, tip, talking, shop, ambience and a second track |
 | 11c | Main visual feedback | Rolling counter, fines, emergencies, card arrival, wrong number, connection flash |
+| L1 | Pressure and the queue fix | Callers hang up; emergencies in 30 s; no one calls while on a call; no dead time after the first connection |
+| L2 | Days | Punch in, a 3-minute shift, closing time, the day card, the clock and calendar |
+| L3 | Score and streak | Earned is the score; streaks, rush hour, near misses, a rating, the best shift, a daily challenge |
+| L4 | Stakes within the day | Burnt cords and the electrician, angry callbacks, complaints, the supervisor's call, sent home |
+| L5 | Stakes across days | Quotas by pneumatic mail, warnings on the wall, fired after three, overtime |
+| L6 | Unlocks and the wall | A day schedule replaces the shop; frames, desk items; the mystery and the victory scene removed |
+| L7 | Chores | The register lever, wiping the glass, mail slips |
+| L8 | Nerves | A nerves meter; coffee, a cigarette, the flask |
+| L9 | Narrative between days | The story bible, one-line calls, story calls once and in order, headlines and new faces |
 | 11d | Extra visual feedback | Earnings coins, finished-call exit, shop effects, goal shimmer, wall clock, caller reactions |
 | 12 | Mobile and Web polish | Good on phones and desktop browsers |
-| 13 | Balance | A tuned time to reach the mystery upgrade |
+| 13 | Balance | A tuned first week: quotas, patience, pace and pay per day |
 
-Steps 1–10d are built (9a saves and touch; 9b the Web build on itch.io, D26; 10 the tutorial, D57; 10b faster lookup, D58; 10c the quick-connect tip, D59; 10d static fonts). **Step 11 (sound and feel, D60)** comes next, split into 11a (gather the sounds, the orchestrator with the lead), 11b (wire them), 11c and 11d (visual feedback); the Operator's notebook (D59) waits for the lead. Steps 10–13 are outlines; the orchestrator turns each one into a full brief before launching it.
+Steps 1–10d and 11c are built (9a saves and touch; 9b the Web build on itch.io, D26; 10 the tutorial, D57; 10b faster lookup, D58; 10c the quick-connect tip, D59; 10d static fonts; 11c the main visual feedback, D60). **The loop redesign comes next: steps L1–L9** (Design §12, D61–D74), in that order, before 11b, 11d, 12 and 13 (D74). 11a's sound candidates wait on the lead's picks and 11b wires them after the L-steps, with the new moments added. The Operator's notebook (D59) stays on hold. L1 is a full brief; L2–L9 are outlines the orchestrator turns into briefs, with the numbers from Design §12.13 confirmed by the lead, before launching each. Before L1: commit 11c's fix passes 4–6.
 
 > **Renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7, 7d → 8, 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11, 9 → 12, 10 → 13. The briefs of done steps, commit messages and older reports keep the numbers they were written with.
 
@@ -1916,6 +1934,7 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
 | V14 | A sparkle on the "Quick! +X¢" tip popup | 11d |
 
 **Rules for every Step 11 part:**
+- **Style.** Follow [StyleGuide.md](StyleGuide.md), written after 11c's playtests: sparks that looked like confetti, a glossy lamp and a hard-to-read sign. A bad outcome never looks or sounds like a reward, and sparkles are for rewards only.
 - **Not noisy.** Repeated sounds get a small random pitch (about ±5%) and a cap on how often they play; when several stamps or coins land in one frame, play one. New sounds are no louder than the cash register. Each new clip's gain is a serialized field so the lead can tune by ear.
 - **Volume channels.** Every new source has an `AudioChannelSource`: effects on `Sfx`, the ambience and music on `Music`.
 - **Pause (D56).** Anything tied to a waiting call (the emergency bell, the ticks, wobbles, the clock) stops while paused. Music and ambience keep playing, as the music does today. Popups already started may finish.
@@ -2035,12 +2054,72 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
   - Every new graphic has `raycastTarget` off.
 - **Playtest:** the game feels alive and readable, and nothing distracts from finding the jack.
 
+### The loop redesign: steps L1–L9 (D61–D74, Design §12)
+The 2026-10-25 playtest (Progress, "Playtest and redesign") sent the game back to its loop: the busy operator is the heart, with shifts, patience, stakes, chores, nerves, a wall of frames and the story between days. These steps come **before 11b, 11d, 12 and 13** (D74). Each is one agent at high effort unless noted. Before launching one, the orchestrator confirms its open numbers (Design §12.13) with the lead and writes them into the brief; every number lands in `Economy.json` or `Calls.json`, never in code, and `Docs/EconomyFile.md` is updated in the same step. Views follow [StyleGuide.md](StyleGuide.md); placeholder shapes stand in for art that isn't drawn yet (Plan §8, "Art for the wall and the chores").
+
+### Step L1: Pressure and the queue fix (D63, D64)
+**Why:** people call while already on a call (a bug), callers never leave, emergencies allow 140 s, and after the first connection the player waits 25 s with nothing to do.
+- **Queue rule** (`CallQueue.TakeNext`; Design 5.2 and D52 change): skip a script while either of its jacks (`From`, `To`) is the `From` or `To` of a live call, or its caller's name has a live call (the existing check). A skipped script comes round again; if every script is skipped the slot stays empty.
+- **Patience** (Domain): `CallScript.PatienceSeconds` from `Calls.json` `patienceSeconds`; absent means `Economy.json` `defaultPatienceSeconds`; 0 means the call waits forever (the tutorial's call, tests). `Call.PatienceSecondsLeft` counts while Incoming, Taken or Connecting, is held with `WaitingHeld` like the response timer, and stops for good once connected. A call with a response time (an emergency) uses the response time only. At 0 the call ends as `CallEndReason.HungUp = 6`: no pay, no fine; the queue brings it back later as usual. `CareerStats.CallsHungUp` counts them.
+- **Card:** the patience shows on the existing countdown ring in the attention amber (`#F5D278`, StyleGuide §3), never the alarm red, with a gentle pulse in the last 5 s; the stamp reads "Hung up" in the neutral brown ink; `CallAudio` plays the receiver-down for HungUp. No new sound.
+- **Data** (`Calls.json`, `Economy.json`): early calls 10–15 s long (confirm); `patienceSeconds` only where a call needs its own; emergencies `responseTimeSeconds` 30 (confirm), `penaltyCents` about one good call's pay, pay above regular calls; `startingCords` per the lead. `Validate Content`: a patience of 0 or less when present is reported; an emergency that also sets patience gets a note.
+- **Emergency sound:** if the S1 and S2 picks are already in `Assets/Audio/`, wire the bell and the tick here as 11b's S1/S2 brief says; otherwise leave them for 11b and say so in the report.
+- **Tests:** the queue skips by jack and by caller and comes round again; patience counts only while waiting, is held with the tutorial, ends as HungUp with no pay or fine; an emergency ignores patience; the real files load with the new fields and every regular call gets a patience above 0; `CareerStats` counts hang-ups.
+- **Docs:** `EconomyFile.md` (the new fields), Design 5.1's table and 5.2, Plan §8's row.
+- **Playtest:** three minutes on a new game: nobody rings while they're on a call; cards turn amber and leave with "Hung up"; an emergency is tight at 30 s; the first connection leaves no dead time.
+
+### Step L2: Days (D62) (outline)
+- Domain `Shift`: the shift's seconds from `Economy.json`, the day number, a `ClosingTime` event; at closing, live calls end as a new reason (no pay, no complaint, a "Closing time" stamp) and cords return to the tray; the queue pauses between days. The day number and the career totals go into the save (a migration).
+- The punch clock on the wall: punch in starts the shift (day 1 starts after the tutorial's first call), punch out at closing. The wall clock (V11) and the calendar, both stopped on pause.
+- The day card (GameUI, its own canvas above the book): earned, connected, hung up, missed, placeholders for best streak and rating (L3) and for "Tomorrow: ..." (L6), and a Next day button. Autosave on the card.
+- Pace per day in `Economy.json` (a `days` or `schedule` list: shift length, patience scale, call pool); rush hour waits for L3.
+- Tests: closing ends calls without pay; the day number saves and loads; a reload starts the current day with an empty board; the punch clock gates the shift.
+
+### Step L3: Score and streak (D67) (outline)
+- Domain `Streak` and `DayScore`: earned per shift is the score; a streak of correct connections broken by a wrong number, hang-up or miss, with a bonus from `Economy.json`; rush hour in the last minute (×2 pay, faster arrival); "Just in time!" for an emergency connected inside its last N s; a rating from earned against the day's target and the complaints; the best shift saved and shown in the main menu; one daily challenge a day from a list in `Economy.json`, checked at closing.
+- Views: the streak counter (the caller panel's top or the wall; the brief decides), the connection bell pitched up per step, a thud on a break, the quick-connect window shown shrinking on the card, stamps for "Just in time!" and the challenge, the rating and the challenge on the day card.
+- Tests: streak rules, rush-hour pay, the near-miss window, the rating formula, the challenge checks, the best shift saved.
+
+### Step L4: Stakes within the day (D68) (outline)
+- Burnt cord: on a wrong number the judged cord is dead for the rest of the day (or N s, confirm): smoking in the tray, impossible to pick up (`CableController` state, `CordBridge`). The intercom (a chore): hold or crank to call the electrician, who fixes the cord after about 10 s for a fee, with a longer wait each time.
+- Angry callbacks: a hung-up caller's next call has shorter patience, a cross face (a tint until V12's art) and no tip; a second hang-up from the same person is a complaint at once.
+- Complaints: hang-ups, wrong numbers and misses, shown as stamps in a row while the day runs; at 3 the supervisor's call (a special card that must be answered and holds a cord and attention); at 5 "Sent home": the day ends early with the quota missed.
+- A missed emergency: the fine, a complaint, the supervisor's line lit for a minute.
+- Tests for every rule; the numbers in `Economy.json`.
+
+### Step L5: Stakes across days (D68) (outline; the lead confirms "fired" first)
+- A quota per day in `Economy.json`, delivered by the pneumatic mail at punch-in (the chore: open the capsule); a missed quota puts a written warning on the wall; beating the next quota removes one; three warnings: fired, with a career card (days worked, best shift, frames), then a new career that keeps the frames and the board and skips the tutorial.
+- Overtime: at closing time the player may keep working; callers get crankier each minute; a late punch-out is a complaint after N min; overtime pay counts.
+- Save: the warnings and the career history.
+
+### Step L6: Unlocks and the wall (D65, D66, D71) (outline)
+- `Economy.json`: `upgrades` becomes a `schedule` by day (a cord, a board stage with its `stagePool`, a chore, a desk item, a resident, the quota, the challenge); `StatSheet` reads the day's unlocks; the income multipliers go (confirm); the `secret` upgrade, `GoalProgress`, the savings fill, the "To be continued" dialog, `VictorySequenceView` and `VictoryTownGraphic` are removed (D65); the shop panel shows what's unlocked and what's next, or leaves the board (confirm). The tutorial's shop steps change with it.
+- The wall: frames ("Operator of the week" on day 7, "of the month" on day 30, the feats), the warnings, the desk items, each hung at day end with a nail-and-swing moment; the first-week milestone on the day-7 card.
+- Tests: schedule parsing and validation; unlocks by day; a frame is awarded once.
+
+### Step L7: Chores (D69) (outline)
+- The register lever: the drawer collects the earnings; a pull banks them with the register sound and pays the streak bonus; unbanked money at closing counts half (confirm).
+- Wiping the glass: smoke from a short circuit and steam in rush hour hide jacks under a fogged pane until a drag wipes it.
+- Mid-shift mail slips (optional).
+- The rule: at most two or three chores active; each arrives alone through the schedule.
+
+### Step L8: Nerves (D70) (outline)
+- Domain `Nerves`: rises with hang-ups, emergency bells and rush-hour time; decays; thresholds. Effects in the views: hand jitter, plugs that want a second try, fluttering book pages.
+- Coffee or water (a 1 s hold, a small calm), the cigarette (a big calm, smoke on the glass), the flask (a full calm and a confidence bonus, then a swaying board and a drifting hand; a second nip risks a wrong plug and "Sent home" if the supervisor calls). The assets are swappable for coffee and cough syrup; no moralising text.
+- Tests for the meter, the thresholds and the three remedies.
+
+### Step L9: Narrative between days (D72)
+- **First the story bible,** `Docs/Story.md` (the orchestrator with the lead, approved before any JSON): the cast with one want and one flaw each; three to five crossing arcs; the beats per day for the first week; headlines; the new resident per day.
+- Then the calls: one-line ringing messages; a `story` flag that plays a call once per career and in order (`CallQueue`, the played list saved), filler errands that loop; 50–60 calls for the first week; the headline and the new face on the day card; the validator checks story ids and their order.
+- Tests: story calls never repeat; the order holds; a pushed-back story call returns next.
+
 ### Step 12: Mobile and Web polish (outline)
 - **Layout:**
   - Aspect ratios 16:9, 19.5:9 and 4:3. **From the 9b iPhone playtest:** at 19.5:9 the art covers only the middle 16:9, and the sides show the camera's black background (the pause button sits in the black on the right). Extend or tint the sides.
   - **Fullscreen on iPhone:** itch's fullscreen button does nothing there, because iPhone browsers don't allow page fullscreen, only video (iPad does). itch's "Click to launch in fullscreen" embed option opens the game over the whole page instead.
   - A portrait "rotate your device" screen (D24).
   - Touch target sizes.
+  - Small board text at phone size. The EMERGENCY sign under the red lamp (11c) is about 12 px tall at 1080p and only a red mark at 844×390, and caller names, card badges and shop labels are similar. Decide what must stay readable on a phone, and where it can go.
 - **Performance:** nested canvases for the HUD and cards; a sprite atlas and texture compression.
 - **Build settings:**
   - Remove unused packages (Visual Scripting, Multiplayer Center, Collab), once the team agrees.
@@ -2052,7 +2131,7 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
   - Its skill (lookup time, error rate) is configurable.
   - It runs hours of game time in seconds.
   - It reports the time to reach the mystery, the income curve and the fines.
-- **Tuning:** adjust prices, rates and pacing in `Economy.json` toward the target in D27.
+- **Tuning:** adjust quotas, patience, pay and the day schedule in `Economy.json` toward the target in D27: a first week that stays tense and beatable.
 - **Playtest:** a full run from a new save feels right.
 
 #### Step 9b playtest, round 4 (lead, 2026-10-19): iPhone

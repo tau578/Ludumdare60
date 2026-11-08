@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Switchboard.Content;
 using Switchboard.Domain;
 using Switchboard.UI;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -14,6 +15,12 @@ namespace Switchboard.Game
         [SerializeField] private GameConfig config;
         [SerializeField] private CordBridge cordBridge;
         [SerializeField] private GameLoopRunner loopRunner;
+        [SerializeField, Tooltip("The emergency lamp's sign: Della Respira, its static atlas.")]
+        private TMP_FontAsset emergencySignFont;
+        [SerializeField, Min(1), Tooltip("The emergency lamp's bulb size in board units (the number lamps' bulbs are 96).")]
+        private float emergencyLampSize = EmergencyLampView.DefaultBulbSize;
+        [SerializeField, Tooltip("The EMERGENCY plate's size and lettering, in bulb sizes, so they follow the bulb.")]
+        private EmergencyLampView.SignProportions emergencySign = new EmergencyLampView.SignProportions();
 
         private OpenBoardLink boardLink;
         private Autosave autosave;
@@ -76,7 +83,8 @@ namespace Switchboard.Game
                     "(startingClientSlots or an extra_clients clientSlots). Lower the file's values or add slots to the panel.", config);
             callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, Session.Penalties, callerSlots, PortraitOf,
                 cordBridge.ColorOf, config.CardStyleFor, syncBoard: cordBridge.Synchronize, counter: moneyCounter);
-            EmergencyLampView.Create(BoardLamps(scene, sockets), Session.Calls);
+            EmergencyLampView.Create(BoardLamps(scene, sockets), Session.Calls, emergencySignFont, emergencyLampSize,
+                emergencySign);
             PhoneBookView bookView = FindSingle<PhoneBookView>(scene);
             boardLink = new OpenBoardLink(sockets, callQueue, Session.Stats, Session.Board);
             shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene), moneyCounter);
