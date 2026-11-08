@@ -5857,3 +5857,11 @@ Follow-ups (docs, for the orchestrator):
   - Unity imported them with no console messages. `Docs/AudioSources.md` lists them all.
 - **11a is done:** 20 effects, 3 ambience loops and 3 music tracks are in `Assets/Audio/`; S9 is deferred. Nothing is committed. Wiring is 11b, which waits until after the loop redesign (D74).
 
+#### Handover: the style guide continues in a new session (orchestrator, 2026-11-08)
+- **The lead wants to finish `Docs/StyleGuide.md` in a fresh session.** Its §10 now holds the three open questions with the full options and recommendations (two red families, money gold vs brass, the font split), and its "Status" note at the top says what comes after: the `GameStyle` paint box (Plan §8).
+- **Comparison pages** (git-ignored, local):
+  - `Builds/StyleChoices/style-options.html`: reds, golds and fonts.
+  - `Builds/StyleChoices/sign-options.html`: the EMERGENCY sign options. Its generator is `work/make_sign_page.py`; the sign is decided (C, brass).
+- **Plan §3, new rule 15:** small visual passes stay light.
+- **Also local only:** the branch `step-11c-lamp-glossy-glass` (`e914ff8`), with the glossy lamp kept aside.
+

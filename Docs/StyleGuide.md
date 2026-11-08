@@ -2,7 +2,16 @@
 
 How everything in the game should look and move, so new pieces match the hand-painted board. **Read it before any visual work** (effects, popups, signs, lamps, menus, new UI). The art in `Assets/Sprites/` is the reference; this guide writes down what the art already does, plus what the lead's playtests taught (2026-10-22).
 
-Draft (orchestrator, 2026-10-22). Points marked **Question** wait for the lead.
+Draft (orchestrator, 2026-10-22; brought up to date 2026-11-08). Points marked **Question** wait for the lead.
+
+**Status and what's next (2026-11-08):**
+- **To finish this guide:** decide the three open questions in §10 (reds, golds, fonts) with the lead. A comparison page shows every option on the game's own colours in its real fonts: `Builds/StyleChoices/style-options.html` (git-ignored, open it in Chrome). §10 also writes the options out, in case the page is gone.
+- **Then the "paint box":** one shared settings asset, `GameStyle`, holds the named colours, the font roles and the standard timings from this guide. New code reads names such as "Alarm" or "Money gold" instead of raw numbers. The older components move onto it gradually, when they are touched anyway or in a Step 12 cleanup, never as one big rewrite. Plan §8 tracks it.
+- **Settled so far:**
+  - The look and materials (§1–§2).
+  - The feedback language (§4).
+  - The EMERGENCY sign (an engraved brass plate set into the frame, 11c fix pass 7).
+  - Text on the wood goes on brass plates (§5).
 
 ## 1. The look in one paragraph
 
@@ -61,9 +70,7 @@ Sampled from the game's art and code. Use these instead of inventing new colours
 | **Attention** (hover, guide) | Amber: `#F5D278` hover, `#FFD06E` lamp | Hovered jacks, the caller's blinking jack, book-row hover |
 | **Neutral** (new order, cut off) | Browns: `#7B5220` "New order!", `#5C5044` "Cut off" | Stamps that are neither good nor bad |
 
-**Question:** the code has about eight slightly different reds for "bad". The proposal is to keep two: **danger light** `#F14034` (effects and glows on dark) and **danger ink** `#A42626` (text and stamps on paper), and move the others to them over time.
-
-**Question:** the pause title's gold (`#FFDB1F`) is brighter and yellower than the money gold (`#F2D27A`). Should titles keep their own gold, or use the money gold?
+**Open:** how many reds and golds, and which jobs they get. See §10, questions 1 and 2.
 
 ## 4. Feedback language: what each outcome looks like
 
@@ -95,7 +102,7 @@ The game uses three fonts. All of them are the **static** TMP assets (`… SDF S
 - **Minimum size:** 24 units at 1920×1080. On a phone (844×390) the game is about 0.36× as big, so small board text becomes hard to read there (Plan Step 12).
 - **Don't change a shared font material.** For an outline or shadow, use offset copies of the label or a material instance made once.
 
-**Question:** in-game labels (stamps, badges, the bubble, popups) use plain LiberationSans, while menus and signs use the decorative fonts. Should in-game labels move to Della Respira for a more period look? The catch: `¢` is only in LiberationSans, so money text would stay there unless the atlas is regenerated.
+**Open:** where the line between the fonts runs. See §10, question 3.
 
 ## 6. Motion
 
@@ -155,3 +162,48 @@ Timings in use now. New effects match these instead of inventing their own.
 5. **Text:** in the font for its role, with contrast of at least 4.5:1, measured.
 6. **Behaviour:** freezes on pause if it belongs to a waiting call. Takes no clicks. Covers nothing at any board size.
 7. **Side by side:** a screenshot next to its neighbours (the number lamps, cards, the frame) shows it belongs, and the report includes that comparison.
+
+## 10. Open questions (for the lead)
+
+The principle behind all three: **the same meaning gets the same colour, and a different meaning gets a clearly different one.** Several colours is fine. Near-copies that nobody can tell apart are the problem: they mark no difference and they make consistency impossible. The lead's own point (2026-11-08) was that different things should look different, and that one gold everywhere would be too much repetition. The proposals below follow that.
+
+**1. Reds: two families by meaning, a few deliberate shades each** (the orchestrator's recommendation)
+- **Now:** eight reds, picked one at a time:
+  - wrong-number flash `#F14034`;
+  - closed-jack glow `#F15746`;
+  - fine on the counter `#C42828`;
+  - "can't afford" `#B23E3E`;
+  - "Wrong number!" stamp `#A42626`;
+  - "Missed" stamp `#74121E`;
+  - countdown ring `#FF5C30`;
+  - emergency lamp `#E84A34`.
+  
+  Some are genuinely different jobs; the two jack flashes and the two counter reds are near-copies.
+- **Alarm (orange-red, "act now"), emergencies only:**
+  - Alarm glow `#FF6A3D`: lights on dark, such as the countdown ring and the lamp's glow.
+  - Alarm `#E84A34`: the lamp.
+  - Alarm quiet `#8E3426`: the unlit lamp.
+- **Error (crimson, "that was wrong"), mistakes and losses:**
+  - Error glow `#EE4450`: flashes on dark, such as the wrong-number and closed jacks.
+  - Error `#C42F3A`: the fine and "can't afford" on the counter.
+  - Error ink `#A42626`: "Wrong number!" on paper.
+  - Error deep `#74121E`: "Missed" on paper, the worst case.
+- **Why:** a player learns that orange-red means "hurry" and crimson means "mistake", which matters in a game about speed. It is still about seven reds, but each has a defined job.
+
+**2. Golds: two golds, two jobs** (recommendation)
+- **Money gold, bright:** only money and rewards. Text `#F2D27A`; coin `#FFDA70` / `#D49231` / `#7E4B1B`; tip `#FAE68C`.
+- **Brass, muted:** decoration, such as the frame's curls `#96881E`, rims and titles.
+- **The pause title** is a bright lemon, `#FFDB1F`, a third gold that competes with the money. The options are **light brass** `#D9BE72`, **cream** `#F3E9CF`, or keeping the lemon. The recommendation is light brass or cream, so that money stays the only thing that shines.
+
+**3. Fonts: keep three, each with one job** (recommendation)
+- **Why not one font:** it loses hierarchy, because titles look like labels. Two or three typefaces with clear roles is standard.
+- **Boecklins Universe:** big decorative titles only. Its letters stop being readable when small: the three-stem "M".
+- **Della Respira:** short period labels, meaning stamps, signs, name plates and menus. **This moves stamps and name plates** off LiberationSans.
+- **LiberationSans:** anything read fast or full of numbers: the speech bubble, money, prices and timers. It is the only font with `¢`.
+- **To judge it:** compare the stamp and name-plate rows on the comparison page.
+
+**After the answers:**
+1. Write the decisions into §3 and §5, and remove this section.
+2. If the reds change, move the EMERGENCY sign's letters to the agreed family. Today they are dark engraved brown-reds, `#3A140C` / `#480B0D`.
+3. Then plan the `GameStyle` paint box (see "Status" at the top).
+

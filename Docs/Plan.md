@@ -75,6 +75,7 @@ Ground rules:
 12. **Hands off git and settings.** Don't commit or push. Don't change packages or ProjectSettings unless your step says so.
 13. **When blocked, stop and report.** That includes MCP disconnecting, tests you can't fix, or a gap in the design. Don't invent design.
 14. **Finish** by appending your report (§7) to `Docs/Progress.md`. Return the same report as your final message.
+15. **Small visual passes stay light** (lead, 2026-11-08: a colour change took 23 minutes). For a look-only tweak: one compile, the EditMode tests and one comparison screenshot, with **no tuning loops**. Report what still differs, and let the lead decide whether another round is worth it. Prefer exposing the values as Inspector settings, so the lead can tune them in Play Mode without an agent.
 
 ## 4. Unity MCP cheat sheet (for agents)
 Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP__create_script,mcp__UnityMCP__refresh_unity,…`.
@@ -190,6 +191,7 @@ Since D48 (lead, 2026-10-18) the project is one shared work, so nothing here nee
 | Queue skips callers only (bug) | `CallQueue.TakeNext` skips a script only when its caller's name has a live call, so a recipient on the line can ring, and a call to a busy jack sits unconnectable on its card (D52 "busy lines wait"). Playtesters read both as bugs (2026-10-25). | L1 (D63) |
 | Mystery upgrade and victory scene to remove | The `secret` entry, `GoalProgress`, the savings fill, the "To be continued" dialog, `VictorySequenceView` and `VictoryTownGraphic` are thrown out (D65). Harmless until then. | L6 |
 | Art for the wall and the chores | Frames (week, month, feats), a brass plaque, a warning slip, the clock and calendar faces, desk items (plant, mug, cat photo, radio), the punch clock, the intercom, the pneumatic tube and capsule, the register lever, the cup, the cigarette and the flask (with a coffee and cough-syrup pair, D70). Placeholder shapes until drawn. | L2–L8 |
+| Style guide decisions, then the "paint box" | `Docs/StyleGuide.md` §10 holds three open questions (reds, golds, fonts), with options and a comparison page, `Builds/StyleChoices/style-options.html`. After the lead decides: one shared `GameStyle` settings asset with the named colours, font roles and standard timings. New visuals use it; older components move onto it when touched, or in a Step 12 cleanup. The EMERGENCY sign's colours are already Inspector settings on `LabelStripGraphic`; more can follow so the lead can tune looks without an agent. | style guide session, then tokens before 11d |
 
 Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `UpgradeShopPanel/HeaderSlot`, or update `GameInstaller` with the rename. `Book.json` keeps its format and `contactsPerPage`; the book sorts itself (D53), so the file's order doesn't matter.
 
