@@ -27,19 +27,20 @@
 | 12. Paint box (`GameStyle`) | done | ✅ 2026-11-09 (21 min + 14 + 11 + 18 min fixes) | ✅ 745/745 tests, scope clean | ✅ | |
 | 13a. Pressure and the queue fix | not started | | | | |
 | 13b. Days | not started | | | | |
-| 13c. Score and streak | not started | | | | |
-| 13d. Stakes within the day | not started | | | | |
-| 13e. Stakes across days | not started | | | | |
-| 13f. Unlocks and the wall | not started | | | | |
-| 13g. Chores | not started | | | | |
-| 13h. Nerves | not started | | | | |
-| 13i. Narrative between days | not started | | | | |
+| 13c. Residents and the call director | not started | | | | |
+| 13d. Score and streak | not started | | | | |
+| 13e. Stakes within the day | not started | | | | |
+| 13f. Stakes across days | not started | | | | |
+| 13g. Unlocks and the wall | not started | | | | |
+| 13h. Chores | not started | | | | |
+| 13i. Nerves | not started | | | | |
+| 13j. Narrative between days | not started | | | | |
 | 14. Wire the sounds | not started | | | | |
 | 15. Extra visual feedback | not started | | | | |
 | 16. Mobile and Web polish | not started | | | | |
 | 17. Balance | not started | | | | |
 
-**Renumbered (lead, 2026-11-09)** so every step has the same kind of name and the numbers follow the order of work: S1 → 12, L1–L9 → 13a–13i, 11b → 14, 11d → 15, 12 → 16, 13 → 17. Older reports and notes use the old names.
+**Renumbered (lead, 2026-11-09)** so every step has the same kind of name and the numbers follow the order of work: S1 → 12, L1–L9 → 13a, 13b and 13d–13j (13c, residents and the call director, was added on 2026-11-09 and moved the later parts one letter), 11b → 14, 11d → 15, 12 → 16, 13 → 17. Older reports and notes use the old names.
 
 A step moves through these statuses: not started → building → verifying → playtesting → done. It can also be blocked.
 
@@ -6272,3 +6273,9 @@ Follow-ups:
 - **Docs:** StyleGuide §3 and §4 (the badge exception and the hover table), Design D75, D76 and the status row, and Plan §8 (the flaky test) are updated.
 
 **Playtest (lead, 2026-11-09):** everything looks fine. **Step 12 is done.** Nothing is committed yet.
+
+### Residents and the call director; the busy-caller rule; story structure (lead, 2026-11-09)
+- **The rule:** nobody calls while on a call, as caller or recipient; a call to a busy recipient is allowed but rare, shown as "Line busy", and a hang-up over a busy line is no complaint. 13a's queue rule is narrowed to this (D63).
+- **Residents (D77):** the resident becomes the unit of content: `Residents.json` grown from `Book.json`, read by the book and the rules; calls by resident id; a runtime `Resident` with state; generated errands; a call director with its knobs in `Economy.json`. New part **13c**; the later parts moved one letter (13d–13j).
+- **Story structure (D72):** arcs as chains of hand-written beats, no branching; a headline per beat, a holding line per arc, a few generic headlines; the day card shows the headline of the beat that resolved last.
+- **Docs:** Design §1, 5.2, 5.7, §12.4, §12.11–§12.14, D53, D63, D72, D77; Plan §8, the §9 table (its tail is now in build order: 12, 13a–13j, 14–17) and the 13a, 13c and 13j briefs; CLAUDE.md; this table.

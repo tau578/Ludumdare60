@@ -188,9 +188,9 @@ Since D48 (lead, 2026-10-18) the project is one shared work, so nothing here nee
 | `SlowGuidePulse` material in EditMode tests | The guide's hidden book-glow material is freed only in `OnDestroy`, which EditMode tests don't run, so each test run leaves 2 materials in editor memory. Free it in `OnDisable` too, or in the test teardown. | cleanup, any step |
 | Web build leftovers (9b) | Done in the 2026-10-20 cleanup: `WebBuild` saves, snapshots the URP asset, the URP global settings, the two dynamic fonts and `TimeManager.asset`, builds, and writes back whatever changed (in a `finally`), then puts `preloadedAssets` back. **Confirmed by the Step 10 build (2026-10-20, itch #2168670): `git status` was clean afterwards.** **Gap fixed (2026-10-21):** `WebBuild` now snapshots the two dynamic fonts and the two `SDF Static` materials from disk *before* its save, restores them, and empties the fonts in memory afterwards; the next real build should confirm `git status` stays clean. **Since Step 10d the font part is a safety net only:** nothing in the game uses the dynamic fonts and the Static materials already hold TMP's own `_ScaleRatio` values, so a build has nothing font-related to restore; the snapshot code and `WebBuildTests` stay, harmless. Still open: a "Build Web (Dev)" menu would put the dev panel in a phone build. | Dev menu in Step 16 |
 
-| Queue skips callers only (bug) | `CallQueue.TakeNext` skips a script only when its caller's name has a live call, so a recipient on the line can ring, and a call to a busy jack sits unconnectable on its card (D52 "busy lines wait"). Playtesters read both as bugs (2026-10-25). | 13a (D63) |
-| Mystery upgrade and victory scene to remove | The `secret` entry, `GoalProgress`, the savings fill, the "To be continued" dialog, `VictorySequenceView` and `VictoryTownGraphic` are thrown out (D65). Harmless until then. | 13f |
-| Art for the wall and the chores | Frames (week, month, feats), a brass plaque, a warning slip, the clock and calendar faces, desk items (plant, mug, cat photo, radio), the punch clock, the intercom, the pneumatic tube and capsule, the register lever, the cup, the cigarette and the flask (with a coffee and cough-syrup pair, D70). Placeholder shapes until drawn. | 13b–13h |
+| Queue skips callers only (bug) | `CallQueue.TakeNext` skips a script only when its caller's name is a live call's *caller*, so a person being called can ring at the same time (Agatha, on the line with the doctor, rings the police), and a call to a busy jack sits unconnectable on its card (D52 "busy lines wait"). Playtesters read both as bugs (2026-10-25, 2026-11-09). The rule (lead, 2026-11-09): nobody calls while on a call; a busy recipient is allowed, rarely, shown as "Line busy". | 13a (D63); on residents in 13c (D77) |
+| Mystery upgrade and victory scene to remove | The `secret` entry, `GoalProgress`, the savings fill, the "To be continued" dialog, `VictorySequenceView` and `VictoryTownGraphic` are thrown out (D65). Harmless until then. | 13g |
+| Art for the wall and the chores | Frames (week, month, feats), a brass plaque, a warning slip, the clock and calendar faces, desk items (plant, mug, cat photo, radio), the punch clock, the intercom, the pneumatic tube and capsule, the register lever, the cup, the cigarette and the flask (with a coffee and cough-syrup pair, D70). Placeholder shapes until drawn. | 13b–13i |
 | Flaky test | `FeedbackEffectsTests.AWrongNumberShortsTheLineWithStreaksArcsAndSmokeNotStars` failed its "allocates no memory" check once (step 12, fix pass 3), in code that pass didn't touch, and passed on re-runs. If it fails again, look at the short-circuit mesh's allocations or make the check tolerant of a first-frame allocation. | when it fails again |
 | Components still on raw colours | Step 12 built the `GameStyle` paint box (D75, `Assets/Content/GameStyle.asset`) and moved only the pieces the decisions change. Still on their own numbers: the fine popup's red (`FloatingTextView` in `GameUI.prefab`, which should be Error), the card's "EMERGENCY" badge label, the per-second circle, the jacks' hover amber and connected green (they can read Attention hover and Good light through `IBoardPalette`), and the shop, book, cords, coins, tutorial and menus. Each moves when it is touched anyway, or in a Step 16 cleanup. | when touched, or Step 16 |
 | Small text on phones and weak contrast (Step 12 report) | At 844×390, long caller names in Della Respira shrink to about 7 px and go soft; thicken them (a face-dilate material copy, like the EMERGENCY sign) or raise their minimum auto-size. The name plate's lighter top is about 4.2:1 with the cream ink. On the money drums the Error flash (1.65:1) and the resting digits (2.96:1) are low-contrast. The urgent countdown ring is thin, so its colour is hard to see when the window is small. The EMERGENCY badge's dark letters are thin at phone size. | Step 16, or when the counter or cards are touched |
@@ -217,22 +217,24 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 9b | First Web build on itch.io | Plays in a browser, and progress survives a reload and a new upload |
 | 10 | Tutorial | A guided first call |
 | 11a | Gather the sounds | Kenney and ElevenLabs candidates; the lead picks; picks imported |
-| 14 | Wire the sounds | Emergency bell and ticks, end-of-call cues, stamps, tip, talking, shop, ambience and a second track |
 | 11c | Main visual feedback | Rolling counter, fines, emergencies, card arrival, wrong number, connection flash |
-| 13a | Pressure and the queue fix | Callers hang up; emergencies in 30 s; no one calls while on a call; no dead time after the first connection |
+| 12 | Paint box (`GameStyle`) | One asset holds the named colours, fonts and timings, and the views read it (D75, D76) |
+| 13a | Pressure and the queue fix | Callers hang up; emergencies in 30 s; nobody calls while on a call; "Line busy" cards; no dead time after the first connection |
 | 13b | Days | Punch in, a 3-minute shift, closing time, the day card, the clock and calendar |
-| 13c | Score and streak | Earned is the score; streaks, rush hour, near misses, a rating, the best shift, a daily challenge |
-| 13d | Stakes within the day | Burnt cords and the electrician, angry callbacks, complaints, the supervisor's call, sent home |
-| 13e | Stakes across days | Quotas by pneumatic mail, warnings on the wall, fired after three, overtime |
-| 13f | Unlocks and the wall | A day schedule replaces the shop; frames, desk items; the mystery and the victory scene removed |
-| 13g | Chores | The register lever, wiping the glass, mail slips |
-| 13h | Nerves | A nerves meter; coffee, a cigarette, the flask |
-| 13i | Narrative between days | The story bible, one-line calls, story calls once and in order, headlines and new faces |
+| 13c | Residents and the call director | One list of people the book shows and the rules read; calls by resident id; generated errands; a director decides what rings next |
+| 13d | Score and streak | Earned is the score; streaks, rush hour, near misses, a rating, the best shift, a daily challenge |
+| 13e | Stakes within the day | Burnt cords and the electrician, angry callbacks, complaints, the supervisor's call, sent home |
+| 13f | Stakes across days | Quotas by pneumatic mail, warnings on the wall, fired after three, overtime |
+| 13g | Unlocks and the wall | A day schedule replaces the shop; frames, desk items; the mystery and the victory scene removed |
+| 13h | Chores | The register lever, wiping the glass, mail slips |
+| 13i | Nerves | A nerves meter; coffee, a cigarette, the flask |
+| 13j | Narrative between days | The story bible, arcs as chains of beats, one-line calls, headlines picked from what resolved, new faces |
+| 14 | Wire the sounds | Emergency bell and ticks, end-of-call cues, stamps, tip, talking, shop, ambience and a second track |
 | 15 | Extra visual feedback | Earnings coins, finished-call exit, shop effects, goal shimmer, wall clock, caller reactions |
-| 12 | Mobile and Web polish | Good on phones and desktop browsers |
-| 13 | Balance | A tuned first week: quotas, patience, pace and pay per day |
+| 16 | Mobile and Web polish | Good on phones and desktop browsers |
+| 17 | Balance | A tuned first week: quotas, patience, pace and pay per day |
 
-Steps 1–10d, 11a, 11c and 12 are built (9a saves and touch; 9b the Web build on itch.io, D26; 10 the tutorial, D57; 10b faster lookup, D58; 10c the quick-connect tip, D59; 10d static fonts; 11a the sounds gathered; 11c the main visual feedback, D60; 12 the `GameStyle` paint box, D75). **The loop redesign comes next: step 13, parts 13a–13i** (Design §12, D61–D74), in that order, before 14, 15, 16 and 17 (D74). 14 wires 11a's sounds after step 13, with the new moments added. The Operator's notebook (D59) stays on hold. 13a is a full brief; 13b–13i are outlines the orchestrator turns into briefs, with the numbers from Design §12.13 confirmed by the lead, before launching each. **Renumbered on 2026-11-09** so every step has the same kind of name, in the order of work: S1 → 12, L1–L9 → 13a–13i, 11b → 14, 11d → 15, 12 → 16, 13 → 17. Older reports and commits use the old names.
+Steps 1–10d, 11a, 11c and 12 are built (9a saves and touch; 9b the Web build on itch.io, D26; 10 the tutorial, D57; 10b faster lookup, D58; 10c the quick-connect tip, D59; 10d static fonts; 11a the sounds gathered; 11c the main visual feedback, D60; 12 the `GameStyle` paint box, D75). **The loop redesign comes next: step 13, parts 13a–13j** (Design §12, D61–D74, D77), in that order, before 14, 15, 16 and 17 (D74). 14 wires 11a's sounds after step 13, with the new moments added. The Operator's notebook (D59) stays on hold. 13a is a full brief; 13b–13j are outlines the orchestrator turns into briefs, with the numbers from Design §12.13 confirmed by the lead, before launching each. **Renumbered on 2026-11-09** so every step has the same kind of name, in the order of work: S1 → 12, L1–L9 → 13a, 13b and 13d–13j (13c, residents and the call director, was added on 2026-11-09 and moved the later parts one letter), 11b → 14, 11d → 15, 12 → 16, 13 → 17. Older reports and commits use the old names.
 
 > **Renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7, 7d → 8, 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11, 9 → 12, 10 → 13. The briefs of done steps, commit messages and older reports keep the numbers they were written with.
 
@@ -2040,7 +2042,7 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
     - Keep each label's box. If the text no longer fits, use TMP auto-size inside the box rather than a bigger box.
     - Measure the ink against the paper and against the plate: at least 4.5:1.
   - **Old fields:** remove the serialized colour fields this step replaces (for example `CallCardView.wrongInk`, `missedInk` and `urgentRingColor`), and check prefabs and scenes so that no leftover serialized value wins.
-- **Not in this step:** any other component (Plan §8, "Components still on raw colours"), the shop's colours, the victory scene (13f removes it), new art.
+- **Not in this step:** any other component (Plan §8, "Components still on raw colours"), the shop's colours, the victory scene (13g removes it), new art.
 - **Tests:** no domain rule changes, so there are no new EditMode tests, and the existing suite stays green. `GameStyle` is presentation code in Assembly-CSharp, which the test assembly can't reference.
 - **Screenshots** (`Temp/Captures/`), four in all:
   1. cards showing a stamp and the name plates;
@@ -2155,64 +2157,76 @@ The lead's playtest of fix pass 1:
   - With a cord in hand, only a live call's jack shows red; other plugged jacks show yellow.
   - With an empty hand, only an unfinished cord's jack lights up, in yellow.
 
-### Step 13: The loop redesign, parts 13a–13i (D61–D74, Design §12)
-The 2026-10-25 playtest (Progress, "Playtest and redesign") sent the game back to its loop: the busy operator is the heart, with shifts, patience, stakes, chores, nerves, a wall of frames and the story between days. These steps come **before 14, 15, 16 and 17** (D74). Each is one agent at high effort unless noted. Before launching one, the orchestrator confirms its open numbers (Design §12.13) with the lead and writes them into the brief; every number lands in `Economy.json` or `Calls.json`, never in code, and `Docs/EconomyFile.md` is updated in the same step. Views follow [StyleGuide.md](StyleGuide.md) and take their colours, fonts and timings from `GameStyle` (Step 12); placeholder shapes stand in for art that isn't drawn yet (Plan §8, "Art for the wall and the chores").
+### Step 13: The loop redesign, parts 13a–13j (D61–D74, D77, Design §12)
+The 2026-10-25 playtest (Progress, "Playtest and redesign") sent the game back to its loop: the busy operator is the heart, with shifts, patience, stakes, chores, nerves, a wall of frames and the story between days. These steps come **before 14, 15, 16 and 17** (D74). Each is one agent at high effort unless noted. Before launching one, the orchestrator confirms its open numbers (Design §12.13) with the lead and writes them into the brief; every number lands in `Economy.json` or `Calls.json`, never in code, and `Docs/EconomyFile.md` is updated in the same step. Views follow [StyleGuide.md](StyleGuide.md) and take their colours, fonts and timings from `GameStyle` (Step 12); placeholder shapes stand in for art that isn't drawn yet (Plan §8, "Art for the wall and the chores"). **13c (residents and the call director) was added on 2026-11-09** (D77) and moved the later parts one letter; 13e's angry callbacks, 13g's arrivals by day and 13j's story build on its resident state.
 
 ### Step 13a: Pressure and the queue fix (D63, D64)
 **Why:** people call while already on a call (a bug), callers never leave, emergencies allow 140 s, and after the first connection the player waits 25 s with nothing to do.
-- **Queue rule** (`CallQueue.TakeNext`; Design 5.2 and D52 change): skip a script while either of its jacks (`From`, `To`) is the `From` or `To` of a live call, or its caller's name has a live call (the existing check). A skipped script comes round again; if every script is skipped the slot stays empty.
+- **Queue rule** (`CallQueue.TakeNext`; Design 5.2, D52 and D63 change; lead, 2026-11-09): **nobody calls while on a call.** Skip a script while its `From` jack is the `From` or `To` of any live call (the existing caller-name check stays). A skipped script comes round again; if every script is skipped the slot stays empty. **A busy recipient is allowed:** a script whose `To` jack is in a live call may be dealt, but at most one such card at a time (`Economy.json` `maxBusyLineCards`, 1; confirm).
+- **The "Line busy" card:** while a dealt call's recipient jack carries a live call, the card shows "Line busy" in place of the pay badge (neutral, StyleGuide §4) and its patience runs; when the jack frees, the card returns to normal. A hang-up while the line was busy ends as `HungUp` too but is flagged (`Call.HungUpOnBusyLine`), so 13e counts no complaint for it. A jack held only by a stale plug (D45) is not a busy line: the player pulls the plug.
 - **Patience** (Domain): `CallScript.PatienceSeconds` from `Calls.json` `patienceSeconds`; absent means `Economy.json` `defaultPatienceSeconds`; 0 means the call waits forever (the tutorial's call, tests). `Call.PatienceSecondsLeft` counts while Incoming, Taken or Connecting, is held with `WaitingHeld` like the response timer, and stops for good once connected. A call with a response time (an emergency) uses the response time only. At 0 the call ends as `CallEndReason.HungUp = 6`: no pay, no fine; the queue brings it back later as usual. `CareerStats.CallsHungUp` counts them.
 - **Card:** the patience shows on the existing countdown ring in the attention amber (`#F5D278`, StyleGuide §3), never the alarm red, with a gentle pulse in the last 5 s; the stamp reads "Hung up" in the neutral brown ink; `CallAudio` plays the receiver-down for HungUp. No new sound.
 - **Data** (`Calls.json`, `Economy.json`): early calls 10–15 s long (confirm); `patienceSeconds` only where a call needs its own; emergencies `responseTimeSeconds` 30 (confirm), `penaltyCents` about one good call's pay, pay above regular calls; `startingCords` per the lead. `Validate Content`: a patience of 0 or less when present is reported; an emergency that also sets patience gets a note.
 - **Emergency sound:** if the S1 and S2 picks are already in `Assets/Audio/`, wire the bell and the tick here as 14's S1/S2 brief says; otherwise leave them for 14 and say so in the report.
-- **Tests:** the queue skips by jack and by caller and comes round again; patience counts only while waiting, is held with the tutorial, ends as HungUp with no pay or fine; an emergency ignores patience; the real files load with the new fields and every regular call gets a patience above 0; `CareerStats` counts hang-ups.
+- **Tests:** the queue skips a caller who is on any live call, as caller or recipient, and comes round again; a busy-recipient script is dealt, at most one at a time; the busy-line flag is set only while the recipient's jack carried a live call; patience counts only while waiting, is held with the tutorial, ends as HungUp with no pay or fine; an emergency ignores patience; the real files load with the new fields and every regular call gets a patience above 0; `CareerStats` counts hang-ups.
 - **Docs:** `EconomyFile.md` (the new fields), Design 5.1's table and 5.2, Plan §8's row.
-- **Playtest:** three minutes on a new game: nobody rings while they're on a call; cards turn amber and leave with "Hung up"; an emergency is tight at 30 s; the first connection leaves no dead time.
+- **Playtest:** three minutes on a new game: nobody rings while they're on a call, as caller or recipient; at most one card says "Line busy", and it connects once the line frees; cards turn amber and leave with "Hung up"; an emergency is tight at 30 s; the first connection leaves no dead time.
 
 ### Step 13b: Days (D62) (outline)
 - Domain `Shift`: the shift's seconds from `Economy.json`, the day number, a `ClosingTime` event; at closing, live calls end as a new reason (no pay, no complaint, a "Closing time" stamp) and cords return to the tray; the queue pauses between days. The day number and the career totals go into the save (a migration).
 - The punch clock on the wall: punch in starts the shift (day 1 starts after the tutorial's first call), punch out at closing. The wall clock (V11) and the calendar, both stopped on pause.
-- The day card (GameUI, its own canvas above the book): earned, connected, hung up, missed, placeholders for best streak and rating (13c) and for "Tomorrow: ..." (13f), and a Next day button. Autosave on the card.
-- Pace per day in `Economy.json` (a `days` or `schedule` list: shift length, patience scale, call pool); rush hour waits for 13c.
+- The day card (GameUI, its own canvas above the book): earned, connected, hung up, missed, placeholders for best streak and rating (13d) and for "Tomorrow: ..." (13g), and a Next day button. Autosave on the card.
+- Pace per day in `Economy.json` (a `days` or `schedule` list: shift length, patience scale, call pool); rush hour waits for 13d.
 - Tests: closing ends calls without pay; the day number saves and loads; a reload starts the current day with an empty board; the punch clock gates the shift.
 
-### Step 13c: Score and streak (D67) (outline)
+### Step 13c: Residents and the call director (D77) (outline; added 2026-11-09)
+**Why:** the rules know no people, so nothing can be remembered about a caller between calls; every call repeats its caller's name, portrait and jack; and hand-written pools can't guarantee the busy-caller rule or vary the day. Design §12.14.
+- **Data:** `Book.json` becomes `Assets/Configs/Residents.json` (keep the GUID if the rename allows it; `GameConfig.bookFile` follows): `id`, `name`, `portrait`, `jack`, `profession`, `address`, `emergencyService`, `arrivesOnDay`, `patienceFactor`, `temper`, `voice`. `Calls.json` entries get `caller` and `to` as resident ids and lose `name`, `icon`, `from` and `to`; `story` and `arc` arrive here as plain fields (13j uses them). New `Errands.json`: the templates and the relationship list. The 33 calls and 14 entries are migrated by hand in the step. `Docs/BookFile.md` becomes the residents guide; `Docs/EconomyFile.md` is updated.
+- **Content:** `ResidentsFileLoader` and `ResidentsCatalog` replace `BookFileLoader` and `BookCatalog`; `PhoneBookView` reads residents (same rows, same order rules, D53); `CallsFileLoader` resolves ids to jacks; `ErrandsFileLoader`; the validator checks ids, jacks on the board, arrivals before use and template placeholders, in plain words.
+- **Domain:** `Resident` (id, jack, and state: `OnCall`, `HangUps`, `Anger`, `LastCallDay`) in a `ResidentRegistry`; `CallDirector` replaces `CallQueue`'s pool loop, with per-day knobs from `Economy.json` (`callsPerMinute`, `emergencyEvery`, `maxBusyLineCards`, `errandShare`): story beats first when due and their people free, errands generated from templates through `IRandom`, 13a's rules kept (nobody calls while on a call; one busy-line card). `CallScript` gains `Caller` and `Recipient` resident ids. Saves: per-resident anger and hang-ups and the director's position (a migration).
+- **Views:** cards take the portrait from the resident; `CallerJackLights` and the book's jack mark read jacks from residents. No visual change otherwise.
+- **Tests:** the loaders and their messages; the busy-caller rule holds for generated and story calls alike; a resident's state survives between calls and across a save; the director is deterministic for a seed; errands never repeat the same template to the same pair twice running; the real files load.
+- **Playtest:** ten minutes: the book looks the same; nobody calls while on a call; everyday calls vary in wording; the same faces recur.
+
+### Step 13d: Score and streak (D67) (outline)
 - Domain `Streak` and `DayScore`: earned per shift is the score; a streak of correct connections broken by a wrong number, hang-up or miss, with a bonus from `Economy.json`; rush hour in the last minute (×2 pay, faster arrival); "Just in time!" for an emergency connected inside its last N s; a rating from earned against the day's target and the complaints; the best shift saved and shown in the main menu; one daily challenge a day from a list in `Economy.json`, checked at closing.
 - Views: the streak counter (the caller panel's top or the wall; the brief decides), the connection bell pitched up per step, a thud on a break, the quick-connect window shown shrinking on the card, stamps for "Just in time!" and the challenge, the rating and the challenge on the day card.
 - Tests: streak rules, rush-hour pay, the near-miss window, the rating formula, the challenge checks, the best shift saved.
 
-### Step 13d: Stakes within the day (D68) (outline)
+### Step 13e: Stakes within the day (D68) (outline)
 - Burnt cord: on a wrong number the judged cord is dead for the rest of the day (or N s, confirm): smoking in the tray, impossible to pick up (`CableController` state, `CordBridge`). The intercom (a chore): hold or crank to call the electrician, who fixes the cord after about 10 s for a fee, with a longer wait each time.
 - Angry callbacks: a hung-up caller's next call has shorter patience, a cross face (a tint until V12's art) and no tip; a second hang-up from the same person is a complaint at once.
 - Complaints: hang-ups, wrong numbers and misses, shown as stamps in a row while the day runs; at 3 the supervisor's call (a special card that must be answered and holds a cord and attention); at 5 "Sent home": the day ends early with the quota missed.
 - A missed emergency: the fine, a complaint, the supervisor's line lit for a minute.
 - Tests for every rule; the numbers in `Economy.json`.
 
-### Step 13e: Stakes across days (D68) (outline; the lead confirms "fired" first)
+### Step 13f: Stakes across days (D68) (outline; the lead confirms "fired" first)
 - A quota per day in `Economy.json`, delivered by the pneumatic mail at punch-in (the chore: open the capsule); a missed quota puts a written warning on the wall; beating the next quota removes one; three warnings: fired, with a career card (days worked, best shift, frames), then a new career that keeps the frames and the board and skips the tutorial.
 - Overtime: at closing time the player may keep working; callers get crankier each minute; a late punch-out is a complaint after N min; overtime pay counts.
 - Save: the warnings and the career history.
 
-### Step 13f: Unlocks and the wall (D65, D66, D71) (outline)
+### Step 13g: Unlocks and the wall (D65, D66, D71) (outline)
 - `Economy.json`: `upgrades` becomes a `schedule` by day (a cord, a board stage with its `stagePool`, a chore, a desk item, a resident, the quota, the challenge); `StatSheet` reads the day's unlocks; the income multipliers go (confirm); the `secret` upgrade, `GoalProgress`, the savings fill, the "To be continued" dialog, `VictorySequenceView` and `VictoryTownGraphic` are removed (D65); the shop panel shows what's unlocked and what's next, or leaves the board (confirm). The tutorial's shop steps change with it.
 - The wall: frames ("Operator of the week" on day 7, "of the month" on day 30, the feats), the warnings, the desk items, each hung at day end with a nail-and-swing moment; the first-week milestone on the day-7 card.
 - Tests: schedule parsing and validation; unlocks by day; a frame is awarded once.
 
-### Step 13g: Chores (D69) (outline)
+### Step 13h: Chores (D69) (outline)
 - The register lever: the drawer collects the earnings; a pull banks them with the register sound and pays the streak bonus; unbanked money at closing counts half (confirm).
 - Wiping the glass: smoke from a short circuit and steam in rush hour hide jacks under a fogged pane until a drag wipes it.
 - Mid-shift mail slips (optional).
 - The rule: at most two or three chores active; each arrives alone through the schedule.
 
-### Step 13h: Nerves (D70) (outline)
+### Step 13i: Nerves (D70) (outline)
 - Domain `Nerves`: rises with hang-ups, emergency bells and rush-hour time; decays; thresholds. Effects in the views: hand jitter, plugs that want a second try, fluttering book pages.
 - Coffee or water (a 1 s hold, a small calm), the cigarette (a big calm, smoke on the glass), the flask (a full calm and a confidence bonus, then a swaying board and a drifting hand; a second nip risks a wrong plug and "Sent home" if the supervisor calls). The assets are swappable for coffee and cough syrup; no moralising text.
 - Tests for the meter, the thresholds and the three remedies.
 
-### Step 13i: Narrative between days (D72)
+### Step 13j: Narrative between days (D72)
 - **First the story bible,** `Docs/Story.md` (the orchestrator with the lead, approved before any JSON): the cast with one want and one flaw each; three to five crossing arcs; the beats per day for the first week; headlines; the new resident per day.
 - Then the calls: one-line ringing messages; a `story` flag that plays a call once per career and in order (`CallQueue`, the played list saved), filler errands that loop; 50–60 calls for the first week; the headline and the new face on the day card; the validator checks story ids and their order.
-- Tests: story calls never repeat; the order holds; a pushed-back story call returns next.
+- **Story structure (lead, 2026-11-09):** arcs are chains of beats, no branching; each beat has a headline; each arc a holding line; a few generic headlines. The day card's headline picker: the last resolved beat today, else the holding line of the arc furthest along, else a generic line. Beats play in arc order; a pushed-back beat waits if its people are busy.
+- **Writing volume:** three to five arcs of eight to twelve beats (50–60 story calls), one holding line per arc, five to ten generic headlines, and the errand templates from 13c.
+- Tests: story calls never repeat; the order holds within an arc; a pushed-back story call returns next; the headline picker's three cases.
 
 ### Step 14: Wire the sounds (D60)
 **Who:** one agent at high effort. **Needs 11a's picks.** Runs after 11c (lead, 2026-10-22). **From 11c:** `CallCardView.StampShown(CallCardView)` fires on the first visible frame of every stamp pop: use it for the S4 thunk. Emergencies get no "New order!" stamp (V13), so their arrival has no thunk; the S1 bell covers it. `EmergencyLampView` (the red lamp and its EMERGENCY sign) lights while any emergency waits: start and stop the S1 bell on the same signal.
