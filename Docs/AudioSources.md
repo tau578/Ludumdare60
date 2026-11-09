@@ -3,7 +3,7 @@
 Every sound in `Assets/Audio/`, where it came from and its licence. Add a row whenever a sound is added (Step 11a, D60).
 
 **Licences:**
-- **ElevenLabs** sound effects are generated on the free plan. Commercial use needs a credit to elevenlabs.io, so the Credits screen names it (11b adds the line). A paid plan needs no credit; check the plan before the game ever becomes paid or takes donations.
+- **ElevenLabs** sound effects are generated on the free plan. Commercial use needs a credit to elevenlabs.io, so the Credits screen names it (14 adds the line). A paid plan needs no credit; check the plan before the game ever becomes paid or takes donations.
 - **Kenney** packs are CC0: free, no credit needed.
 - **Pixabay** music is under the Pixabay Content License: commercial use is allowed and no credit is required. The game credits the current track anyway (`Credits.txt`).
 
@@ -19,7 +19,7 @@ Every sound in `Assets/Audio/`, where it came from and its licence. Add a row wh
 | `Sfx/CoinsAway.wav` | S3b | A fine is taken | ElevenLabs sound effects, 1.5 s: "Small pile of coins scooped and dragged away across a wooden table, metallic clinks fading" |
 | `Sfx/StampThunk.wav` | S4 | Every stamp (vary the pitch slightly) | ElevenLabs sound effects, 0.6 s: "Rubber stamp hitting paper on a wooden desk, one short soft thud" |
 | `Sfx/CoinJingle.wav` | S5 | A call finishes and pays | ElevenLabs sound effects, 1.2 s: "A few coins clinking together in a hand, short cheerful jingle, close" |
-| `Sfx/CoinTick.wav` | S5b | Small coins from connected calls (11d) | ElevenLabs sound effects, 0.5 s: "One small coin clink, bright and soft, very short" |
+| `Sfx/CoinTick.wav` | S5b | Small coins from connected calls (15) | ElevenLabs sound effects, 0.5 s: "One small coin clink, bright and soft, very short" |
 | `Sfx/CutOff.wav` | S6 | A plug pulled early: line click and busy tone | ElevenLabs sound effects, 2.0 s: "Telephone handset hang-up click then three short busy tone beeps, vintage, lo-fi" |
 | `Sfx/TipBell.wav` | S7 | The quick-connect tip | ElevenLabs sound effects, 1.0 s: "A single ding of a brass desk bell, bright, clear, loud" |
 | `Sfx/CallerVoiceA.wav` | S8 | Caller talking (a man's voice); one of three voices for different characters | ElevenLabs sound effects, 2.0 s: "Muffled gibberish voice of a man speaking quickly through an old telephone earpiece, unintelligible syllables, lo-fi, tinny" |
@@ -52,7 +52,7 @@ Every sound in `Assets/Audio/`, where it came from and its licence. Add a row wh
 | `Sfx/PhoneBabble.wav` | **Source not recorded** (`2fc3810`) |
 | `Sfx/SecretUpgrade.wav`, `ShopInsufficientFunds.wav`, `ShopPurchase.wav` | **Source not recorded** (`2c0d99d`) |
 | `Cable/PlugBlocked.wav`, `PlugInsert.wav`, `PlugRemove.wav` | **Source not recorded** (`bf4f654`) |
-| `../Content/Audio/card-take-click.wav` | The Step 3 placeholder, unused; 11b deletes it |
+| `../Content/Audio/card-take-click.wav` | The Step 3 placeholder, unused; 14 deletes it |
 
 **Open:** whoever added the sounds marked "source not recorded" should fill in their source and licence before the game is published.
 

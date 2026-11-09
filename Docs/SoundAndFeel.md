@@ -1,6 +1,6 @@
 # Sound and feel: suggestions
 
-The orchestrator's list of missing sounds and visual feedback (2026-10-22). The lead took every item (D60). The build briefs are in [Plan.md](Plan.md) §9, "Step 11" (11a–11d), which use the same numbers: **S1–S16** for sounds and **V1–V14** for visuals.
+The orchestrator's list of missing sounds and visual feedback (2026-10-22). The lead took every item (D60). The build briefs are in [Plan.md](Plan.md) §9, "Step 11" (11a, 11c, 14 and 15), which use the same numbers: **S1–S16** for sounds and **V1–V14** for visuals.
 
 ## What the game already has
 
@@ -50,7 +50,7 @@ The Step 3 placeholder `card-take-click.wav` is already replaced by `CardTake.wa
 | V6 | **Connection.** A small flash ring at both jacks, and a tiny wiggle in the cord if the cord code allows it. |
 | V13 | **Fix:** the "New order!" stamp covers the EMERGENCY badge and its countdown (Plan §8). |
 
-**Nice extras (Step 11d):**
+**Nice extras (Step 15):**
 
 | # | Idea |
 |---|---|
@@ -84,6 +84,6 @@ Sources: [ElevenLabs API: sound generation](https://elevenlabs.io/docs/api-refer
 
 ## Build order
 1. **11a, gather the sounds.** The orchestrator, with the lead. Download Kenney, generate the ElevenLabs candidates and put them on a listening page. The lead picks; the picks go into `Assets/Audio/` and `Docs/AudioSources.md`.
-2. **11b, wire the sounds** into the game: S1–S16 and the Credits line.
+2. **14, wire the sounds** into the game: S1–S16 and the Credits line.
 3. **11c, main visual feedback:** V1–V6 and V13.
-4. **11d, extra visual feedback:** V7–V12 and V14.
+4. **15, extra visual feedback:** V7–V12 and V14.

@@ -36,8 +36,29 @@ namespace Switchboard.UI
         private SocketFlashGraphic ringFlash;
         private SocketFlashGraphic wrongFlash;
         private SocketFlashGraphic shortFlash;
+        private IBoardPalette palette;
+        // GameStyle's defaults, for sockets the game hasn't given a palette (the volume patch, unit tests).
+        private static readonly Color UnstyledErrorGlow = new Color32(238, 68, 80, 255);
+        private const float UnstyledWrongRingOuter = .54f;
+        private const float UnstyledWrongStrength = .85f;
+        private const float UnstyledBlockedGlow = 1.5f;
+        private const float ConnectedGlow = 1.4f;
+        /// <summary>The game's paint box; the red glows read it each time they show, so Play Mode edits apply.</summary>
+        public IBoardPalette Palette
+        {
+            get => palette;
+            set { palette = value; RefreshHalo(); }
+        }
+        /// <summary>Crimson light on dark: the wrong-number flash and the red ring over a live call's jack.</summary>
+        public Color ErrorGlow => palette != null ? palette.ErrorGlow : UnstyledErrorGlow;
+        public float WrongNumberRingOuter => palette != null ? palette.WrongNumberRingOuter : UnstyledWrongRingOuter;
+        public float WrongNumberStrength => palette != null ? palette.WrongNumberStrength : UnstyledWrongStrength;
+        public float BlockedGlowIntensity => palette != null ? palette.BlockedGlowIntensity : UnstyledBlockedGlow;
         public bool IsHighlighted => highlighted;
-        public bool IsBlockedHighlight => blockedHighlight;
+        /// <summary>The red ring: a held cord over another cord's plug while that plug carries a live call.</summary>
+        public bool IsDangerShowing => ShowsDanger;
+        /// <summary>The amber hover; never on a live call's jack, which stays green or turns red.</summary>
+        public bool IsHoverShowing => ShowsHover;
         public bool IsDimmed => dimmed;
         public bool IsCallConnected => callConnected;
         /// <summary>The lamp asked for (D58); a closed socket never shows it.</summary>
@@ -68,6 +89,9 @@ namespace Switchboard.UI
         {
             if (!isActiveAndEnabled || dimmed) return;
             wrongFlash = Flash(wrongFlash, "Socket wrong flash");
+            wrongFlash.WrongNumberColor = ErrorGlow;
+            wrongFlash.WrongNumberRingOuter = WrongNumberRingOuter;
+            wrongFlash.WrongNumberStrength = WrongNumberStrength;
             wrongFlash.Play(SocketFlashKind.WrongNumber);
             if (!spark) return;
             bool created = shortFlash == null;
@@ -129,8 +153,16 @@ namespace Switchboard.UI
         private Color Tint => dimmed ? color * dimmedTint : color;
         // A closed jack can't carry a call or take a plug, so the dimmed look wins over green and hover.
         private bool ShowsConnected => callConnected && !dimmed;
+        // Both read the connected light itself, so the ring swaps between red, amber and green the moment a call starts
+        // or ends under the pointer (the lead's hover table, 2026-11-09).
+        private bool ShowsDanger => blockedHighlight && ShowsConnected;
+        private bool ShowsHover => highlighted && !callConnected && !dimmed;
         private bool ShowsHalo => !dimmed && (callConnected || highlighted);
 
+        /// <summary>
+        /// <paramref name="value"/>: hovered in a way that shows amber; <paramref name="blocked"/>: a held cord over
+        /// another cord's plug, red while that plug carries a live call. A live call's jack never shows amber.
+        /// </summary>
         public void SetHighlighted(bool value, bool blocked = false)
         {
             blocked = value && blocked;
@@ -160,9 +192,10 @@ namespace Switchboard.UI
                 if (lampGraphic != null) lampGraphic.transform.SetAsFirstSibling();
             }
             if (halo == null) return;
-            halo.color = blockedHighlight ? new Color32(241, 87, 70, 255)
-                : ShowsConnected ? new Color32(125, 255, 155, 255) : SocketHaloGraphic.HoverColor;
-            halo.Intensity = ShowsConnected && !blockedHighlight ? 1.4f : 1f;
+            // Red means "don't" (StyleGuide §4): a held cord over a live call's plug, at the blocked glow's strength.
+            halo.color = ShowsDanger ? ErrorGlow
+                : ShowsConnected ? (Color)new Color32(125, 255, 155, 255) : SocketHaloGraphic.HoverColor;
+            halo.Intensity = ShowsDanger ? BlockedGlowIntensity : ShowsConnected ? ConnectedGlow : 1f;
             halo.gameObject.SetActive(visible);
         }
 

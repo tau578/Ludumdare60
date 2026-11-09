@@ -33,9 +33,10 @@ namespace Switchboard.UI
         public const int MaxStreaks = 10;
         /// <summary>Nothing of the short circuit reaches further from the jack's centre, in jack widths.</summary>
         public const float MaxReach = 1.5f;
+        /// <summary>The wrong-number ring's inner edge, in jack widths.</summary>
+        public const float WrongRingInner = .22f;
         // Close to the connected jacks' green halo (11c playtest: the first mint was too pale).
         public static readonly Color RingColor = new Color32(104, 240, 134, 255);
-        public static readonly Color WrongColor = new Color32(241, 64, 52, 255);
         private static readonly Color HotWhite = new Color32(255, 255, 242, 255);
         private static readonly Color HotYellow = new Color32(255, 226, 104, 255);
         private static readonly Color HotOrange = new Color32(255, 128, 36, 255);
@@ -72,6 +73,12 @@ namespace Switchboard.UI
         private float age = -1;
 
         public SocketFlashKind Kind { get; private set; }
+        /// <summary>The wrong-number flash's colour, set by the socket from the game's palette before it plays.</summary>
+        public Color WrongNumberColor { get; set; } = Color.white;
+        /// <summary>The wrong-number ring's outer edge in jack widths, set by the socket from the palette before it plays.</summary>
+        public float WrongNumberRingOuter { get; set; } = .54f;
+        /// <summary>The wrong-number ring's strength, 0 to 1, set by the socket from the palette before it plays.</summary>
+        public float WrongNumberStrength { get; set; } = .85f;
         public bool IsPlaying => age >= 0;
         public float Age => age;
         public float Duration => Kind == SocketFlashKind.ConnectRing ? RingSeconds
@@ -190,8 +197,9 @@ namespace Switchboard.UI
             if (Kind == SocketFlashKind.WrongNumber)
             {
                 // Two quick red flashes that fade, around the hole and over the rim.
-                float flash = (.55f + .45f * Mathf.Cos(t * Mathf.PI * 4f)) * (1f - t * .7f);
-                Ring(mesh, rect.center, size * .22f, size * .62f, Tint(WrongColor, flash));
+                float flash = (.55f + .45f * Mathf.Cos(t * Mathf.PI * 4f)) * (1f - t * .7f) * Mathf.Clamp01(WrongNumberStrength);
+                float outer = Mathf.Max(WrongRingInner + .02f, WrongNumberRingOuter);
+                Ring(mesh, rect.center, size * WrongRingInner, size * outer, Tint(WrongNumberColor, flash));
                 return;
             }
             DrawSmoke(mesh, rect.center, size);

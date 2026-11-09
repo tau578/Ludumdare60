@@ -20,9 +20,6 @@ namespace Switchboard.Game
         [SerializeField, Min(0), Tooltip("How long the plate's glow lasts when income lands.")] private float glowSeconds = .6f;
         [SerializeField, Range(0, 1)] private float glowAlpha = .4f;
         [SerializeField] private Color glowColor = new Color32(255, 236, 160, 255);
-        [SerializeField, Min(0)] private float fineShakeSeconds = .3f;
-        [SerializeField, Min(0)] private float fineShakePixels = 6f;
-        [SerializeField] private Color fineInk = new Color32(196, 40, 40, 255);
         [SerializeField, Min(1), Tooltip("The decimal point is small at the digits' size: drawn this much bigger on its own drum.")]
         private float dotScale = 1.9f;
         [SerializeField, Range(-.5f, .5f), Tooltip("Where the dot sits on its drum, as a share of the drum's height (negative: lower).")]
@@ -32,6 +29,7 @@ namespace Switchboard.Game
         private Wallet wallet;
         private PenaltyService penalties;
         private UpgradeService upgrades;
+        private GameStyle style;
         private long shownCents = -1;
         private RectTransform slot;
         private Vector3 alignedMin;
@@ -66,13 +64,16 @@ namespace Switchboard.Game
         public bool IsShaking => shakeTarget != null;
 
         /// <param name="headerSlot">The shop panel's header plaque to sit in; null keeps the prefab position.</param>
-        public void Bind(Wallet source, RectTransform headerSlot, PenaltyService fines, UpgradeService shop)
+        /// <param name="paint">The paint box: the fine's and "can't afford"'s Error ink and the fine's shake.</param>
+        public void Bind(Wallet source, RectTransform headerSlot, PenaltyService fines, UpgradeService shop,
+            GameStyle paint = null)
         {
             ResetInsufficientFunds();
             Unsubscribe();
             wallet = source;
             penalties = fines;
             upgrades = shop;
+            style = paint;
             if (penalties != null) penalties.FineApplied += OnFineApplied;
             if (upgrades != null) upgrades.UpgradeBought += OnUpgradeBought;
             if (finePopup != null) finePopup.Hide();
@@ -334,10 +335,16 @@ namespace Switchboard.Game
             incomeCoins.Fly(portrait, label.rectTransform);
         }
 
-        public void ShowInsufficientFunds() => Shake(Vector3.up, InsufficientFundsDuration, 8f, new Color32(178, 62, 62, 255));
+        public void ShowInsufficientFunds()
+        {
+            if (style != null) Shake(Vector3.up, InsufficientFundsDuration, 8f, style.Error);
+        }
 
-        /// <summary>A fine (V2): the plaque shakes sideways and flashes red.</summary>
-        public void ShowFine() => Shake(Vector3.right, fineShakeSeconds, fineShakePixels, fineInk);
+        /// <summary>A fine (V2): the plaque shakes sideways and flashes Error crimson.</summary>
+        public void ShowFine()
+        {
+            if (style != null) Shake(Vector3.right, style.FineShakeSeconds, style.FineShakePixels, style.Error);
+        }
 
         private void Shake(Vector3 axis, float seconds, float pixels, Color ink)
         {

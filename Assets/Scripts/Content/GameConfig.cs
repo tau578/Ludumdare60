@@ -20,8 +20,8 @@ namespace Switchboard.Content
             new Color32(240, 232, 206, 255)
         };
         [SerializeField, Tooltip("How regular calls' cards look.")] private CallCardStyle regularCards;
-        [SerializeField, Tooltip("How emergency calls' cards look (D09): a badge and an accent besides the countdown ring.")]
-        private CallCardStyle emergencyCards = new CallCardStyle { badgeText = "EMERGENCY", accent = new Color(0.78f, 0.13f, 0.13f, 1) };
+        [SerializeField, Tooltip("How emergency calls' cards look (D09): a badge and an accent besides the countdown ring. The accent is GameStyle's Alarm, #E84A34.")]
+        private CallCardStyle emergencyCards = new CallCardStyle { badgeText = "EMERGENCY", accent = new Color32(0xE8, 0x4A, 0x34, 255) };
         [SerializeField, Tooltip("Assets/Configs/Calls.json, the designer's hand-written calls (D51).")]
         private TextAsset callsFile;
         [SerializeField, FormerlySerializedAs("peopleFile"), Tooltip("Assets/Configs/Book.json, the designer's phone book (D53).")]

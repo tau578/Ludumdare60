@@ -154,6 +154,7 @@ GameObject:
   - component: {fileID: 7067467364080436388}
   - component: {fileID: 3993240531949041541}
   - component: {fileID: 1643921489516862712}
+  - component: {fileID: 2413590027337132290}
   m_Layer: 5
   m_Name: Title
   m_TagString: Untagged
@@ -218,7 +219,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontColor: {r: 1, g: 0.86, b: 0.12, a: 1}
+  m_fontColor: {r: 1, g: 0.85882354, b: 0.12156863, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -280,6 +281,19 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &2413590027337132290
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 268726173197347082}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7eef21b7372b14970983374e79a9cdf8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.Game.TitleInk
+  style: {fileID: 11400000, guid: 85e5ee1d5a1754f7abc3eb0146858b88, type: 2}
 --- !u!1 &293664993383387556
 GameObject:
   m_ObjectHideFlags: 0
@@ -291,6 +305,7 @@ GameObject:
   - component: {fileID: 6379060834634348822}
   - component: {fileID: 1623437228491288651}
   - component: {fileID: 4100463769933511697}
+  - component: {fileID: 306710951211557455}
   m_Layer: 5
   m_Name: Title
   m_TagString: Untagged
@@ -355,7 +370,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontColor: {r: 1, g: 0.86, b: 0.12, a: 1}
+  m_fontColor: {r: 1, g: 0.85882354, b: 0.12156863, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -417,6 +432,19 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &306710951211557455
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 293664993383387556}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7eef21b7372b14970983374e79a9cdf8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.Game.TitleInk
+  style: {fileID: 11400000, guid: 85e5ee1d5a1754f7abc3eb0146858b88, type: 2}
 --- !u!1 &410153865729722750
 GameObject:
   m_ObjectHideFlags: 0
@@ -976,6 +1004,7 @@ MonoBehaviour:
   slideSpeed: 14
   callerFrame: {fileID: 21300000, guid: 334abe67356188d4589e014d293d7520, type: 3}
   takeSound: {fileID: 7137156963589572439}
+  arrivalWidths: 0.75
 --- !u!1 &1133741870067380973
 GameObject:
   m_ObjectHideFlags: 0
@@ -3477,6 +3506,12 @@ MonoBehaviour:
   plate: {fileID: 6546221493006738700}
   finePopup: {fileID: 6699700565966887452}
   spendPopup: {fileID: 7091962267575421279}
+  rollSeconds: 0.15
+  glowSeconds: 0.6
+  glowAlpha: 0.4
+  glowColor: {r: 1, g: 0.9254902, b: 0.627451, a: 1}
+  dotScale: 1.9
+  dotLift: -0.12
 --- !u!1 &4536427450967041161
 GameObject:
   m_ObjectHideFlags: 0
@@ -3680,10 +3715,6 @@ MonoBehaviour:
   stamp: {fileID: 3816823820630791185}
   stampLabel: {fileID: 8669614049924617898}
   stampOutline: {fileID: 3277460219077246671}
-  paidInk: {r: 0.14901961, g: 0.40784314, b: 0.22745098, a: 1}
-  wrongInk: {r: 0.6431373, g: 0.14901961, b: 0.14901961, a: 1}
-  cutOffInk: {r: 0.36078432, g: 0.3137255, b: 0.26666668, a: 1}
-  missedInk: {r: 0.45490196, g: 0.07058824, b: 0.11764706, a: 1}
   speechBubble: {fileID: 6533502445742123560}
   speechLabel: {fileID: 5348750625164458506}
   charactersPerSecond: 40
@@ -3696,23 +3727,20 @@ MonoBehaviour:
   rateOutline: {fileID: 1957082658858597730}
   responseRingRoot: {fileID: 8805804281894748906}
   responseRing: {fileID: 9068418060051696417}
-  urgentSeconds: 10
-  urgentRingColor: {r: 1, g: 0.36078432, b: 0.1882353, a: 1}
-  urgentPulsesPerSecond: 3
   earningsBadge: {fileID: 6654713596598988795}
   earningsLabel: {fileID: 1142940325221820156}
   onHoldAlpha: 0.45
   durationBadge: {fileID: 6849460699400428684}
   durationLabel: {fileID: 8022789896024053561}
-  stampSeconds: 1.5
   pressTarget: {fileID: 5212060997721711748}
   pressFlash: {fileID: 1805677206234749488}
   pressSeconds: 0.2
   pressFlashAlpha: 0.45
-  newOrderInk: {r: 0.48235294, g: 0.32156864, b: 0.1254902, a: 1}
-  stampPopSeconds: 0.38
-  stampOvershoot: 1.16
-  stampExitSeconds: 0.22
+  arrivalSeconds: 0.55
+  ringShakeSeconds: 0.45
+  ringShakeDegrees: 5
+  wrongShakeSeconds: 0.4
+  wrongShakePixels: 12
 --- !u!1 &4707503454797463356
 GameObject:
   m_ObjectHideFlags: 0

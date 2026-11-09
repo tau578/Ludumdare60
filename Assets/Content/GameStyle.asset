@@ -1,0 +1,84 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fec6f30fcb3847caa29091cbd24c3e5, type: 3}
+  m_Name: GameStyle
+  m_EditorClassIdentifier: Assembly-CSharp::Switchboard.Game.GameStyle
+  paper: {r: 0.9529412, g: 0.9137255, b: 0.8117647, a: 1}
+  stampPaper: {r: 0.91764706, g: 0.8784314, b: 0.78039217, a: 1}
+  ink: {r: 0.2, g: 0.14117648, b: 0.101960786, a: 1}
+  creamText: {r: 0.9529412, g: 0.9137255, b: 0.8117647, a: 1}
+  menuText: {r: 1, g: 0.98039216, b: 0.9098039, a: 1}
+  goldLine: {r: 0.5882353, g: 0.53333336, b: 0.11764706, a: 1}
+  brassPlateTop: {r: 0.7764706, g: 0.6627451, b: 0.36862746, a: 1}
+  brassPlateBottom: {r: 0.65882355, g: 0.5411765, b: 0.25882354, a: 1}
+  brassPlateRim: {r: 0.43137255, g: 0.3529412, b: 0.11764706, a: 1}
+  goodLight: {r: 0.49019608, g: 1, b: 0.60784316, a: 1}
+  goodRing: {r: 0.40784314, g: 0.9411765, b: 0.5254902, a: 1}
+  goodInk: {r: 0.14901961, g: 0.40784314, b: 0.22745098, a: 1}
+  moneyText: {r: 0.9490196, g: 0.8235294, b: 0.47843137, a: 1}
+  coinLight: {r: 1, g: 0.85490197, b: 0.4392157, a: 1}
+  coinMiddle: {r: 0.83137256, g: 0.57254905, b: 0.19215687, a: 1}
+  coinDark: {r: 0.49411765, g: 0.29411766, b: 0.105882354, a: 1}
+  tip: {r: 0.98039216, g: 0.9019608, b: 0.54901963, a: 1}
+  brass: {r: 0.5882353, g: 0.53333336, b: 0.11764706, a: 1}
+  lightBrass: {r: 0.8509804, g: 0.74509805, b: 0.44705883, a: 1}
+  titleGold: {r: 1, g: 0.85882354, b: 0.12156863, a: 1}
+  errorGlow: {r: 0.93333334, g: 0.26666668, b: 0.3137255, a: 1}
+  error: {r: 0.76862746, g: 0.18431373, b: 0.22745098, a: 1}
+  errorInk: {r: 0.6431373, g: 0.14901961, b: 0.14901961, a: 1}
+  errorDeep: {r: 0.45490196, g: 0.07058824, b: 0.11764706, a: 1}
+  alarmGlow: {r: 1, g: 0.41568628, b: 0.23921569, a: 1}
+  alarm: {r: 0.9098039, g: 0.2901961, b: 0.20392157, a: 1}
+  alarmQuiet: {r: 0.5568628, g: 0.20392157, b: 0.14901961, a: 1}
+  attentionHover: {r: 0.9607843, g: 0.8235294, b: 0.47058824, a: 1}
+  attentionLamp: {r: 1, g: 0.8156863, b: 0.43137255, a: 1}
+  newOrderInk: {r: 0.48235294, g: 0.32156864, b: 0.1254902, a: 1}
+  cutOffInk: {r: 0.36078432, g: 0.3137255, b: 0.26666668, a: 1}
+  signQuiet: {r: 0.22745098, g: 0.078431375, b: 0.047058824, a: 1}
+  signLit: {r: 0.28235295, g: 0.043137256, b: 0.050980393, a: 1}
+  wrongNumberRingOuter: 0.54
+  wrongNumberStrength: 0.85
+  blockedGlowIntensity: 1.5
+  displayFont: {fileID: 11400000, guid: 7d2b11d5fb507429a9a4fdd0335c9fe3, type: 2}
+  labelFont: {fileID: 11400000, guid: c945699ba85e042f1adf81c370d111c7, type: 2}
+  plainFont: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  stampPopSeconds: 0.38
+  stampOvershoot: 1.16
+  stampExitSeconds: 0.22
+  stampHoldSeconds: 1.5
+  cardPressSeconds: 0.2
+  cardArrivalSeconds: 0.55
+  ringShakeSeconds: 0.45
+  ringShakeDegrees: 5
+  wrongShakeSeconds: 0.4
+  wrongShakePixels: 12
+  emergencyWobbleDegrees: 2
+  emergencyWobblesPerSecond: 1.2
+  urgentSeconds: 10
+  urgentWobbleDegrees: 5
+  urgentPulsesPerSecond: 3
+  lampFlashesPerSecond: 2
+  coinFlightSeconds: 1
+  coinSpacingSeconds: 0.055
+  drumRollSeconds: 0.15
+  plateGlowSeconds: 0.6
+  fineShakeSeconds: 0.3
+  fineShakePixels: 6
+  popupSeconds: 1
+  connectRingSeconds: 0.5
+  cordWaveSeconds: 0.5
+  cordWavePixels: 12
+  wrongFlashSeconds: 0.5
+  shortCircuitSeconds: 0.6
+  cordJoltSeconds: 0.35
+  cordJoltPixels: 7
+  typingCharactersPerSecond: 40

@@ -50,7 +50,6 @@ namespace Switchboard.Game
             public float Gap => gap;
         }
 
-        public const float FlashesPerSecond = 2f;
         /// <summary>The bulb's default size in the board's units (the number lamps' bulbs are 96); the game passes its
         /// own serialized value.</summary>
         public const float DefaultBulbSize = 44f;
@@ -59,24 +58,19 @@ namespace Switchboard.Game
         // Where the bulb sits, in board units from the last column number's centre: level with the numbers, on the
         // free frame between the number's bulb and the frame's gold curl.
         private static readonly Vector2 BulbOffset = new Vector2(99.5f, 0);
-        // Unlit: dull, frosted deep red. Lit: a warm red lit from inside, hottest in the middle (the inner glow).
-        private static readonly Color UnlitTint = new Color32(160, 62, 50, 255);
-        private static readonly Color LitTint = new Color32(232, 74, 52, 255);
-        private static readonly Color InnerGlowTint = new Color32(255, 150, 105, 135);
+        // The colours come from GameStyle (D75): the bulb is Alarm quiet unlit and Alarm lit; its glows and the light
+        // on the plate are Alarm glow, each at its own strength (alpha).
         private const float InnerGlowScale = .62f;
-        private static readonly Color GlowTint = new Color32(255, 84, 52, 175);
+        private const float InnerGlowAlpha = 135 / 255f;
+        private const float GlowAlpha = 175 / 255f;
         public const string SignText = "EMERGENCY";
-        // Engraved: a dark brown-red cut into the brass, and a touch redder while the alarm's light is on the plate.
-        // Both stay dark, so they read at 4.5:1 on the darkest brass under the full red wash (5.0:1 quiet, 4.6:1 lit).
-        public static readonly Color32 SignQuiet = new Color32(58, 20, 12, 255);
-        public static readonly Color32 SignLit = new Color32(72, 11, 13, 255);
         /// <summary>The light caught by each letter's cut lower edge: an offset copy of the lettering.</summary>
         public static readonly Color32 SignEngraveEdge = new Color32(255, 240, 200, 89);
         /// <summary>How far the light edge sits below the letters, in bulb sizes (0.6 units at 44).</summary>
         public const float SignEngraveDepth = .6f / 44f;
-        /// <summary>The red light on the plate's face at full flash (its alpha is the strength).</summary>
-        public static readonly Color32 SignWashTint = new Color32(232, 84, 58, 36);
-        private static readonly Color32 SignHaloTint = new Color32(255, 84, 52, 150);
+        /// <summary>The strength of the red light on the plate's face at full flash.</summary>
+        public const float SignWashAlpha = 36 / 255f;
+        private const float SignHaloAlpha = 150 / 255f;
         /// <summary>Lit, the lit lettering never fades below this over the quiet one, so it stays lit at the flash's dim end.</summary>
         public const float SignLitFloor = .35f;
         /// <summary>The space between the rim and the lettering's box, in plate heights.</summary>
@@ -85,6 +79,7 @@ namespace Switchboard.Game
         /// Respira's thin strokes never reach their own colour, so the letters would read lighter than they are.</summary>
         public const float SignLetterWeight = .3f;
         private CallService calls;
+        private GameStyle style;
         private Transform lastColumn;
         private RectTransform rect;
         private float bulbSize;
@@ -127,15 +122,19 @@ namespace Switchboard.Game
         public Material SignMaterial { get; private set; }
         /// <summary>The plate's measures in bulb sizes.</summary>
         public SignProportions Proportions { get; private set; }
+        /// <summary>The paint box the lamp and its plate take their colours, font and flash rate from.</summary>
+        public GameStyle Style => style;
 
         /// <summary>
         /// Builds the lamp beside the last column number; null when the board has no column numbers.
         /// <paramref name="boardLamps"/> must be the board's lamps only (not the volume patch's). The column lamps of
-        /// closed columns are hidden but keep their place, so the spot doesn't move as the board grows.
+        /// closed columns are hidden but keep their place, so the spot doesn't move as the board grows. The lettering
+        /// uses <paramref name="paint"/>'s Label font.
         /// </summary>
         public static EmergencyLampView Create(IReadOnlyList<SwitchboardLampView> boardLamps, CallService callService,
-            TMP_FontAsset signFont, float bulbSize = DefaultBulbSize, SignProportions sign = null)
+            GameStyle paint, float bulbSize = DefaultBulbSize, SignProportions sign = null)
         {
+            if (paint == null) return null;
             float top = float.NegativeInfinity;
             foreach (SwitchboardLampView lamp in boardLamps)
                 if (lamp != null) top = Mathf.Max(top, lamp.transform.position.y);
@@ -151,6 +150,7 @@ namespace Switchboard.Game
             var root = new GameObject("Emergency lamp", typeof(RectTransform), typeof(LayoutElement));
             root.GetComponent<LayoutElement>().ignoreLayout = true;
             var view = root.AddComponent<EmergencyLampView>();
+            view.style = paint;
             view.bulbSize = bulbSize > 0 ? bulbSize : DefaultBulbSize;
             view.Proportions = sign ?? new SignProportions();
             view.rect = (RectTransform)root.transform;
@@ -160,13 +160,14 @@ namespace Switchboard.Game
             view.rect.sizeDelta = Vector2.one * view.bulbSize;
             // Bottom to top: the lamp's light on the frame, the dark bulb, the lit bulb, its inner light, then the
             // plate, drawn last so the lamp's light never tints it and its lettering is read against the plate alone.
-            view.Glow = view.Part<LampGlowGraphic>(view.rect, "Glow", GlowScale, GlowTint);
-            view.Bulb = view.Part<Image>(view.rect, "Bulb", 1, UnlitTint);
+            view.Glow = view.Part<LampGlowGraphic>(view.rect, "Glow", GlowScale);
+            view.Bulb = view.Part<Image>(view.rect, "Bulb", 1);
             view.Bulb.sprite = last.BulbOff;
-            view.LitBulb = view.Part<Image>(view.rect, "Lit bulb", 1, LitTint);
+            view.LitBulb = view.Part<Image>(view.rect, "Lit bulb", 1);
             view.LitBulb.sprite = last.BulbOn;
-            view.InnerGlow = view.Part<LampGlowGraphic>(view.rect, "Inner glow", InnerGlowScale, InnerGlowTint);
-            view.BuildSign(signFont);
+            view.InnerGlow = view.Part<LampGlowGraphic>(view.rect, "Inner glow", InnerGlowScale);
+            view.BuildSign(paint.LabelFont);
+            view.ApplyColours();
             view.lastColumn = last.transform;
             view.Follow();
             view.Bind(callService);
@@ -202,25 +203,25 @@ namespace Switchboard.Game
             sign.sizeDelta = size;
             sign.anchoredPosition = new Vector2(0, -(bulbSize * .5f + Proportions.Gap * bulbSize + size.y * .5f));
             Sign = sign;
-            SignGlow = Strip(sign, "Sign glow", LabelStripGraphic.Layer.Halo, SignHaloTint);
-            SignPlate = Strip(sign, "Sign plate", LabelStripGraphic.Layer.Plate, Color.white);
+            SignGlow = Strip(sign, "Sign glow", LabelStripGraphic.Layer.Halo);
+            SignPlate = Strip(sign, "Sign plate", LabelStripGraphic.Layer.Plate);
             SignPlate.Mounting = LabelStripGraphic.Mount.Recessed;
-            SignWash = Strip(sign, "Sign wash", LabelStripGraphic.Layer.Wash, SignWashTint);
+            SignWash = Strip(sign, "Sign wash", LabelStripGraphic.Layer.Wash);
             if (font == null) font = TMP_Settings.defaultFontAsset;
             float fontSize = font != null ? FontSizeFor(font, Proportions.CapHeight * bulbSize) : 12;
             // Only the width limits the lettering; the box is tall enough for the font's whole line.
             var lettering = new Vector2(SignPlate.Face.width - size.y * SignPadding * 2, size.y * 2);
             SignEdgeLabel = Lettering(sign, "Sign engraved edge", SignEngraveEdge, font, fontSize, lettering);
             SignEdgeLabel.rectTransform.anchoredPosition = new Vector2(0, -SignEngraveDepth * bulbSize);
-            SignLabel = Lettering(sign, "Sign text", SignQuiet, font, fontSize, lettering);
-            SignLitLabel = Lettering(sign, "Sign lit text", SignLit, font, fontSize, lettering);
+            SignLabel = Lettering(sign, "Sign text", Color.white, font, fontSize, lettering);
+            SignLitLabel = Lettering(sign, "Sign lit text", Color.white, font, fontSize, lettering);
             if (font == null || font.material == null) return;
             SignMaterial = new Material(font.material) { name = "Emergency sign lettering" };
             SignMaterial.SetFloat(ShaderUtilities.ID_FaceDilate, SignLetterWeight);
             SignEdgeLabel.fontSharedMaterial = SignLabel.fontSharedMaterial = SignLitLabel.fontSharedMaterial = SignMaterial;
         }
 
-        private static LabelStripGraphic Strip(RectTransform parent, string name, LabelStripGraphic.Layer layer, Color tint)
+        private static LabelStripGraphic Strip(RectTransform parent, string name, LabelStripGraphic.Layer layer)
         {
             var strip = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer)).AddComponent<LabelStripGraphic>();
             RectTransform stripRect = strip.rectTransform;
@@ -229,7 +230,6 @@ namespace Switchboard.Game
             stripRect.anchorMax = Vector2.one;
             stripRect.sizeDelta = Vector2.zero;
             strip.Part = layer;
-            strip.color = tint;
             strip.raycastTarget = false;
             return strip;
         }
@@ -258,17 +258,32 @@ namespace Switchboard.Game
             return label;
         }
 
-        private T Part<T>(RectTransform parent, string name, float scale, Color tint) where T : Graphic
+        private T Part<T>(RectTransform parent, string name, float scale) where T : Graphic
         {
             var part = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer)).AddComponent<T>();
             var partRect = part.rectTransform;
             partRect.SetParent(parent, false);
             partRect.anchorMin = partRect.anchorMax = new Vector2(.5f, .5f);
             partRect.sizeDelta = Vector2.one * bulbSize * scale;
-            part.color = tint;
             part.raycastTarget = false;
             return part;
         }
+
+        // Read from the paint box when the lamp is built and each time a warning starts, so a Play Mode edit shows at the
+        // next emergency. A colour that hasn't changed leaves its graphic's mesh alone.
+        private void ApplyColours()
+        {
+            Glow.color = WithAlpha(style.AlarmGlow, GlowAlpha);
+            Bulb.color = style.AlarmQuiet;
+            LitBulb.color = style.Alarm;
+            InnerGlow.color = WithAlpha(style.AlarmGlow, InnerGlowAlpha);
+            SignGlow.color = WithAlpha(style.AlarmGlow, SignHaloAlpha);
+            SignWash.color = WithAlpha(style.AlarmGlow, SignWashAlpha);
+            SignLabel.color = style.SignQuiet;
+            SignLitLabel.color = style.SignLit;
+        }
+
+        private static Color WithAlpha(Color colour, float alpha) => new Color(colour.r, colour.g, colour.b, alpha);
 
         /// <summary>Any emergency still waiting for its connection, on a card or not.</summary>
         public static bool AnyEmergencyWaiting(IReadOnlyList<Call> live)
@@ -286,11 +301,13 @@ namespace Switchboard.Game
         /// <summary>Moves the flashing on by <paramref name="gameSeconds"/> (0 while paused). LateUpdate drives it.</summary>
         public void Tick(float gameSeconds)
         {
+            bool wasWarning = IsWarning;
             IsWarning = calls != null && AnyEmergencyWaiting(calls.Live);
+            if (IsWarning && !wasWarning) ApplyColours();
             if (IsWarning) clock += gameSeconds;
             else clock = 0;
             // Starts lit, so a new emergency shows at once.
-            Brightness = IsWarning ? .5f + .5f * Mathf.Cos(clock * FlashesPerSecond * Mathf.PI * 2f) : 0f;
+            Brightness = IsWarning ? .5f + .5f * Mathf.Cos(clock * style.LampFlashesPerSecond * Mathf.PI * 2f) : 0f;
             if (Brightness != shownBrightness)
             {
                 shownBrightness = Brightness;

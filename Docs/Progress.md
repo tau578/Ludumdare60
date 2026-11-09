@@ -23,20 +23,23 @@
 | 10c. Quick-connect tip | done | ✅ 2026-10-21 (14 min) | ✅ 697/697 tests, scope clean | ✅ | 845a1b3 |
 | 10d. Static fonts | done | ✅ 2026-10-22 (26 min) | ✅ 705/705 tests, scope clean | ✅ | ed0e2ad |
 | 11a. Gather the sounds | done | ✅ 2026-11-08 | ✅ 23 sounds and 3 tracks imported, console clean | ✅ lead picked | |
-| 11b. Wire the sounds | not started | | | | |
 | 11c. Main visual feedback | done | ✅ 2026-10-22 (25 min + 13 + 29 + 15 + 16 + 17 + 19 + 23 min fixes) | ✅ 744/744 tests, scope clean | ✅ | abbd5f1, 0deb398 |
-| 11d. Extra visual feedback | not started | | | | |
-| L1. Pressure and the queue fix | not started | | | | |
-| L2. Days | not started | | | | |
-| L3. Score and streak | not started | | | | |
-| L4. Stakes within the day | not started | | | | |
-| L5. Stakes across days | not started | | | | |
-| L6. Unlocks and the wall | not started | | | | |
-| L7. Chores | not started | | | | |
-| L8. Nerves | not started | | | | |
-| L9. Narrative between days | not started | | | | |
-| 12. Mobile and Web polish | not started | | | | |
-| 13. Balance | not started | | | | |
+| 12. Paint box (`GameStyle`) | done | ✅ 2026-11-09 (21 min + 14 + 11 + 18 min fixes) | ✅ 745/745 tests, scope clean | ✅ | |
+| 13a. Pressure and the queue fix | not started | | | | |
+| 13b. Days | not started | | | | |
+| 13c. Score and streak | not started | | | | |
+| 13d. Stakes within the day | not started | | | | |
+| 13e. Stakes across days | not started | | | | |
+| 13f. Unlocks and the wall | not started | | | | |
+| 13g. Chores | not started | | | | |
+| 13h. Nerves | not started | | | | |
+| 13i. Narrative between days | not started | | | | |
+| 14. Wire the sounds | not started | | | | |
+| 15. Extra visual feedback | not started | | | | |
+| 16. Mobile and Web polish | not started | | | | |
+| 17. Balance | not started | | | | |
+
+**Renumbered (lead, 2026-11-09)** so every step has the same kind of name and the numbers follow the order of work: S1 → 12, L1–L9 → 13a–13i, 11b → 14, 11d → 15, 12 → 16, 13 → 17. Older reports and notes use the old names.
 
 A step moves through these statuses: not started → building → verifying → playtesting → done. It can also be blocked.
 
@@ -5865,3 +5868,407 @@ Follow-ups (docs, for the orchestrator):
 - **Plan §3, new rule 15:** small visual passes stay light.
 - **Also local only:** the branch `step-11c-lamp-glossy-glass` (`e914ff8`), with the glossy lamp kept aside.
 
+#### Style decisions (lead, 2026-11-09)
+- **The lead settled the style guide's three open questions** (D75), each with the recommended option:
+  - Reds: two families. **Alarm** (orange-red) for emergencies only, and **Error** (crimson) for mistakes and losses.
+  - Golds: **money gold** for money and rewards only, **brass** for decoration. The pause title moves to light brass `#D9BE72`.
+  - Fonts: three, each with one job. Stamps and name plates move to Della Respira.
+- **The paint box** comes next, as its own step, 12 (Plan §9). It runs before 13a and applies these decisions.
+- **Docs:** StyleGuide §3, §4 and §5 hold the decisions, and §10 is removed. Plan §8 and §9, CLAUDE.md and Design D75 are updated.
+- **The EMERGENCY sign keeps its dark engraved letters.** The alarm shows only as Alarm-glow light on the plate.
+
+## Step 12 report: 2026-11-09
+Result: done
+Playable now: the D75 style decisions are in the game. A wrong number and a taken jack glow Error crimson, and an emergency shows Alarm orange-red: the lamp, its glows, the light on the EMERGENCY plate, the countdown ring and the card's accent. The fine and "can't afford" flash Error on the counter. The stamps and the cards' name plates are in Della Respira. The pause title, the pause Options title and the main menu's titles are light brass. All of these read from one asset, `Assets/Content/GameStyle.asset`.
+How to test:
+1. Play `Final` (or start from `MainMenu`): the main menu's "OPERATOR!" title, and the Options and Credits page titles, are light brass instead of lemon.
+2. Make a wrong connection: the jack flashes crimson (a pinker red than before). Hover a held cord over a jack another cord is using: that glow is the same crimson.
+3. Wait for an emergency: the lamp, its glow and the plate's light are orange-red, the card's EMERGENCY badge is orange-red, and in the last 10 s the countdown ring pulses orange-red. Let it run out: the "Missed" stamp is dark crimson, and the counter shakes and flashes crimson.
+4. Stamps ("New order!", "Paid $…", "Wrong number!", "Cut off", "Missed …") and the caller names under the portraits are in Della Respira.
+5. Pause: "Paused" is light brass.
+6. Tuning in Play Mode: select `Assets/Content/GameStyle.asset` and change a colour or timing. It shows at the next stamp, pulse or emergency, and the change stays after Play Mode.
+Created:
+- `Assets/Scripts/Game/GameStyle.cs`: the paint box, a ScriptableObject (`Switchboard.Game`, Assembly-CSharp). It holds every named colour the brief lists, with the guide's hex values and a tooltip saying where each is used; the three font roles; and the whole StyleGuide §6 timing table.
+- `Assets/Content/GameStyle.asset`: the one instance. Display is Boecklins Universe SDF Static, Label is Della Respira SDF Static, Plain is LiberationSans SDF.
+- `Assets/Scripts/UI/IBoardPalette.cs`: a one-property interface (`ErrorGlow`) that `GameStyle` implements. The socket code reads the palette through it, so the board code doesn't depend on the Game layer (the same idea as Domain interfaces implemented by Content).
+- `Assets/Scripts/Game/Views/TitleInk.cs`: sits on a title label, holds a serialized `GameStyle` and sets the label to Light brass in `OnEnable`, so it reads the colour each time the title shows. It is for menu titles outside the installer's reach.
+Changed:
+- `GameInstaller.cs`: a serialized `style` field replaces `emergencySignFont`. If `style` is missing, the installer logs an error and uses a runtime default instance (the guide's colours, no fonts). It passes the style to `MoneyCounterView.Bind`, `CallQueueView.Bind`, `EmergencyLampView.Create` and every board `SocketView.Palette`.
+- `CallQueueView.cs`: `Bind` takes the `GameStyle` and passes it to each card's `Show`.
+- `CallCardView.cs`:
+  - Removed the serialized `paidInk`, `wrongInk`, `cutOffInk`, `missedInk`, `newOrderInk`, `urgentRingColor`, `urgentSeconds`, `urgentPulsesPerSecond`, `stampSeconds`, `stampPopSeconds`, `stampOvershoot`, `stampExitSeconds`, `wobbleDegrees`, `wobblesPerSecond` and `urgentWobbleDegrees`. It reads them from `GameStyle` when it applies them.
+  - `Show` sets the stamp and name labels to the Label font. The boxes and the existing auto-size ranges are unchanged.
+- `EmergencyLampView.cs`:
+  - `Create` takes a `GameStyle` in place of the sign font and returns null without one.
+  - The tint constants are gone. The bulb is Alarm quiet unlit and Alarm lit. The glow, inner glow, plate halo and plate wash are Alarm glow, each keeping its old alpha as a constant (175, 135, 150, 36). The letters are the style's sign quiet and lit colours, and the flash rate is the style's.
+  - Colours are applied at build and again each time a warning starts.
+- `MoneyCounterView.cs`:
+  - Removed `fineInk`, `fineShakeSeconds` and `fineShakePixels`. `Bind` takes the style (an optional parameter).
+  - The fine shake and "can't afford" use Error and the style's fine-shake timing. Without a style they do nothing (only a test binds without one).
+- `SocketGraphic.cs`, `SocketView.cs`, `SocketFlashGraphic.cs`:
+  - Sockets get a `Palette` (`IBoardPalette`). The taken-jack halo and the wrong-number flash read `ErrorGlow` from it each time they show.
+  - A socket with no palette (unit tests, the volume patch) uses a fallback of the same `#EE4450`.
+  - `SocketFlashGraphic.WrongColor` is replaced by a `WrongNumberColor` property that the socket sets before playing. The spark colours are unchanged.
+- `GameConfig.cs` and `Assets/Content/GameConfig.asset`: the emergency cards' accent is set to Alarm `#E84A34`, in both the asset and the code default. The field stays.
+- Tests, kept the same and pointed at the new names:
+  - `SocketHoverTests` (3 asserts): the taken-jack glow is now `#EE4450`.
+  - `FeedbackEffectsTests`: the fine flash compares with `Style.Error`, the sign letters with `lamp.Style`, and the wash's strength with `SignWashAlpha`; the second lamp is built with `lamp.Style`.
+Scene and prefab changes:
+- `Game.prefab`: `GameInstaller.style` points to `GameStyle.asset`, and the stale `emergencySignFont` line is gone.
+- `GameUI.prefab`:
+  - The pause "Paused" and pause "Options" titles are `#D9BE72`, each with a `TitleInk`.
+  - Re-saving dropped the removed `CallCardView` fields, and wrote out fields the prefab had never saved (`CallCardView` motion, `MoneyCounterView` roll and glow, `arrivalWidths`). Each has its code default, so nothing changes.
+- `StartMenu.prefab` (menu tools): "Title of Game" (shown as "OPERATOR!" through the `MainMenu` scene's text override; plus the hidden PressStart copy), "Options" and "Credits" titles are `#D9BE72`, each with a `TitleInk`. The re-save only added 4 components and recoloured 4 labels; the rest of the diff is reordering.
+- `Final.unity` and `MainMenu.unity` unchanged. Neither has an override on any field this step touched.
+
+| Piece | Old | New | Name in `GameStyle` |
+|---|---|---|---|
+| Wrong-number flash (`SocketFlashGraphic`) | `#F14034` | `#EE4450` | Error glow |
+| Taken-jack glow (`SocketGraphic` halo) | `#F15746` | `#EE4450` | Error glow |
+| Fine on the counter | `#C42828` | `#C42F3A` | Error |
+| "Can't afford" on the counter | `#B23E3E` | `#C42F3A` | Error |
+| "Wrong number!" stamp | `#A42626` | `#A42626` | Error ink |
+| "Missed" stamp | `#74121E` | `#74121E` | Error deep |
+| "Paid" stamp | `#26683A` | `#26683A` | Good ink |
+| "Cut off" stamp | `#5C5044` | `#5C5044` | Cut off ink (Neutral) |
+| "New order!" stamp | `#7B5220` | `#7B5220` | New order ink (Neutral) |
+| Countdown ring, urgent | `#FF5C30` | `#FF6A3D` | Alarm glow |
+| Emergency lamp, lit | `#E84A34` | `#E84A34` | Alarm |
+| Emergency lamp, unlit | `#A03E32` | `#8E3426` | Alarm quiet |
+| Lamp glow (alpha 175) | `#FF5434` | `#FF6A3D` | Alarm glow |
+| Lamp inner glow (alpha 135) | `#FF9669` | `#FF6A3D` | Alarm glow |
+| Light on the plate (alpha 36) | `#E8543A` | `#FF6A3D` | Alarm glow |
+| Halo round the plate (alpha 150) | `#FF5434` | `#FF6A3D` | Alarm glow |
+| Emergency card accent (`GameConfig`) | `#C72121` | `#E84A34` | Alarm (same value; the field stays) |
+| Sign letters, quiet / lit | `#3A140C` / `#480B0D` | unchanged | Sign quiet / Sign lit |
+| Pause title, pause Options title | `#FFDB1F` | `#D9BE72` | Light brass |
+| Main menu title, Options and Credits titles | `#FFDB17` | `#D9BE72` | Light brass |
+| Sign font (was `GameInstaller.emergencySignFont`) | Della Respira SDF Static | same | Label font |
+| Stamps' font | LiberationSans SDF (bold) | Della Respira SDF Static (still bold style) | Label font |
+| Name plates' font | LiberationSans SDF | Della Respira SDF Static | Label font |
+| Stamp pop / overshoot / exit / hold | 0.38 s / 1.16 / 0.22 s / 1.5 s | same | Stamp pop seconds, Stamp overshoot, Stamp exit seconds, Stamp hold seconds |
+| Emergency wobble, urgent wobble, pulse, urgent from | 2° at 1.2/s, 5°, 3/s, 10 s | same | Emergency wobble, Urgent wobble, Urgent pulses, Urgent seconds |
+| Lamp flash | 2/s | same | Lamp flashes per second |
+| Fine shake | 0.3 s, 6 px | same | Fine shake seconds and pixels |
+
+The other §6 timings (card press, arrival, ring shake, "no" shake, coins, drums, popups, connection ring, cord wave, wrong flash, short circuit, jolt, typing) are in the asset but not wired yet, as the brief says.
+
+Measured contrast (WCAG):
+- **Titles** (measured against the rendered backdrop):
+  - The pause title in light brass is 9.1:1 on the pause backdrop (`#2A1B10`); lemon was 12.1:1.
+  - The main menu "OPERATOR!" in light brass is 9.3–9.9:1 on the menu backdrop (`#21130D`–`#291910`); lemon was 12.4–13.2:1.
+  - Both are well over 3:1, and dimmer than money gold (11.2:1 on the same backdrop), so the title no longer outshines the money.
+- **Stamp inks** on the stamp paper (the stamp image is `#F3E9CF`): Paid 5.56, Wrong number 6.02, Missed 9.40, New order 5.66, Cut off 6.47, all ≥ 4.5:1. Against the guide's `#EAE0C7` they are 5.12, 5.54, 8.65, 5.21 and 5.95.
+- **Name plate ink** (`#FFF9E0`, unchanged): 5.93:1 on the guide's plate `#346A59`. On the rendered plate it is 6.0:1 at its darker part and **4.2–4.7:1 at its lighter part** (sampled `#40846C`–`#3D7B65`), so the light part of the gradient is just under 4.5.
+- **EMERGENCY letters under the new Alarm-glow wash:** at worst 4.82:1 (it was 4.63:1; the existing contrast test still passes).
+- **Error on the money drums:** 1.65:1 against the drum face (`#6C9864`). The old fine red was 1.71, and the resting digits are 2.96. The red flash is a colour cue together with the shake, not text to read.
+
+Tests: 744/744 EditMode (no new tests; GameStyle is presentation only, as the brief says).
+Console: clean. Play Mode logged only Unity's own "Ignoring depth surface load/store action as it is memoryless" lines, not from project code; the console was cleared afterwards.
+Screenshots (`Temp/Captures/`):
+- `step-S1-1-stamps.png`: "New order!", "Wrong number!" and "Paid $0.57" on cards, with the name plates, next to the board.
+- `step-S1-2-emergency.png`: Agatha Higgins' emergency card with its orange-red badge and the urgent ring (6 s left), and the lit lamp with its plate.
+- `step-S1-3-pause.png`: "Paused" in light brass.
+- `step-S1-4-phone.png`: the same cards at 844×390.
+- `step-S1-5-menu-title.png`: the main menu title, captured only to measure its contrast.
+
+Editor state:
+- Play Mode is stopped and the Game view is back to 1920×1080.
+- The Play run wrote a save (`operator.save` and its backup). There was no save before, so both keys were deleted.
+- `Final.unity` is active and unchanged. No `TimeManager`, `SampleScene` or font files were re-saved.
+
+Deviations from Design/Plan:
+- **The socket code reads the palette through `IBoardPalette`**, a one-property interface in `Switchboard.UI`, not `GameStyle` directly. This keeps the board code free of the Game layer, the debt Plan §8 already notes for `CableInputController`. Sockets without a palette fall back to the same `#EE4450`.
+- **Titles use `TitleInk`**, a small component with its own serialized reference, not `GameInstaller`. This covers the pause menu and the main menu the same way.
+- **Gold line and Brass** are both `#96881E` in the guide. Both are in the asset as the brief lists them.
+- **Timings wired:** only those of the pieces this step moves (stamps, the emergency's wobble and pulse, the lamp's flash, the fine's shake).
+
+Still differs from the guide:
+- **At phone size (844×390) long names in Della Respira fade.** "Violet Fairweather" auto-sizes down to about 19 units (about 7 px on the phone), and its thin strokes go soft and hard to read. Short names ("Nora Ellis", "Winston Tuttle") and every stamp stay readable. Not fixed in this step, as the brief says.
+- **The light top of the name plate's gradient is about 4.2:1** with the existing cream ink (see contrast above).
+- **The emergency card's urgent ring is thin and nearly empty in the last seconds**, so its new orange-red is hard to see at the default 918×693 Game view. It is clear at full size.
+
+Follow-ups:
+- The fine popup ("-$2.00 in red", a `FloatingTextView` colour in `GameUI.prefab`) wasn't in the brief's list and keeps its own red. Moving it to Error would match the counter.
+- The card's type badge "EMERGENCY" label and the per-second circle colours stay raw (Plan §8, "Components still on raw colours").
+- `SocketHaloGraphic.HoverColor` (`#F5D278`) and the connected green (`#7DFF9B`) in `SocketGraphic` could read Attention hover and Good light through `IBoardPalette` the next time the sockets are touched.
+- For phones (Step 16): thicken Della Respira on small name plates (a face-dilate material copy, like the EMERGENCY sign), or raise their minimum auto-size.
+- Money drums: the Error flash and the resting digits are both low-contrast on the green drum face. Worth a look when the counter is next touched.
+
+**Verification (orchestrator, 2026-11-09):**
+- **Tests:** 744/744 EditMode tests pass on a re-run, and the console is clean.
+- **Scope:** every changed file is one the step needed, and the report lists it. `StartMenu.prefab` gains only the four `TitleInk` components and the colour change; its other diff lines are reordering, and no object was removed. `GameUI.prefab`'s removed timing fields held the same values as the `GameStyle` defaults, so nothing changes silently.
+- **Screenshots match the report:** the stamps and name plates are in Della Respira, the lamp is orange-red, and "Paused" is light brass. At phone size the long names go soft, as reported.
+- **Deviations accepted:**
+  - `IBoardPalette` keeps the board code free of the Game layer, in line with Design §3.
+  - `TitleInk` handles titles outside `GameInstaller`'s reach, as the brief allowed.
+- **Follow-ups** went to Plan §8: the remaining raw colours, Della Respira on phones, the name plate's lighter top, and the money drums' contrast.
+
+## Step 12, fix pass 1 report: 2026-11-09
+Result: done
+Playable now: the titles are bright gold again. A mistake is a deeper, rose-leaning crimson and an emergency is a clear fire orange, so the two no longer look alike. The wrong-number ring is smaller and softer, and a taken jack's red refusal glow is stronger. The EMERGENCY badge on the cards is orange with dark ink letters. Every new value is a `GameStyle` setting that can be tuned in Play Mode.
+How to test:
+1. Main menu: "OPERATOR!" (and the Options and Credits page titles) are bright gold `#FFDB1F`.
+2. Pause: "Paused" is bright gold.
+3. Wait for an emergency (or keep playing until one comes): the lamp, its glow, the light on the plate, the countdown ring and the card's badge are orange. The badge's "EMERGENCY" is in dark ink.
+4. Make a wrong connection: both jacks flash crimson. The ring now stays close round the hole and is softer. The sparks are unchanged.
+5. Hold a cord over a jack another cord is using: the red ring is brighter than before.
+6. Tuning: select `Assets/Content/GameStyle.asset`. The new settings are "Title gold" (Decoration) and, under "The board's glows", "Wrong Number Ring Outer", "Wrong Number Strength" and "Blocked Glow Intensity". Changes show at the next flash, hover or menu opening, and stay after Play Mode.
+Created: nothing.
+Changed:
+- `Assets/Scripts/Game/GameStyle.cs`:
+  - New `titleGold` (`#FFDB1F`). The Light brass tooltip now says it's for decoration.
+  - New code defaults for Error glow and the three Alarm colours.
+  - New "The board's glows" settings: `wrongNumberRingOuter` (0.45), `wrongNumberStrength` (0.7) and `blockedGlowIntensity` (1.5), each with a tooltip and range. They implement the new `IBoardPalette` members.
+  - New `Contrast(Color, Color)` (WCAG) and `TextContrast` (4.5), used by the card badge.
+- `Assets/Scripts/UI/IBoardPalette.cs`: three new members, `WrongNumberRingOuter`, `WrongNumberStrength` and `BlockedGlowIntensity`.
+- `Assets/Scripts/UI/SocketGraphic.cs`:
+  - The no-palette fallbacks match `GameStyle`'s defaults: Error glow `#E6305A`, ring 0.45, strength 0.7, blocked glow 1.5.
+  - The wrong flash gets the ring size and strength from the palette each time it plays.
+  - The blocked halo reads its intensity each time it refreshes. The connected halo's 1.4 is unchanged, now a named constant.
+- `Assets/Scripts/UI/SocketFlashGraphic.cs`: new `WrongNumberRingOuter` and `WrongNumberStrength` properties, set by the socket before it plays. The inner edge stays 0.22, now `WrongRingInner`. The ring's alpha is multiplied by the strength. The short circuit is untouched.
+- `Assets/Scripts/Game/Views/TitleInk.cs`: reads `TitleGold` instead of `LightBrass`.
+- `Assets/Scripts/Game/Views/CallCardView.cs`: the badge label keeps its own colour on cards without an accent. On an accented card it keeps that colour if it reaches 4.5:1 on the accent; otherwise it takes `GameStyle`'s Ink, when Ink reads better. With today's values, emergency badges get Ink and regular cards are unchanged.
+- `Assets/Scripts/Content/GameConfig.cs`: the code default for `emergencyCards.accent` is `#F07024`.
+- `Assets/Tests/Game/Editor/SocketHoverTests.cs`: the expected taken-jack colour is `#E6305A` (2 asserts). Also a new test, `ASocketWithoutAPaletteGlowsAndFlashesLikeTheDefaultPaintBox`: a socket with no palette and a socket given a fresh `GameStyle` show the same Error glow, ring size, ring strength and blocked-glow intensity, both in their properties and in the flash and halo they draw.
+- `Assets/Tests/Game/Editor/FeedbackEffectsTests.cs`: `TheLampIsTheBoardsOwnBulbTintedRedAndItsGlowFollowsTheFlash` tested "red" as r > 2g. The new unlit Alarm quiet `#8E4A22` is orange, so the test now checks a warm orange: r > 1.5g and r > 3b. The "muted, not pure red" and "darker unlit" checks are unchanged.
+Assets and prefabs:
+- `Assets/Content/GameStyle.asset`: the new colours and settings (table below).
+- `Assets/Content/GameConfig.asset`: `emergencyCards.accent` is `#F07024`.
+- `Assets/Prefabs/Game/GameUI.prefab`: the "Paused" and pause "Options" titles' serialized colour is `#FFDB1F`. The diff against HEAD has the same line count as after step 12; only the colour values changed.
+- `Assets/Tools/rodrigo_menu_tools/Runtime/Prefabs/StartMenu.prefab`: the four `TitleInk` titles (main title, its hidden copy, Options, Credits) are `#FFDB1F`. Only the colour lines changed.
+- `Final.unity` and `MainMenu.unity` are unchanged.
+
+| Setting | Old | New | Where |
+|---|---|---|---|
+| Title colour (`TitleInk`) | Light brass `#D9BE72` | Title gold `#FFDB1F` | new `GameStyle.titleGold`; Light brass stays for decoration |
+| Titles' serialized colour (GameUI 2, StartMenu 4) | `#D9BE72` | `#FFDB1F` | prefabs |
+| Alarm glow | `#FF6A3D` | `#FF8A2A` | `GameStyle` asset and code |
+| Alarm | `#E84A34` | `#F07024` | `GameStyle` asset and code |
+| Alarm quiet | `#8E3426` | `#8E4A22` | `GameStyle` asset and code |
+| Error glow | `#EE4450` | `#E6305A` | `GameStyle` asset and code |
+| Emergency card accent | `#E84A34` | `#F07024` | `GameConfig.asset` and code default |
+| Unstyled socket fallback | `#EE4450` | `#E6305A` | `SocketGraphic` |
+| Wrong-number ring, outer edge | 0.62 of the jack | 0.45 | `GameStyle.wrongNumberRingOuter` (inner stays 0.22) |
+| Wrong-number ring, strength | 1.0 | 0.7 | `GameStyle.wrongNumberStrength` |
+| Taken-jack (blocked) glow intensity | 1.0 | 1.5 | `GameStyle.blockedGlowIntensity` (connected stays 1.4) |
+| EMERGENCY badge label | cream `#F3E9CF` | Ink `#33241A` while on the orange accent | `CallCardView` |
+
+Measured contrast (WCAG relative luminance):
+- **EMERGENCY badge.** The label in the prefab is `#F3E9CF`, not `#FFF9E0`. On flat colours, cream is 3.18:1 on the old `#E84A34` and 2.46:1 on `#F07024`; Ink is 5.01:1 on `#F07024`. On the rendered badge (the accent at alpha 0.94 over the card, sampled `#E6763C`), cream would be 2.47:1 and Ink is **4.99:1**; the darkest letter pixel measures 5.1:1. Ink passes 4.5:1 and cream doesn't, so the badge takes Ink.
+- **EMERGENCY plate letters under the new orange wash.** The face runs from `#A88A42` to `#C6A95E`; the wash is `#FF8A2A` at alpha 0.141. With the wash, the worst case is **5.00:1** (lit letters on the darker face) and the quiet letters reach 5.17:1. Quiet with no wash is 4.96:1. Under the old wash the worst case was 4.79:1. The existing test (`TheSignsLettersReadAtFourAndAHalfToOneOnTheDrawnPlateQuietAndAtEveryPointOfTheFlash`) passes; it measures through the real flash, gamma and linear.
+- **Titles in Title gold** (sampled from the captures):
+  - "Paused": 12.7:1 on the darkest backdrop near it (`#26170D`), and at least 9.7:1 against the lightest pixels near the letters, which include their anti-aliased edges.
+  - "OPERATOR!": 13.2:1 and at least 9.8:1, measured the same way.
+  - Both are far above 3:1.
+
+**Title size finding:** nothing changes a title's size at runtime.
+- In Play Mode (MainMenu loaded from Final), "OPERATOR!" is Boecklins Universe SDF Static at font size 144, with auto-size off and scale 1. Its rect is 1920×50 and its drawn capitals are 109.5 units tall, the same as the prefab. The pause titles are 56, also with auto-size off.
+- `TitleInk` sets only the colour.
+- No script in the menu tools or the game sets a font size, auto-size or scale on these titles.
+- Step 12's prefab diff changes no size, rect or font field. The scene's overrides are only text, font asset, font style and material, all from step 10d.
+- So the larger look was most likely the paler, flatter light brass reading differently, or a different Game view size. With the gold back, it should look as it did before.
+
+Tests: 745/745 EditMode (new: `SocketHoverTests.ASocketWithoutAPaletteGlowsAndFlashesLikeTheDefaultPaintBox`). The first run failed one test, the lamp "red" check above; it was updated, recompiled, and the second run was green.
+Console: clean. Play Mode logged only Unity's own "Ignoring depth surface load/store action as it is memoryless", not from project code. The console was cleared afterwards.
+Screenshots (`Temp/Captures/`, 1920×1080):
+- `step-12-fix1-1-two-reds.png`: the key frame.
+  - Two emergency cards (Agatha Higgins with the orange urgent ring, Winston Tuttle), with orange EMERGENCY badges in dark ink.
+  - The lit orange lamp and its plate.
+  - A crimson wrong-number flash on C2 (the caller's jack: a flash, no sparks), a wrong jack A3 with the short circuit, and B1 showing the closed-jack glow.
+  - The flashes and the glow were started from code (`FlashWrongNumber`, `SetHighlighted(true, blocked: true)`) with the cord input disabled for the frame. No real cord was held over B1.
+- `step-12-fix1-2-menu-title.png`: "OPERATOR!" in Title gold.
+- `step-12-fix1-3-pause-title.png`: "Paused" in Title gold.
+Editor state:
+- Play Mode is stopped, and the Game view is back to Free Aspect (its size before).
+- The lead's save (`operator.save` and `operator.save.backup`, both present before) was backed up first and restored exactly afterwards. The Play run had changed it.
+- `Final.unity` is active and unchanged. No `SampleScene`, `TimeManager` or font files were re-saved, and no temporary callbacks were left.
+Deviations from Design/Plan:
+- **The badge picks its ink by measured contrast, not "while the accent is Alarm".** It keeps the cream when cream reaches 4.5:1 on the accent, and otherwise takes Ink when Ink reads better. With today's values that is exactly "Ink on Alarm", and it stays right if the lead retunes the accent in `GameConfig` or Alarm in `GameStyle` without the other.
+- **One existing test's colour rule changed** (the lamp's "red" check became "warm orange"), because the lead's new Alarm quiet is orange by design.
+Still differs / for the lead to judge:
+- The wrong-number ring at 0.45 and 70% is clearly smaller and softer in the capture. At the moment a wrong plug goes in, the short circuit's white-yellow flash still covers the wrong jack's ring for about 0.12 s; the caller's jack shows the ring clearly.
+- The light on the EMERGENCY plate (alpha 36) is faint in orange, as it was in orange-red.
+- The badge's "EMERGENCY" letters are small (LiberationSans, auto-sized about 15 at 1080p), so at phone size the dark ink stays thin. It's readable at 1080p.
+Follow-ups:
+- `m_fontColor32` in the title labels' YAML still holds stale values (white in GameUI, `#FFDB17` in StartMenu), as it did at HEAD. TMP draws from `m_fontColor`, so nothing shows; Unity rewrites the cache when the text is next edited in the Inspector.
+- The fine popup's own red and the other raw colours stay as listed in Plan §8.
+
+**Verification (orchestrator, 2026-11-09):**
+- **Tests:** 745/745 EditMode tests pass on a re-run, and the console is clean.
+- **Scope:** the same files as step 12, with no new ones.
+- **Values:** `GameStyle.asset` holds exactly the approved values, and both prefabs' titles hold title gold.
+- **Screenshot:** the key frame shows the two families clearly apart: the orange lamp, badges and countdown ring against the rose-crimson wrong-number ring and blocked glow.
+- **Deviations accepted:**
+  - The badge chooses cream or Ink by measured contrast, so it stays right if the colours are retuned.
+  - The lamp test checks for a warm orange instead of red.
+- **Docs:** StyleGuide §1, §3, §4 and §5, Design D75 and the status row, and Plan §8 are updated.
+
+## Step 12, fix pass 2 report: 2026-11-09
+Result: done
+Playable now: the emergency lamp, its glows, the light on the plate and the countdown ring are step 12's orange-red again. A wrong number and a taken jack are step 12's crimson again. The wrong-number ring sits halfway between step 12 and fix pass 1. The taken jack's stronger glow (1.5), the gold titles and the EMERGENCY badge (fire orange with dark Ink letters) stay as fix pass 1 left them.
+How to test:
+1. Wait for an emergency: the lamp, its glow and the plate's light are orange-red (`#E84A34`, glow `#FF6A3D`), as after step 12. The card's EMERGENCY badge is still fire orange with dark letters.
+2. In the last 10 s the countdown ring pulses orange-red.
+3. Make a wrong connection: both jacks flash crimson `#EE4450`. The ring is bigger and stronger than in fix pass 1, but smaller and softer than in step 12.
+4. Hold a cord over a jack another cord is using: it glows crimson (not pink), more strongly than in step 12.
+5. Main menu and pause titles are still bright gold.
+6. Tuning: `Assets/Content/GameStyle.asset`, "The board's glows": "Wrong Number Ring Outer" is 0.54 and "Wrong Number Strength" is 0.85.
+Created: nothing.
+Changed:
+- `Assets/Scripts/Game/GameStyle.cs`:
+  - Code defaults back to step 12: Error glow `#EE4450`, Alarm glow `#FF6A3D`, Alarm `#E84A34`, Alarm quiet `#8E3426`.
+  - `wrongNumberRingOuter` .54 and `wrongNumberStrength` .85.
+  - Tooltips: Error glow no longer says "rose"; the Alarm header says orange-red. The Alarm tooltip now says the emergency badge doesn't follow Alarm: its accent in `GameConfig` keeps its own fire orange `#F07024`, with Ink letters (lead, 2026-11-09).
+  - `Contrast` and `TextContrast` are kept, since the badge still uses them.
+- `Assets/Content/GameStyle.asset`: the same four colours and two ring values. Title gold and the blocked glow's 1.5 are unchanged.
+- `Assets/Scripts/UI/SocketGraphic.cs`: the unstyled fallbacks are Error glow `#EE4450`, ring 0.54 and strength 0.85. The blocked glow stays 1.5.
+- `Assets/Scripts/UI/SocketFlashGraphic.cs`: the `WrongNumberRingOuter` and `WrongNumberStrength` property defaults are .54 and .85.
+- `Assets/Scripts/Content/GameConfig.cs`: only the `emergencyCards` tooltip changed. It now says the accent keeps its own fire orange, apart from `GameStyle`'s Alarm. The default stays `#F07024`.
+- `Assets/Scripts/Game/Views/CallCardView.cs`: only the `BadgeInkOn` comment changed. It now names "the emergency badge's fire orange" instead of "Alarm's orange". The contrast switch is unchanged.
+- `Assets/Content/GameConfig.asset`: `emergencyCards.accent` is `#F07024`, the same as after fix pass 1. It was set to `#E84A34` during this pass and set back after the lead's correction.
+- `Assets/Tests/Game/Editor/SocketHoverTests.cs`: the expected taken-jack colour is `#EE4450` again (2 asserts). The palette-defaults test from fix pass 1 needed no change, because it compares against a fresh `GameStyle`.
+- `Assets/Tests/Game/Editor/FeedbackEffectsTests.cs`: the lamp's colour check is back to its step 12 form: "Tinted red", with r > 2g and r > 2b.
+Scene and prefab changes:
+- No prefab changed in this pass.
+- **`Assets/Scenes/Final.unity` shows an order-only re-save** (8 lines moved, no value changed: the PhoneBook instance's two `m_AnchoredPosition` overrides swapped places). It came from entering Play Mode. I tried to discard it with `git checkout -- Assets/Scenes/Final.unity`, but the permission check refused the command. **The orchestrator should discard it.** The scene in the editor is not dirty.
+
+| Setting | Fix pass 1 | Now | Where |
+|---|---|---|---|
+| Alarm glow | `#FF8A2A` | `#FF6A3D` | `GameStyle` asset and code |
+| Alarm | `#F07024` | `#E84A34` | `GameStyle` asset and code |
+| Alarm quiet | `#8E4A22` | `#8E3426` | `GameStyle` asset and code |
+| Error glow | `#E6305A` | `#EE4450` | `GameStyle` asset and code, `SocketGraphic` fallback, `SocketHoverTests` |
+| Wrong-number ring, outer edge | 0.45 | 0.54 | `GameStyle`, `SocketGraphic` fallback, `SocketFlashGraphic` default |
+| Wrong-number ring, strength | 0.7 | 0.85 | `GameStyle`, `SocketGraphic` fallback, `SocketFlashGraphic` default |
+| Blocked glow intensity | 1.5 | 1.5 (kept) | `GameStyle`, `SocketGraphic` fallback |
+| Title gold | `#FFDB1F` | `#FFDB1F` (kept) | `GameStyle`, `TitleInk` |
+| Emergency badge accent | `#F07024` | `#F07024` (kept) | `GameConfig.asset` and code default |
+| Badge label | Ink on the orange (contrast switch) | same (kept) | `CallCardView.BadgeInkOn` |
+
+A grep for the fix pass 1 values (`#FF8A2A`, `#8E4A22`, `#E6305A`, the ring's .45 and .7 as RGB or float) finds none left in the scripts, tests or `GameStyle.asset`. `#F07024` stays only in the badge accent and the Alarm tooltip that names it.
+
+Measured contrast:
+- **The badge is unchanged** from fix pass 1: Ink on `#F07024` is 5.01:1 on flat colour and 4.99:1 on the rendered badge.
+- **The EMERGENCY plate's letters** are back under step 12's `#FF6A3D` wash, where step 12 measured a worst case of 4.82:1. The existing ≥ 4.5:1 test passes.
+
+Tests: 745/745 EditMode, run twice: after the first edits, and again after the lead's correction.
+Console: clean after compiling. Play Mode logged only Unity's own "Ignoring depth surface load/store action as it is memoryless" lines; the console was cleared afterwards.
+Screenshot: `Temp/Captures/step-12-fix2-key.png` (1920×1080). It shows:
+- Agatha Higgins' emergency card with the fire-orange badge and dark "EMERGENCY" letters.
+- The lit orange-red lamp and its plate.
+- Crimson wrong-number rings on A3 and B2.
+- B1's crimson closed-jack glow.
+The flashes and the glow were started from code (`FlashWrongNumber(false)`, `SetHighlighted(true, blocked: true)`) with the cord input turned off for that frame. The countdown ring was not yet in its urgent seconds, so it isn't orange in this frame.
+Editor state:
+- Play Mode is stopped.
+- The Game view is back to Free Aspect (917×693, as before).
+- `Final.unity` is active and not dirty.
+- `Time.timeScale` is 1, and no callbacks are left.
+- The PlayerPrefs save was not backed up, as the brief allows; the Play run may have updated it.
+Deviations from Design/Plan:
+- **The badge was kept at fix pass 1, per the lead's correction.** The brief said to put the accent back to `#E84A34` with cream letters. The lead's correction keeps the accent at `#F07024` with Ink letters, so `BadgeInkOn` and `GameStyle.Contrast`/`TextContrast` stay. The badge accent is now its own colour, not Alarm, and the tooltips say so.
+Follow-ups:
+- Discard the order-only `Final.unity` re-save (see above).
+- Docs to update (orchestrator): StyleGuide and Design D75 now say "the emergency card's accent = Alarm". The badge is now its own fire orange `#F07024` with Ink letters, while Alarm is back at `#E84A34`.
+
+**Verification (orchestrator, 2026-11-09):**
+- **Tests:** 745/745 EditMode tests pass. The MCP job timed out while Unity was in the background, but the run completed; its counts were read from Unity's `TestResults.xml`.
+- **Values:** `GameStyle.asset` holds step 12's reds (`#FF6A3D`, `#E84A34`, `#8E3426`, `#EE4450`), the ring at 0.54 and 0.85, the blocked glow at 1.5 and title gold. `GameConfig`'s emergency accent is `#F07024`. A grep finds no other copy of fix pass 1's values.
+- **Screenshot:** the badge is orange with dark letters, the lamp and plate are orange-red, and the wrong-number rings and blocked glow are crimson.
+- **Correction mid-pass:** the lead's correction to keep the badge reached the agent in time, and the brief in Plan §9 records it.
+- **`Final.unity`:** entering Play Mode re-saved it with two overrides swapped and no value changed. The agent's `git checkout` was blocked by the permission check, so the lead decides whether to discard it.
+
+## Step 12, fix pass 3 report: 2026-11-09
+Result: done
+Playable now: the EMERGENCY badge is step 12's orange-red `#E84A34` again, the same colour as the lamp, with its own cream letters. The jack hover follows the lead's exact table (below). Clicks, drops and picking up plugs are unchanged; only the ring's colour changed.
+How to test:
+1. Wait for an emergency: the card's badge is orange-red like the lamp, with cream "EMERGENCY" letters. There is no fire orange anywhere.
+2. **Empty hand:**
+   - An empty jack, a live call's jack (it stays green) and a jack whose call is over show nothing, as before.
+   - Only a jack holding one end of an unfinished cord hovers amber.
+3. **Cord in hand:**
+   - A live call's jack (green light) shows the red ring.
+   - An unfinished cord's jack and a finished call's jack now hover amber (they were red).
+   - Empty jacks hover amber, as before.
+4. **Changes under the pointer:** hold a cord over a live call's jack and let the call end without moving: red turns amber.
+5. Closed jacks show nothing.
+Created: nothing.
+Changed:
+- `Assets/Scripts/Game/Views/CallCardView.cs`: removed `BadgeInkOn`, its comment, the `typeBadgeLabelColor` field and the line that set the badge label's colour. The label keeps its prefab colour (cream `#F3E9CF`), as in step 12.
+- `Assets/Scripts/Game/GameStyle.cs`: removed `Contrast`, `Luminance`, `Channel` and `TextContrast` (nothing else used them). Tooltips updated: Alarm says the badge and rate outline use the same colour (the accent in `GameConfig`); Error glow and "Blocked Glow Intensity" describe the red ring over a live call's jack.
+- `Assets/Scripts/Content/GameConfig.cs`: the `emergencyCards.accent` code default is `#E84A34`, and the tooltip says it equals `GameStyle`'s Alarm.
+- `Assets/Content/GameConfig.asset`: `emergencyCards.accent` is `#E84A34` (`{r: 0.9098039, g: 0.2901961, b: 0.20392157}`, the same as `alarm` in `GameStyle.asset`).
+- `Assets/Scripts/UI/SocketGraphic.cs`: `SetHighlighted(value, blocked)` keeps its signature, with new meanings:
+  - `value` asks for the amber hover. It shows only while the jack has no live call (`ShowsHover`, exposed as `IsHoverShowing`).
+  - `blocked` (a held cord over another cord's plug) shows the red ring only while the connected light is on (`ShowsDanger`, exposed as `IsDangerShowing`). Before, it was red on any plug.
+  - Both read the connected light directly, so the ring changes between red, amber and green as soon as a call connects or ends under the pointer.
+  - A hovered live call's jack with no `blocked` stays green.
+- `Assets/Scripts/UI/SocketView.cs`: `RefreshHighlight()` asks for amber when hovered with a cord in hand, or with an empty hand on a half-patched jack. It asks for `blocked` when a cord is held over another cord's plug.
+  - "Half-patched" comes from the socket's own state: the cord in it has no second plug (`occupyingCable.SecondSocket == null`). No new game-layer state was needed.
+  - The cord input calls `SetPointerState` on the hovered jack every frame, so a second plug going in elsewhere updates the ring without the pointer moving.
+- `Assets/Scripts/UI/IBoardPalette.cs`: doc comments only.
+- `Assets/Tests/Game/Editor/SocketHoverTests.cs`:
+  - Removed `InactiveSocketsRequireHoverAndAHeldCord` and `ActiveCallStaysGreenWithoutHoverAndClearsWhenTheCallEnds`, which tested the old rules.
+  - Added a shared `Board` with every kind of jack: a live call, a half-patched cord, a finished call, an empty jack and a closed jack.
+  - New test `WithAnEmptyHandOnlyAHalfPatchedJackHoversAmber`: the empty-hand column, driven through `CableInputController.ProcessTarget`, plus clearing when the pointer leaves.
+  - New test `WithACordInHandOnlyALiveCallsJackIsRedAndEveryOtherOpenJackIsAmber`: the held-cord column, red at the paint box's strength, a cord over its own plug, and clearing on leave.
+  - New test `TheRingUpdatesWithoutThePointerMovingAndAClickStillPicksThePlugUp`:
+    - with a cord held: the call ends (red to amber), a call connects (amber to red), the jack closes (nothing);
+    - with an empty hand on a half-patched jack: the second plug goes in elsewhere (amber to nothing), the call connects (green), the call ends (nothing);
+    - an empty-handed click on a live plug still picks it up.
+  - `AClosedSocketNeverShowsAHalo` also checks an empty hand.
+  - The palette-defaults test hovers a connected jack with `blocked`.
+- `Assets/Tests/Game/Editor/FeedbackEffectsTests.cs`: in `TheWrongNumberFlashHandsEachJackBackAsItWas`, the "hovered" jack is a connected one, so it still shows a red halo. `Look` reads `IsDangerShowing` instead of the removed `IsBlockedHighlight`.
+Scene and prefab changes: none. `Assets/Scenes/Final.unity` still has the same order-only re-save as before (8 lines swapped). Play Mode didn't change it further, and it was left alone.
+
+| Hover over | Empty hand | Holding a cord | Before this pass (empty / holding) |
+|---|---|---|---|
+| Empty open jack | nothing | amber | nothing / amber |
+| A live (connected) call's jack | nothing (stays green) | red ring | green / red |
+| One end of an unfinished cord (half-patched) | **amber** | **amber** | nothing / red |
+| A finished call's jack (both plugs in, no live call) | nothing | **amber** | nothing / red |
+| Closed jack | nothing | nothing | nothing / nothing |
+
+The fire-orange grep (`F07024`, `240, 112, 36`, `0.9411765, g: 0.4392157`, "fire orange", `BadgeInkOn`, `TextContrast`) finds nothing left in the scripts, tests, assets, prefabs or scenes. The other hits on `0.9411765` are unrelated creams, greens and alphas.
+
+Measured contrast: cream `#F3E9CF` on `#E84A34` is **3.18:1** on flat colour. That is under the brief's "about 3.7", which was based on a brighter cream than the prefab's. The lead accepted the lower contrast.
+
+Tests: 745/745 EditMode (new: the three `SocketHoverTests` above, replacing two old tests, one of which had two cases). An earlier run, made before the lead's final table, failed once in the GC-allocation check of `FeedbackEffectsTests.AWrongNumberShortsTheLineWithStreaksArcsAndSmokeNotStars`, in code this pass doesn't touch. It passed alone and in the final full run, so it looks flaky.
+Console: clean after compiling. Play Mode logged only Unity's own "Ignoring depth surface load/store action as it is memoryless". The console was cleared afterwards.
+Screenshot: `Temp/Captures/step-12-fix3-table.png` (918×693, the Game view's Free Aspect). It shows:
+- Agatha Higgins' emergency card with the orange-red badge and cream letters (read from the running game: label `#F3E9CF`, background `#E84A34` at alpha 0.94), next to the EMERGENCY lamp (dark in this blink phase).
+- A live call from B2 to C3: B2 shows the red ring under a held cord, and C3 is green.
+- D4 holds one end of an unfinished cord and shows amber under an empty hand.
+
+How it was staged: everything was set from code, two hovers in one frame. `CordBridge` and the cord input were turned off so the game wouldn't react, the states were set in a short-lived `Canvas.willRenderCanvases` handler, and one frame was stepped. The B and 2 section lamps are lit because of the staged held-cord hover.
+Editor state:
+- Play Mode is stopped, and `Final.unity` is active and not dirty.
+- The Game view is unchanged (Free Aspect), and `Time.timeScale` is 1.
+- The temporary handlers removed themselves; only Unity's own remain.
+- The PlayerPrefs save wasn't backed up, as allowed; the short Play runs may have updated it.
+Deviations from Design/Plan:
+- **Hover rule: the lead's exact table.** It replaces the brief's empty-hand "danger" ring and the two interim rules sent during this pass. As a result:
+  - There is no empty-hand red ring.
+  - The held-cord "taken" ring is red only on a live call's jack (the brief said it "stays exactly as it is").
+  - An empty hand shows amber on a half-patched jack.
+- `GameStyle`'s setting keeps its name `blockedGlowIntensity` ("Blocked Glow Intensity"), so the tuned value isn't lost. It sets the red ring's strength.
+Follow-ups:
+- **Drops on occupied jacks don't bounce today.** The lead's notes say drops on occupied jacks "bounce with the blocked sound as today". In the unchanged code (`CableInputController.HandleSocketClick`), a held cord dropped on another usable cord's jack **displaces** that cord: both its ends go back to the tray, and the held plug goes in (`HeldCableReplacesConnectedCableAndReturnsBothOldEndsToTray`). Only a closed jack, a cord the input doesn't own, or a socket with no plug anchor plays the blocked feedback. So the new amber on unfinished and finished cords' jacks invites a drop that will displace that cord. The lead may want to decide whether that is right.
+- **An empty hand next to a half-patched cord may be rare.** While a cord has one end in (`OneEndConnected`), the cord input keeps it as the cord in hand (`ProcessTarget` only lets go of a cord once it is `Ready` or `Connected`). So the empty-hand amber cell may show only in edge cases. I didn't trace every path. It is implemented and tested as the table asks.
+- The section lamps (`SwitchboardLampView`, through `IsNavigationHighlighted`) still light whenever a cord is held over an open jack. That is unchanged.
+- If the GC check in `AWrongNumberShortsTheLineWithStreaksArcsAndSmokeNotStars` fails again, it may need a warm-up pass before it measures.
+
+**Verification (orchestrator, 2026-11-09):**
+- **Tests:** 745/745 EditMode tests pass on a re-run.
+- **Hover rule:** checked line by line against the lead's table (`SocketView.RefreshHighlight`, `SocketGraphic.ShowsHover` and `ShowsDanger`), and every cell matches.
+- **Screenshot:**
+  - a live call's jack under a held cord is red, and its other end is green;
+  - an unfinished cord's jack under an empty hand is amber;
+  - the badge is orange-red with cream letters.
+- **Badge:** no fire orange is left.
+- **The lead's table changed twice during the pass** (via messages). The first handback had an interim rule; the agent was resumed and rebuilt it to the final table.
+- **Corrected claim:** the orchestrator had told the lead that drops on taken jacks bounce. They replace that cord instead (existing behaviour, tested), so StyleGuide §4 now says what a drop does under each light.
+- **Docs:** StyleGuide §3 and §4 (the badge exception and the hover table), Design D75, D76 and the status row, and Plan §8 (the flaky test) are updated.
+
+**Playtest (lead, 2026-11-09):** everything looks fine. **Step 12 is done.** Nothing is committed yet.

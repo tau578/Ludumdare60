@@ -228,7 +228,8 @@ namespace Switchboard.Game.Tests
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.Missed));
             Assert.That(call.FineCents, Is.EqualTo(300));
             Assert.That(counter.IsShaking, Is.True, "the plaque shakes");
-            Assert.That(counter.Reels.All(r => r.color == new Color32(196, 40, 40, 255)), Is.True, "and flashes red");
+            Color error = All<EmergencyLampView>().Single().Style.Error;
+            Assert.That(counter.Reels.All(r => r.color == error), Is.True, "and flashes Error crimson");
             var coins = All<IncomeCoinsView>().Single();
             Assert.That(coins.AwayCount, Is.InRange(3, 5), "a few coins fly to the missed card");
             Assert.That(coins.IsFlying, Is.False, "fine coins never hold the counter back");
@@ -770,8 +771,8 @@ namespace Switchboard.Game.Tests
             Assert.That(bright.rectTransform.anchoredPosition, Is.EqualTo(quiet.rectTransform.anchoredPosition));
 
             // One dark brown-red family, quiet and lit: no switch to ivory or white.
-            Assert.That(quiet.color, Is.EqualTo((Color)EmergencyLampView.SignQuiet));
-            Assert.That(bright.color, Is.EqualTo((Color)EmergencyLampView.SignLit));
+            Assert.That(quiet.color, Is.EqualTo(lamp.Style.SignQuiet));
+            Assert.That(bright.color, Is.EqualTo(lamp.Style.SignLit));
             Color quietHsv = Hsv(quiet.color), brightHsv = Hsv(bright.color);
             Assert.That(HueDegreesApart(quietHsv.r, brightHsv.r), Is.LessThan(15), "one hue family in both states");
             foreach (Color hsv in new[] { quietHsv, brightHsv })
@@ -816,7 +817,7 @@ namespace Switchboard.Game.Tests
             Assert.That(highest, Is.GreaterThan(.9f), "lit");
             Assert.That(highest - lowest, Is.GreaterThan(.4f), "and flashing");
             Assert.That(lowest, Is.EqualTo(EmergencyLampView.SignLitFloor).Within(1e-4f), "step 5 lands on the flash's dim end");
-            Assert.That(((Color)EmergencyLampView.SignWashTint).a, Is.EqualTo(.14f).Within(.01f), "a red wash of about 14% at full flash");
+            Assert.That(EmergencyLampView.SignWashAlpha, Is.EqualTo(.14f).Within(.01f), "a red wash of about 14% at full flash");
             Assert.That(() => lamp.Tick(.01f), UnityEngine.TestTools.Constraints.Is.Not.AllocatingGCMemory(), "a flash frame allocates nothing");
 
             float paused = lamp.SignBrightness;
@@ -941,7 +942,7 @@ namespace Switchboard.Game.Tests
             RectTransform numberBulb = boardLamps[0].GetComponentsInChildren<Image>(true).First(i => i.sprite == boardLamps[0].BulbOff).rectTransform;
             float unit = WorldRect(numberBulb).width / 96f;
             var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(SignFontPath);
-            EmergencyLampView other = EmergencyLampView.Create(boardLamps, session.Calls, font, 30, proportions);
+            EmergencyLampView other = EmergencyLampView.Create(boardLamps, session.Calls, lamp.Style, 30, proportions);
             try
             {
                 foreach (EmergencyLampView each in new[] { lamp, other })
@@ -1137,7 +1138,7 @@ namespace Switchboard.Game.Tests
         {
             Transform halo = socket.transform.Find("Socket halo");
             string haloLook = halo == null ? "no halo" : halo.gameObject.activeSelf + " " + halo.GetComponent<Graphic>().color;
-            return $"{socket.IsHighlighted}/{socket.IsBlockedHighlight}/{socket.IsCallConnected}/{socket.IsDimmed}/" +
+            return $"{socket.IsHighlighted}/{socket.IsDangerShowing}/{socket.IsCallConnected}/{socket.IsDimmed}/" +
                 $"{socket.Lamp}/{socket.IsLampShowing}/{socket.color}/{haloLook}";
         }
 
@@ -1153,6 +1154,7 @@ namespace Switchboard.Game.Tests
             blinking.SetLamp(SocketLamp.Blinking);
             marked.SetLamp(SocketLamp.Steady);
             connected.SetCallConnected(true);
+            hovered.SetCallConnected(true);
             hovered.SetHighlighted(true, blocked: true);
             var all = new[] { blinking, marked, connected, hovered, plain };
             string[] before = all.Select(Look).ToArray();

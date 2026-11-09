@@ -37,6 +37,7 @@ namespace Switchboard.Game
         private PenaltyService penalties;
         private Func<CallScript, Sprite> portraitOf;
         private Func<bool, CallCardStyle> styleOf;
+        private GameStyle paint;
         private Func<CordId, Color> cordColorOf;
         private RectTransform[] slots = new RectTransform[0];
         private Vector2[] slotCentres = new Vector2[0];
@@ -96,8 +97,8 @@ namespace Switchboard.Game
 
         public void Bind(CallService callService, OperatorDesk operatorDesk, EarningsService earningsService,
             PenaltyService penaltyService, RectTransform[] callerSlots, Func<CallScript, Sprite> portraits,
-            Func<CordId, Color> cordColors, Func<bool, CallCardStyle> cardStyles, Action syncBoard = null,
-            MoneyCounterView counter = null)
+            Func<CordId, Color> cordColors, Func<bool, CallCardStyle> cardStyles, GameStyle paintBox,
+            Action syncBoard = null, MoneyCounterView counter = null)
         {
             Unsubscribe();
             calls = callService;
@@ -108,6 +109,7 @@ namespace Switchboard.Game
             penalties = penaltyService;
             portraitOf = portraits;
             styleOf = cardStyles;
+            paint = paintBox;
             cordColorOf = cordColors;
             slots = callerSlots ?? new RectTransform[0];
             slotCentres = new Vector2[slots.Length];
@@ -240,7 +242,7 @@ namespace Switchboard.Game
             CallCardView card = FreeCard();
             card.ShowDuration = showDurations;
             CallCardStyle style = styleOf != null ? styleOf(call.Request.Script.IsEmergency) : default;
-            card.Show(call, portraitOf?.Invoke(call.Request.Script), cordColorOf, style, earnings?.CurrentMultiplier ?? 1);
+            card.Show(call, portraitOf?.Invoke(call.Request.Script), cordColorOf, style, paint, earnings?.CurrentMultiplier ?? 1);
             shown.Add(card);
             SnapToSlot(card, shown.Count - 1);
             // V4: it slides in from the caller panel's edge; it is clickable at once.

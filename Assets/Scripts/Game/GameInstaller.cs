@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using Switchboard.Content;
 using Switchboard.Domain;
 using Switchboard.UI;
-using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -15,8 +14,8 @@ namespace Switchboard.Game
         [SerializeField] private GameConfig config;
         [SerializeField] private CordBridge cordBridge;
         [SerializeField] private GameLoopRunner loopRunner;
-        [SerializeField, Tooltip("The emergency lamp's sign: Della Respira, its static atlas.")]
-        private TMP_FontAsset emergencySignFont;
+        [SerializeField, Tooltip("The paint box (D75): named colours, font roles and timings, passed to the views.")]
+        private GameStyle style;
         [SerializeField, Min(1), Tooltip("The emergency lamp's bulb size in board units (the number lamps' bulbs are 96).")]
         private float emergencyLampSize = EmergencyLampView.DefaultBulbSize;
         [SerializeField, Tooltip("The EMERGENCY plate's size and lettering, in bulb sizes, so they follow the bulb.")]
@@ -37,6 +36,12 @@ namespace Switchboard.Game
             {
                 Debug.LogError("GameInstaller needs a GameConfig.", this);
                 return;
+            }
+            if (style == null)
+            {
+                // The guide's colours and timings still apply; only the fonts are missing.
+                Debug.LogError("GameInstaller needs a GameStyle (Assets/Content/GameStyle.asset).", this);
+                style = ScriptableObject.CreateInstance<GameStyle>();
             }
 
             // Board, views and this root share one scene (D38). Views live in other prefabs, so they are found
@@ -76,15 +81,15 @@ namespace Switchboard.Game
             cordBridge.EnsureCords(Session.Stats.Cords);
             Session.Stats.Changed += OnStatsChanged;
             RectTransform shopHeader = LevelScene.FindShopHeader(scene);
-            moneyCounter.Bind(Session.Wallet, shopHeader, Session.Penalties, Session.Upgrades);
+            moneyCounter.Bind(Session.Wallet, shopHeader, Session.Penalties, Session.Upgrades, style);
+            foreach (SocketView socket in sockets) socket.Palette = style;
             RectTransform[] callerSlots = LevelScene.FindCallerSlots(scene);
             if (callerSlots.Length < economy.MostClientSlots)
                 Debug.LogWarning($"The caller panel has {callerSlots.Length} slots, but Economy.json can open {economy.MostClientSlots} " +
                     "(startingClientSlots or an extra_clients clientSlots). Lower the file's values or add slots to the panel.", config);
             callQueue.Bind(Session.Calls, Session.Desk, Session.Earnings, Session.Penalties, callerSlots, PortraitOf,
-                cordBridge.ColorOf, config.CardStyleFor, syncBoard: cordBridge.Synchronize, counter: moneyCounter);
-            EmergencyLampView.Create(BoardLamps(scene, sockets), Session.Calls, emergencySignFont, emergencyLampSize,
-                emergencySign);
+                cordBridge.ColorOf, config.CardStyleFor, style, syncBoard: cordBridge.Synchronize, counter: moneyCounter);
+            EmergencyLampView.Create(BoardLamps(scene, sockets), Session.Calls, style, emergencyLampSize, emergencySign);
             PhoneBookView bookView = FindSingle<PhoneBookView>(scene);
             boardLink = new OpenBoardLink(sockets, callQueue, Session.Stats, Session.Board);
             shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene), moneyCounter);

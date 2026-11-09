@@ -183,15 +183,17 @@ Since D48 (lead, 2026-10-18) the project is one shared work, so nothing here nee
 | Art imports | Art re-exported outside Unity keeps the old slices: `caller-04`/`05` (5b) and `caller-06`/`07`/`08` (6) came back at 190×190 with 191×191 slices, and Unity dropped them silently (all fixed to 190×190 in the `.meta`). After every art merge, compare each changed PNG's size with its `.meta` sprite rect. `Assets/Sprites/board/caller.png` (229×190, slice 190×191) has no sprite for the same reason; nothing uses it yet. `3ca8bc9` (9b fix): `caller-02` came back at 190×190 with a 191-high slice (fixed to 190×190). `police.png` is 191×191 with a 190×186 slice that cuts off the top 5 rows; full size or not is for the lead. | check after art merges |
 | Closed caller-slot covers (6) | Closed slots are hidden since `041fb90` (Step 6's dark discs are gone). A cover-plate drawing could show them as closed. | when art exists |
 | Unused random helpers (7) | `IRandom`, `SeededRandom`, `RandomExtensions` and `FloatRange` in `Domain/Common` have no users since the spawner went. Delete them, or keep `IRandom` if a later step needs randomness. | cleanup, any step |
-| Menu leftovers (9a fix) | The Options and Credits "Go back" buttons keep the old 24/20 label sizes (big, slightly low). The menu package's `Music_randomizer` (in `StartMenu.prefab` and `Music_randomizer.prefab`) points at two tracks never committed (`a84ac8ff…`, `e974b80e…`, since `3522d9a`), so it plays nothing; in the Web build it is the likely source of one "Trying to get length of sound which is not loaded yet" console line (9b; still there, as a plain log line, in the 2026-10-20 build with the new loading cover). | `Music_randomizer` in 11b (S16); the labels in 12 |
+| Menu leftovers (9a fix) | The Options and Credits "Go back" buttons keep the old 24/20 label sizes (big, slightly low). The menu package's `Music_randomizer` (in `StartMenu.prefab` and `Music_randomizer.prefab`) points at two tracks never committed (`a84ac8ff…`, `e974b80e…`, since `3522d9a`), so it plays nothing; in the Web build it is the likely source of one "Trying to get length of sound which is not loaded yet" console line (9b; still there, as a plain log line, in the 2026-10-20 build with the new loading cover). | `Music_randomizer` in 14 (S16); the labels in 12 |
 | Pointer on external displays (9b) | The game draws its own hand again (lead, 2026-10-19), and `SystemPointer` hides the system pointer: only on a change, with a transparent 1×1 image in browsers (`SystemPointer.jslib`, which also re-hides it if Unity rewrites the canvas cursor while starting up). PNG system-pointer hands (`d79421d`) were set aside because a system pointer doesn't shrink with the window. **It depends on the monitor:** on the MacBook's built-in screen every version tried was steady in Chrome and the editor. On the lead's external display (120–140 Hz), Chrome flickers the pointer by itself, and the editor loses custom pointers. Safari is fine. Not fixed yet: when the mouse leaves itch's frame, the drawn hand stays at the frame's edge (fix pass 1 had a rule for this, since discarded). | check other machines in 12 |
 | `SlowGuidePulse` material in EditMode tests | The guide's hidden book-glow material is freed only in `OnDestroy`, which EditMode tests don't run, so each test run leaves 2 materials in editor memory. Free it in `OnDisable` too, or in the test teardown. | cleanup, any step |
-| Web build leftovers (9b) | Done in the 2026-10-20 cleanup: `WebBuild` saves, snapshots the URP asset, the URP global settings, the two dynamic fonts and `TimeManager.asset`, builds, and writes back whatever changed (in a `finally`), then puts `preloadedAssets` back. **Confirmed by the Step 10 build (2026-10-20, itch #2168670): `git status` was clean afterwards.** **Gap fixed (2026-10-21):** `WebBuild` now snapshots the two dynamic fonts and the two `SDF Static` materials from disk *before* its save, restores them, and empties the fonts in memory afterwards; the next real build should confirm `git status` stays clean. **Since Step 10d the font part is a safety net only:** nothing in the game uses the dynamic fonts and the Static materials already hold TMP's own `_ScaleRatio` values, so a build has nothing font-related to restore; the snapshot code and `WebBuildTests` stay, harmless. Still open: a "Build Web (Dev)" menu would put the dev panel in a phone build. | Dev menu in Step 12 |
+| Web build leftovers (9b) | Done in the 2026-10-20 cleanup: `WebBuild` saves, snapshots the URP asset, the URP global settings, the two dynamic fonts and `TimeManager.asset`, builds, and writes back whatever changed (in a `finally`), then puts `preloadedAssets` back. **Confirmed by the Step 10 build (2026-10-20, itch #2168670): `git status` was clean afterwards.** **Gap fixed (2026-10-21):** `WebBuild` now snapshots the two dynamic fonts and the two `SDF Static` materials from disk *before* its save, restores them, and empties the fonts in memory afterwards; the next real build should confirm `git status` stays clean. **Since Step 10d the font part is a safety net only:** nothing in the game uses the dynamic fonts and the Static materials already hold TMP's own `_ScaleRatio` values, so a build has nothing font-related to restore; the snapshot code and `WebBuildTests` stay, harmless. Still open: a "Build Web (Dev)" menu would put the dev panel in a phone build. | Dev menu in Step 16 |
 
-| Queue skips callers only (bug) | `CallQueue.TakeNext` skips a script only when its caller's name has a live call, so a recipient on the line can ring, and a call to a busy jack sits unconnectable on its card (D52 "busy lines wait"). Playtesters read both as bugs (2026-10-25). | L1 (D63) |
-| Mystery upgrade and victory scene to remove | The `secret` entry, `GoalProgress`, the savings fill, the "To be continued" dialog, `VictorySequenceView` and `VictoryTownGraphic` are thrown out (D65). Harmless until then. | L6 |
-| Art for the wall and the chores | Frames (week, month, feats), a brass plaque, a warning slip, the clock and calendar faces, desk items (plant, mug, cat photo, radio), the punch clock, the intercom, the pneumatic tube and capsule, the register lever, the cup, the cigarette and the flask (with a coffee and cough-syrup pair, D70). Placeholder shapes until drawn. | L2–L8 |
-| Style guide decisions, then the "paint box" | `Docs/StyleGuide.md` §10 holds three open questions (reds, golds, fonts), with options and a comparison page, `Builds/StyleChoices/style-options.html`. After the lead decides: one shared `GameStyle` settings asset with the named colours, font roles and standard timings. New visuals use it; older components move onto it when touched, or in a Step 12 cleanup. The EMERGENCY sign's colours are already Inspector settings on `LabelStripGraphic`; more can follow so the lead can tune looks without an agent. | style guide session, then tokens before 11d |
+| Queue skips callers only (bug) | `CallQueue.TakeNext` skips a script only when its caller's name has a live call, so a recipient on the line can ring, and a call to a busy jack sits unconnectable on its card (D52 "busy lines wait"). Playtesters read both as bugs (2026-10-25). | 13a (D63) |
+| Mystery upgrade and victory scene to remove | The `secret` entry, `GoalProgress`, the savings fill, the "To be continued" dialog, `VictorySequenceView` and `VictoryTownGraphic` are thrown out (D65). Harmless until then. | 13f |
+| Art for the wall and the chores | Frames (week, month, feats), a brass plaque, a warning slip, the clock and calendar faces, desk items (plant, mug, cat photo, radio), the punch clock, the intercom, the pneumatic tube and capsule, the register lever, the cup, the cigarette and the flask (with a coffee and cough-syrup pair, D70). Placeholder shapes until drawn. | 13b–13h |
+| Flaky test | `FeedbackEffectsTests.AWrongNumberShortsTheLineWithStreaksArcsAndSmokeNotStars` failed its "allocates no memory" check once (step 12, fix pass 3), in code that pass didn't touch, and passed on re-runs. If it fails again, look at the short-circuit mesh's allocations or make the check tolerant of a first-frame allocation. | when it fails again |
+| Components still on raw colours | Step 12 built the `GameStyle` paint box (D75, `Assets/Content/GameStyle.asset`) and moved only the pieces the decisions change. Still on their own numbers: the fine popup's red (`FloatingTextView` in `GameUI.prefab`, which should be Error), the card's "EMERGENCY" badge label, the per-second circle, the jacks' hover amber and connected green (they can read Attention hover and Good light through `IBoardPalette`), and the shop, book, cords, coins, tutorial and menus. Each moves when it is touched anyway, or in a Step 16 cleanup. | when touched, or Step 16 |
+| Small text on phones and weak contrast (Step 12 report) | At 844×390, long caller names in Della Respira shrink to about 7 px and go soft; thicken them (a face-dilate material copy, like the EMERGENCY sign) or raise their minimum auto-size. The name plate's lighter top is about 4.2:1 with the cream ink. On the money drums the Error flash (1.65:1) and the resting digits (2.96:1) are low-contrast. The urgent countdown ring is thin, so its colour is hard to see when the window is small. The EMERGENCY badge's dark letters are thin at phone size. | Step 16, or when the counter or cards are touched |
 
 Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `UpgradeShopPanel/HeaderSlot`, or update `GameInstaller` with the rename. `Book.json` keeps its format and `contactsPerPage`; the book sorts itself (D53), so the file's order doesn't matter.
 
@@ -215,22 +217,22 @@ Names the code looks up: keep `CallerQueuePanel`, `UpgradeShopPanel` and `Upgrad
 | 9b | First Web build on itch.io | Plays in a browser, and progress survives a reload and a new upload |
 | 10 | Tutorial | A guided first call |
 | 11a | Gather the sounds | Kenney and ElevenLabs candidates; the lead picks; picks imported |
-| 11b | Wire the sounds | Emergency bell and ticks, end-of-call cues, stamps, tip, talking, shop, ambience and a second track |
+| 14 | Wire the sounds | Emergency bell and ticks, end-of-call cues, stamps, tip, talking, shop, ambience and a second track |
 | 11c | Main visual feedback | Rolling counter, fines, emergencies, card arrival, wrong number, connection flash |
-| L1 | Pressure and the queue fix | Callers hang up; emergencies in 30 s; no one calls while on a call; no dead time after the first connection |
-| L2 | Days | Punch in, a 3-minute shift, closing time, the day card, the clock and calendar |
-| L3 | Score and streak | Earned is the score; streaks, rush hour, near misses, a rating, the best shift, a daily challenge |
-| L4 | Stakes within the day | Burnt cords and the electrician, angry callbacks, complaints, the supervisor's call, sent home |
-| L5 | Stakes across days | Quotas by pneumatic mail, warnings on the wall, fired after three, overtime |
-| L6 | Unlocks and the wall | A day schedule replaces the shop; frames, desk items; the mystery and the victory scene removed |
-| L7 | Chores | The register lever, wiping the glass, mail slips |
-| L8 | Nerves | A nerves meter; coffee, a cigarette, the flask |
-| L9 | Narrative between days | The story bible, one-line calls, story calls once and in order, headlines and new faces |
-| 11d | Extra visual feedback | Earnings coins, finished-call exit, shop effects, goal shimmer, wall clock, caller reactions |
+| 13a | Pressure and the queue fix | Callers hang up; emergencies in 30 s; no one calls while on a call; no dead time after the first connection |
+| 13b | Days | Punch in, a 3-minute shift, closing time, the day card, the clock and calendar |
+| 13c | Score and streak | Earned is the score; streaks, rush hour, near misses, a rating, the best shift, a daily challenge |
+| 13d | Stakes within the day | Burnt cords and the electrician, angry callbacks, complaints, the supervisor's call, sent home |
+| 13e | Stakes across days | Quotas by pneumatic mail, warnings on the wall, fired after three, overtime |
+| 13f | Unlocks and the wall | A day schedule replaces the shop; frames, desk items; the mystery and the victory scene removed |
+| 13g | Chores | The register lever, wiping the glass, mail slips |
+| 13h | Nerves | A nerves meter; coffee, a cigarette, the flask |
+| 13i | Narrative between days | The story bible, one-line calls, story calls once and in order, headlines and new faces |
+| 15 | Extra visual feedback | Earnings coins, finished-call exit, shop effects, goal shimmer, wall clock, caller reactions |
 | 12 | Mobile and Web polish | Good on phones and desktop browsers |
 | 13 | Balance | A tuned first week: quotas, patience, pace and pay per day |
 
-Steps 1–10d and 11c are built (9a saves and touch; 9b the Web build on itch.io, D26; 10 the tutorial, D57; 10b faster lookup, D58; 10c the quick-connect tip, D59; 10d static fonts; 11c the main visual feedback, D60). **The loop redesign comes next: steps L1–L9** (Design §12, D61–D74), in that order, before 11b, 11d, 12 and 13 (D74). 11a's sound candidates wait on the lead's picks and 11b wires them after the L-steps, with the new moments added. The Operator's notebook (D59) stays on hold. L1 is a full brief; L2–L9 are outlines the orchestrator turns into briefs, with the numbers from Design §12.13 confirmed by the lead, before launching each. Before L1: commit 11c's fix passes 4–6.
+Steps 1–10d, 11a, 11c and 12 are built (9a saves and touch; 9b the Web build on itch.io, D26; 10 the tutorial, D57; 10b faster lookup, D58; 10c the quick-connect tip, D59; 10d static fonts; 11a the sounds gathered; 11c the main visual feedback, D60; 12 the `GameStyle` paint box, D75). **The loop redesign comes next: step 13, parts 13a–13i** (Design §12, D61–D74), in that order, before 14, 15, 16 and 17 (D74). 14 wires 11a's sounds after step 13, with the new moments added. The Operator's notebook (D59) stays on hold. 13a is a full brief; 13b–13i are outlines the orchestrator turns into briefs, with the numbers from Design §12.13 confirmed by the lead, before launching each. **Renumbered on 2026-11-09** so every step has the same kind of name, in the order of work: S1 → 12, L1–L9 → 13a–13i, 11b → 14, 11d → 15, 12 → 16, 13 → 17. Older reports and commits use the old names.
 
 > **Renumbered (lead, 2026-10-18)** so the numbers follow the build order. Old → new: 7a → 6 (board growth, done), 7c → 7, 7d → 8, 6 → 9 (saves, Web build), 7b → 10 (tutorial), 8 → 11, 9 → 12, 10 → 13. The briefs of done steps, commit messages and older reports keep the numbers they were written with.
 
@@ -1775,10 +1777,10 @@ Asked at the 9a playtest and built before 9b, so the first Web build has it. **R
 8. **Pause.** The pause button's Main Menu, then Continue, works as in the editor.
 
 **Out of scope:**
-- Mobile layout, aspect ratios, the "rotate your device" screen, texture compression and performance (Step 12)
+- Mobile layout, aspect ratios, the "rotate your device" screen, texture compression and performance (Step 16)
 - the tutorial (10) and sound (11)
 - making the itch page public (the lead)
-- the menu leftovers in §8 (Step 12), unless the browser console shows errors from them
+- the menu leftovers in §8 (Step 16), unless the browser console shows errors from them
 
 ### Step 10: Tutorial: a spotlight guide for the first call (D57)
 **Decisions (lead, 2026-10-20, D57):**
@@ -1902,22 +1904,22 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
 
 | # | Sound | Source idea | Step |
 |---|---|---|---|
-| S1 | Emergency arrives, and again every few seconds while it waits (D60) | ElevenLabs: an old electric fire-alarm bell, two short rings; or the unused `RotaryRingSource.mp3` | 11a, 11b |
-| S2 | Emergency's last 10 s: a clock tick that speeds up with the ring's pulse | ElevenLabs: one mechanical clock tick (played repeatedly by code) | 11a, 11b |
-| S3 | Missed call and fine: a sad muted-trumpet "wah-wah" plus coins sliding away | Kenney Music Jingles / Casino Audio, or ElevenLabs | 11a, 11b |
-| S4 | Every stamp: a rubber-stamp thunk, 2–3 variants, slight pitch change | Kenney Impact Sounds or ElevenLabs | 11a, 11b |
-| S5 | Paid: receiver down plus a light coin jingle; S5b a soft single coin tick for V7 | Kenney Casino Audio | 11a, 11b (S5b in 11d) |
-| S6 | Cut off: a line click and a short busy tone | ElevenLabs | 11a, 11b |
-| S7 | Quick-connect tip: a brass desk-bell "ding" | ElevenLabs (a test clip exists) | 11a, 11b |
-| S8 | Callers talking while the bubble types: muffled telephone syllables, a pitch per caller | ElevenLabs, 4–6 short syllables | 11a, 11b |
-| S9 | Mystery becomes affordable (`GoalAffordable`): a short "ta-da" | Kenney Music Jingles | 11a, 11b |
-| S10 | Board growth (heavy clunk and relays), new cord (cord rattle into the tray), new caller slot (cover plate sliding open) | ElevenLabs | 11a, 11b |
-| S11 | Plug into a closed jack: a dull thud (today it shares the wrong-number buzz) | the unused `Assets/Audio/Cable/PlugBlocked.wav` | 11b |
-| S12 | Book row click (marks a jack): a pencil tick | ElevenLabs or Kenney | 11a, 11b |
-| S13 | Page turns alternate `bookFlip1` and the unused `bookFlip2` | in the project | 11b |
-| S14 | Pause open/close: a switch click (`switch_001/002`, unused) | in the project | 11b |
-| S15 | Victory: a brass fanfare, the music ducked under it | Kenney Music Jingles | 11a, 11b |
-| S16 | An office ambience loop (distant operators, a typewriter, room tone) and a second jazz track | ElevenLabs (loop); a free music library (e.g. Pixabay) for the track | 11a, 11b |
+| S1 | Emergency arrives, and again every few seconds while it waits (D60) | ElevenLabs: an old electric fire-alarm bell, two short rings; or the unused `RotaryRingSource.mp3` | 11a, 14 |
+| S2 | Emergency's last 10 s: a clock tick that speeds up with the ring's pulse | ElevenLabs: one mechanical clock tick (played repeatedly by code) | 11a, 14 |
+| S3 | Missed call and fine: a sad muted-trumpet "wah-wah" plus coins sliding away | Kenney Music Jingles / Casino Audio, or ElevenLabs | 11a, 14 |
+| S4 | Every stamp: a rubber-stamp thunk, 2–3 variants, slight pitch change | Kenney Impact Sounds or ElevenLabs | 11a, 14 |
+| S5 | Paid: receiver down plus a light coin jingle; S5b a soft single coin tick for V7 | Kenney Casino Audio | 11a, 14 (S5b in 15) |
+| S6 | Cut off: a line click and a short busy tone | ElevenLabs | 11a, 14 |
+| S7 | Quick-connect tip: a brass desk-bell "ding" | ElevenLabs (a test clip exists) | 11a, 14 |
+| S8 | Callers talking while the bubble types: muffled telephone syllables, a pitch per caller | ElevenLabs, 4–6 short syllables | 11a, 14 |
+| S9 | Mystery becomes affordable (`GoalAffordable`): a short "ta-da" | Kenney Music Jingles | 11a, 14 |
+| S10 | Board growth (heavy clunk and relays), new cord (cord rattle into the tray), new caller slot (cover plate sliding open) | ElevenLabs | 11a, 14 |
+| S11 | Plug into a closed jack: a dull thud (today it shares the wrong-number buzz) | the unused `Assets/Audio/Cable/PlugBlocked.wav` | 14 |
+| S12 | Book row click (marks a jack): a pencil tick | ElevenLabs or Kenney | 11a, 14 |
+| S13 | Page turns alternate `bookFlip1` and the unused `bookFlip2` | in the project | 14 |
+| S14 | Pause open/close: a switch click (`switch_001/002`, unused) | in the project | 14 |
+| S15 | Victory: a brass fanfare, the music ducked under it | Kenney Music Jingles | 11a, 14 |
+| S16 | An office ambience loop (distant operators, a typewriter, room tone) and a second jazz track | ElevenLabs (loop); a free music library (e.g. Pixabay) for the track | 11a, 14 |
 
 | # | Visual | Step |
 |---|---|---|
@@ -1927,14 +1929,14 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
 | V4 | A new card slides in with a bounce and shakes when it rings | 11c |
 | V5 | Wrong number: the card shakes "no", both jacks flash red, a small spark at the plug | 11c |
 | V6 | Connection: a flash ring at both jacks (a cord wiggle if the cord code allows it cheaply) | 11c |
-| V7 | Live earnings: small coins or "+¢" rise from a connected card now and then, with S5b | 11d |
-| V8 | A finished call's card slides out with a coin burst (cosmetic, no extra money) | 11d |
-| V9 | Shop: the bought button punches with a sparkle; new jacks light up in a wave; a new cord drops into the tray with a bounce; a new caller slot opens | 11d |
-| V10 | The mystery upgrade shimmers while affordable, and the shop pulses once when it first becomes affordable | 11d |
-| V11 | A wall clock showing game time (stops on pause) | 11d |
-| V12 | Caller faces react (happy when connected, cross on a wrong number). Needs new art; until then a portrait bounce and a red tint | 11d |
+| V7 | Live earnings: small coins or "+¢" rise from a connected card now and then, with S5b | 15 |
+| V8 | A finished call's card slides out with a coin burst (cosmetic, no extra money) | 15 |
+| V9 | Shop: the bought button punches with a sparkle; new jacks light up in a wave; a new cord drops into the tray with a bounce; a new caller slot opens | 15 |
+| V10 | The mystery upgrade shimmers while affordable, and the shop pulses once when it first becomes affordable | 15 |
+| V11 | A wall clock showing game time (stops on pause) | 15 |
+| V12 | Caller faces react (happy when connected, cross on a wrong number). Needs new art; until then a portrait bounce and a red tint | 15 |
 | V13 | The "New order!" stamp no longer hides the EMERGENCY badge and countdown (Plan §8) | 11c |
-| V14 | A sparkle on the "Quick! +X¢" tip popup | 11d |
+| V14 | A sparkle on the "Quick! +X¢" tip popup | 15 |
 
 **Rules for every Step 11 part:**
 - **Style.** Follow [StyleGuide.md](StyleGuide.md), written after 11c's playtests: sparks that looked like confetti, a glossy lamp and a hard-to-read sign. A bad outcome never looks or sounds like a reward, and sparkles are for rewards only.
@@ -1960,12 +1962,259 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
 5. **Import the picks:**
    - Copy each pick into `Assets/Audio/Sfx/` (ambience and music into `Assets/Audio/Music/`) with a plain name (`EmergencyBell`, `ClockTick`, `StampThunk1`…), then `refresh_unity`. Keep Kenney's OGGs as OGG.
    - Write `Docs/AudioSources.md`: every clip in the game, where it came from, its licence, and the ElevenLabs prompt for generated ones.
-   - The wiring is 11b.
-6. **Credit:** the free plan requires a credit to elevenlabs.io for commercial use, so 11b adds "Sound effects: Kenney (kenney.nl), ElevenLabs (elevenlabs.io)" to the Credits screen.
+   - The wiring is 14.
+6. **Credit:** the free plan requires a credit to elevenlabs.io for commercial use, so 14 adds "Sound effects: Kenney (kenney.nl), ElevenLabs (elevenlabs.io)" to the Credits screen.
 
 **Done when:** every slot from S1 to S16 that needs a new file has a pick the lead approved, the picks are in `Assets/Audio/`, `Docs/AudioSources.md` lists them, and the credit balance is noted in the Progress report.
 
-### Step 11b: Wire the sounds (D60)
+### Step 11c: Main visual feedback (D60)
+**Who:** one agent at high effort. Independent of 14. **Built before 14** (lead, 2026-10-22), while the lead picks the 11a sounds, so 14 doesn't exist yet: where a visual is timed to the stamp pop, add a plain C# event on `CallCardView` (for example `StampShown`) that 14's stamp thunk will reuse.
+
+- **V1: rolling counter.** `MoneyCounterView` already has reels (`reels[i]`). When the shown cents change, each changed reel rolls: the old digit slides up and out and the new one comes in from below, about 0.15 s, clipped to the reel window.
+  - Only the reels that changed move. When many digits change at once (a big fine or purchase), they all roll together.
+  - The coin flight's target and the exact amount (`label.text`) stay as they are.
+  - A soft brightening of the plate when money comes in.
+  - No allocations per frame: build strings only when the cents change.
+- **V2: fines.** On `FineApplied`: the plaque shakes (a few px, about 0.3 s) and flashes red, and 3–5 coins fly from the counter to the missed card and fade. Reuse `IncomeCoinsView` with the direction reversed. The red "-$X" popup stays.
+- **V3: emergencies.**
+  - While an emergency waits, its card wobbles gently (about ±2°). In the last `urgentSeconds` it shakes harder, in step with the ring's pulse.
+  - A small red warning lamp flashes while any emergency waits. Put it where it covers no jack, label, card or book: for example on the caller panel's frame or the board's top frame. Build it from the existing `LampGlowGraphic`/`CircleGraphic` until one is drawn.
+  - Both freeze while paused.
+- **V4: card arrival.** A new card slides in from the left edge of the caller panel with a small overshoot (about 0.35 s), then shakes briefly as its bell rings.
+  - It must fit `CallQueueView`'s slide-up and the stamp hold (D52): a call that waits for a stamp still appears only after that stamp leaves.
+  - The card can be clicked as soon as it is visible.
+- **V5: wrong number.** The card shakes "no" (three horizontal swings, about 0.4 s), both jacks flash red for about 0.5 s, and a small spark of a few UI stars appears at the plug. The flash must hand back to whatever the jack showed before: the 10b caller lamp, halos, the green connected jacks and closed-jack dimming.
+- **V6: connection.** A flash ring expands from both jacks when a circuit closes.
+  - A cord wiggle only if `CableController` offers a cheap, safe way to do it; otherwise skip it and say so in the report.
+- **V13: the stamp and the badge.** On an emergency card the "New order!" stamp must not hide the EMERGENCY badge or the countdown ring. Move it for emergencies, or leave it out there because the badge already says so; say which in the report. Remove the row from Plan §8.
+- **Tests (EditMode):**
+  - Reels roll only for changed digits, end on the exact amount, and allocate nothing per frame while idle.
+  - The fine shake and coins start on `FineApplied`.
+  - The emergency wobble runs only while waiting and freezes on pause.
+  - Arrival keeps the stamp-hold order.
+  - The wrong-number flash restores each jack's previous look.
+  - Every new graphic has `raycastTarget` off and sits on a canvas that doesn't overlap the book.
+- **Screenshots:** a roll mid-way, a fine, an emergency card with the lamp, a wrong number, a connection ring.
+
+### Step 12: The paint box (`GameStyle`) and the style decisions (D75)
+**Who:** one agent at high effort, **before 13a**, so step 13's new visuals read named colours and fonts from the start. Plan §3 rule 15 applies: a light visual pass with no tuning loops.
+
+**Why:** colours sit as raw numbers in about twenty components, picked one at a time; there are eight slightly different reds. StyleGuide §3, §5 and §6 now name every colour, font role and timing, and the lead settled the reds, golds and fonts on 2026-11-09. This step puts the names in one asset and applies those three decisions.
+
+- **The asset:** `GameStyle`, a ScriptableObject in the Game layer (`Assets/Scripts/Game/GameStyle.cs`, namespace `Switchboard.Game`). It lives in Assembly-CSharp because it references `TMP_FontAsset`. There is one instance, at `Assets/Content/GameStyle.asset` next to `GameConfig.asset`, and nothing writes to it at runtime.
+  - **Colours:** the named colours of StyleGuide §3, under the guide's names, with the hex values exactly as written there:
+    - surfaces the code uses: paper, ink, cream text, gold line, and the brass plate's top, bottom and rim;
+    - Good: light, ring, ink;
+    - Money gold: text, the three coin tones, tip;
+    - Brass and Light brass;
+    - Error glow, Error, Error ink, Error deep;
+    - Alarm glow, Alarm, Alarm quiet;
+    - Attention: hover, lamp;
+    - Neutral: new order, cut off;
+    - the EMERGENCY sign's engraved letters: quiet, lit.
+    
+    A tooltip on each says where it is used.
+  - **Fonts:** three roles. Display is `Boecklins Universe SDF Static`, Label is `Della Respira SDF Static` and Plain is `LiberationSans SDF`.
+  - **Timings:** the StyleGuide §6 table as named values. Wire only the ones the components touched here already use; the rest wait for step 13.
+- **How components get it:**
+  - `GameInstaller` (the composition root) holds a serialized reference and passes it to the views it configures, the way it passes `emergencySignFont` today. The sign's font then comes from the Label role, and the separate field goes.
+  - A view outside `GameInstaller`'s reach, such as a menu on its own prefab, gets a serialized reference instead.
+  - No statics, singletons or lookups.
+  - Components read a colour when they apply it, not once at start. That way the lead can tune the asset in Play Mode and see the change at the next event. Asset edits made in Play Mode are kept afterwards, unlike component edits.
+- **Apply the decisions. Only these pieces move onto `GameStyle`:**
+  - **Error (crimson):**
+    - the wrong-number flash (`SocketFlashGraphic.WrongColor`, `#F14034`) and the closed-jack glow (`SocketGraphic`, `#F15746`) become **Error glow**;
+    - the fine on the counter (`MoneyCounterView.fineInk`, `#C42828`) and "can't afford" (`#B23E3E`) become **Error**;
+    - the "Wrong number!" stamp becomes **Error ink**, and "Missed" becomes **Error deep** (both keep their values, now named).
+  - **Alarm (orange-red):**
+    - the countdown ring (`CallCardView.urgentRingColor`, `#FF5C30`) becomes **Alarm glow**;
+    - the emergency lamp becomes **Alarm** when lit and **Alarm quiet** when unlit (unlit was `#A03E32`);
+    - the lamp's glows and the light on the sign (`EmergencyLampView` `GlowTint`, `InnerGlowTint`, `SignWashTint`, `SignHaloTint`) become **Alarm glow**, each keeping its current alpha;
+    - the emergency card's accent (`emergencyCards.accent` in `GameConfig.asset`, now `#C72121`) is set to Alarm's value in the asset. The field stays, because it is set per caller type.
+  - **The sign's letters keep their values** (`#3A140C` quiet, `#480B0D` lit), now named in `GameStyle`.
+  - **Titles:**
+    - The pause title becomes **light brass** `#D9BE72` instead of lemon `#FFDB1F`, and so does any other title in the same lemon (check the main menu).
+    - Measure each title's contrast against what is behind it (at least 3:1 for text of 36 or more) and report the number.
+  - **Fonts:**
+    - The card stamps ("Paid", "Wrong number!", "Cut off", "Missed", "New order!") and the cards' caller name plates switch to the Label role (Della Respira).
+    - Keep each label's box. If the text no longer fits, use TMP auto-size inside the box rather than a bigger box.
+    - Measure the ink against the paper and against the plate: at least 4.5:1.
+  - **Old fields:** remove the serialized colour fields this step replaces (for example `CallCardView.wrongInk`, `missedInk` and `urgentRingColor`), and check prefabs and scenes so that no leftover serialized value wins.
+- **Not in this step:** any other component (Plan §8, "Components still on raw colours"), the shop's colours, the victory scene (13f removes it), new art.
+- **Tests:** no domain rule changes, so there are no new EditMode tests, and the existing suite stays green. `GameStyle` is presentation code in Assembly-CSharp, which the test assembly can't reference.
+- **Screenshots** (`Temp/Captures/`), four in all:
+  1. cards showing a stamp and the name plates;
+  2. the emergency card with the lamp and the countdown ring;
+  3. the pause menu's title;
+  4. the same cards at phone size (844×390), to judge Della Respira when small. If its strokes fade there, report it and don't fix it in this step.
+- **Report:** a table of every moved colour and font (old, new, name in `GameStyle`), the measured contrasts, and anything that still looks different from the guide.
+- **Playtest:**
+  - A wrong number flashes crimson and an emergency glows orange-red, and the two read as different things.
+  - Stamps and name plates look 1930s and stay readable, on a phone too.
+  - The pause title no longer competes with the money.
+
+### Step 12, fix pass 1: titles back to gold, two reds that read apart, gentler wrong-number ring (lead, 2026-11-09)
+**Who:** one agent at high effort. Quick, but quality comes first: every value lands in `GameStyle` so the lead can tune it in Play Mode without an agent. Plan §3 rule 15 applies.
+
+The lead's playtest of step 12:
+- The light-brass titles are vague and grab much less attention.
+- The wrong-number flash is too strong.
+- The closed-jack glow could be a bit stronger.
+- Mistake and emergency reds look almost the same.
+- Everything else is fine.
+
+1. **Titles back to bright gold.**
+   - Add **Title gold** `#FFDB1F` (the original pause title colour) to `GameStyle`.
+   - `TitleInk` reads it instead of Light brass. Light brass stays in the asset for decoration.
+   - Set the titles' serialized colour in `GameUI.prefab` and `StartMenu.prefab` to the same value, so the editor shows what the game shows.
+   - Neither screen shows the money counter, so a bright title competes with nothing there.
+   - The lead also felt the main menu title looked bigger. Step 12 changed no size in the files, so confirm that nothing changes the title's size or auto-size at runtime, and report what you find.
+2. **The two reds pushed apart.** Set these in `GameStyle.asset` and as the code defaults in `GameStyle.cs`:
+   - Alarm glow `#FF8A2A`, Alarm `#F07024`, Alarm quiet `#8E4A22` (emergency: clearly orange, like fire).
+   - Error glow `#E6305A` (mistake: a deeper crimson leaning towards rose).
+   - Leave Error, Error ink and Error deep as they are.
+   - Also update the copies: `emergencyCards.accent` in `GameConfig.asset` (= Alarm), `SocketGraphic`'s fallback for unstyled sockets (= Error glow), and the expected colours in the tests.
+3. **Text on the Alarm colour must stay readable.**
+   - The card's EMERGENCY badge background takes the accent. Its cream label was already about 3.7:1 on `#E84A34`, and would be about 2.8:1 on `#F07024`.
+   - Measure it. If it is under 4.5:1, give the badge label `GameStyle`'s Ink while the accent is Alarm, the way a fire sign has dark letters on orange.
+   - Re-measure the EMERGENCY plate's engraved letters under the new orange wash (at least 4.5:1).
+4. **Gentler wrong-number ring** (`SocketFlashGraphic`, now 0.22 to 0.62 of the jack's size, full strength):
+   - Make the outer edge about 0.45 of the jack's size and the strength about 70%.
+   - Both values become `GameStyle` settings, read through `IBoardPalette` when the flash plays.
+   - The short-circuit sparks stay as they are.
+5. **Stronger closed-jack glow** (`SocketGraphic`, the blocked halo at intensity 1.0; a connected jack has 1.4):
+   - Use about 1.5, as a `GameStyle` setting read through `IBoardPalette`.
+- **Tests:** the existing suite stays green, with the expected colours updated. Sockets without a palette use the same defaults as `GameStyle`.
+- **Screenshots** (`Temp/Captures/`), three:
+  1. **The key one:** one frame with an emergency waiting (lit lamp, plate, card badge) and a wrong-number flash at the same moment, ideally with a held cord over a closed jack, so the two reds can be judged side by side;
+  2. the main menu title;
+  3. the pause title.
+- **Report:** old and new value for each setting, the contrasts measured, and the title-size finding.
+- **Playtest:**
+  - The titles catch the eye again.
+  - A wrong number reads as crimson and an emergency as orange; the two never look alike.
+  - The wrong-number ring no longer shouts.
+  - A closed jack refuses clearly.
+
+### Step 12, fix pass 2: back to the first reds, a middle wrong-number ring (lead, 2026-11-09)
+**Who:** one agent at high effort. Quick, with quality first; Plan §3 rule 15 applies.
+
+The lead's playtest of fix pass 1:
+- The gold titles are right; keep them.
+- The fire-orange glow and the rose crimson don't work: put back step 12's colours. The EMERGENCY badge under the caller's name was good as fix pass 1 left it (orange with dark letters): keep it.
+- The wrong-number ring is now too soft. Step 12's version was too strong.
+- The closed jack turned pink; only its colour should go back, and the stronger glow stays.
+
+1. **Colours back to step 12** (in `GameStyle.asset` and the code defaults in `GameStyle.cs`):
+   - Alarm glow `#FF6A3D`, Alarm `#E84A34`, Alarm quiet `#8E3426`.
+   - Error glow `#EE4450`.
+   - The copy follows: `SocketGraphic`'s fallback for unstyled sockets (`#EE4450`).
+2. **The EMERGENCY badge stays as fix pass 1 left it** (lead's correction): `emergencyCards.accent` stays fire orange `#F07024`, and the contrast-based switch keeps its letters dark Ink. The badge's orange is now its own colour, no longer equal to Alarm, so update the tooltip that says otherwise.
+3. **Wrong-number ring halfway** between step 12 (outer edge 0.62, strength 1.0) and fix pass 1 (0.45, 0.7): **outer edge 0.54, strength 0.85**. Update the `GameStyle` defaults and the unstyled fallbacks.
+4. **Keep:** title gold, the blocked glow's intensity of 1.5, and the settings read through `IBoardPalette`.
+- **Tests:**
+  - Expected colours back to the step 12 values.
+  - The lamp test's colour check back to its step 12 form (red leads clearly).
+  - The suite stays green.
+- **Screenshot:** one frame like fix pass 1's key frame: an emergency waiting (lamp, plate, badge), a wrong-number flash and the blocked glow.
+- **Saves:** the lead doesn't need the PlayerPrefs save kept, so no backup is needed.
+- **Playtest:**
+  - The lamp, its glow and the jacks look as they did after step 12; the badge stays orange with dark letters.
+  - The wrong-number ring is strong but no longer shouts.
+  - A closed jack glows red, more strongly than before.
+
+### Step 12, fix pass 3: the badge back to step 12, and a "danger" ring on live calls (lead, 2026-11-09)
+**Who:** one agent at high effort. Quick, with quality first; Plan §3 rule 15 applies.
+
+1. **The EMERGENCY badge back to step 12.** Fix pass 2 kept the badge in fire orange through a misread of the lead's note; the lead wants no fire orange anywhere.
+   - `emergencyCards.accent` (in `GameConfig.asset` and its code default) becomes `#E84A34`, equal to Alarm again.
+   - The badge label goes back to its own cream: remove `CallCardView.BadgeInkOn`, and remove `GameStyle.Contrast` / `TextContrast` if nothing else uses them.
+   - Update the tooltips and comments that call the badge's orange its own colour.
+   - The lead accepts the lower contrast of cream on `#E84A34` (about 3.7:1).
+2. **The jack hover lights, as the lead's exact table** (settled during the pass; red means "don't do it"):
+
+   | Hover over | Empty hand | Holding a cord |
+   |---|---|---|
+   | An empty open jack | nothing | amber (as before) |
+   | A jack of an active (connected) call, the one with the green light | nothing (stays green) | red (as before) |
+   | A jack holding one end of an unfinished cord | **amber** (was nothing) | **amber** (was red) |
+   | A jack whose call is over (cord still in) | nothing | **amber** (was red) |
+   | A closed jack (not drawn) | nothing | nothing |
+
+   - Only the lights change. A drop on an occupied jack still bounces with the blocked sound, and picking up plugs works as before.
+   - A light updates when a state changes while hovered: the call connects, the call ends, or the second plug goes in.
+   - The board code stays free of the Game layer.
+- **Tests** (`SocketHoverTests`):
+  - Every cell of the table above.
+  - The ring clears when the pointer leaves.
+  - It turns from red to amber when the call ends while hovered.
+  - The suite stays green.
+- **Screenshot:** one frame showing the step-12 badge (orange-red, cream letters) next to the lamp, and the danger ring on a connected call's jack under an empty-handed pointer.
+- **Playtest:**
+  - The badge matches the lamp again, with cream letters.
+  - With a cord in hand, only a live call's jack shows red; other plugged jacks show yellow.
+  - With an empty hand, only an unfinished cord's jack lights up, in yellow.
+
+### Step 13: The loop redesign, parts 13a–13i (D61–D74, Design §12)
+The 2026-10-25 playtest (Progress, "Playtest and redesign") sent the game back to its loop: the busy operator is the heart, with shifts, patience, stakes, chores, nerves, a wall of frames and the story between days. These steps come **before 14, 15, 16 and 17** (D74). Each is one agent at high effort unless noted. Before launching one, the orchestrator confirms its open numbers (Design §12.13) with the lead and writes them into the brief; every number lands in `Economy.json` or `Calls.json`, never in code, and `Docs/EconomyFile.md` is updated in the same step. Views follow [StyleGuide.md](StyleGuide.md) and take their colours, fonts and timings from `GameStyle` (Step 12); placeholder shapes stand in for art that isn't drawn yet (Plan §8, "Art for the wall and the chores").
+
+### Step 13a: Pressure and the queue fix (D63, D64)
+**Why:** people call while already on a call (a bug), callers never leave, emergencies allow 140 s, and after the first connection the player waits 25 s with nothing to do.
+- **Queue rule** (`CallQueue.TakeNext`; Design 5.2 and D52 change): skip a script while either of its jacks (`From`, `To`) is the `From` or `To` of a live call, or its caller's name has a live call (the existing check). A skipped script comes round again; if every script is skipped the slot stays empty.
+- **Patience** (Domain): `CallScript.PatienceSeconds` from `Calls.json` `patienceSeconds`; absent means `Economy.json` `defaultPatienceSeconds`; 0 means the call waits forever (the tutorial's call, tests). `Call.PatienceSecondsLeft` counts while Incoming, Taken or Connecting, is held with `WaitingHeld` like the response timer, and stops for good once connected. A call with a response time (an emergency) uses the response time only. At 0 the call ends as `CallEndReason.HungUp = 6`: no pay, no fine; the queue brings it back later as usual. `CareerStats.CallsHungUp` counts them.
+- **Card:** the patience shows on the existing countdown ring in the attention amber (`#F5D278`, StyleGuide §3), never the alarm red, with a gentle pulse in the last 5 s; the stamp reads "Hung up" in the neutral brown ink; `CallAudio` plays the receiver-down for HungUp. No new sound.
+- **Data** (`Calls.json`, `Economy.json`): early calls 10–15 s long (confirm); `patienceSeconds` only where a call needs its own; emergencies `responseTimeSeconds` 30 (confirm), `penaltyCents` about one good call's pay, pay above regular calls; `startingCords` per the lead. `Validate Content`: a patience of 0 or less when present is reported; an emergency that also sets patience gets a note.
+- **Emergency sound:** if the S1 and S2 picks are already in `Assets/Audio/`, wire the bell and the tick here as 14's S1/S2 brief says; otherwise leave them for 14 and say so in the report.
+- **Tests:** the queue skips by jack and by caller and comes round again; patience counts only while waiting, is held with the tutorial, ends as HungUp with no pay or fine; an emergency ignores patience; the real files load with the new fields and every regular call gets a patience above 0; `CareerStats` counts hang-ups.
+- **Docs:** `EconomyFile.md` (the new fields), Design 5.1's table and 5.2, Plan §8's row.
+- **Playtest:** three minutes on a new game: nobody rings while they're on a call; cards turn amber and leave with "Hung up"; an emergency is tight at 30 s; the first connection leaves no dead time.
+
+### Step 13b: Days (D62) (outline)
+- Domain `Shift`: the shift's seconds from `Economy.json`, the day number, a `ClosingTime` event; at closing, live calls end as a new reason (no pay, no complaint, a "Closing time" stamp) and cords return to the tray; the queue pauses between days. The day number and the career totals go into the save (a migration).
+- The punch clock on the wall: punch in starts the shift (day 1 starts after the tutorial's first call), punch out at closing. The wall clock (V11) and the calendar, both stopped on pause.
+- The day card (GameUI, its own canvas above the book): earned, connected, hung up, missed, placeholders for best streak and rating (13c) and for "Tomorrow: ..." (13f), and a Next day button. Autosave on the card.
+- Pace per day in `Economy.json` (a `days` or `schedule` list: shift length, patience scale, call pool); rush hour waits for 13c.
+- Tests: closing ends calls without pay; the day number saves and loads; a reload starts the current day with an empty board; the punch clock gates the shift.
+
+### Step 13c: Score and streak (D67) (outline)
+- Domain `Streak` and `DayScore`: earned per shift is the score; a streak of correct connections broken by a wrong number, hang-up or miss, with a bonus from `Economy.json`; rush hour in the last minute (×2 pay, faster arrival); "Just in time!" for an emergency connected inside its last N s; a rating from earned against the day's target and the complaints; the best shift saved and shown in the main menu; one daily challenge a day from a list in `Economy.json`, checked at closing.
+- Views: the streak counter (the caller panel's top or the wall; the brief decides), the connection bell pitched up per step, a thud on a break, the quick-connect window shown shrinking on the card, stamps for "Just in time!" and the challenge, the rating and the challenge on the day card.
+- Tests: streak rules, rush-hour pay, the near-miss window, the rating formula, the challenge checks, the best shift saved.
+
+### Step 13d: Stakes within the day (D68) (outline)
+- Burnt cord: on a wrong number the judged cord is dead for the rest of the day (or N s, confirm): smoking in the tray, impossible to pick up (`CableController` state, `CordBridge`). The intercom (a chore): hold or crank to call the electrician, who fixes the cord after about 10 s for a fee, with a longer wait each time.
+- Angry callbacks: a hung-up caller's next call has shorter patience, a cross face (a tint until V12's art) and no tip; a second hang-up from the same person is a complaint at once.
+- Complaints: hang-ups, wrong numbers and misses, shown as stamps in a row while the day runs; at 3 the supervisor's call (a special card that must be answered and holds a cord and attention); at 5 "Sent home": the day ends early with the quota missed.
+- A missed emergency: the fine, a complaint, the supervisor's line lit for a minute.
+- Tests for every rule; the numbers in `Economy.json`.
+
+### Step 13e: Stakes across days (D68) (outline; the lead confirms "fired" first)
+- A quota per day in `Economy.json`, delivered by the pneumatic mail at punch-in (the chore: open the capsule); a missed quota puts a written warning on the wall; beating the next quota removes one; three warnings: fired, with a career card (days worked, best shift, frames), then a new career that keeps the frames and the board and skips the tutorial.
+- Overtime: at closing time the player may keep working; callers get crankier each minute; a late punch-out is a complaint after N min; overtime pay counts.
+- Save: the warnings and the career history.
+
+### Step 13f: Unlocks and the wall (D65, D66, D71) (outline)
+- `Economy.json`: `upgrades` becomes a `schedule` by day (a cord, a board stage with its `stagePool`, a chore, a desk item, a resident, the quota, the challenge); `StatSheet` reads the day's unlocks; the income multipliers go (confirm); the `secret` upgrade, `GoalProgress`, the savings fill, the "To be continued" dialog, `VictorySequenceView` and `VictoryTownGraphic` are removed (D65); the shop panel shows what's unlocked and what's next, or leaves the board (confirm). The tutorial's shop steps change with it.
+- The wall: frames ("Operator of the week" on day 7, "of the month" on day 30, the feats), the warnings, the desk items, each hung at day end with a nail-and-swing moment; the first-week milestone on the day-7 card.
+- Tests: schedule parsing and validation; unlocks by day; a frame is awarded once.
+
+### Step 13g: Chores (D69) (outline)
+- The register lever: the drawer collects the earnings; a pull banks them with the register sound and pays the streak bonus; unbanked money at closing counts half (confirm).
+- Wiping the glass: smoke from a short circuit and steam in rush hour hide jacks under a fogged pane until a drag wipes it.
+- Mid-shift mail slips (optional).
+- The rule: at most two or three chores active; each arrives alone through the schedule.
+
+### Step 13h: Nerves (D70) (outline)
+- Domain `Nerves`: rises with hang-ups, emergency bells and rush-hour time; decays; thresholds. Effects in the views: hand jitter, plugs that want a second try, fluttering book pages.
+- Coffee or water (a 1 s hold, a small calm), the cigarette (a big calm, smoke on the glass), the flask (a full calm and a confidence bonus, then a swaying board and a drifting hand; a second nip risks a wrong plug and "Sent home" if the supervisor calls). The assets are swappable for coffee and cough syrup; no moralising text.
+- Tests for the meter, the thresholds and the three remedies.
+
+### Step 13i: Narrative between days (D72)
+- **First the story bible,** `Docs/Story.md` (the orchestrator with the lead, approved before any JSON): the cast with one want and one flaw each; three to five crossing arcs; the beats per day for the first week; headlines; the new resident per day.
+- Then the calls: one-line ringing messages; a `story` flag that plays a call once per career and in order (`CallQueue`, the played list saved), filler errands that loop; 50–60 calls for the first week; the headline and the new face on the day card; the validator checks story ids and their order.
+- Tests: story calls never repeat; the order holds; a pushed-back story call returns next.
+
+### Step 14: Wire the sounds (D60)
 **Who:** one agent at high effort. **Needs 11a's picks.** Runs after 11c (lead, 2026-10-22). **From 11c:** `CallCardView.StampShown(CallCardView)` fires on the first visible frame of every stamp pop: use it for the S4 thunk. Emergencies get no "New order!" stamp (V13), so their arrival has no thunk; the S1 bell covers it. `EmergencyLampView` (the red lamp and its EMERGENCY sign) lights while any emergency waits: start and stop the S1 bell on the same signal.
 
 - **S1 and S2: emergencies.**
@@ -2014,36 +2263,7 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
   - No new audio source lacks an `AudioChannelSource`.
 - **Playtest:** a busy board for 3 minutes sounds lively, not noisy; an emergency feels urgent; Options' volume cords change every new sound.
 
-### Step 11c: Main visual feedback (D60)
-**Who:** one agent at high effort. Independent of 11b. **Built before 11b** (lead, 2026-10-22), while the lead picks the 11a sounds, so 11b doesn't exist yet: where a visual is timed to the stamp pop, add a plain C# event on `CallCardView` (for example `StampShown`) that 11b's stamp thunk will reuse.
-
-- **V1: rolling counter.** `MoneyCounterView` already has reels (`reels[i]`). When the shown cents change, each changed reel rolls: the old digit slides up and out and the new one comes in from below, about 0.15 s, clipped to the reel window.
-  - Only the reels that changed move. When many digits change at once (a big fine or purchase), they all roll together.
-  - The coin flight's target and the exact amount (`label.text`) stay as they are.
-  - A soft brightening of the plate when money comes in.
-  - No allocations per frame: build strings only when the cents change.
-- **V2: fines.** On `FineApplied`: the plaque shakes (a few px, about 0.3 s) and flashes red, and 3–5 coins fly from the counter to the missed card and fade. Reuse `IncomeCoinsView` with the direction reversed. The red "-$X" popup stays.
-- **V3: emergencies.**
-  - While an emergency waits, its card wobbles gently (about ±2°). In the last `urgentSeconds` it shakes harder, in step with the ring's pulse.
-  - A small red warning lamp flashes while any emergency waits. Put it where it covers no jack, label, card or book: for example on the caller panel's frame or the board's top frame. Build it from the existing `LampGlowGraphic`/`CircleGraphic` until one is drawn.
-  - Both freeze while paused.
-- **V4: card arrival.** A new card slides in from the left edge of the caller panel with a small overshoot (about 0.35 s), then shakes briefly as its bell rings.
-  - It must fit `CallQueueView`'s slide-up and the stamp hold (D52): a call that waits for a stamp still appears only after that stamp leaves.
-  - The card can be clicked as soon as it is visible.
-- **V5: wrong number.** The card shakes "no" (three horizontal swings, about 0.4 s), both jacks flash red for about 0.5 s, and a small spark of a few UI stars appears at the plug. The flash must hand back to whatever the jack showed before: the 10b caller lamp, halos, the green connected jacks and closed-jack dimming.
-- **V6: connection.** A flash ring expands from both jacks when a circuit closes.
-  - A cord wiggle only if `CableController` offers a cheap, safe way to do it; otherwise skip it and say so in the report.
-- **V13: the stamp and the badge.** On an emergency card the "New order!" stamp must not hide the EMERGENCY badge or the countdown ring. Move it for emergencies, or leave it out there because the badge already says so; say which in the report. Remove the row from Plan §8.
-- **Tests (EditMode):**
-  - Reels roll only for changed digits, end on the exact amount, and allocate nothing per frame while idle.
-  - The fine shake and coins start on `FineApplied`.
-  - The emergency wobble runs only while waiting and freezes on pause.
-  - Arrival keeps the stamp-hold order.
-  - The wrong-number flash restores each jack's previous look.
-  - Every new graphic has `raycastTarget` off and sits on a canvas that doesn't overlap the book.
-- **Screenshots:** a roll mid-way, a fine, an emergency card with the lamp, a wrong number, a connection ring.
-
-### Step 11d: Extra visual feedback (D60)
+### Step 15: Extra visual feedback (D60)
 **Who:** one agent at high effort, after 11c (it reuses 11c's effects).
 
 - **V7: live earnings.** Every few seconds (serialized), a small coin or "+¢" rises from each connected card, with the soft coin tick (S5b, from 11a). At most a few per second across all cards, and nothing while on hold or paused. It is cosmetic: it pays nothing.
@@ -2068,66 +2288,7 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
   - Every new graphic has `raycastTarget` off.
 - **Playtest:** the game feels alive and readable, and nothing distracts from finding the jack.
 
-### The loop redesign: steps L1–L9 (D61–D74, Design §12)
-The 2026-10-25 playtest (Progress, "Playtest and redesign") sent the game back to its loop: the busy operator is the heart, with shifts, patience, stakes, chores, nerves, a wall of frames and the story between days. These steps come **before 11b, 11d, 12 and 13** (D74). Each is one agent at high effort unless noted. Before launching one, the orchestrator confirms its open numbers (Design §12.13) with the lead and writes them into the brief; every number lands in `Economy.json` or `Calls.json`, never in code, and `Docs/EconomyFile.md` is updated in the same step. Views follow [StyleGuide.md](StyleGuide.md); placeholder shapes stand in for art that isn't drawn yet (Plan §8, "Art for the wall and the chores").
-
-### Step L1: Pressure and the queue fix (D63, D64)
-**Why:** people call while already on a call (a bug), callers never leave, emergencies allow 140 s, and after the first connection the player waits 25 s with nothing to do.
-- **Queue rule** (`CallQueue.TakeNext`; Design 5.2 and D52 change): skip a script while either of its jacks (`From`, `To`) is the `From` or `To` of a live call, or its caller's name has a live call (the existing check). A skipped script comes round again; if every script is skipped the slot stays empty.
-- **Patience** (Domain): `CallScript.PatienceSeconds` from `Calls.json` `patienceSeconds`; absent means `Economy.json` `defaultPatienceSeconds`; 0 means the call waits forever (the tutorial's call, tests). `Call.PatienceSecondsLeft` counts while Incoming, Taken or Connecting, is held with `WaitingHeld` like the response timer, and stops for good once connected. A call with a response time (an emergency) uses the response time only. At 0 the call ends as `CallEndReason.HungUp = 6`: no pay, no fine; the queue brings it back later as usual. `CareerStats.CallsHungUp` counts them.
-- **Card:** the patience shows on the existing countdown ring in the attention amber (`#F5D278`, StyleGuide §3), never the alarm red, with a gentle pulse in the last 5 s; the stamp reads "Hung up" in the neutral brown ink; `CallAudio` plays the receiver-down for HungUp. No new sound.
-- **Data** (`Calls.json`, `Economy.json`): early calls 10–15 s long (confirm); `patienceSeconds` only where a call needs its own; emergencies `responseTimeSeconds` 30 (confirm), `penaltyCents` about one good call's pay, pay above regular calls; `startingCords` per the lead. `Validate Content`: a patience of 0 or less when present is reported; an emergency that also sets patience gets a note.
-- **Emergency sound:** if the S1 and S2 picks are already in `Assets/Audio/`, wire the bell and the tick here as 11b's S1/S2 brief says; otherwise leave them for 11b and say so in the report.
-- **Tests:** the queue skips by jack and by caller and comes round again; patience counts only while waiting, is held with the tutorial, ends as HungUp with no pay or fine; an emergency ignores patience; the real files load with the new fields and every regular call gets a patience above 0; `CareerStats` counts hang-ups.
-- **Docs:** `EconomyFile.md` (the new fields), Design 5.1's table and 5.2, Plan §8's row.
-- **Playtest:** three minutes on a new game: nobody rings while they're on a call; cards turn amber and leave with "Hung up"; an emergency is tight at 30 s; the first connection leaves no dead time.
-
-### Step L2: Days (D62) (outline)
-- Domain `Shift`: the shift's seconds from `Economy.json`, the day number, a `ClosingTime` event; at closing, live calls end as a new reason (no pay, no complaint, a "Closing time" stamp) and cords return to the tray; the queue pauses between days. The day number and the career totals go into the save (a migration).
-- The punch clock on the wall: punch in starts the shift (day 1 starts after the tutorial's first call), punch out at closing. The wall clock (V11) and the calendar, both stopped on pause.
-- The day card (GameUI, its own canvas above the book): earned, connected, hung up, missed, placeholders for best streak and rating (L3) and for "Tomorrow: ..." (L6), and a Next day button. Autosave on the card.
-- Pace per day in `Economy.json` (a `days` or `schedule` list: shift length, patience scale, call pool); rush hour waits for L3.
-- Tests: closing ends calls without pay; the day number saves and loads; a reload starts the current day with an empty board; the punch clock gates the shift.
-
-### Step L3: Score and streak (D67) (outline)
-- Domain `Streak` and `DayScore`: earned per shift is the score; a streak of correct connections broken by a wrong number, hang-up or miss, with a bonus from `Economy.json`; rush hour in the last minute (×2 pay, faster arrival); "Just in time!" for an emergency connected inside its last N s; a rating from earned against the day's target and the complaints; the best shift saved and shown in the main menu; one daily challenge a day from a list in `Economy.json`, checked at closing.
-- Views: the streak counter (the caller panel's top or the wall; the brief decides), the connection bell pitched up per step, a thud on a break, the quick-connect window shown shrinking on the card, stamps for "Just in time!" and the challenge, the rating and the challenge on the day card.
-- Tests: streak rules, rush-hour pay, the near-miss window, the rating formula, the challenge checks, the best shift saved.
-
-### Step L4: Stakes within the day (D68) (outline)
-- Burnt cord: on a wrong number the judged cord is dead for the rest of the day (or N s, confirm): smoking in the tray, impossible to pick up (`CableController` state, `CordBridge`). The intercom (a chore): hold or crank to call the electrician, who fixes the cord after about 10 s for a fee, with a longer wait each time.
-- Angry callbacks: a hung-up caller's next call has shorter patience, a cross face (a tint until V12's art) and no tip; a second hang-up from the same person is a complaint at once.
-- Complaints: hang-ups, wrong numbers and misses, shown as stamps in a row while the day runs; at 3 the supervisor's call (a special card that must be answered and holds a cord and attention); at 5 "Sent home": the day ends early with the quota missed.
-- A missed emergency: the fine, a complaint, the supervisor's line lit for a minute.
-- Tests for every rule; the numbers in `Economy.json`.
-
-### Step L5: Stakes across days (D68) (outline; the lead confirms "fired" first)
-- A quota per day in `Economy.json`, delivered by the pneumatic mail at punch-in (the chore: open the capsule); a missed quota puts a written warning on the wall; beating the next quota removes one; three warnings: fired, with a career card (days worked, best shift, frames), then a new career that keeps the frames and the board and skips the tutorial.
-- Overtime: at closing time the player may keep working; callers get crankier each minute; a late punch-out is a complaint after N min; overtime pay counts.
-- Save: the warnings and the career history.
-
-### Step L6: Unlocks and the wall (D65, D66, D71) (outline)
-- `Economy.json`: `upgrades` becomes a `schedule` by day (a cord, a board stage with its `stagePool`, a chore, a desk item, a resident, the quota, the challenge); `StatSheet` reads the day's unlocks; the income multipliers go (confirm); the `secret` upgrade, `GoalProgress`, the savings fill, the "To be continued" dialog, `VictorySequenceView` and `VictoryTownGraphic` are removed (D65); the shop panel shows what's unlocked and what's next, or leaves the board (confirm). The tutorial's shop steps change with it.
-- The wall: frames ("Operator of the week" on day 7, "of the month" on day 30, the feats), the warnings, the desk items, each hung at day end with a nail-and-swing moment; the first-week milestone on the day-7 card.
-- Tests: schedule parsing and validation; unlocks by day; a frame is awarded once.
-
-### Step L7: Chores (D69) (outline)
-- The register lever: the drawer collects the earnings; a pull banks them with the register sound and pays the streak bonus; unbanked money at closing counts half (confirm).
-- Wiping the glass: smoke from a short circuit and steam in rush hour hide jacks under a fogged pane until a drag wipes it.
-- Mid-shift mail slips (optional).
-- The rule: at most two or three chores active; each arrives alone through the schedule.
-
-### Step L8: Nerves (D70) (outline)
-- Domain `Nerves`: rises with hang-ups, emergency bells and rush-hour time; decays; thresholds. Effects in the views: hand jitter, plugs that want a second try, fluttering book pages.
-- Coffee or water (a 1 s hold, a small calm), the cigarette (a big calm, smoke on the glass), the flask (a full calm and a confidence bonus, then a swaying board and a drifting hand; a second nip risks a wrong plug and "Sent home" if the supervisor calls). The assets are swappable for coffee and cough syrup; no moralising text.
-- Tests for the meter, the thresholds and the three remedies.
-
-### Step L9: Narrative between days (D72)
-- **First the story bible,** `Docs/Story.md` (the orchestrator with the lead, approved before any JSON): the cast with one want and one flaw each; three to five crossing arcs; the beats per day for the first week; headlines; the new resident per day.
-- Then the calls: one-line ringing messages; a `story` flag that plays a call once per career and in order (`CallQueue`, the played list saved), filler errands that loop; 50–60 calls for the first week; the headline and the new face on the day card; the validator checks story ids and their order.
-- Tests: story calls never repeat; the order holds; a pushed-back story call returns next.
-
-### Step 12: Mobile and Web polish (outline)
+### Step 16: Mobile and Web polish (outline)
 - **Layout:**
   - Aspect ratios 16:9, 19.5:9 and 4:3. **From the 9b iPhone playtest:** at 19.5:9 the art covers only the middle 16:9, and the sides show the camera's black background (the pause button sits in the black on the right). Extend or tint the sides.
   - **Fullscreen on iPhone:** itch's fullscreen button does nothing there, because iPhone browsers don't allow page fullscreen, only video (iPad does). itch's "Click to launch in fullscreen" embed option opens the game over the whole page instead.
@@ -2140,7 +2301,7 @@ The 2026-10-25 playtest (Progress, "Playtest and redesign") sent the game back t
   - Set compression for the host, with Decompression Fallback if needed.
 - **Playtest:** on iOS Safari, Android Chrome and a desktop browser.
 
-### Step 13: Balance (outline)
+### Step 17: Balance (outline)
 - **Simulation:** a headless EditMode simulation with a bot operator.
   - Its skill (lookup time, error rate) is configurable.
   - It runs hours of game time in seconds.
@@ -2150,6 +2311,6 @@ The 2026-10-25 playtest (Progress, "Playtest and redesign") sent the game back t
 
 #### Step 9b playtest, round 4 (lead, 2026-10-19): iPhone
 - **On the lead's iPhone, from the itch Draft page, everything runs smoothly:** taps pick up and plug cords, calls connect, and a bubble shows.
-- **Black borders:** the screen is wider than the 16:9 art, so the sides show the camera's black background. That's Step 12's aspect-ratio work (added to its outline).
-- **itch's fullscreen button does nothing on the iPhone.** iPhone browsers allow fullscreen only for video, so no page can go fullscreen there. On the itch page, the "Click to launch in fullscreen" embed option is the way to fill the screen; added to Step 12's outline.
-- Plan §8's touch row: the iPhone check is done; Android is left for Step 12.
+- **Black borders:** the screen is wider than the 16:9 art, so the sides show the camera's black background. That's Step 16's aspect-ratio work (added to its outline).
+- **itch's fullscreen button does nothing on the iPhone.** iPhone browsers allow fullscreen only for video, so no page can go fullscreen there. On the itch page, the "Click to launch in fullscreen" embed option is the way to fill the screen; added to Step 16's outline.
+- Plan §8's touch row: the iPhone check is done; Android is left for Step 16.

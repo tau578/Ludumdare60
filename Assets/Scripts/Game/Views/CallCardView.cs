@@ -5,7 +5,6 @@ using Switchboard.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace Switchboard.Game
@@ -27,10 +26,6 @@ namespace Switchboard.Game
         [SerializeField] private GameObject stamp;
         [SerializeField] private TMP_Text stampLabel;
         [SerializeField] private Outline stampOutline;
-        [SerializeField] private Color paidInk = new Color32(38, 104, 58, 255);
-        [SerializeField] private Color wrongInk = new Color32(164, 38, 38, 255);
-        [SerializeField] private Color cutOffInk = new Color32(92, 80, 68, 255);
-        [SerializeField] private Color missedInk = new Color32(116, 18, 30, 255);
         [SerializeField] private GameObject speechBubble;
         [SerializeField] private TMP_Text speechLabel;
         [SerializeField, Min(1), Tooltip("How fast the bubble's text types out.")]
@@ -48,9 +43,6 @@ namespace Switchboard.Game
         private GameObject responseRingRoot;
         [SerializeField, Tooltip("A radial-filled ring that empties as the response time runs out.")]
         private Image responseRing;
-        [SerializeField, Min(0), Tooltip("Seconds left when the ring turns urgent.")] private float urgentSeconds = 10f;
-        [SerializeField] private Color urgentRingColor = new Color32(255, 92, 48, 255);
-        [SerializeField, Min(0)] private float urgentPulsesPerSecond = 3f;
         [SerializeField] private GameObject earningsBadge;
         [SerializeField] private TMP_Text earningsLabel;
         [SerializeField, Range(0, 1), Tooltip("How strongly the cord ring and earnings show while the call is on hold.")]
@@ -58,7 +50,6 @@ namespace Switchboard.Game
         [SerializeField, Tooltip("Dev only: the hidden duration, shown when the dev panel asks.")]
         private GameObject durationBadge;
         [SerializeField] private TMP_Text durationLabel;
-        [SerializeField, Min(0)] private float stampSeconds = 1.5f;
         [SerializeField, Tooltip("Squashes and bounces when a click takes the call.")]
         private RectTransform pressTarget;
         [SerializeField, Tooltip("A white copy of the portrait that flashes on the press.")]
@@ -66,21 +57,15 @@ namespace Switchboard.Game
         [SerializeField, Min(0.01f)] private float pressSeconds = 0.2f;
         [SerializeField, Range(0, 1)] private float pressFlashAlpha = 0.45f;
 
-        [SerializeField] private Color newOrderInk = new Color32(123, 82, 32, 255);
-        [SerializeField, FormerlySerializedAs("newOrderPopSeconds"), Min(.05f)] private float stampPopSeconds = .38f;
-        [SerializeField, FormerlySerializedAs("newOrderOvershoot"), Range(1, 1.4f)] private float stampOvershoot = 1.16f;
-        [SerializeField, Min(.01f)] private float stampExitSeconds = .22f;
-
         [Header("Motion (D60)")]
         [SerializeField, Min(.05f), Tooltip("A new card's slide in from the caller panel's edge.")] private float arrivalSeconds = .55f;
         [SerializeField, Min(.05f), Tooltip("The shake as a new card's bell rings, after it lands.")] private float ringShakeSeconds = .45f;
         [SerializeField, Min(0)] private float ringShakeDegrees = 5f;
         [SerializeField, Min(.05f), Tooltip("A wrong number's \"no\": three sideways swings.")] private float wrongShakeSeconds = .4f;
         [SerializeField, Min(0)] private float wrongShakePixels = 12f;
-        [SerializeField, Min(0), Tooltip("A waiting emergency's gentle wobble.")] private float wobbleDegrees = 2f;
-        [SerializeField, Min(0)] private float wobblesPerSecond = 1.2f;
-        [SerializeField, Min(0), Tooltip("The wobble in the last urgent seconds, in step with the ring's pulse.")]
-        private float urgentWobbleDegrees = 5f;
+        // The paint box (D75): the stamps' inks and font, the name plate's font, the countdown ring's Alarm glow, and the
+        // stamp and emergency timings. Read when applied, so Play Mode edits show at the next stamp or pulse.
+        private GameStyle paint;
         private CanvasGroup cardGroup;
         private float arrivalTime = -1;
         private float arrivalDistance;
@@ -123,7 +108,7 @@ namespace Switchboard.Game
         /// <summary>Raised after the status stamp's display time and exit animation finish.</summary>
         public event Action<CallCardView> Finished;
 
-        /// <summary>Raised on the first frame a stamp pops ("New order!", "Paid", "Wrong number!"...), for its thunk (11b).</summary>
+        /// <summary>Raised on the first frame a stamp pops ("New order!", "Paid", "Wrong number!"...), for its thunk (Step 14).</summary>
         public event Action<CallCardView> StampShown;
 
         /// <summary>Where the queue rests the card; the motion offset is added on top (D60).</summary>
@@ -138,8 +123,8 @@ namespace Switchboard.Game
         /// <summary>An emergency still waiting for its connection: its response timer runs (D09).</summary>
         public bool IsWaitingEmergency => Call != null && Call.HasResponseTime &&
             (Call.State == CallState.Incoming || Call.State == CallState.Taken || Call.State == CallState.Connecting);
-        public bool IsUrgent => IsWaitingEmergency && Call.ResponseSecondsLeft <= urgentSeconds;
-        public float UrgentSeconds => urgentSeconds;
+        public bool IsUrgent => IsWaitingEmergency && Call.ResponseSecondsLeft <= paint.UrgentSeconds;
+        public float UrgentSeconds => paint != null ? paint.UrgentSeconds : 0;
         public bool IsStampShowing => stamp != null && stamp.activeSelf;
 
         public Call Call { get; private set; }
@@ -151,13 +136,18 @@ namespace Switchboard.Game
         public bool IsGivingTask => IsSpeechBubbleVisible && (Call.State == CallState.Taken || Call.State == CallState.Connecting);
         public bool IsTaskTextComplete => IsGivingTask && !typing.IsTyping;
 
-        public void Show(Call call, Sprite callerPortrait, Func<CordId, Color> cordColorOf, CallCardStyle style, double incomeMultiplier = 1)
+        public void Show(Call call, Sprite callerPortrait, Func<CordId, Color> cordColorOf, CallCardStyle style,
+            GameStyle paintBox, double incomeMultiplier = 1)
         {
             gameObject.SetActive(true);
             Initialize();
             Call = call;
+            paint = paintBox;
             cordColors = cordColorOf;
             portrait.sprite = callerPortrait != null ? callerPortrait : defaultPortrait;
+            // Stamps and name plates are short period labels: the Label font (D75), in their own boxes, auto-sized.
+            SetFont(stampLabel, paint.LabelFont);
+            SetFont(nameLabel, paint.LabelFont);
             if (nameLabel != null) nameLabel.text = call.Request.Script.Name;
             shownMultiplier = double.NaN;
             SetIncomeMultiplier(incomeMultiplier);
@@ -236,7 +226,7 @@ namespace Switchboard.Game
                 }
                 ShowStamp(state);
                 stampLabel.text = "New order!";
-                stampLabel.color = stampOutline.effectColor = newOrderInk;
+                stampLabel.color = stampOutline.effectColor = paint.NewOrderInk;
                 return;
             }
             if (state != CallState.Ended)
@@ -248,7 +238,7 @@ namespace Switchboard.Game
             feePopup.Hide();
             if (tipPopup != null) tipPopup.Hide();
             // Cleared calls leave at once; the others show what happened for a moment.
-            if (Call.EndReason == CallEndReason.Cleared || stampSeconds <= 0)
+            if (Call.EndReason == CallEndReason.Cleared || paint.StampHoldSeconds <= 0)
             {
                 ResetStamp();
                 stampTimeLeft = 0;
@@ -256,7 +246,7 @@ namespace Switchboard.Game
             }
             if (!endingStampExit && ShowStamp(state))
             {
-                stampTimeLeft = stampSeconds;
+                stampTimeLeft = paint.StampHoldSeconds;
                 if (Call.EndReason == CallEndReason.WrongConnection) wrongShakeTime = 0;
             }
             RefreshStamp();
@@ -367,8 +357,8 @@ namespace Switchboard.Game
         {
             if (!IsWaitingEmergency) return 0;
             return IsUrgent
-                ? urgentWobbleDegrees * Mathf.Sin(gameClock * urgentPulsesPerSecond * Mathf.PI * 2f)
-                : wobbleDegrees * Mathf.Sin(gameClock * wobblesPerSecond * Mathf.PI * 2f);
+                ? paint.UrgentWobbleDegrees * Mathf.Sin(gameClock * paint.UrgentPulsesPerSecond * Mathf.PI * 2f)
+                : paint.EmergencyWobbleDegrees * Mathf.Sin(gameClock * paint.EmergencyWobblesPerSecond * Mathf.PI * 2f);
         }
 
         // Writes only on a change, so a still card costs nothing.
@@ -572,7 +562,7 @@ namespace Switchboard.Game
             double total = Call.Request.Script.ResponseTimeSeconds;
             float fill = total > 0 ? Mathf.Clamp01((float)(Call.ResponseSecondsLeft / total)) : 0f;
             fill = Mathf.Ceil(fill * 360f) / 360f;
-            bool urgent = Call.ResponseSecondsLeft <= urgentSeconds;
+            bool urgent = Call.ResponseSecondsLeft <= paint.UrgentSeconds;
             if (fill != shownRingFill)
             {
                 shownRingFill = fill;
@@ -580,8 +570,8 @@ namespace Switchboard.Game
             }
             if (urgent)
             {
-                float wave = 0.5f + 0.5f * Mathf.Sin(gameClock * urgentPulsesPerSecond * Mathf.PI * 2f);
-                Color hot = urgentRingColor;
+                float wave = 0.5f + 0.5f * Mathf.Sin(gameClock * paint.UrgentPulsesPerSecond * Mathf.PI * 2f);
+                Color hot = paint.AlarmGlow;
                 responseRing.color = new Color(hot.r, hot.g, hot.b, 0.55f + 0.45f * wave);
                 responseRing.rectTransform.localScale = Vector3.one * (1f + 0.04f * wave);
                 ringWasUrgent = true;
@@ -603,10 +593,11 @@ namespace Switchboard.Game
             }
             // Bound loading hitches so the first visible frames still show the pop.
             stampPopTime += Mathf.Min(Time.unscaledDeltaTime, .05f);
-            float t = Mathf.Clamp01(stampPopTime / Mathf.Max(.05f, stampPopSeconds));
+            float overshoot = paint.StampOvershoot;
+            float t = Mathf.Clamp01(stampPopTime / Mathf.Max(.05f, paint.StampPopSeconds));
             float scale = t < .55f
-                ? Mathf.Lerp(.05f, stampOvershoot, 1f - Mathf.Pow(1f - t / .55f, 3))
-                : t < .82f ? Mathf.Lerp(stampOvershoot, .97f, Mathf.SmoothStep(0, 1, (t - .55f) / .27f))
+                ? Mathf.Lerp(.05f, overshoot, 1f - Mathf.Pow(1f - t / .55f, 3))
+                : t < .82f ? Mathf.Lerp(overshoot, .97f, Mathf.SmoothStep(0, 1, (t - .55f) / .27f))
                 : Mathf.Lerp(.97f, 1, Mathf.SmoothStep(0, 1, (t - .82f) / .18f));
             stamp.transform.localScale = stampScale * scale;
             if (t >= 1) { stamp.transform.localScale = stampScale; stampPopTime = -1; }
@@ -644,7 +635,7 @@ namespace Switchboard.Game
             var departing = Instantiate(stamp, stamp.transform.parent, false);
             departing.name = "DepartingStamp";
             departing.transform.SetParent(transform.parent, true);
-            departing.GetComponent<StampExitAnimation>().Play(stampExitSeconds, () => Destroy(departing));
+            departing.GetComponent<StampExitAnimation>().Play(paint.StampExitSeconds, () => Destroy(departing));
         }
 
         private void FinishWithStampExit()
@@ -657,7 +648,7 @@ namespace Switchboard.Game
             endingStampExit = true;
             stampPopTime = -1;
             StopPress();
-            stampExit.Play(stampExitSeconds, () =>
+            stampExit.Play(paint.StampExitSeconds, () =>
             {
                 ResetStamp();
                 FinishCard();
@@ -741,11 +732,16 @@ namespace Switchboard.Game
         {
             switch (reason)
             {
-                case CallEndReason.Finished: return paidInk;
-                case CallEndReason.DisconnectedEarly: return cutOffInk;
-                case CallEndReason.Missed: return missedInk;
-                default: return wrongInk;
+                case CallEndReason.Finished: return paint.GoodInk;
+                case CallEndReason.DisconnectedEarly: return paint.CutOffInk;
+                case CallEndReason.Missed: return paint.ErrorDeep;
+                default: return paint.ErrorInk;
             }
+        }
+
+        private static void SetFont(TMP_Text label, TMP_FontAsset font)
+        {
+            if (label != null && font != null && label.font != font) label.font = font;
         }
 
         private static string StampText(Call call)

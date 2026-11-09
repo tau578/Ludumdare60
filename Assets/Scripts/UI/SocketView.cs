@@ -41,6 +41,8 @@ namespace Switchboard.UI
         /// <summary>D60: a ring when a call connects here (V6), a red flash on a wrong number (V5).</summary>
         public void PlayConnectRing() => Graphic.PlayConnectRing();
         public void FlashWrongNumber(bool spark) => Graphic.FlashWrongNumber(spark);
+        /// <summary>The game's paint box for this socket's red glows (D75).</summary>
+        public IBoardPalette Palette { get => Graphic.Palette; set => Graphic.Palette = value; }
 
         public bool TryOccupy(CableController cable)
         {
@@ -115,8 +117,15 @@ namespace Switchboard.UI
             RefreshHighlight();
         }
 
-        private void RefreshHighlight() => Graphic.SetHighlighted(pointerHovered && pointerCable != null,
-            IsOccupied && occupyingCable != pointerCable);
+        // The lead's hover table (2026-11-09). A held cord: amber, or red over another cord's plug while its call is live.
+        // An empty hand: amber only on a half-patched jack (one plug in), nothing elsewhere. Only a look: clicks are unchanged.
+        // The cord input calls this every frame while hovered, so a second plug going in elsewhere updates it too.
+        private void RefreshHighlight()
+        {
+            bool holding = pointerCable != null;
+            bool halfPatched = IsOccupied && occupyingCable.SecondSocket == null;
+            Graphic.SetHighlighted(pointerHovered && (holding || halfPatched), holding && IsOccupied && occupyingCable != pointerCable);
+        }
 
         private void OnDisable()
         {

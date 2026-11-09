@@ -6,7 +6,7 @@ A casual telephone switchboard-operator game:
 - Connected calls pay a one-off connection fee plus a per-second rate.
 - Wrong connections make the caller hang up; the same call returns only when the queue comes round to it (D52).
 - A missed emergency brings a fine, but money never drops below 0 and there is no lose condition.
-- Today the player buys upgrades in a shop and saves for a `secret` entry. **The loop redesign (Design §12, D61–D74; Plan §9 steps L1–L9) removes the mystery upgrade and the victory scene (D65)** and makes the busy operator the heart: shifts with a day card, patience and 30 s emergencies, a score with streaks, stakes (burnt cords, complaints, quotas, fired), chores, nerves, a wall of frames, and the story between days.
+- Today the player buys upgrades in a shop and saves for a `secret` entry. **The loop redesign (Design §12, D61–D74; Plan §9 steps 13a–13i) removes the mystery upgrade and the victory scene (D65)** and makes the busy operator the heart: shifts with a day card, patience and 30 s emergencies, a score with streaks, stakes (burnt cords, complaints, quotas, fired), chores, nerves, a wall of frames, and the story between days.
 - The economy is driven by the hand-edited `Assets/Configs/Economy.json` (D39, D40): one-time upgrade entries in chains, values that set the result, costs in cents.
 
 Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile browsers, hosted on itch.io (D26), mouse and touch through the new Input System. Team repo: `github.com/tau578/Ludumdare60`, branch `main`. Teammates push often.
@@ -17,7 +17,7 @@ Unity 6000.3.6f1, URP with the 2D Renderer, Web build for desktop and mobile bro
 3. `Docs/Design.md`: the source of truth for game rules, architecture and decisions D01–D59. The game follows the docs. If the code or a brief disagrees with it, stop and ask the lead; don't improvise, and don't change either side on your own.
 4. `Docs/StyleGuide.md`: **before any visual work** (effects, popups, lamps, signs, UI). It covers the look and materials (matte, frosted, never glossy), the palette and what each colour means, the feedback language (bad never looks like a reward), the fonts and their contrast, motion timings, layers, and a checklist.
 
-**Next step:** see the first row in `Docs/Progress.md` that isn't "done". Steps 1–10d are done and **11c** (main visual feedback) is built; its fix passes 4–6 are uncommitted and go in first. **Next is the loop redesign, steps L1–L9** (Design §12, Plan §9): L1 pressure and the queue fix, L2 days, L3 score and streak, L4 and L5 stakes, L6 unlocks and the wall, L7 chores, L8 nerves, L9 narrative between days. They come before 11b (wire the sounds; 11a is done and the files are in `Assets/Audio/`, listed in `Docs/AudioSources.md`), 11d, 12 and 13 (D74: no deadline, the loop before polish). Before launching an L-step, confirm its numbers (Design §12.13) with the lead. **Also open:** the style guide's three questions (`Docs/StyleGuide.md` §10: reds, golds, fonts), then the `GameStyle` paint box (Plan §8). The Operator's notebook (D59) is on hold. Steps were renumbered on 2026-10-18 to follow the build order; older reports and commits use the old numbers.
+**Next step:** see the first row in `Docs/Progress.md` that isn't "done". Steps 1–10d, 11a, 11c and 12 (the `GameStyle` paint box, D75, D76) are done. **Next is the loop redesign, steps 13a–13i** (Design §12, Plan §9): 13a pressure and the queue fix, 13b days, 13c score and streak, 13d and 13e stakes, 13f unlocks and the wall, 13g chores, 13h nerves, 13i narrative between days. They come before 14 (wire the sounds; 11a is done and the files are in `Assets/Audio/`, listed in `Docs/AudioSources.md`), 15 (extra visual feedback), 16 (mobile and web polish) and 17 (balance) (D74: no deadline, the loop before polish). Before launching a part of step 13, confirm its numbers (Design §12.13) with the lead. The Operator's notebook (D59) is on hold. Steps were renumbered on 2026-10-18 to follow the build order, and again on 2026-11-09 so every step has the same kind of name (S1 → 12, L1–L9 → 13a–13i, 11b → 14, 11d → 15, 12 → 16, 13 → 17); older reports and commits use the old names.
 
 ## Roles and workflow
 - **The user is the project lead.** The main session is the **orchestrator**. It never implements a step itself; every step and every fix pass is built by a **subagent** launched with the Agent tool (`subagent_type: general-purpose`).
@@ -78,6 +78,7 @@ Teammates still push to `main`, so pre-flight always merges first (see the git r
   - **`CordBridge`** observes the `CableController`s every `LateUpdate`, reading only public members (Design §3). It reports plugs and circuits to `OperatorDesk`, and returns cords to the tray with `CableController.TryRemove`.
   - `GameInstaller` finds the views and the board's objects in its own scene **by component type**. The only name lookups are `CallerQueuePanel` (the caller slots) and `UpgradeShopPanel/HeaderSlot` (the money plaque).
 - **Composition root:** `GameInstaller`. No singletons, statics with state, service locators, or `FindObjectOfType`.
+- **Style (D75):** `Assets/Content/GameStyle.asset` holds the named colours, font roles and timings of `Docs/StyleGuide.md`. `GameInstaller` passes it to the views; new visuals read colours from it by name, never as raw numbers.
 - **Communication:** views call verbs (`OperatorDesk.TryTake`), services raise C# events, and values that change every frame are polled in `LateUpdate`.
 - **UI:**
   - `GameUI.prefab` is a Screen Space Overlay canvas (sorting order 10, 1920×1080 Expand), laid over the board's `SwitchboardCanvas`.
@@ -134,7 +135,7 @@ When the lead asks for a new build or to publish, the main session can do this d
 Known issues and to-dos, such as touch input in the cord code, held cords dropping on button clicks, stale editor-menu paths and the hidden A–Z tabs, are listed in `Docs/Plan.md` §8. A step that fixes one removes it there.
 
 ## Open decisions (Design §10)
-- D27: the pace: shift length, patience, emergency time, quotas, bonuses and pay per day. The full list of numbers to confirm is Design §12.13; each L-step's brief carries its own.
+- D27: the pace: shift length, patience, emergency time, quotas, bonuses and pay per day. The full list of numbers to confirm is Design §12.13; each part of step 13 carries its own in its brief.
 - D66 and D68 need the lead's yes on two points: the shop panel's fate and cutting the income multipliers; firing after three warnings.
 - D15 is closed: the mystery upgrade is removed (D65).
 
