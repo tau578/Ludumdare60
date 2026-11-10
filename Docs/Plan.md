@@ -31,6 +31,8 @@ Ground rules:
 - **One agent at a time.** There is a single Unity editor. Parallel agents would fight over compilation and Play Mode.
 - **No git worktrees.** The editor is tied to this folder.
 - **Don't touch Unity while an agent works.** Save your own changes before a step starts.
+- **Step names: a number per step, a letter per part** (lead, 2026-11-09). New work takes the next free number, or the next letter inside its step. Never use prefixes such as "L1" or "S1": they broke the system once, and step 12 had to renumber everything.
+- **Settle every detail with the lead before launching.** A message sent to a running agent can arrive after it finishes, and the agent then reruns (step 12, fix passes 2 and 3 each changed course mid-pass). When a note is ambiguous ("the emergency sign"), ask which element is meant, and repeat the interpretation back to the lead.
 
 ## 2. Pre-flight checklist (before every step)
 - [ ] Unity is open on this project with MCP for Unity connected. The orchestrator checks that `mcpforunity://instances` lists `Ludumdare60`. The editor is idle and not in Play Mode.
@@ -108,7 +110,7 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Game view size (3) | Set it with `PlayModeWindow.SetCustomRenderingResolution`, for example 1280×720 or 844×390, and set it back to 1920×1080 afterwards. Each new size stays in the Game view's size list as an editor preference, not a project file. |
 | Tests on Assembly-CSharp types (3) | `Assets/Tests/Editor/` (the cable tests' asmdef) can't see Assembly-CSharp types such as `PhoneBookView`. Put such tests in `Assets/Tests/Game/Editor/`, which has no asmdef and compiles into Assembly-CSharp-Editor. |
 | Dev panel (2a) | F1 or the "Dev" button, just left of the pause button in the play area's top-right corner (since the 2026-10-20 cleanup it follows the play area, not the screen; since 9a pass 3 it opens as a row along the top edge): + $10, Call now, Emergency now (4), Speed ×5/×1, Show/Hide times, Clear calls. Editor and development builds only. Its IMGUI clicks also reach the cord input as "empty space" clicks. |
-| Format-only re-saves (4) | Test runs and Play Mode can re-save `ProjectSettings/TimeManager.asset` (as well as `SampleScene.unity`) with only format changes. Discard them with `git checkout -- <file>` and mention it in the report. |
+| Format-only re-saves (4) | Test runs and Play Mode can re-save `ProjectSettings/TimeManager.asset` (as well as `SampleScene.unity`) with only format changes. Since step 12, entering Play Mode can also re-save `Final.unity` with two `PhoneBook` overrides swapped and no value changed. The permission check can refuse an agent's `git checkout`: then report the file, and the orchestrator asks the lead. Discard them with `git checkout -- <file>` and mention it in the report. |
 | Layout in prefab editing (5a) | Unity's layout groups don't run while a prefab is edited from code, so an editor menu that resizes children must set their `sizeDelta` directly (as `Update Upgrade Shop Buttons` does). |
 | Disabled buttons (5a) | Setting `Button.interactable = false` applies the button's grey, half-transparent disabled tint and changes the shop's look. To make a button inert, ignore the click in the view and dim the button in code. |
 | Book row clicks (10b) | Rows have no raycast target: the open book's art takes the click, and `PhoneBookView.OnPointerClick` finds the row under it (`RowAt`, after the page corners), marks its jack (`JackPicked`) and closes. In tests call `book.OnPointerClick` with a `PointerEventData` at the row's centre; in Play Mode use EventSystem raycasts inside a `Canvas.willRenderCanvases` handler. Pulling a cord's only plug out sends it back to the tray, so a test that replugs must take a tray cord again. **Hover (10b fix 1):** the cord input passes its top hit's position to `PhoneBookView.HoverAt` each frame (no new raycast target); in tests call `input.ProcessTarget(book.OpenBookRect.gameObject, null, rowCentre, false)`. In Play Mode the real pointer clears it every frame (Unity unfocused hides the pointers), so disable `CableInputController` for the captured frame and call `book.HoverAt` directly. |
@@ -122,6 +124,8 @@ Load the tools you need with ToolSearch first, for example `select:mcp__UnityMCP
 | Deleting files (7) | Delete through MCP (`delete_script`, `manage_asset` `delete`) or a plain `rm` followed by `refresh_unity`. Never use `git rm`: it stages the deletion. |
 | Renaming an asset (8) | Rename or move it with `manage_asset` (Unity's `AssetDatabase.MoveAsset`), never in the file system: Unity keeps the GUID, so every prefab and asset that references it still finds it with no re-wiring (`PhoneBook.json` → `Book.json`). Git shows a delete plus a new file until both are staged. |
 | Saves in tests (9a) | EditMode tests run `GameInstaller.Start`, so anything that reads or writes PlayerPrefs there touches the lead's real save. `GameInstaller` opens the save only when `Application.isPlaying`; `SaveIsolationTests` guards it. Play Mode checks write `operator.save` and `operator.save.backup`: delete both at the end. |
+| Test jobs while Unity is in the background (12) | `run_tests` can report "failed to initialize (tests did not start within timeout)" while the run still completes. Before re-running, read `~/Library/Application Support/DefaultCompany/ludumdare-60/TestResults.xml`: its `<test-run>` totals and end time show the real result. Pass `init_timeout: 60000` on the next try. |
+| The lead's save (12) | The lead doesn't need the PlayerPrefs save protected during agents' Play Mode runs (2026-11-09): no backup or restore. |
 | Missing JSON fields (5c) | `JsonUtility.FromJson` keeps field initializers for fields the file leaves out, also inside nested objects in arrays. Use a marker initializer (NaN, or a named `Unset` constant) to tell "missing" from 0. |
 | Web cursor checks (9b fix) | To see what Unity sends to the page, serve a patched framework through CDP `Fetch` (for example, log every `_JS_Cursor_SetShow`), and watch the canvas `style` with a MutationObserver. Imitate itch's iframe with a host page on a second port. Restart `http.server` after every build, because the build deletes and recreates `Builds/Web`. |
 | TMP letter height and weight (11c fix 7) | Measure letter heights without the text renderer's padding (`ShaderUtilities.GetPadding` × fontSize / pointSize). Thin fonts such as Della Respira under about 12 px never reach their colour; thicken the strokes with one material copy made once and destroyed with its owner, and never change the shared font material. |
@@ -193,7 +197,7 @@ Since D48 (lead, 2026-10-18) the project is one shared work, so nothing here nee
 | Art for the wall and the chores | Frames (week, month, feats), a brass plaque, a warning slip, the clock and calendar faces, desk items (plant, mug, cat photo, radio), the punch clock, the intercom, the pneumatic tube and capsule, the register lever, the cup, the cigarette and the flask (with a coffee and cough-syrup pair, D70). Placeholder shapes until drawn. | 13b–13i |
 | Flaky test | `FeedbackEffectsTests.AWrongNumberShortsTheLineWithStreaksArcsAndSmokeNotStars` failed its "allocates no memory" check once (step 12, fix pass 3), in code that pass didn't touch, and passed on re-runs. If it fails again, look at the short-circuit mesh's allocations or make the check tolerant of a first-frame allocation. | when it fails again |
 | Components still on raw colours | Step 12 built the `GameStyle` paint box (D75, `Assets/Content/GameStyle.asset`) and moved only the pieces the decisions change. Still on their own numbers: the fine popup's red (`FloatingTextView` in `GameUI.prefab`, which should be Error), the card's "EMERGENCY" badge label, the per-second circle, the jacks' hover amber and connected green (they can read Attention hover and Good light through `IBoardPalette`), and the shop, book, cords, coins, tutorial and menus. Each moves when it is touched anyway, or in a Step 16 cleanup. | when touched, or Step 16 |
-| Small text on phones and weak contrast (Step 12 report) | At 844×390, long caller names in Della Respira shrink to about 7 px and go soft; thicken them (a face-dilate material copy, like the EMERGENCY sign) or raise their minimum auto-size. The name plate's lighter top is about 4.2:1 with the cream ink. On the money drums the Error flash (1.65:1) and the resting digits (2.96:1) are low-contrast. The urgent countdown ring is thin, so its colour is hard to see when the window is small. The EMERGENCY badge's dark letters are thin at phone size. | Step 16, or when the counter or cards are touched |
+| Small text on phones and weak contrast (Step 12 report) | At 844×390, long caller names in Della Respira shrink to about 7 px and go soft; thicken them (a face-dilate material copy, like the EMERGENCY sign) or raise their minimum auto-size. The name plate's lighter top is about 4.2:1 with the cream ink. On the money drums the Error flash (1.65:1) and the resting digits (2.96:1) are low-contrast. The urgent countdown ring is thin, so its colour is hard to see when the window is small. The EMERGENCY badge's cream letters are about 3.2:1 on Alarm, an exception the lead accepted (StyleGuide §3). | Step 16, or when the counter or cards are touched |
 
 | Tutorial rework after step 13 (D81) | Reorder so the blinking-light step can't be clicked past; teach the pay badge and the why of money; check that the row-click step survives a click-through; the shop steps change with 13g. Only the free-a-cord step is added now (13a, pass 2). | after 13 |
 | Right-click to leave a cord dangling (open, D79) | The lead may try it later: a right-click drops the held cord with one plug in its jack and the other loose. Depends on how 13a's one-click pickup feels. | open; Design §12.13 |
@@ -2029,7 +2033,7 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
   - Components read a colour when they apply it, not once at start. That way the lead can tune the asset in Play Mode and see the change at the next event. Asset edits made in Play Mode are kept afterwards, unlike component edits.
 - **Apply the decisions. Only these pieces move onto `GameStyle`:**
   - **Error (crimson):**
-    - the wrong-number flash (`SocketFlashGraphic.WrongColor`, `#F14034`) and the closed-jack glow (`SocketGraphic`, `#F15746`) become **Error glow**;
+    - the wrong-number flash (`SocketFlashGraphic.WrongColor`, `#F14034`) and the taken-jack glow (`SocketGraphic`, `#F15746`; the brief first called it "closed-jack", but closed jacks aren't drawn) become **Error glow**;
     - the fine on the counter (`MoneyCounterView.fineInk`, `#C42828`) and "can't afford" (`#B23E3E`) become **Error**;
     - the "Wrong number!" stamp becomes **Error ink**, and "Missed" becomes **Error deep** (both keep their values, now named).
   - **Alarm (orange-red):**
@@ -2065,7 +2069,7 @@ The lead took every item on the orchestrator's list (2026-10-22), split into fou
 The lead's playtest of step 12:
 - The light-brass titles are vague and grab much less attention.
 - The wrong-number flash is too strong.
-- The closed-jack glow could be a bit stronger.
+- The taken-jack glow (the red ring on a jack that already holds a plug) could be a bit stronger. The playtest script had called it a closed-jack glow by mistake: closed jacks aren't drawn.
 - Mistake and emergency reds look almost the same.
 - Everything else is fine.
 
@@ -2088,11 +2092,11 @@ The lead's playtest of step 12:
    - Make the outer edge about 0.45 of the jack's size and the strength about 70%.
    - Both values become `GameStyle` settings, read through `IBoardPalette` when the flash plays.
    - The short-circuit sparks stay as they are.
-5. **Stronger closed-jack glow** (`SocketGraphic`, the blocked halo at intensity 1.0; a connected jack has 1.4):
+5. **Stronger taken-jack glow** (`SocketGraphic`, the blocked halo at intensity 1.0; a connected jack has 1.4):
    - Use about 1.5, as a `GameStyle` setting read through `IBoardPalette`.
 - **Tests:** the existing suite stays green, with the expected colours updated. Sockets without a palette use the same defaults as `GameStyle`.
 - **Screenshots** (`Temp/Captures/`), three:
-  1. **The key one:** one frame with an emergency waiting (lit lamp, plate, card badge) and a wrong-number flash at the same moment, ideally with a held cord over a closed jack, so the two reds can be judged side by side;
+  1. **The key one:** one frame with an emergency waiting (lit lamp, plate, card badge) and a wrong-number flash at the same moment, ideally with a held cord over a taken jack, so the two reds can be judged side by side;
   2. the main menu title;
   3. the pause title.
 - **Report:** old and new value for each setting, the contrasts measured, and the title-size finding.
@@ -2100,7 +2104,7 @@ The lead's playtest of step 12:
   - The titles catch the eye again.
   - A wrong number reads as crimson and an emergency as orange; the two never look alike.
   - The wrong-number ring no longer shouts.
-  - A closed jack refuses clearly.
+  - A taken jack refuses clearly.
 
 ### Step 12, fix pass 2: back to the first reds, a middle wrong-number ring (lead, 2026-11-09)
 **Who:** one agent at high effort. Quick, with quality first; Plan §3 rule 15 applies.
@@ -2109,7 +2113,7 @@ The lead's playtest of fix pass 1:
 - The gold titles are right; keep them.
 - The fire-orange glow and the rose crimson don't work: put back step 12's colours. The EMERGENCY badge under the caller's name was good as fix pass 1 left it (orange with dark letters): keep it.
 - The wrong-number ring is now too soft. Step 12's version was too strong.
-- The closed jack turned pink; only its colour should go back, and the stronger glow stays.
+- The taken jack's glow turned pink; only its colour should go back, and the stronger glow stays.
 
 1. **Colours back to step 12** (in `GameStyle.asset` and the code defaults in `GameStyle.cs`):
    - Alarm glow `#FF6A3D`, Alarm `#E84A34`, Alarm quiet `#8E3426`.
@@ -2127,9 +2131,9 @@ The lead's playtest of fix pass 1:
 - **Playtest:**
   - The lamp, its glow and the jacks look as they did after step 12; the badge stays orange with dark letters.
   - The wrong-number ring is strong but no longer shouts.
-  - A closed jack glows red, more strongly than before.
+  - A taken jack glows red, more strongly than before.
 
-### Step 12, fix pass 3: the badge back to step 12, and a "danger" ring on live calls (lead, 2026-11-09)
+### Step 12, fix pass 3: the badge back to step 12, and the jack hover lights (D76) (lead, 2026-11-09)
 **Who:** one agent at high effort. Quick, with quality first; Plan §3 rule 15 applies.
 
 1. **The EMERGENCY badge back to step 12.** Fix pass 2 kept the badge in fire orange through a misread of the lead's note; the lead wants no fire orange anywhere.

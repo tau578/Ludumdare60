@@ -7,7 +7,7 @@
 | 1c. Money slot in shop header | done | ✅ 2026-10-17 (8 min) | ✅ 91/91 tests | ✅ | 47735c1 |
 | 2a. Queue, callbacks, dev panel | done | ✅ 2026-10-17 (24 min) | ✅ 156/156 tests, scope clean | ✅ | 2b00ac7 |
 | 2b. Hold and resume | done | ✅ 2026-10-18 (12 min) | ✅ 187/187 tests, scope clean | ✅ | 4c5ac50 |
-| 3. Phone book and cards | done | ✅ 2026-10-18 (16 min + 8 min fix + 3 min fix) | ✅ 211/211 tests, scope clean | ✅ | |
+| 3. Phone book and cards | done | ✅ 2026-10-18 (16 min + 8 min fix + 3 min fix) | ✅ 211/211 tests, scope clean | ✅ | 6533954 |
 | 4. Emergencies and fines | done | ✅ 2026-10-18 (26 min) | ✅ 255/255 tests, scope clean | ✅ | 14fd59c |
 | Scene merge: `Final` (D38) | done | ✅ 2026-10-18 (11 min) | ✅ 255/255 tests, scope clean | ✅ | 3002ea8 |
 | 5a. Economy file, shop, income, secret | done | ✅ 2026-10-18 (23 min) | ✅ 304/304 tests, scope clean | ✅ | e115c59 |
@@ -22,9 +22,9 @@
 | 10b. Faster lookup | done | ✅ 2026-10-20 (20 min + 15 + 20 + 19 min fixes) | ✅ 671/671 tests, scope clean | ✅ | c412194 |
 | 10c. Quick-connect tip | done | ✅ 2026-10-21 (14 min) | ✅ 697/697 tests, scope clean | ✅ | 845a1b3 |
 | 10d. Static fonts | done | ✅ 2026-10-22 (26 min) | ✅ 705/705 tests, scope clean | ✅ | ed0e2ad |
-| 11a. Gather the sounds | done | ✅ 2026-11-08 | ✅ 23 sounds and 3 tracks imported, console clean | ✅ lead picked | |
+| 11a. Gather the sounds | done | ✅ 2026-11-08 | ✅ 23 sounds and 3 tracks imported, console clean | ✅ lead picked | b98f732 |
 | 11c. Main visual feedback | done | ✅ 2026-10-22 (25 min + 13 + 29 + 15 + 16 + 17 + 19 + 23 min fixes) | ✅ 744/744 tests, scope clean | ✅ | abbd5f1, 0deb398 |
-| 12. Paint box (`GameStyle`) | done | ✅ 2026-11-09 (21 min + 14 + 11 + 18 min fixes) | ✅ 745/745 tests, scope clean | ✅ | |
+| 12. Paint box (`GameStyle`) | done | ✅ 2026-11-09 (21 min + 14 + 11 + 18 min fixes) | ✅ 745/745 tests, scope clean | ✅ | 9d4dd84 |
 | 13a. Pressure and the queue fix | not started | | | | |
 | 13b. Days | not started | | | | |
 | 13c. Residents and the call director | not started | | | | |
@@ -5873,7 +5873,7 @@ Follow-ups (docs, for the orchestrator):
 #### Style decisions (lead, 2026-11-09)
 - **The lead settled the style guide's three open questions** (D75), each with the recommended option:
   - Reds: two families. **Alarm** (orange-red) for emergencies only, and **Error** (crimson) for mistakes and losses.
-  - Golds: **money gold** for money and rewards only, **brass** for decoration. The pause title moves to light brass `#D9BE72`.
+  - Golds: **money gold** for money and rewards only, **brass** for decoration. The pause title moves to light brass `#D9BE72` (fix pass 1 put the titles back to the bright title gold `#FFDB1F`).
   - Fonts: three, each with one job. Stamps and name plates move to Della Respira.
 - **The paint box** comes next, as its own step, 12 (Plan §9). It runs before 13a and applies these decisions.
 - **Docs:** StyleGuide §3, §4 and §5 hold the decisions, and §10 is removed. Plan §8 and §9, CLAUDE.md and Design D75 are updated.
@@ -6006,6 +6006,16 @@ Follow-ups:
   - `TitleInk` handles titles outside `GameInstaller`'s reach, as the brief allowed.
 - **Follow-ups** went to Plan §8: the remaining raw colours, Della Respira on phones, the name plate's lighter top, and the money drums' contrast.
 
+**Playtest (lead, 2026-11-09):** the stamps, name plates and the rest are fine. Four notes went to fix pass 1:
+- The light-brass titles look vague and grab much less attention. The main menu title also looked bigger to the lead, though no size had changed.
+- The wrong-number flash is too strong.
+- The taken jack's red glow could be a bit stronger. The playtest script called it a "closed-jack" glow by mistake: closed jacks aren't drawn.
+- The mistake and emergency reds look almost the same.
+
+Also answered:
+- The emergency card's accent tints the EMERGENCY badge, the price circle's outline and the ringing halo.
+- An emergency "just hangs there" because it waits 140 s today; 13a cuts that to about 30 s.
+
 ## Step 12, fix pass 1 report: 2026-11-09
 Result: done
 Playable now: the titles are bright gold again. A mistake is a deeper, rose-leaning crimson and an emergency is a clear fire orange, so the two no longer look alike. The wrong-number ring is smaller and softer, and a taken jack's red refusal glow is stronger. The EMERGENCY badge on the cards is orange with dark ink letters. Every new value is a `GameStyle` setting that can be tuned in Play Mode.
@@ -6106,6 +6116,14 @@ Follow-ups:
   - The lamp test checks for a warm orange instead of red.
 - **Docs:** StyleGuide §1, §3, §4 and §5, Design D75 and the status row, and Plan §8 are updated.
 
+**Playtest (lead, 2026-11-09):**
+- The gold titles are right.
+- The fire orange and the rose crimson don't work: back to step 12's colours.
+- The softer wrong-number ring now feels too weak.
+- The taken jack's glow turned pink.
+- The orange light on the plate looked faint, probably because of the new palette.
+- Phone size and the PlayerPrefs save don't matter for now.
+
 ## Step 12, fix pass 2 report: 2026-11-09
 Result: done
 Playable now: the emergency lamp, its glows, the light on the plate and the countdown ring are step 12's orange-red again. A wrong number and a taken jack are step 12's crimson again. The wrong-number ring sits halfway between step 12 and fix pass 1. The taken jack's stronger glow (1.5), the gold titles and the EMERGENCY badge (fire orange with dark Ink letters) stay as fix pass 1 left them.
@@ -6180,6 +6198,11 @@ Follow-ups:
 - **Screenshot:** the badge is orange with dark letters, the lamp and plate are orange-red, and the wrong-number rings and blocked glow are crimson.
 - **Correction mid-pass:** the lead's correction to keep the badge reached the agent in time, and the brief in Plan §9 records it.
 - **`Final.unity`:** entering Play Mode re-saved it with two overrides swapped and no value changed. The agent's `git checkout` was blocked by the permission check, so the lead decides whether to discard it.
+
+**Playtest (lead, 2026-11-09):**
+- **The badge was not reverted.** The EMERGENCY badge under the caller's name was still fire orange. The orchestrator had read the lead's note ("the latest color of the emergency sign was good") as an instruction to keep it, and redirected the running agent accordingly; the lead wanted it back with the rest.
+- **The red ring on taken jacks:** the lead questioned it, because red should mean "don't do it" and a plug already shows that the jack is busy. The lead proposed red as a warning on live calls, then settled the exact hover table during fix pass 3 (D76).
+- **A wrong claim:** the orchestrator told the lead that drops on taken jacks bounce. They replace that cord instead (see the fix pass 3 verification).
 
 ## Step 12, fix pass 3 report: 2026-11-09
 Result: done
@@ -6273,7 +6296,7 @@ Follow-ups:
 - **Corrected claim:** the orchestrator had told the lead that drops on taken jacks bounce. They replace that cord instead (existing behaviour, tested), so StyleGuide §4 now says what a drop does under each light.
 - **Docs:** StyleGuide §3 and §4 (the badge exception and the hover table), Design D75, D76 and the status row, and Plan §8 (the flaky test) are updated.
 
-**Playtest (lead, 2026-11-09):** everything looks fine. **Step 12 is done.** Nothing is committed yet.
+**Playtest (lead, 2026-11-09):** everything looks fine. **Step 12 is done**, committed as `9d4dd84`.
 
 ### Residents and the call director; the busy-caller rule; story structure (lead, 2026-11-09)
 - **The rule:** nobody calls while on a call, as caller or recipient; a call to a busy recipient is allowed but rare, shown as "Line busy", and a hang-up over a busy line is no complaint. 13a's queue rule is narrowed to this (D63).
