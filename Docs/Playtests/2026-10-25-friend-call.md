@@ -1,6 +1,6 @@
 # Playtest: recorded call with a friend (2026-10-25)
 
-A long voice call in which a friend played the itch Draft build while the lead watched and asked questions, and the lead then streamed the current `main` version. Written up on 2026-11-09 from the transcript. This playtest sent the game back to its loop: the loop redesign in Design §12 (D61–D74) and steps 13a–13i in Plan §9 grew out of it.
+A long voice call in which a friend played the itch Draft build while the lead watched and asked questions, and the lead then streamed the current `main` version. Written up on 2026-11-09 from the transcript. This playtest sent the game back to its loop: the loop redesign in Design §12 (D61–D74) and steps 13a–13k in Plan §9 grew out of it.
 
 ## The recording
 
@@ -92,4 +92,4 @@ Grouped, with a one-line view on each.
 4. Add gentle pressure: callers who eventually hang up, or a queue that costs something if ignored, while keeping "no lose condition" if the design keeps it.
 5. Fix the two things that break the fiction: the same person on two calls, and the tutorial click-through plus the missing "free a cord" step.
 
-The lead's answer is the loop redesign in Design §12 and steps 13a–13i.
+The lead's answer is the loop redesign in Design §12 and steps 13a–13k.

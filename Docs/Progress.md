@@ -35,6 +35,7 @@
 | 13h. Chores | not started | | | | |
 | 13i. Nerves | not started | | | | |
 | 13j. Narrative between days | not started | | | | |
+| 13k. The clipboard book | not started | | | | |
 | 14. Wire the sounds | not started | | | | |
 | 15. Extra visual feedback | not started | | | | |
 | 16. Mobile and Web polish | not started | | | | |
@@ -6279,3 +6280,8 @@ Follow-ups:
 - **Residents (D77):** the resident becomes the unit of content: `Residents.json` grown from `Book.json`, read by the book and the rules; calls by resident id; a runtime `Resident` with state; generated errands; a call director with its knobs in `Economy.json`. New part **13c**; the later parts moved one letter (13d–13j).
 - **Story structure (D72):** arcs as chains of hand-written beats, no branching; a headline per beat, a holding line per arc, a few generic headlines; the day card shows the headline of the beat that resolved last.
 - **Docs:** Design §1, 5.2, 5.7, §12.4, §12.11–§12.14, D53, D63, D72, D77; Plan §8, the §9 table (its tail is now in build order: 12, 13a–13j, 14–17) and the 13a, 13c and 13j briefs; CLAUDE.md; this table.
+
+### The playtest notes answered (lead, 2026-11-10)
+- The 2026-10-25 notes that had no home now have one (Design §12.15, D78–D81): the tutorial gets only the free-a-cord step now and a rework after step 13; every message opens with "Connect me to <b>Name</b>."; new cards arrive at the top; one click on either plug of a finished call's cord frees it into the hand; the book becomes a vertical clipboard docked at the right (new part 13k, independent); pattern-breaking calls fall out of 13c's director; no board change for reading busy lines until 13a is played.
+- Open: a right-click to leave a cord dangling (Plan §8, Design §12.13); whether a cut-off emergency counts as a complaint.
+- The lead's direction, restated: action-based rather than narrative; the story stays between days. The 2026-10-25 tester's complaint was effort, not a wish for a story game.
