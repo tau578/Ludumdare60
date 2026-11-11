@@ -16,7 +16,7 @@ namespace Switchboard.Domain
             if (switchboard == null) throw new ArgumentNullException(nameof(switchboard));
             startingCents = Math.Max(0, content.StartingCents);
             Wallet = save != null ? new Wallet(save.cents, save.fraction) : new Wallet(content.StartingCents);
-            Calls = new CallService();
+            Calls = new CallService(content.DefaultPatienceSeconds);
             Upgrades = new UpgradeService(content.Upgrades, Wallet);
             // Before the stats, shelf and goal are built, so they start from the bought ids with no second rebuild.
             if (save != null) Upgrades.Restore(save.upgrades);
@@ -25,13 +25,13 @@ namespace Switchboard.Domain
             Board = new OpenBoard(Stats);
             IsTutorial = tutorial && save == null;
             ShopHintsDone = save != null ? HintsFromSave(save.shopHintsDone) : IsTutorial ? ShopHints.None : ShopHints.All;
-            Queue = new CallQueue(Calls, Stats, IsTutorial);
+            Queue = new CallQueue(Calls, Stats, IsTutorial, content.MaxBusyLineCards);
             if (save != null) Queue.Restore(save.queuePosition);
             Shelf = new ShopShelf(Upgrades);
             Goal = new GoalProgress(Upgrades, Wallet);
             Earnings = new EarningsService(Calls, Wallet, () => Stats.IncomeMultiplier,
                 new QuickConnectTip(content.QuickConnectSeconds, content.QuickConnectTipCents));
-            Penalties = new PenaltyService(Calls, Wallet);
+            Penalties = new PenaltyService(Calls, Wallet, content.EmergencyFineFactor, () => Stats.IncomeMultiplier);
             Desk = new OperatorDesk(Calls, new ConnectionRule(), switchboard);
             Career = new CareerStats(Calls, Earnings, Penalties, save?.career);
             IsRestored = save != null;

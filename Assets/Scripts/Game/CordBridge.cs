@@ -60,6 +60,7 @@ namespace Switchboard.Game
             extraColors = extraCordColors ?? new Color[0];
             List<CableInputController> inputs = LevelScene.FindAll<CableInputController>(scene);
             input = inputs.Count == 1 ? inputs[0] : null;
+            if (input != null) input.CarriesLiveCall = CarriesLiveCall;
             if (input == null)
                 Debug.LogError($"CordBridge needs exactly one CableInputController in the scene '{scene.name}' to add cords, but found {inputs.Count}.", this);
         }
@@ -196,6 +197,15 @@ namespace Switchboard.Game
         {
             CableController cable = CableAt(cord);
             return cable != null ? cable.CableColor : Color.white;
+        }
+
+        // D79: the cord input lifts a closed cord in one click only when no live call rides on it. Lifted, the cord
+        // reports as returned to the tray (and a pickup reports nothing), so the desk needs nothing new.
+        private bool CarriesLiveCall(CableController cable)
+        {
+            if (desk == null) return true;
+            int index = System.Array.IndexOf(cables, cable);
+            return index < 0 || desk.CallOn(new CordId(index)) != null;
         }
 
         private CableController CableAt(CordId cord) =>

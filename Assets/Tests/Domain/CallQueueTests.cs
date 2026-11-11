@@ -69,7 +69,8 @@ namespace Switchboard.Domain.Tests
             session.Calls.Connect(first.Id);
             session.Tick(.01);
             Assert.That(first.State, Is.EqualTo(CallState.Connected));
-            Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_1", "call_2", "call_3" }));
+            // The talking call is a tab and holds no window (D83): all three windows fill.
+            Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_1", "call_2", "call_3", "call_4" }));
             session.Tick(first.SecondsLeft);
             Assert.That(first.EndReason, Is.EqualTo(CallEndReason.Finished));
             Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_2", "call_3", "call_4" }));
@@ -272,15 +273,16 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void AConnectedCallHoldsItsSlotUntilItEndsThenTheNextTakesItInTheSameTick()
+        public void AConnectedCallFreesItsWindowAtOnce()
         {
+            // D83 (13a pass 2b): a talking call shrinks to a tab, so its window takes the next caller at once.
             GameSession session = Session(Scripts.Pool(3, Small), 1);
             session.Tick(0.01);
             Call call = session.Calls.Live[0];
             session.Desk.TryTake(call.Id);
             session.Desk.OnCircuitClosed(new CordId(0), call.Request.From, call.Request.To);
             for (int i = 0; i < 19; i++) session.Tick(1);
-            Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_1" }));
+            Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_1", "call_2" }));
 
             session.Tick(1.5);
 
@@ -291,7 +293,7 @@ namespace Switchboard.Domain.Tests
         [Test]
         public void BuyingABiggerBoardSwitchesToItsPoolAndOpensASlotThatFillsAtOnce()
         {
-            CallScript[] stage = Scripts.Pool(3, new BoardSize(4, 4), "stage_");
+            CallScript[] stage = Scripts.StagePool(3);
             GameSession session = Session(Scripts.Pool(4, Small), 2, FakeUpgrade.BoardUpgrade("board_1", 1000, 4, stage, 3));
             session.Tick(0.01);
             Call oldCall = session.Calls.Live[0];
@@ -303,12 +305,13 @@ namespace Switchboard.Domain.Tests
             Assert.That(session.Queue.Position, Is.Zero);
             session.Tick(0.01);
 
-            Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_1", "call_2", "stage_1" }),
-                "calls already on cards stay; the new slot takes the new pool's first call");
+            // The talking call_1 holds no window (D83), so call_2 and the new pool's first two fill the three windows.
+            Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_1", "call_2", "stage_1", "stage_2" }),
+                "calls already on cards stay; the free windows take the new pool's first calls");
             Assert.That(oldCall.State, Is.EqualTo(CallState.Connected));
             session.Calls.End(session.Calls.Live[1].Id, CallEndReason.WrongConnection);
             session.Tick(0.01);
-            Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_1", "stage_1", "stage_2" }));
+            Assert.That(LiveIds(session), Is.EqualTo(new[] { "call_1", "stage_1", "stage_2", "stage_3" }));
         }
 
         [Test]
@@ -326,7 +329,7 @@ namespace Switchboard.Domain.Tests
         [Test]
         public void ResetUpgradesGoesBackToTheStartPoolsFirstCall()
         {
-            CallScript[] stage = Scripts.Pool(3, new BoardSize(4, 4), "stage_");
+            CallScript[] stage = Scripts.StagePool(3);
             GameSession session = Session(Scripts.Pool(4, Small), 2, FakeUpgrade.BoardUpgrade("board_1", 1000, 4, stage, 3));
             session.Tick(0.01);
             session.Upgrades.TryBuy("board_1");

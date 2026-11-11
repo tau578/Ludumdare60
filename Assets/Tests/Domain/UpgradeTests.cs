@@ -249,10 +249,11 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void FinesAreNotMultiplied()
+        public void FinesFollowTheIncomeMultiplier()
         {
             var emergency = new EmergencyWorld();
-            var penalties = new PenaltyService(calls, wallet);
+            // D82 supersedes D37: the fine is 1.5 times the emergency's pay, multiplier included.
+            var penalties = new PenaltyService(calls, wallet, 1.5, () => stats.IncomeMultiplier);
             wallet.Earn(9200);
             upgrades.TryBuy("income_1");
             upgrades.TryBuy("income_2");
@@ -262,7 +263,7 @@ namespace Switchboard.Domain.Tests
             penalties.FineApplied += e => taken = e.TakenCents;
             Call call = calls.Add(emergency.EmergencyRequest(0));
             calls.End(call.Id, CallEndReason.Missed);
-            Assert.That(taken, Is.EqualTo(200));
+            Assert.That(taken, Is.EqualTo(608), "135¢ x 3 x 1.5 = 607.5¢, rounded to 608¢");
         }
     }
 

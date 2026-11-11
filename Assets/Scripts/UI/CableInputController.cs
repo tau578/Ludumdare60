@@ -44,6 +44,11 @@ namespace Switchboard.UI
         public CableCursorMode CursorMode { get; private set; }
         /// <summary>The top hit under a hovering mouse or pen, or null: a finger has no hover (D58 fix 2's card flare).</summary>
         public GameObject HoverTarget { get; private set; }
+        /// <summary>
+        /// Whether a closed cord still carries a live call (D79), answered by the game. While it is unset every plug
+        /// comes out one at a time, as the cord code alone has always done.
+        /// </summary>
+        public System.Func<CableController, bool> CarriesLiveCall { get; set; }
 
         /// <summary>
         /// While suspended (the pause menu, D56) clicks neither pick, plug nor drop, and a held cord stays held.
@@ -379,6 +384,12 @@ namespace Switchboard.UI
                     if (!owner.TryRemove(socket) || !owner.TryReturnToTray()) return;
                     if (heldCable.TryInsert(socket) && heldCable.Phase == CablePhase.Connected)
                         heldCable = null;
+                    return;
+                }
+                // D79: a cord whose call is over comes off in one click; a live call's plug keeps D07's hold.
+                if (owner.Phase == CablePhase.Connected && CarriesLiveCall != null && !CarriesLiveCall(owner))
+                {
+                    if (owner.TryLiftFromBoard()) heldCable = owner;
                     return;
                 }
                 if (owner.TryRemove(socket)) heldCable = owner.IsInTray ? null : owner;

@@ -15,6 +15,11 @@ namespace Switchboard.Game
     /// connected or on hold, then a stamp. Emergencies also get their badge, their accent and a countdown ring.
     /// D60 (11c): a new card slides in and shakes as its bell rings (V4); a waiting emergency wobbles, harder in its
     /// last seconds (V3); a wrong number shakes the card "no" (V5). Emergencies show no "New order!" stamp (V13).
+    /// D63 (13a): a regular caller's patience shows on the same ring in Attention amber, pulsing gently at the end. A call
+    /// to a busy line has no label of its own (D83): the player chooses between cutting the talk off and letting it wait.
+    /// D83 (13a pass 2b): a talking call's card shrinks to a tab (the queue sets <see cref="Scale"/>): portrait, a time-left
+    /// ring in Good green, the money so far on a small plate under it, "On hold" on its name plate while held, then its
+    /// end stamp. A tab takes no clicks; its popups and stamp keep a readable size.
     /// </summary>
     public sealed class CallCardView : MonoBehaviour, IPointerClickHandler
     {
@@ -22,6 +27,7 @@ namespace Switchboard.Game
         [SerializeField, Tooltip("The caller's name under the portrait.")] private TMP_Text nameLabel;
         [SerializeField] private TMP_Text rateLabel;
         private TMP_Text connectionLabel;
+        private GameObject rateCircle;
         private double shownMultiplier = double.NaN;
         [SerializeField] private GameObject stamp;
         [SerializeField] private TMP_Text stampLabel;
@@ -63,6 +69,14 @@ namespace Switchboard.Game
         [SerializeField, Min(0)] private float ringShakeDegrees = 5f;
         [SerializeField, Min(.05f), Tooltip("A wrong number's \"no\": three sideways swings.")] private float wrongShakeSeconds = .4f;
         [SerializeField, Min(0)] private float wrongShakePixels = 12f;
+
+        [Header("Tab (D83), in canvas units")]
+        [SerializeField, Min(8), Tooltip("The money under a tab: its text size.")] private float tabLabelSize = 24f;
+        [SerializeField, Min(8), Tooltip("The width of the plate under a tab.")] private float tabLabelWidth = 96f;
+        [SerializeField, Tooltip("The gap between the tab's portrait and its plate; negative tucks the plate under the portrait.")]
+        private float tabLabelGap = -6f;
+        [SerializeField, Range(.1f, 1), Tooltip("A tab's end stamp, as a share of a card's stamp.")]
+        private float tabStampScale = .5f;
         // The paint box (D75): the stamps' inks and font, the name plate's font, the countdown ring's Alarm glow, and the
         // stamp and emergency timings. Read when applied, so Play Mode edits show at the next stamp or pulse.
         private GameStyle paint;
@@ -102,6 +116,12 @@ namespace Switchboard.Game
         private string typedText;
         private float pressTime = -1;
         private bool detailsVisible;
+        private bool isTab;
+        private float scale = 1;
+        private RectTransform labelOverlay;
+        private Image tabPlate;
+        private Vector2 earningsAnchorMin, earningsAnchorMax;
+        private float earningsFontMin, earningsFontMax;
 
         public event Action<CallCardView> Clicked;
 
@@ -126,6 +146,39 @@ namespace Switchboard.Game
         public bool IsUrgent => IsWaitingEmergency && Call.ResponseSecondsLeft <= paint.UrgentSeconds;
         public float UrgentSeconds => paint != null ? paint.UrgentSeconds : 0;
         public bool IsStampShowing => stamp != null && stamp.activeSelf;
+        /// <summary>The countdown ring shows: an emergency's response time, or a caller's patience while it counts (D63).</summary>
+        public bool IsRingShown => responseRingRoot != null && responseRingRoot.activeSelf;
+        /// <summary>The ring is counting a caller's patience, in Attention amber (D63).</summary>
+        public bool IsPatienceRing => IsRingShown && Call != null && Call.IsWaiting && !Call.HasResponseTime;
+        public Color RingColor => responseRing != null ? responseRing.color : Color.clear;
+
+        /// <summary>A talking call's tab (D83): shrunk, no clicks, the money under it.</summary>
+        public bool IsTab => isTab;
+        /// <summary>The tab's plate under the portrait, for tests and the layout; inactive on a full card.</summary>
+        public RectTransform TabPlateRect => tabPlate != null ? tabPlate.rectTransform : null;
+        public bool IsTabPlateShown => tabPlate != null && tabPlate.gameObject.activeSelf;
+        public string EarningsText => earningsLabel != null && earningsLabel.gameObject.activeSelf ? earningsLabel.text : null;
+        public string NamePlateText => nameLabel != null && nameLabel.gameObject.activeSelf ? nameLabel.text : null;
+
+        /// <summary>
+        /// The card's size: 1 in a window, smaller as a tab. The popups and the stamp are counter-scaled, so they stay readable.
+        /// </summary>
+        public float Scale
+        {
+            get => scale;
+            set
+            {
+                scale = Mathf.Max(.01f, value);
+                transform.localScale = new Vector3(scale, scale, 1);
+                Vector3 counter = new Vector3(1 / scale, 1 / scale, 1);
+                if (feePopup != null) feePopup.transform.localScale = counter;
+                if (tipPopup != null) tipPopup.transform.localScale = counter;
+                if (initialized && stamp.activeSelf && stampPopTime < 0 && !endingStampExit) stamp.transform.localScale = StampRest;
+            }
+        }
+
+        // A tab's stamp keeps a set share of a card's stamp, whatever the tab's own size.
+        private Vector3 StampRest => isTab ? stampScale * (tabStampScale / scale) : stampScale;
 
         public Call Call { get; private set; }
         public RectTransform PortraitRect => portrait != null ? portrait.rectTransform : (RectTransform)transform;
@@ -143,6 +196,8 @@ namespace Switchboard.Game
             Initialize();
             Call = call;
             paint = paintBox;
+            ApplyTab(false, 1);
+            Scale = 1;
             cordColors = cordColorOf;
             portrait.sprite = callerPortrait != null ? callerPortrait : defaultPortrait;
             // Stamps and name plates are short period labels: the Label font (D75), in their own boxes, auto-sized.
@@ -194,21 +249,24 @@ namespace Switchboard.Game
             // The type badge sits on top while the call waits.
             bool showTypeBadge = waiting && typeBadge != null && !string.IsNullOrEmpty(typeBadgeLabel.text);
             if (typeBadge != null) typeBadge.SetActive(showTypeBadge);
-            // The response timer stops for good on a correct connection (D09), so the ring goes with it.
-            if (responseRingRoot != null) responseRingRoot.SetActive(Call.HasResponseTime && waiting);
+            // The response timer and the patience stop for good on a correct connection (D09, D63), so the ring goes with them.
+            if (responseRingRoot != null) responseRingRoot.SetActive(RingWanted());
             earningsBadge.SetActive(false);
-            nameLabel.gameObject.SetActive(!onCord);
-            earningsLabel.gameObject.SetActive(onCord);
+            // A tab keeps its money plate through the end stamp; its name plate says only "On hold" (D83).
+            nameLabel.gameObject.SetActive(isTab ? onHold : !onCord);
+            nameLabel.text = isTab ? "On hold" : Call.Request.Script.Name;
+            earningsLabel.gameObject.SetActive(onCord || isTab);
+            if (tabPlate != null) tabPlate.gameObject.SetActive(isTab);
             if (onCord)
             {
                 shownCents = (long)Math.Floor(Call.CentsEarned + 1e-9);
                 earningsLabel.text = MoneyFormat.Compact(shownCents);
             }
-            cordRing.gameObject.SetActive(onCord);
+            cordRing.gameObject.SetActive(onCord && !isTab);
             if (onCord && Call.Cord is CordId cord && cordColors != null) cordRing.color = Faded(cordColors(cord), onHold);
-            earningsLabel.color = Faded(earningsColor, onHold);
+            earningsLabel.color = Faded(isTab ? paint.MoneyText : earningsColor, onHold);
 
-            bool showSpeech = detailsVisible && (inHand || onCord);
+            bool showSpeech = detailsVisible && (inHand || onCord) && !isTab;
             speechBubble.SetActive(showSpeech);
             if (showSpeech)
                 Say(onHold ? "On hold"
@@ -274,6 +332,54 @@ namespace Switchboard.Game
             Refresh();
         }
 
+        /// <summary>
+        /// A talking call's card becomes a tab (D83), or a tab becomes a full card again. <paramref name="tabScale"/> is the
+        /// tab's final <see cref="Scale"/>: the plate's text is sized for it, while the queue slides the scale there.
+        /// </summary>
+        public void SetTab(bool tab, float tabScale)
+        {
+            Initialize();
+            ApplyTab(tab, tabScale);
+            Refresh();
+        }
+
+        private void ApplyTab(bool tab, float tabScale)
+        {
+            isTab = tab;
+            detailsVisible = detailsVisible && !tab;
+            if (cardGroup != null) cardGroup.blocksRaycasts = !tab;
+            if (rateCircle != null) rateCircle.SetActive(!tab);
+            if (connectionLabel != null) connectionLabel.gameObject.SetActive(!tab);
+            rateLabel.gameObject.SetActive(!tab);
+            RectTransform money = earningsLabel.rectTransform;
+            if (!tab)
+            {
+                money.anchorMin = earningsAnchorMin;
+                money.anchorMax = earningsAnchorMax;
+                earningsLabel.fontSizeMin = earningsFontMin;
+                earningsLabel.fontSizeMax = earningsFontMax;
+                if (tabPlate != null) tabPlate.gameObject.SetActive(false);
+                return;
+            }
+            // Under the portrait, in the overlay's own units, sized so the text reads at tabLabelSize once the tab has shrunk.
+            float s = Mathf.Max(.01f, tabScale);
+            Vector2 overlay = labelOverlay.rect.size;
+            float height = tabLabelSize * 1.25f / s;
+            float width = tabLabelWidth / s;
+            float centre = -portrait.rectTransform.rect.height * .5f - tabLabelGap / s - height * .5f;
+            money.anchorMin = new Vector2(.5f - width * .5f / overlay.x, .5f + (centre - height * .5f) / overlay.y);
+            money.anchorMax = new Vector2(.5f + width * .5f / overlay.x, .5f + (centre + height * .5f) / overlay.y);
+            money.offsetMin = money.offsetMax = Vector2.zero;
+            earningsLabel.fontSizeMax = tabLabelSize / s;
+            earningsLabel.fontSizeMin = tabLabelSize * .6f / s;
+            if (tabPlate == null) return;
+            RectTransform plate = tabPlate.rectTransform;
+            plate.anchorMin = money.anchorMin;
+            plate.anchorMax = money.anchorMax;
+            plate.offsetMin = plate.offsetMax = Vector2.zero;
+            if (paint != null) tabPlate.color = paint.CardTeal;
+        }
+
         /// <summary>A quick squash, bounce and brighten for a click that took the call.</summary>
         public void PlayPress()
         {
@@ -286,6 +392,11 @@ namespace Switchboard.Game
 
         public void Hide()
         {
+            if (initialized && (isTab || scale != 1))
+            {
+                ApplyTab(false, 1);
+                Scale = 1;
+            }
             Call = null;
             cordColors = null;
             speechBubble.SetActive(false);
@@ -411,6 +522,10 @@ namespace Switchboard.Game
             cardGroup = GetComponent<CanvasGroup>();
             if (cardGroup == null) cardGroup = gameObject.AddComponent<CanvasGroup>();
             AddCallerDecorations();
+            earningsAnchorMin = earningsLabel.rectTransform.anchorMin;
+            earningsAnchorMax = earningsLabel.rectTransform.anchorMax;
+            earningsFontMin = earningsLabel.fontSizeMin;
+            earningsFontMax = earningsLabel.fontSizeMax;
             defaultPortrait = portrait.sprite;
             stampRect = (RectTransform)stamp.transform;
             stampSize = stampRect.rect.size;
@@ -437,12 +552,13 @@ namespace Switchboard.Game
             overlay.sizeDelta = portrait.rectTransform.sizeDelta;
             overlay.anchoredPosition = portrait.rectTransform.anchoredPosition;
             overlay.SetSiblingIndex(portrait.transform.GetSiblingIndex() + 1);
+            labelOverlay = overlay;
             var oldRate = rateLabel.transform.parent.GetComponent<Image>();
             var oldName = nameLabel.transform.parent.GetComponent<Image>();
             if (oldRate != null) oldRate.enabled = false;
             if (oldName != null) oldName.enabled = false;
             if (rateOutline != null) rateOutline.enabled = false;
-            AddRateCircle(overlay);
+            rateCircle = AddRateCircle(overlay);
             connectionLabel = Instantiate(rateLabel, overlay.transform);
             connectionLabel.name = "Connection reward";
             PlaceDecorationText(connectionLabel, overlay.transform, new Vector2(47.2f, 47.4f), new Vector2(43, 35), 23);
@@ -464,10 +580,32 @@ namespace Switchboard.Game
             Color counterColor = earningsLabel.color;
             PlaceDecorationText(earningsLabel, overlay.transform, new Vector2(0, -49), new Vector2(130, 32), 28);
             earningsLabel.color = counterColor;
+            // A tab's money sits on a small plate of the badges' teal under the portrait (D83), drawn behind the text.
+            tabPlate = new GameObject("Tab plate", typeof(RectTransform), typeof(CanvasRenderer)).AddComponent<Image>();
+            tabPlate.transform.SetParent(overlay, false);
+            tabPlate.transform.SetSiblingIndex(earningsLabel.transform.GetSiblingIndex());
+            if (oldName != null)
+            {
+                tabPlate.sprite = oldName.sprite;
+                tabPlate.type = oldName.type;
+            }
+            tabPlate.raycastTarget = false;
+            tabPlate.gameObject.SetActive(false);
             earningsBadge.SetActive(false);
         }
 
-        private static void AddRateCircle(RectTransform parent)
+        private bool RingWanted()
+        {
+            if (Call == null) return false;
+            CallState state = Call.State;
+            // A tab's ring shows the time left of the talk (D83).
+            if (isTab) return Call.IsTalking;
+            if (state != CallState.Incoming && state != CallState.Taken && state != CallState.Connecting) return false;
+            // A held caller (the tutorial's) can't hang up, so no ring counts down for them.
+            return Call.HasResponseTime || (Call.HasPatience && !Call.WaitingHeld);
+        }
+
+        private GameObject AddRateCircle(RectTransform parent)
         {
             var rim = new GameObject("Larger per-second circle", typeof(RectTransform), typeof(CanvasRenderer))
                 .AddComponent<CircleGraphic>();
@@ -485,6 +623,7 @@ namespace Switchboard.Game
             fill.rectTransform.anchorMin = Vector2.one * .04f;
             fill.rectTransform.anchorMax = Vector2.one * .96f;
             fill.rectTransform.offsetMin = fill.rectTransform.offsetMax = Vector2.zero;
+            return rim.gameObject;
         }
 
         private static void PlaceDecorationText(TMP_Text label, Transform parent, Vector2 position, Vector2 size, float fontSize)
@@ -533,7 +672,13 @@ namespace Switchboard.Game
         private void LateUpdate()
         {
             if (Call == null || Call.State == CallState.Ended) return;
-            if (responseRing != null && responseRingRoot != null && responseRingRoot.activeSelf) UpdateResponseRing();
+            if (responseRingRoot != null)
+            {
+                // The tutorial's release changes nothing in the call's state, so the ring is polled here.
+                bool ring = RingWanted();
+                if (responseRingRoot.activeSelf != ring) responseRingRoot.SetActive(ring);
+                if (ring && responseRing != null) UpdateResponseRing();
+            }
             if (Call.State == CallState.Connected || Call.State == CallState.OnHold)
             {
                 long cents = (long)Math.Floor(Call.CentsEarned + 1e-9);
@@ -559,15 +704,38 @@ namespace Switchboard.Game
         // The fill changes every frame, so it is only written when it moves by a visible step.
         private void UpdateResponseRing()
         {
-            double total = Call.Request.Script.ResponseTimeSeconds;
-            float fill = total > 0 ? Mathf.Clamp01((float)(Call.ResponseSecondsLeft / total)) : 0f;
+            bool talking = Call.IsTalking;
+            bool patience = !talking && !Call.HasResponseTime;
+            double total = talking ? Call.Request.DurationSeconds
+                : patience ? Call.PatienceSeconds : Call.Request.Script.ResponseTimeSeconds;
+            double left = talking ? Call.SecondsLeft : patience ? Call.PatienceSecondsLeft : Call.ResponseSecondsLeft;
+            float fill = total > 0 ? Mathf.Clamp01((float)(left / total)) : 0f;
             fill = Mathf.Ceil(fill * 360f) / 360f;
-            bool urgent = Call.ResponseSecondsLeft <= paint.UrgentSeconds;
             if (fill != shownRingFill)
             {
                 shownRingFill = fill;
                 responseRing.fillAmount = fill;
             }
+            if (talking)
+            {
+                // Good green, never the alarm: the talk runs out on its own and pays (D83). Dimmed while on hold, like the money.
+                responseRing.color = Faded(paint.GoodRing, Call.State == CallState.OnHold);
+                responseRing.rectTransform.localScale = Vector3.one;
+                ringWasUrgent = true;
+                return;
+            }
+            if (patience)
+            {
+                // Attention amber, never the alarm (D63): a caller losing patience is a nudge, not an emergency.
+                Color amber = paint.AttentionHover;
+                float wave = left <= paint.PatienceUrgentSeconds
+                    ? 0.5f + 0.5f * Mathf.Sin(gameClock * paint.PatiencePulsesPerSecond * Mathf.PI * 2f) : 1f;
+                responseRing.color = new Color(amber.r, amber.g, amber.b, 0.7f + 0.3f * wave);
+                responseRing.rectTransform.localScale = Vector3.one * (left <= paint.PatienceUrgentSeconds ? 1f + 0.02f * wave : 1f);
+                ringWasUrgent = true;
+                return;
+            }
+            bool urgent = Call.ResponseSecondsLeft <= paint.UrgentSeconds;
             if (urgent)
             {
                 float wave = 0.5f + 0.5f * Mathf.Sin(gameClock * paint.UrgentPulsesPerSecond * Mathf.PI * 2f);
@@ -599,8 +767,8 @@ namespace Switchboard.Game
                 ? Mathf.Lerp(.05f, overshoot, 1f - Mathf.Pow(1f - t / .55f, 3))
                 : t < .82f ? Mathf.Lerp(overshoot, .97f, Mathf.SmoothStep(0, 1, (t - .55f) / .27f))
                 : Mathf.Lerp(.97f, 1, Mathf.SmoothStep(0, 1, (t - .82f) / .18f));
-            stamp.transform.localScale = stampScale * scale;
-            if (t >= 1) { stamp.transform.localScale = stampScale; stampPopTime = -1; }
+            stamp.transform.localScale = StampRest * scale;
+            if (t >= 1) { stamp.transform.localScale = StampRest; stampPopTime = -1; }
         }
 
         // All statuses share the same rectangle and animation. Text/fine refreshes do not replay it.
@@ -619,7 +787,7 @@ namespace Switchboard.Game
             stampGroup.alpha = 1;
             stampPopTime = 0;
             stampAnnounced = false;
-            stamp.transform.localScale = stampScale * .05f;
+            stamp.transform.localScale = StampRest * .05f;
             return true;
         }
 
@@ -669,7 +837,7 @@ namespace Switchboard.Game
             stampPopTime = -1;
             if (stampExit != null) stampExit.Cancel();
             if (stampGroup != null) stampGroup.alpha = 1;
-            if (initialized) stamp.transform.localScale = stampScale;
+            if (initialized) stamp.transform.localScale = StampRest;
             stamp.SetActive(false);
         }
 
@@ -705,7 +873,7 @@ namespace Switchboard.Game
             pressTime += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(pressTime / pressSeconds);
             float y = PressScale(t);
-            pressTarget.localScale = new Vector3(1f + (1f - y) * 0.5f, y, 1f);
+            pressTarget.localScale = new Vector3((1f + (1f - y) * 0.5f) * PressBase, y * PressBase, 1f);
             if (pressFlash != null)
                 pressFlash.color = new Color(1f, 1f, 1f, pressFlashAlpha * (1f - t) * (1f - t));
             if (t >= 1f) StopPress();
@@ -722,9 +890,12 @@ namespace Switchboard.Game
         private void StopPress()
         {
             pressTime = -1;
-            if (pressTarget != null) pressTarget.localScale = Vector3.one;
+            if (pressTarget != null) pressTarget.localScale = new Vector3(PressBase, PressBase, 1f);
             if (pressFlash != null) pressFlash.gameObject.SetActive(false);
         }
+
+        // The press squashes the card itself, so it squashes around the tab's size, not back to a full card.
+        private float PressBase => pressTarget == transform ? scale : 1f;
 
         private Color Faded(Color color, bool onHold) => onHold ? new Color(color.r, color.g, color.b, color.a * onHoldAlpha) : color;
 
@@ -733,7 +904,8 @@ namespace Switchboard.Game
             switch (reason)
             {
                 case CallEndReason.Finished: return paint.GoodInk;
-                case CallEndReason.DisconnectedEarly: return paint.CutOffInk;
+                case CallEndReason.DisconnectedEarly:
+                case CallEndReason.HungUp: return paint.CutOffInk;
                 case CallEndReason.Missed: return paint.ErrorDeep;
                 default: return paint.ErrorInk;
             }
@@ -751,6 +923,7 @@ namespace Switchboard.Game
                 case CallEndReason.Finished: return "Paid " + MoneyFormat.Dollars((long)Math.Round(call.CentsEarned));
                 case CallEndReason.WrongConnection: return "Wrong number!";
                 case CallEndReason.DisconnectedEarly: return "Cut off";
+                case CallEndReason.HungUp: return "Hung up";
                 // The amount actually taken; nothing could be taken from an empty wallet.
                 case CallEndReason.Missed: return call.FineCents > 0 ? "Missed " + MoneyFormat.Dollars(-call.FineCents) : "Missed";
                 default: return string.Empty;

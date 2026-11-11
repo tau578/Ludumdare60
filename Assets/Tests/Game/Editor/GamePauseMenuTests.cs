@@ -119,7 +119,9 @@ namespace Switchboard.Game.Tests
             CableController cable = All<CableController>().First(c => c.gameObject.activeInHierarchy);
             SocketView[] jacks = All<SocketView>().Where(s => s.IsOpen && s.gameObject.activeInHierarchy).Take(2).ToArray();
             Assert.That(cable.TryPickUp() && cable.TryInsert(jacks[0]) && cable.TryInsert(jacks[1]), Is.True);
-            // Pulling one plug of a patched cord puts that end in hand, as a click on its jack does.
+            // Pulling one plug of a live call's cord puts that end in hand, as a click on its jack does (D07); a cord
+            // with no live call would come off whole (D79), so this one counts as live.
+            cords.CarriesLiveCall = _ => true;
             cords.HandleSocketClick(jacks[1]);
             Assert.That(cords.ActiveCable, Is.SameAs(cable));
             Assert.That(cable.Phase, Is.EqualTo(CablePhase.OneEndConnected));

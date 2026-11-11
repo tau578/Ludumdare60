@@ -94,8 +94,11 @@ namespace Switchboard.Game
             boardLink = new OpenBoardLink(sockets, callQueue, Session.Stats, Session.Board);
             shop.Bind(Session.Upgrades, Session.Shelf, Session.Goal, Session.Wallet, LevelScene.FindAll<UpgradeSlotView>(scene), moneyCounter);
             goalPanel.Bind(Session.Goal);
-            loopRunner.Bind(Session);
-            if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls);
+            // D81: while a tutorial step is on screen the game's clock holds; the guide is bound further down.
+            FirstOrderGuide guide = null;
+            System.Func<bool> hintShowing = () => guide != null && guide.isActiveAndEnabled && guide.HoldsClock;
+            loopRunner.Bind(Session, hintShowing);
+            if (TryGetComponent(out CallAudio audio)) audio.Bind(Session.Calls, style, hintShowing);
             // Faster lookup (D58): callers' jacks light up, and a book row marks its jack.
             var lights = GetComponent<CallerJackLights>();
             if (lights == null) lights = gameObject.AddComponent<CallerJackLights>();
@@ -108,7 +111,8 @@ namespace Switchboard.Game
             {
                 if (spotlights.Count != 1)
                     Debug.LogWarning($"The tutorial needs one TutorialSpotlight in GameUI, but found {spotlights.Count}.", this);
-                var guide = GetComponent<FirstOrderGuide>();
+                if (spotlights.Count == 1) spotlights[0].ApplyStyle(style);
+                guide = GetComponent<FirstOrderGuide>();
                 if (guide == null) guide = gameObject.AddComponent<FirstOrderGuide>();
                 guide.Bind(callQueue, Session.Calls, bookView, LevelScene.FindAll<CableController>(scene).ToArray(), cordBridge,
                     spotlights.Count == 1 ? spotlights[0] : null, sockets, shopHeader,

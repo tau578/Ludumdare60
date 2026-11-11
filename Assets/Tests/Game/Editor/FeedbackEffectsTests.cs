@@ -78,10 +78,11 @@ namespace Switchboard.Game.Tests
             if (scene.IsValid()) EditorSceneManager.ClosePreviewScene(scene);
         }
 
-        private Call AddCall(string from, string to, bool emergency = false, double response = 30, long penalty = 0)
+        // It pays 10¢ + 5¢/s for 20 s = 110¢, so a missed emergency is fined 1.5 times that, 165¢ (D82).
+        private Call AddCall(string from, string to, bool emergency = false, double response = 30)
         {
             var script = new CallScript("test." + ++callNumber, "Test Caller " + callNumber, "", "Put me through, please.",
-                new JackId(from), new JackId(to), 20, 10, 5, emergency, response, penalty);
+                new JackId(from), new JackId(to), 20, 10, 5, emergency, response);
             return session.Calls.Add(new CallRequest(script));
         }
 
@@ -220,13 +221,14 @@ namespace Switchboard.Game.Tests
         [Test]
         public void AFineShakesThePlaqueRedAndSendsCoinsToTheMissedCard()
         {
-            Call call = AddCall("A1", "B2", emergency: true, response: 5, penalty: 300);
+            Call call = AddCall("A1", "B2", emergency: true, response: 5);
             CallCardView card = CardOf(call);
             Assert.That(card, Is.Not.Null, "setup: the emergency has a card");
             Assert.That(counter.IsShaking, Is.False);
             session.Calls.Tick(6);
             Assert.That(call.EndReason, Is.EqualTo(CallEndReason.Missed));
-            Assert.That(call.FineCents, Is.EqualTo(300));
+            Assert.That(call.FineCents, Is.EqualTo(session.Penalties.FineFor(call.Request.Script)));
+            Assert.That(call.FineCents, Is.EqualTo(165));
             Assert.That(counter.IsShaking, Is.True, "the plaque shakes");
             Color error = All<EmergencyLampView>().Single().Style.Error;
             Assert.That(counter.Reels.All(r => r.color == error), Is.True, "and flashes Error crimson");
@@ -245,7 +247,7 @@ namespace Switchboard.Game.Tests
         {
             session.Wallet.TrySpend(session.Wallet.Cents);
             Invoke(counter, "RefreshBalance");
-            Call call = AddCall("A1", "B2", emergency: true, response: 5, penalty: 300);
+            Call call = AddCall("A1", "B2", emergency: true, response: 5);
             session.Calls.Tick(6);
             Assert.That(call.FineCents, Is.Zero);
             Assert.That(counter.IsShaking, Is.True);
@@ -256,7 +258,7 @@ namespace Switchboard.Game.Tests
         public void AnEmergencyWobblesOnlyWhileItWaitsAndFreezesOnPause()
         {
             Call normal = AddCall("A1", "B2");
-            Call emergency = AddCall("C1", "D2", emergency: true, response: 30, penalty: 100);
+            Call emergency = AddCall("C1", "D2", emergency: true, response: 30);
             CallCardView normalCard = CardOf(normal), card = CardOf(emergency);
             Settle(normalCard);
             Settle(card);
@@ -337,7 +339,7 @@ namespace Switchboard.Game.Tests
         public void EmergenciesShowNoNewOrderStampOverTheirBadge()
         {
             Call normal = AddCall("A1", "B2");
-            Call emergency = AddCall("C1", "D2", emergency: true, response: 30, penalty: 100);
+            Call emergency = AddCall("C1", "D2", emergency: true, response: 30);
             Assert.That(CardOf(normal).IsStampShowing, Is.True, "\"New order!\" on a normal call");
             Assert.That(CardOf(emergency).IsStampShowing, Is.False, "the badge and ring say it already (V13)");
             var shown = new List<CallCardView>();
@@ -604,7 +606,7 @@ namespace Switchboard.Game.Tests
             Assert.That(lamp.Bulb.canvasRenderer.GetAlpha(), Is.EqualTo(1), "the dark bulb always shows");
             foreach (Graphic light in lights) Assert.That(light.canvasRenderer.GetAlpha(), Is.Zero, light.name + " is off while unlit");
 
-            Call emergency = AddCall("C1", "D2", emergency: true, response: 30, penalty: 100);
+            Call emergency = AddCall("C1", "D2", emergency: true, response: 30);
             float lowest = 1, highest = 0;
             for (int i = 0; i < 12; i++)
             {
@@ -801,7 +803,7 @@ namespace Switchboard.Game.Tests
             lamp.Tick(.1f);
             Assert.That(lamp.SignBrightness, Is.Zero, "a normal call doesn't light it");
 
-            Call emergency = AddCall("C1", "D2", emergency: true, response: 30, penalty: 100);
+            Call emergency = AddCall("C1", "D2", emergency: true, response: 30);
             float lowest = 1, highest = 0;
             for (int i = 0; i < 12; i++)
             {
@@ -1009,7 +1011,7 @@ namespace Switchboard.Game.Tests
 
             // The real flash, as drawn: the wash and the lit letters at each step, the dim end included (step 5 lands
             // on it exactly, so nothing depends on chance).
-            Call emergency = AddCall("C1", "D2", emergency: true, response: 30, penalty: 100);
+            Call emergency = AddCall("C1", "D2", emergency: true, response: 30);
             float dimmest = 1, fullest = 0;
             for (int i = 0; i < 12; i++)
             {

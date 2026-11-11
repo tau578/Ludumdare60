@@ -3,7 +3,7 @@ using Switchboard.Domain;
 
 namespace Switchboard.Content
 {
-    /// <summary>What the domain sees of the content: the economy file's money, board start, call queue, quick-connect tip and upgrades.</summary>
+    /// <summary>What the domain sees of the content: the economy file's money, board start, call queue, quick-connect tip, pressure and upgrades.</summary>
     public sealed class GameContent : IGameContent
     {
         public GameContent(EconomyCatalog economy)
@@ -15,6 +15,9 @@ namespace Switchboard.Content
             StartPool = economy.StartPool;
             QuickConnectSeconds = economy.QuickTip.Seconds;
             QuickConnectTipCents = economy.QuickTip.Cents;
+            DefaultPatienceSeconds = economy.DefaultPatienceSeconds;
+            EmergencyFineFactor = economy.EmergencyFineFactor;
+            MaxBusyLineCards = economy.MaxBusyLineCards;
             Upgrades = economy.Upgrades;
         }
 
@@ -25,6 +28,9 @@ namespace Switchboard.Content
         public IReadOnlyList<CallScript> StartPool { get; }
         public double QuickConnectSeconds { get; }
         public long QuickConnectTipCents { get; }
+        public double DefaultPatienceSeconds { get; }
+        public double EmergencyFineFactor { get; }
+        public int MaxBusyLineCards { get; }
         public IReadOnlyList<IUpgrade> Upgrades { get; }
     }
 }

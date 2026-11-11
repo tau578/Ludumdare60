@@ -4,14 +4,19 @@ using System.Collections.Generic;
 namespace Switchboard.Domain
 {
     /// <summary>
-    /// The call queue (D52). Calls play in pool order and loop; every free caller slot takes the next call at once.
+    /// The call queue (D52). Calls play in pool order and loop; every free caller window takes the next call at once.
+    /// Only waiting calls (Incoming, Taken, Connecting) hold a window: a talking call shrinks to a tab and frees its
+    /// window (D83), so the queue fills while the waiting calls are fewer than ClientSlots.
     /// The pool follows StatSheet (the last bought extra_clients's stagePool, or the startPool), and a new pool
-    /// starts at its first call. Live calls and other requests from the same caller are skipped.
+    /// starts at its first call. Live calls and other requests from the same caller are skipped, and so is anyone
+    /// already on a call, as caller or recipient (D63). A call to a busy recipient may be dealt, but only
+    /// maxBusyLineCards of them at a time, and only to someone who is talking (connected or on hold, D83).
     /// </summary>
     public sealed class CallQueue
     {
         private readonly CallService calls;
         private readonly StatSheet stats;
+        private readonly int maxBusyLineCards;
 
         // Live calls dealt from the current pool, with their pool index, so a save can replay them (D55).
         private readonly List<DealtCall> dealt = new List<DealtCall>();
@@ -20,8 +25,10 @@ namespace Switchboard.Domain
         private Call tutorialCall;
         private Call heldCall;
 
-        public CallQueue(CallService calls, StatSheet stats, bool tutorial = false)
+        /// <param name="maxBusyLineCards">Economy.json's maxBusyLineCards (D63): calls to a busy recipient allowed at once.</param>
+        public CallQueue(CallService calls, StatSheet stats, bool tutorial = false, int maxBusyLineCards = 0)
         {
+            this.maxBusyLineCards = Math.Max(0, maxBusyLineCards);
             this.calls = calls ?? throw new ArgumentNullException(nameof(calls));
             this.stats = stats ?? throw new ArgumentNullException(nameof(stats));
             pool = stats.CallPool;
@@ -51,7 +58,7 @@ namespace Switchboard.Domain
             }
         }
 
-        /// <summary>The tutorial is over: the guided call's response timer runs again, if it is still waiting.</summary>
+        /// <summary>The tutorial is over: the guided call's response timer or patience runs again, if it is still waiting.</summary>
         public void ReleaseTutorialCall()
         {
             if (heldCall != null) calls.HoldWaiting(heldCall.Id, false);
@@ -92,13 +99,23 @@ namespace Switchboard.Domain
                 waitingForFirstCall = false;
                 tutorialCall = null;
             }
-            while (calls.Live.Count < stats.ClientSlots)
+            while (WaitingCalls() < stats.ClientSlots)
             {
                 int index = TakeNext();
                 if (index < 0) return;
                 Call call = calls.Add(new CallRequest(pool[index]));
                 dealt.Add(new DealtCall(call.Id, index));
             }
+        }
+
+        /// <summary>Live calls that still wait for their connection and so hold a caller window (D83).</summary>
+        public int WaitingCalls()
+        {
+            IReadOnlyList<Call> live = calls.Live;
+            int count = 0;
+            for (int i = 0; i < live.Count; i++)
+                if (live[i].IsWaiting) count++;
+            return count;
         }
 
         private int TakeNext()
@@ -110,6 +127,11 @@ namespace Switchboard.Domain
                 CallScript script = pool[index];
                 if (script == null || calls.IsLive(script) || HasLiveCaller(script.Name)) continue;
                 if (!stats.Board.Contains(script.From) || !stats.Board.Contains(script.To)) continue;
+                // Nobody calls while on a call (D63). A busy recipient is allowed, but rarely, and only someone who is
+                // talking: never someone whose own card still waits (D83).
+                if (calls.IsJackInLiveCall(script.From)) continue;
+                if (calls.IsJackInWaitingCall(script.To)) continue;
+                if (calls.IsJackInLiveCall(script.To) && BusyLineCards() >= maxBusyLineCards) continue;
                 Position = (index + 1) % count;
                 return index;
             }
@@ -119,6 +141,27 @@ namespace Switchboard.Domain
         private void OnStatsChanged()
         {
             if (!ReferenceEquals(stats.CallPool, pool)) Restart();
+        }
+
+        /// <summary>
+        /// Live calls dealt to a busy recipient: their recipient's jack is used by an earlier live call. Counted from the
+        /// live list, so a card stops counting once the earlier call ends.
+        /// </summary>
+        public int BusyLineCards()
+        {
+            IReadOnlyList<Call> live = calls.Live;
+            int count = 0;
+            for (int i = 1; i < live.Count; i++)
+            {
+                JackId to = live[i].Request.To;
+                for (int j = 0; j < i; j++)
+                    if (live[j].Request.Involves(to))
+                    {
+                        count++;
+                        break;
+                    }
+            }
+            return count;
         }
 
         private bool HasLiveCaller(string name)

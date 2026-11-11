@@ -10,10 +10,13 @@ using UnityEngine.UI;
 namespace Switchboard.Game
 {
     /// <summary>
-    /// Every live call has a card over one of the caller slots, in arrival order (Design 4.3, 5.4).
-    /// When a card leaves, the cards below it slide up. Ended cards keep their slot while the stamp shows, so a call
+    /// Every live call has a card over one of the caller slots (Design 4.3, 5.4). The newest card is the top one (D80): the
+    /// cards rest on the lowest open slots, oldest at the bottom, so a new card lands on top of them, and when a card
+    /// leaves, the cards above it slide down into its place. Ended cards keep their slot while the stamp shows, so a call
     /// the queue fills in at once (D52) waits for that stamp before its card appears.
     /// Only the open slots take cards (D49); closed slot artwork is hidden without changing the layout.
+    /// D83 (13a pass 2b): the windows hold waiting calls only. A talking call's card shrinks into a tab in a 2x2 grid in the
+    /// space of the first closed window (the 4th), and its window takes the next caller; an ended tab shows its stamp there.
     /// </summary>
     public sealed class CallQueueView : MonoBehaviour
     {
@@ -27,8 +30,21 @@ namespace Switchboard.Game
         [SerializeField, Min(0), Tooltip("How far left of its slot a new card starts its slide, in card widths (D60, V4).")]
         private float arrivalWidths = .75f;
 
+        [Header("Talking-call tabs (D83), in canvas units")]
+        [SerializeField, Min(10), Tooltip("A tab's portrait width.")]
+        private float tabSize = 80f;
+        [SerializeField, Tooltip("The gaps between the tabs' portraits: across, and down (room for the money plate).")]
+        private Vector2 tabSpacing = new Vector2(30f, 40f);
+        [SerializeField, Tooltip("Moves the whole grid from the centre of the 4th window's space.")]
+        private Vector2 tabGridOffset = new Vector2(-10f, 6f);
+
+        /// <summary>The most tabs the grid holds: the most cords today (D83).</summary>
+        public const int MaxTabs = 4;
+
         private readonly List<CallCardView> pool = new List<CallCardView>();
         private readonly List<CallCardView> shown = new List<CallCardView>();
+        // Talking calls (and their end stamps), in the order they connected: the grid fills left to right, top to bottom.
+        private readonly List<CallCardView> tabs = new List<CallCardView>();
         private readonly List<Call> waitingForSlot = new List<Call>();
         private readonly Vector3[] slotCorners = new Vector3[4];
         private CallService calls;
@@ -50,6 +66,7 @@ namespace Switchboard.Game
         private Vector2 slotSize;
         private bool showDurations;
         private bool warnedFull;
+        private bool warnedTabs;
         private Action synchronizeBoard;
         private MoneyCounterView moneyCounter;
         public event Action<CallCardView> OrderShown;
@@ -75,6 +92,35 @@ namespace Switchboard.Game
                     if (card != null && card.IsGivingTask) return card.Call;
                 return null;
             }
+        }
+
+        /// <summary>The talking calls' tabs, in grid order (D83).</summary>
+        public IReadOnlyList<CallCardView> Tabs => tabs;
+
+        /// <summary>The tab's resting centre in the grid, in the card area's units.</summary>
+        public Vector2 TabCentre(int index)
+        {
+            int zone = Mathf.Clamp(OpenSlotCount, 0, Mathf.Max(0, slots.Length - 1));
+            Vector2 centre = zone < slotCentres.Length ? slotCentres[zone] : Vector2.zero;
+            int cell = Mathf.Min(index, MaxTabs - 1);
+            float across = tabSize + tabSpacing.x, down = tabSize + tabSpacing.y;
+            return centre + tabGridOffset + new Vector2((cell % 2 - .5f) * across, (.5f - cell / 2) * down);
+        }
+
+        /// <summary>A tab's <see cref="CallCardView.Scale"/>: its portrait art, at the windows' card size, shrunk to <c>tabSize</c>.</summary>
+        public float TabScaleOf(CallCardView card)
+        {
+            float art = card != null ? card.PortraitRect.rect.width : 0;
+            return art > 0 ? tabSize / art : .5f;
+        }
+
+        /// <summary>The waiting card showing the call; null for a call still waiting for a slot, or talking on a tab.</summary>
+        public CallCardView WaitingCardOf(Call call)
+        {
+            if (call == null) return null;
+            foreach (CallCardView card in shown)
+                if (card != null && card.Call == call) return card;
+            return null;
         }
 
         /// <summary>Fills the list with the calls on cards, in slot order; a call still waiting for a slot has none.</summary>
@@ -117,7 +163,7 @@ namespace Switchboard.Game
             BuildSlotVisibility();
             slotMin = new Vector3[slots.Length];
             slotMax = new Vector3[slots.Length];
-            BuildPool(Mathf.Max(1, slots.Length));
+            BuildPool(Mathf.Max(1, slots.Length) + MaxTabs);
             calls.CallAdded += OnCallAdded;
             calls.CallStateChanged += OnCallStateChanged;
             earnings.ConnectionFeePaid += OnConnectionFeePaid;
@@ -130,6 +176,7 @@ namespace Switchboard.Game
                 card.Hide();
             }
             shown.Clear();
+            tabs.Clear();
             waitingForSlot.Clear();
         }
 
@@ -239,12 +286,22 @@ namespace Switchboard.Game
 
         private void ShowCard(Call call)
         {
-            CallCardView card = FreeCard();
+            CallCardView card = call.IsTalking ? FreeTabCard() : FreeCard();
+            if (card == null) return;
             card.ShowDuration = showDurations;
             CallCardStyle style = styleOf != null ? styleOf(call.Request.Script.IsEmergency) : default;
             card.Show(call, portraitOf?.Invoke(call.Request.Script), cordColorOf, style, paint, earnings?.CurrentMultiplier ?? 1);
-            shown.Add(card);
-            SnapToSlot(card, shown.Count - 1);
+            if (call.IsTalking)
+            {
+                // Already talking (nothing restores one today, but a tab is where it belongs): straight into the grid.
+                AddTab(card);
+                card.Scale = TabScaleOf(card);
+                card.RestPosition = TabCentre(tabs.Count - 1);
+                ((RectTransform)card.transform).localPosition = card.RestPosition;
+                return;
+            }
+            shown.Insert(0, card);
+            SnapToSlot(card, SlotOf(0));
             // V4: it slides in from the caller panel's edge; it is clickable at once.
             card.PlayArrival(slotSize.x * arrivalWidths);
             ((RectTransform)card.transform).localPosition = card.RestPosition + card.MotionOffset;
@@ -279,7 +336,42 @@ namespace Switchboard.Game
         {
             // A call that ends before its card could show (the dev panel's clear) never shows.
             if (e.To == CallState.Ended) waitingForSlot.Remove(e.Call);
-            CardOf(e.Call)?.Refresh();
+            CallCardView card = CardOf(e.Call);
+            if (card == null) return;
+            if (e.Call.IsTalking && shown.Remove(card))
+            {
+                // D83: the card shrinks into its tab and its window takes the next caller; the cards above slide down.
+                AddTab(card);
+                DrawUpperCardsOnTop();
+                ShowWaitingCalls();
+                return;
+            }
+            card.Refresh();
+        }
+
+        private void AddTab(CallCardView card)
+        {
+            // A full grid cuts the oldest end stamp short, as a full column does (D52).
+            if (tabs.Count >= MaxTabs)
+            {
+                CallCardView stamped = null;
+                foreach (CallCardView tab in tabs)
+                    if (tab.Call == null || tab.Call.State == CallState.Ended) { stamped = tab; break; }
+                if (stamped != null)
+                {
+                    tabs.Remove(stamped);
+                    stamped.Hide();
+                }
+                else if (!warnedTabs)
+                {
+                    Debug.LogWarning($"CallQueueView: more than {MaxTabs} talking calls; the tab grid holds {MaxTabs}.", this);
+                    warnedTabs = true;
+                }
+            }
+            tabs.Add(card);
+            // The same card size as in a window, so the tab's scale alone sets its size.
+            if (slotSize.x > 0) ((RectTransform)card.transform).sizeDelta = slotSize;
+            card.SetTab(true, TabScaleOf(card));
         }
 
         private void OnConnectionFeePaid(ConnectionFeePaidArgs e)
@@ -320,7 +412,7 @@ namespace Switchboard.Game
 
         private void OnCardFinished(CallCardView card)
         {
-            shown.Remove(card);
+            if (!shown.Remove(card)) tabs.Remove(card);
             card.Hide();
             DrawUpperCardsOnTop();
             ShowWaitingCalls();
@@ -334,10 +426,19 @@ namespace Switchboard.Game
             return null;
         }
 
+        private CallCardView FreeTabCard()
+        {
+            foreach (CallCardView card in pool)
+                if (card.Call == null) return card;
+            return null;
+        }
+
         private CallCardView CardOf(Call call)
         {
             for (int i = 0; i < shown.Count; i++)
                 if (shown[i].Call == call) return shown[i];
+            for (int i = 0; i < tabs.Count; i++)
+                if (tabs[i].Call == call) return tabs[i];
             return null;
         }
 
@@ -351,7 +452,7 @@ namespace Switchboard.Game
             {
                 shown[i].SetIncomeMultiplier(earnings?.CurrentMultiplier ?? 1);
                 var rect = (RectTransform)shown[i].transform;
-                Vector2 target = slotCentres[Mathf.Min(i, slots.Length - 1)];
+                Vector2 target = slotCentres[SlotOf(i)];
                 if (moved) rect.sizeDelta = slotSize;
                 // The slide between slots moves the resting place; the card's own motion rides on top (D60).
                 Vector2 now = shown[i].RestPosition;
@@ -359,14 +460,33 @@ namespace Switchboard.Game
                 shown[i].RestPosition = rest;
                 rect.localPosition = rest + shown[i].MotionOffset;
             }
+            // Tabs slide into their cell and shrink on the same curve, so the card visibly shrinks into its tab (D83).
+            for (int i = 0; i < tabs.Count; i++)
+            {
+                CallCardView tab = tabs[i];
+                float tabScale = TabScaleOf(tab);
+                tab.SetIncomeMultiplier(earnings?.CurrentMultiplier ?? 1);
+                var rect = (RectTransform)tab.transform;
+                if (moved) rect.sizeDelta = slotSize;
+                Vector2 target = TabCentre(i);
+                Vector2 now = tab.RestPosition;
+                tab.RestPosition = (now - target).sqrMagnitude < 0.25f ? target : Vector2.Lerp(now, target, blend);
+                rect.localPosition = tab.RestPosition + tab.MotionOffset;
+                if (tab.Scale != tabScale)
+                    tab.Scale = Mathf.Abs(tab.Scale - tabScale) < .002f ? tabScale : Mathf.Lerp(tab.Scale, tabScale, blend);
+            }
         }
 
-        private void SnapToSlot(CallCardView card, int index)
+        // Cards rest on the lowest open slots, the first (newest) card on top, so a gap always closes from above (D80).
+        private int SlotOf(int index) =>
+            Mathf.Clamp(Mathf.Min(OpenSlotCount, slots.Length) - shown.Count + index, 0, Mathf.Max(0, slots.Length - 1));
+
+        private void SnapToSlot(CallCardView card, int slot)
         {
             MeasureSlots();
             var rect = (RectTransform)card.transform;
             rect.sizeDelta = slotSize;
-            card.RestPosition = slotCentres[Mathf.Min(index, slots.Length - 1)];
+            card.RestPosition = slotCentres[Mathf.Clamp(slot, 0, slots.Length - 1)];
             rect.localPosition = card.RestPosition;
         }
 

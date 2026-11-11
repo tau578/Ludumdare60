@@ -75,6 +75,17 @@ namespace Switchboard.Content
             return data;
         }
 
+        /// <summary>Every message opens by naming the person wanted (D80), so nobody reads it as the caller's name.</summary>
+        public const string LeadIn = "Connect me to <b>";
+
+        /// <summary>"Connect me to &lt;b&gt;Name&lt;/b&gt;." with a name in between, then anything.</summary>
+        public static bool HasLeadIn(string message)
+        {
+            if (message == null || !message.StartsWith(LeadIn, StringComparison.Ordinal)) return false;
+            int close = message.IndexOf("</b>.", LeadIn.Length, StringComparison.Ordinal);
+            return close > LeadIn.Length && message.Substring(LeadIn.Length, close - LeadIn.Length).Trim().Length > 0;
+        }
+
         private static CallScript Check(int index, CallFileEntry entry, Dictionary<string, int> ids,
             Func<string, bool> hasPortrait, List<string> errors)
         {
@@ -98,7 +109,7 @@ namespace Switchboard.Content
             if (icon != null && hasPortrait != null && !hasPortrait(icon))
                 errors.Add($"{where}: icon \"{icon}\" is not in GameConfig's portrait list. Use a portrait name from that list, " +
                     "such as caller-01.");
-            string message = Text(where, "message", entry.message, "what the caller says, such as \"Connect me with Ada Moss, please.\"", errors);
+            string message = Text(where, "message", entry.message, "what the caller says, such as \"Connect me to <b>Ada Moss</b>. It's urgent.\"", errors);
             string from = Jack(where, "from", entry.from, errors);
             string to = Jack(where, "to", entry.to, errors);
             if (from != null && from == to)
@@ -112,7 +123,6 @@ namespace Switchboard.Content
             Cents(where, "centsPerSecond", entry.centsPerSecond, false, "the pay per second, such as \"centsPerSecond\": 5", errors);
 
             double response = 0;
-            long penalty = 0;
             if (entry.emergency)
             {
                 if (double.IsNaN(entry.responseTimeSeconds))
@@ -121,19 +131,45 @@ namespace Switchboard.Content
                 else if (entry.responseTimeSeconds <= 0)
                     errors.Add($"{where}: responseTimeSeconds {Number(entry.responseTimeSeconds)} must be above 0. Use a number of seconds such as 30.");
                 else response = entry.responseTimeSeconds;
-                if (Cents(where, "penaltyCents", entry.penaltyCents, true,
-                        "the fine for missing it, such as \"penaltyCents\": 200 (0 for no fine)", errors))
-                    penalty = (long)entry.penaltyCents;
             }
             if (errors.Count > errorsBefore) return null;
 
-            // A note only: the call still plays, as a regular one.
-            if (!entry.emergency && (!double.IsNaN(entry.responseTimeSeconds) || !double.IsNaN(entry.penaltyCents)))
-                errors.Add($"{where}: responseTimeSeconds and penaltyCents are only used for emergencies. Add \"emergency\": true, " +
-                    "or remove them.");
+            // Notes only: the call still plays.
+            if (!entry.emergency && !double.IsNaN(entry.responseTimeSeconds))
+                errors.Add($"{where}: responseTimeSeconds is only used for emergencies. Add \"emergency\": true, or remove it.");
+            if (!double.IsNaN(entry.penaltyCents))
+                errors.Add($"{where}: penaltyCents is no longer used: a missed emergency's fine is now Economy.json's " +
+                    "emergencyFineFactor times what the call pays. Remove it.");
+            double? patience = Patience(where, entry, errors);
+            if (!HasLeadIn(message))
+                errors.Add($"{where}: the message should start with \"{LeadIn}Name</b>.\", naming the person wanted in bold, " +
+                    "then the caller's own words. A note only: the call still plays.");
 
             return new CallScript(id, name, icon, message, new JackId(from), new JackId(to), entry.durationSeconds,
-                entry.connectCents, entry.centsPerSecond, entry.emergency, response, penalty);
+                entry.connectCents, entry.centsPerSecond, entry.emergency, response, patience);
+        }
+
+        // Patience is optional (D63): left out, the call waits Economy.json's defaultPatienceSeconds.
+        private static double? Patience(string where, CallFileEntry entry, List<string> errors)
+        {
+            double value = entry.patienceSeconds;
+            if (double.IsNaN(value)) return null;
+            if (entry.emergency)
+            {
+                errors.Add($"{where}: patienceSeconds is not used on an emergency, which has only its responseTimeSeconds. " +
+                    "A note only: remove it.");
+                return null;
+            }
+            if (value < 0)
+            {
+                errors.Add($"{where}: patienceSeconds {Number(value)} is negative. Use a number of seconds such as 45, or remove it " +
+                    "to use Economy.json's defaultPatienceSeconds, which the call uses for now.");
+                return null;
+            }
+            if (value == 0)
+                errors.Add($"{where}: patienceSeconds 0 means this caller never hangs up. A note only: use a number of seconds " +
+                    "such as 45, or remove it to use Economy.json's defaultPatienceSeconds.");
+            return value;
         }
 
         private static string Text(string where, string field, string value, string example, List<string> errors)

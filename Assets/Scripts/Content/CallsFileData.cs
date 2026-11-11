@@ -26,6 +26,11 @@ namespace Switchboard.Content
         public double centsPerSecond = double.NaN;
         public bool emergency;
         public double responseTimeSeconds = double.NaN;
+
+        // NaN when the call leaves it out: it then waits Economy.json's defaultPatienceSeconds (D63).
+        public double patienceSeconds = double.NaN;
+
+        // No longer used (D82: the fine follows pay); read only to tell the designer.
         public double penaltyCents = double.NaN;
     }
 }

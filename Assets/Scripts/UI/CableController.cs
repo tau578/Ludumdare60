@@ -139,6 +139,22 @@ namespace Switchboard.UI
             return true;
         }
 
+        /// <summary>
+        /// D79: both plugs of a closed cord come out at once and the cord is picked up, exactly as if it had gone back
+        /// to the tray and been taken from there (one plug-out sound, the same PickedUp event).
+        /// </summary>
+        public bool TryLiftFromBoard()
+        {
+            if (Phase != CablePhase.Connected) return false;
+            SocketView first = FirstSocket, second = SecondSocket;
+            Connection.Reset();
+            if (first != null) first.Release(this);
+            if (second != null) second.Release(this);
+            PlaySound(removeSound, 1f, 0.9f);
+            pointerInside = false;
+            return TryPickUp();
+        }
+
         public void UpdatePointer(Vector2 screenPosition, bool selected = true)
         {
             if (interactionArea == null) return;

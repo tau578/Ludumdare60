@@ -147,10 +147,10 @@ namespace Switchboard.Domain.Tests
         public void AGivenResponseTimeOnARegularCallIsIgnored()
         {
             var script = new CallScript("regular", "Ada Moss", "caller-01", "Hello", new JackId("A1"), new JackId("B2"), 20, 10, 5,
-                emergency: false, responseTimeSeconds: 30, penaltyCents: 200);
+                emergency: false, responseTimeSeconds: 30);
             Call call = calls.Add(new CallRequest(script));
             Assert.That(call.HasResponseTime, Is.False);
-            Assert.That(script.PenaltyCents, Is.Zero);
+            Assert.That(script.ResponseTimeSeconds, Is.Zero);
             calls.Tick(60);
             Assert.That(call.State, Is.EqualTo(CallState.Incoming));
         }

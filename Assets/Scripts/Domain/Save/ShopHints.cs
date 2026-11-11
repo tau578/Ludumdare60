@@ -3,8 +3,9 @@ using System;
 namespace Switchboard.Domain
 {
     /// <summary>
-    /// The tutorial's shop hints (D57), each shown once: buy the first cord (step 9), the mystery upgrade (step 10),
-    /// More Profit and More Clients. The save remembers which are done, so a reload never shows one twice.
+    /// The tutorial's hints after the first call (D57), each shown once: buy the first cord (step 9), the mystery upgrade
+    /// (step 10), More Profit and More Clients, and since 13a pass 4 (D81) the first emergency. The save remembers which
+    /// are done, so a reload never shows one twice.
     /// </summary>
     [Flags]
     public enum ShopHints
@@ -14,6 +15,7 @@ namespace Switchboard.Domain
         Mystery = 2,
         Profit = 4,
         Clients = 8,
-        All = Cord | Mystery | Profit | Clients
+        Emergency = 16,
+        All = Cord | Mystery | Profit | Clients | Emergency
     }
 }

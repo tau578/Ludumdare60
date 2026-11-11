@@ -23,6 +23,8 @@ namespace Switchboard.Game
         private Color creamText = new Color32(0xF3, 0xE9, 0xCF, 255);
         [SerializeField, Tooltip("Cream text on the menus' buttons.")]
         private Color menuText = new Color32(0xFF, 0xFA, 0xE8, 255);
+        [SerializeField, Tooltip("Card teal: the cards' badges, and the plate under a talking call's tab (D83).")]
+        private Color cardTeal = new Color32(0x17, 0x53, 0x51, 255);
         [SerializeField, Tooltip("Gold line: the thin curls on frames and panels.")]
         private Color goldLine = new Color32(0x96, 0x88, 0x1E, 255);
         [SerializeField, Tooltip("Brass plate, its lit top: the EMERGENCY plate.")]
@@ -87,7 +89,7 @@ namespace Switchboard.Game
         [Header("Neutral: neither good nor bad")]
         [SerializeField, Tooltip("The \"New order!\" stamp.")]
         private Color newOrderInk = new Color32(0x7B, 0x52, 0x20, 255);
-        [SerializeField, Tooltip("The \"Cut off\" stamp.")]
+        [SerializeField, Tooltip("Neutral ink: the \"Cut off\" and \"Hung up\" stamps.")]
         private Color cutOffInk = new Color32(0x5C, 0x50, 0x44, 255);
 
         [Header("The EMERGENCY plate's engraved letters")]
@@ -145,6 +147,12 @@ namespace Switchboard.Game
         [SerializeField, Min(0), Tooltip("The emergency lamp's flashes.")]
         private float lampFlashesPerSecond = 2f;
 
+        [Header("Timings: patience (D63; game time, frozen on pause)")]
+        [SerializeField, Min(0), Tooltip("Seconds of patience left when the amber ring starts its gentle pulse.")]
+        private float patienceUrgentSeconds = 5f;
+        [SerializeField, Min(0), Tooltip("The amber patience ring's pulse in its last seconds; slower and softer than an emergency's.")]
+        private float patiencePulsesPerSecond = 1.5f;
+
         [Header("Timings: money")]
         [SerializeField, Min(.01f), Tooltip("One coin's flight to the counter.")]
         private float coinFlightSeconds = 1f;
@@ -180,6 +188,7 @@ namespace Switchboard.Game
         public Color Ink => ink;
         public Color CreamText => creamText;
         public Color MenuText => menuText;
+        public Color CardTeal => cardTeal;
         public Color GoldLine => goldLine;
         public Color BrassPlateTop => brassPlateTop;
         public Color BrassPlateBottom => brassPlateBottom;
@@ -233,6 +242,8 @@ namespace Switchboard.Game
         public float UrgentWobbleDegrees => urgentWobbleDegrees;
         public float UrgentPulsesPerSecond => urgentPulsesPerSecond;
         public float LampFlashesPerSecond => lampFlashesPerSecond;
+        public float PatienceUrgentSeconds => patienceUrgentSeconds;
+        public float PatiencePulsesPerSecond => patiencePulsesPerSecond;
         public float CoinFlightSeconds => coinFlightSeconds;
         public float CoinSpacingSeconds => coinSpacingSeconds;
         public float DrumRollSeconds => drumRollSeconds;

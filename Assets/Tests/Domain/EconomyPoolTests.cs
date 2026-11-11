@@ -22,7 +22,8 @@ namespace Switchboard.Domain.Tests
         private const string Start = "'startingCords': 2, 'startingBoard': { 'cols': 3, 'rows': 3 }, 'startingClientSlots': 2";
 
         // The tip's fields (D59), so each test sees only its own messages.
-        private const string QuickConnect = "'quickConnectSeconds': 5, 'quickConnectTipCents': 5, ";
+        private const string QuickConnect = "'quickConnectSeconds': 5, 'quickConnectTipCents': 5, " +
+            "'defaultPatienceSeconds': 45, 'emergencyFineFactor': 1.5, 'maxBusyLineCards': 1, ";
 
         private const string Secret = "{ 'id': 'secret', 'type': 'secret', 'name': '???', 'costCents': 25000 }";
 

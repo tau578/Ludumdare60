@@ -24,6 +24,15 @@ namespace Switchboard.Domain
         /// <summary>The quick-connect tip in cents, before the income multiplier (D59); 0 turns the tip off.</summary>
         long QuickConnectTipCents { get; }
 
+        /// <summary>How long a caller waits before hanging up, unless the call sets its own (D63); 0 waits forever.</summary>
+        double DefaultPatienceSeconds { get; }
+
+        /// <summary>A missed emergency is fined this many times what connecting it would have paid (D82); 0 fines nothing.</summary>
+        double EmergencyFineFactor { get; }
+
+        /// <summary>How many calls to a busy recipient may wait on cards at once (D63).</summary>
+        int MaxBusyLineCards { get; }
+
         /// <summary>Economy.json's upgrades in file order (D39, D40).</summary>
         IReadOnlyList<IUpgrade> Upgrades { get; }
     }

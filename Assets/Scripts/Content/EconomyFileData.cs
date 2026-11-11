@@ -20,6 +20,11 @@ namespace Switchboard.Content
         public double quickConnectSeconds = double.NaN;
         public double quickConnectTipCents = double.NaN;
 
+        // Pressure (D63, D82); NaN or Unset when the file leaves them out.
+        public double defaultPatienceSeconds = double.NaN;
+        public double emergencyFineFactor = double.NaN;
+        public int maxBusyLineCards = Unset;
+
         /// <summary>Call ids from Calls.json for a new game (D52); null when the file leaves it out.</summary>
         public string[] startPool;
 

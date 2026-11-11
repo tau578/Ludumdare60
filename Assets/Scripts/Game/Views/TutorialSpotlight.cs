@@ -13,13 +13,14 @@ namespace Switchboard.Game
     public readonly struct SpotlightTarget
     {
         public SpotlightTarget(RectTransform rect, float padding = 12f, bool round = false, bool clickable = true,
-            bool lit = true)
+            bool lit = true, bool aside = false)
         {
             Rect = rect;
             Padding = padding;
             Round = round;
             Clickable = clickable;
             Lit = lit;
+            Aside = aside;
         }
 
         public RectTransform Rect { get; }
@@ -27,33 +28,45 @@ namespace Switchboard.Game
         public bool Round { get; }
         public bool Clickable { get; }
         public bool Lit { get; }
+        /// <summary>Lit only to be seen beside the step's target (13a pass 6): the hint and its arrow ignore it.</summary>
+        public bool Aside { get; }
     }
 
     /// <summary>The guide's words, one per step (D57). Plain ASCII only: the static fonts hold nothing else.</summary>
     [Serializable]
     public sealed class TutorialTexts
     {
+        /// <summary>In <see cref="openBook"/>: the recipient's name, as the book lists them.</summary>
+        public const string NamePlaceholder = "{name}";
+
         [TextArea] public string clickCaller = "A call! Click the caller to answer.";
-        [TextArea] public string readMessage = "Read who they want to talk to.";
-        [TextArea] public string readMessageDone = "Read who they want to talk to. Click to continue.";
-        [TextArea] public string callerJack = "This blinking light is the caller's line. Now find who they want.";
-        [TextArea] public string openBook = "Open the phone book.";
-        [TextArea] public string findJacks = "Find who they want and click their name.";
-        [TextArea] public string takeCord = "Take a cord.";
-        [TextArea] public string plugCaller = "Plug one end into the caller's blinking jack.";
-        [TextArea] public string plugRecipient = "Now plug the other end into the jack you found.";
-        [TextArea] public string connected = "Connected! You earn money while they talk.";
+        // 13a pass 6 (D81): the caller's side first, then the recipient's. Pass 7: one focus per step, the words at it.
+        [TextArea] public string takeCord = "Take a cord from the tray.";
+        [TextArea] public string plugCaller = "This blinking jack belongs to your caller. Plug the cord into it.";
+        [TextArea] public string openBook = "They want <b>{name}</b>. Open the book.";
+        [TextArea] public string findJacks = "Click their name. Their jack lights up.";
+        [TextArea] public string plugRecipient = "The steady light marks who they want. Plug the other end in.";
+        // 13a pass 8: one focus each, the tab, then the money.
+        [TextArea] public string connected = "Connected! While they talk, the call waits here as a tab.";
+        [TextArea] public string earning = "You earn money while they talk.";
+        [TextArea] public string freeCord =
+            "The call is over. Click a plug to free the cord. Plug it into the next call, or drop it back in the tray.";
+        [TextArea] public string emergency = "Emergency! Connect it before the red ring runs out, or you pay a fine.";
+        [TextArea] public string nextCard = "Take the next caller.";
+        [TextArea] public string nextCaller = "Their jack is blinking now. Plug the cord into it.";
         [TextArea] public string buyCord = "You can afford another cord. Buy it to handle two calls at once.";
         [TextArea] public string mystery = "Save up for the mystery upgrade!";
         [TextArea] public string buyProfit = "More Profit: every call pays more. Buy it to earn faster.";
-        [TextArea] public string buyClients = "More Clients: more callers at once, and a bigger board.";
+        [TextArea] public string buyClients = "More Clients: more callers at once, and a bigger board. Buy it to grow.";
     }
 
     /// <summary>
     /// The tutorial spotlight (D57): a dark layer over the whole screen with soft holes on the current targets, a
     /// short hint and an arrow beside them, and a Skip button. Holes follow their targets every frame and slide to
     /// the next step's targets. The tutorial is mandatory (fix 1): the dark layer swallows every click outside the
-    /// step's click areas; Skip, and the pause menu above this canvas, always work.
+    /// step's click areas; Skip, and the pause menu above this canvas, always work. A step that only informs shows an
+    /// OK button on its hint (13a pass 5, D81), the only way to end it. A light aside (13a pass 6) shows something
+    /// beside the target, such as the caller's blinking jack while a tray cord is lit; the hint and arrow ignore it.
     /// </summary>
     public sealed class TutorialSpotlight : MonoBehaviour
     {
@@ -66,6 +79,8 @@ namespace Switchboard.Game
         [SerializeField] private TMP_Text hintLabel;
         [SerializeField] private RectTransform arrow;
         [SerializeField] private Button skipButton;
+        [SerializeField, Tooltip("On the hint, for the steps that only inform (D81): the one way to end them.")]
+        private Button okButton;
         [SerializeField] private CanvasGroup group;
         [SerializeField] private TutorialTexts texts = new TutorialTexts();
         [Header("Motion")]
@@ -84,6 +99,7 @@ namespace Switchboard.Game
         private float jackArrowLength = 36f;
         [SerializeField, Min(0)] private float jackArrowGap = 6f;
         [SerializeField, Min(0)] private float margin = 24f;
+        [SerializeField, Min(0), Tooltip("Between the hint's text and its OK button.")] private float okGap = 10f;
 
         private readonly SpotlightTarget[] targets = new SpotlightTarget[MaxHoles];
         private readonly Camera[] targetCameras = new Camera[MaxHoles];
@@ -101,11 +117,16 @@ namespace Switchboard.Game
         private bool showing;
         private bool listening;
         private bool hintPlaced;
+        private bool okShowing;
+        // Every lit place is aside, so the hint points at those after all.
+        private bool pointingAside;
         private Vector2 hintPosition;
         private float fade;
         private float time;
 
         public event Action SkipClicked;
+        /// <summary>The hint's OK button: an information step is read (D81).</summary>
+        public event Action OkClicked;
         /// <summary>A click the dark layer swallowed (outside the step's click areas, Skip and the pause menu).</summary>
         public event Action DimPressed;
         public TutorialTexts Texts => texts;
@@ -116,6 +137,9 @@ namespace Switchboard.Game
         public RectTransform Hint => hint;
         public RectTransform Arrow => arrow;
         public Button SkipButton => skipButton;
+        public Button OkButton => okButton;
+        /// <summary>The current step shows the OK button on its hint.</summary>
+        public bool IsOkShowing => showing && okShowing;
         public SpotlightTarget TargetAt(int index) => targets[index];
         public bool HasGoal(int index) => index >= 0 && index < MaxHoles && goalValid[index];
         public Rect Goal(int index) => goals[index];
@@ -123,12 +147,14 @@ namespace Switchboard.Game
         /// <summary>Shows a step: its words and up to 8 targets, copied, so the caller may reuse its array.</summary>
         /// <param name="anchor">Optional: the hint goes beside this instead of beside the lit places (the open book).</param>
         /// <param name="extraClickArea">Optional: one more place that takes clicks without being lit (the open book).</param>
+        /// <param name="withOk">An information step: the hint carries the OK button that ends it (D81).</param>
         public void Show(string text, SpotlightTarget[] spots, int count, RectTransform anchor = null,
-            RectTransform extraClickArea = null)
+            RectTransform extraClickArea = null, bool withOk = false)
         {
             if (!listening)
             {
                 if (skipButton != null) skipButton.onClick.AddListener(OnSkipClicked);
+                if (okButton != null) okButton.onClick.AddListener(OnOkClicked);
                 if (dim != null) dim.Pressed += OnDimPressed;
                 listening = true;
             }
@@ -141,6 +167,8 @@ namespace Switchboard.Game
             }
             showing = true;
             if (group != null) group.interactable = true;
+            okShowing = withOk && okButton != null;
+            if (okButton != null) okButton.gameObject.SetActive(okShowing);
             SetText(text);
             targetCount = Mathf.Clamp(count, 0, MaxHoles);
             hintAnchor = anchor;
@@ -180,6 +208,27 @@ namespace Switchboard.Game
             if (showing) SkipClicked?.Invoke();
         }
 
+        private void OnOkClicked()
+        {
+            if (IsOkShowing) OkClicked?.Invoke();
+        }
+
+        /// <summary>The buttons' words in the paint box's menu cream and label font (D75), like the menus' buttons.</summary>
+        public void ApplyStyle(GameStyle style)
+        {
+            if (style == null) return;
+            StyleLabel(skipButton, style);
+            StyleLabel(okButton, style);
+        }
+
+        private static void StyleLabel(Button button, GameStyle style)
+        {
+            TMP_Text label = button != null ? button.GetComponentInChildren<TMP_Text>(true) : null;
+            if (label == null) return;
+            label.color = style.MenuText;
+            if (style.LabelFont != null) label.font = style.LabelFont;
+        }
+
         private void OnDimPressed()
         {
             if (showing) DimPressed?.Invoke();
@@ -189,6 +238,7 @@ namespace Switchboard.Game
         {
             if (!listening) return;
             if (skipButton != null) skipButton.onClick.RemoveListener(OnSkipClicked);
+            if (okButton != null) okButton.onClick.RemoveListener(OnOkClicked);
             if (dim != null) dim.Pressed -= OnDimPressed;
         }
 
@@ -208,8 +258,8 @@ namespace Switchboard.Game
             }
             float follow = 1 - Mathf.Exp(-slideSpeed * seconds);
             float breathe = pulse * (.5f - .5f * Mathf.Cos(time * Mathf.PI * 2 / pulseSeconds));
-            Rect union = default;
-            bool any = false;
+            Rect union = default, asideUnion = default;
+            bool any = false, anyAside = false;
             for (int i = 0; i < MaxHoles; i++)
             {
                 goalValid[i] = i < targetCount && targets[i].Lit &&
@@ -219,8 +269,17 @@ namespace Switchboard.Game
                     if (strengths[i] <= .001f) holes[i] = SpawnRect(i);
                     holes[i] = Lerp(holes[i], goals[i], follow);
                     strengths[i] = Mathf.MoveTowards(strengths[i], 1, seconds / fadeSeconds);
-                    union = any ? Union(union, goals[i]) : goals[i];
-                    any = true;
+                    // A light aside (13a pass 6) doesn't move the hint, unless it is all there is.
+                    if (targets[i].Aside)
+                    {
+                        asideUnion = anyAside ? Union(asideUnion, goals[i]) : goals[i];
+                        anyAside = true;
+                    }
+                    else
+                    {
+                        union = any ? Union(union, goals[i]) : goals[i];
+                        any = true;
+                    }
                 }
                 else strengths[i] = Mathf.MoveTowards(strengths[i], 0, seconds / fadeSeconds);
                 Rect shown = Grow(holes[i], breathe * strengths[i]);
@@ -229,9 +288,20 @@ namespace Switchboard.Game
             }
             dim.Apply();
             if (showing) UpdateClickAreas();
+            pointingAside = !any && anyAside;
+            if (pointingAside) { union = asideUnion; any = true; }
             Rect anchorRect = default;
             bool anchored = any && hintAnchor != null && TryLocalRect(hintAnchor, hintAnchorCamera, 0, out anchorRect);
             if (any) PlaceHintAndArrow(union, anchored ? anchorRect : union, anchored, follow);
+            else if (showing && okShowing && hint != null)
+            {
+                // Nothing to point at (its target is gone): the hint and its OK stay, centred, so the step can end.
+                hint.gameObject.SetActive(true);
+                hintPosition = Vector2.zero;
+                hintPlaced = true;
+                hint.anchoredPosition = hintPosition;
+                if (arrow != null) arrow.gameObject.SetActive(false);
+            }
             else
             {
                 if (hint != null) hint.gameObject.SetActive(false);
@@ -252,6 +322,7 @@ namespace Switchboard.Game
         private void Finish()
         {
             showing = false;
+            okShowing = false;
             targetCount = 0;
             hintAnchor = null;
             hintAnchorCamera = null;
@@ -267,6 +338,7 @@ namespace Switchboard.Game
             gameObject.SetActive(false);
         }
 
+        // The text on top; with OK, the button sits under it, centred, and the hint grows to hold both.
         private void SetText(string text)
         {
             if (hintLabel == null || hint == null) return;
@@ -274,7 +346,19 @@ namespace Switchboard.Game
             Vector2 preferred = hintLabel.GetPreferredValues(hintLabel.text, hintMaxWidth - hintPadding.x * 2, 0);
             float width = Mathf.Min(preferred.x, hintMaxWidth - hintPadding.x * 2);
             preferred = hintLabel.GetPreferredValues(hintLabel.text, width, 0);
-            hint.sizeDelta = new Vector2(width, preferred.y) + hintPadding * 2;
+            Vector2 ok = okShowing ? ((RectTransform)okButton.transform).sizeDelta : Vector2.zero;
+            float below = okShowing ? ok.y + okGap : 0;
+            hint.sizeDelta = new Vector2(Mathf.Max(width, ok.x), preferred.y + below) + hintPadding * 2;
+            RectTransform label = hintLabel.rectTransform;
+            label.anchorMin = Vector2.zero;
+            label.anchorMax = Vector2.one;
+            label.offsetMin = new Vector2(hintPadding.x, hintPadding.y + below);
+            label.offsetMax = -hintPadding;
+            if (!okShowing) return;
+            var okRect = (RectTransform)okButton.transform;
+            okRect.anchorMin = okRect.anchorMax = new Vector2(.5f, 0);
+            okRect.pivot = new Vector2(.5f, 0);
+            okRect.anchoredPosition = new Vector2(0, hintPadding.y);
         }
 
         // A new hole grows out of the nearest open one, so the light seems to move rather than blink.
@@ -369,7 +453,7 @@ namespace Switchboard.Game
             float best = float.MaxValue;
             for (int i = 0; i < MaxHoles; i++)
             {
-                if (!goalValid[i]) continue;
+                if (!goalValid[i] || (targets[i].Aside && !pointingAside)) continue;
                 float distance = (goals[i].center - hintGoal).sqrMagnitude;
                 if (distance < best) { best = distance; nearest = i; }
             }

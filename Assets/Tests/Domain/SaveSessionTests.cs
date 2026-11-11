@@ -127,11 +127,23 @@ namespace Switchboard.Domain.Tests
 
             session.Tick(0.05);
 
-            // The board's stage pool deals in order, one live call per caller.
+            // The board's stage pool deals in order: one live call per caller, nobody who is on a call already as caller
+            // or recipient, and at most maxBusyLineCards calls to someone already on a call (D63).
             var expected = new List<string>();
             var callers = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+            var jacks = new HashSet<JackId>();
+            int busyCards = 0;
             foreach (CallScript call in board.StagePool)
-                if (expected.Count < board.ClientSlots && callers.Add(call.Name.Trim())) expected.Add(call.Id);
+            {
+                if (expected.Count >= board.ClientSlots || callers.Contains(call.Name.Trim()) || jacks.Contains(call.From)) continue;
+                bool busy = jacks.Contains(call.To);
+                if (busy && busyCards >= economy.MaxBusyLineCards) continue;
+                if (busy) busyCards++;
+                callers.Add(call.Name.Trim());
+                jacks.Add(call.From);
+                jacks.Add(call.To);
+                expected.Add(call.Id);
+            }
             Assert.That(LiveIds(session), Is.EqualTo(expected));
             Assert.That(session.Wallet.Cents, Is.EqualTo(123));
         }
@@ -209,7 +221,7 @@ namespace Switchboard.Domain.Tests
         [Test]
         public void CallsFromAnOlderPoolDoNotCount()
         {
-            var stage = Scripts.Pool(4, new BoardSize(4, 4), "stage_");
+            var stage = Scripts.StagePool(4);
             FakeContent content = Content(Scripts.Pool(5, Small), 2, 100000,
                 FakeUpgrade.BoardUpgrade("board_1", 1000, 4, stage, 3));
             var session = new GameSession(content, new FakeSwitchboard());
@@ -287,7 +299,7 @@ namespace Switchboard.Domain.Tests
         [Test]
         public void FinesCountTheAmountTaken()
         {
-            var emergency = new[] { Scripts.Emergency("emergency_1", "A1", "B2", penaltyCents: 200) };
+            var emergency = new[] { Scripts.Emergency("emergency_1", "A1", "B2") };
             var session = new GameSession(Content(emergency, 1, 150), new FakeSwitchboard());
             for (int i = 0; i < 20 * 31; i++) session.Tick(0.05);
 
@@ -353,7 +365,8 @@ namespace Switchboard.Domain.Tests
             var loaded = new GameSession(content, new FakeSwitchboard(), data, tutorial: true);
             Assert.That(loaded.IsTutorial, Is.False, "Continue: no first-call guide");
             Assert.That(loaded.ShopHintsDone, Is.EqualTo(ShopHints.Cord | ShopHints.Profit));
-            Assert.That(loaded.ShopHintsPending, Is.EqualTo(ShopHints.Mystery | ShopHints.Clients), "the rest still come");
+            Assert.That(loaded.ShopHintsPending, Is.EqualTo(ShopHints.Mystery | ShopHints.Clients | ShopHints.Emergency),
+                "the rest still come");
 
             Assert.That(new GameSession(content, new FakeSwitchboard(), new SaveData { version = 1, shopHintsDone = 0 })
                 .ShopHintsPending, Is.EqualTo(ShopHints.All), "saved before any hint showed");

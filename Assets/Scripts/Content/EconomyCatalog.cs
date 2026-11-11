@@ -8,9 +8,12 @@ namespace Switchboard.Content
     {
         public EconomyCatalog(long startingCents, int startingCords, BoardSize startingBoard, int startingClientSlots,
             IReadOnlyList<CallScript> startPool, IReadOnlyList<IUpgrade> upgrades, IReadOnlyList<string> errors,
-            QuickConnectTip quickTip = default)
+            QuickConnectTip quickTip = default, Pressure pressure = default)
         {
             QuickTip = quickTip;
+            DefaultPatienceSeconds = pressure.DefaultPatienceSeconds;
+            EmergencyFineFactor = pressure.EmergencyFineFactor;
+            MaxBusyLineCards = pressure.MaxBusyLineCards;
             StartingCents = startingCents;
             StartingCords = startingCords;
             StartingBoard = startingBoard;
@@ -24,6 +27,15 @@ namespace Switchboard.Content
         public int StartingCords { get; }
         public BoardSize StartingBoard { get; }
         public int StartingClientSlots { get; }
+
+        /// <summary>defaultPatienceSeconds (D63): how long a caller waits; 0 waits forever.</summary>
+        public double DefaultPatienceSeconds { get; }
+
+        /// <summary>emergencyFineFactor (D82): a missed emergency costs this many times its pay; 0 fines nothing.</summary>
+        public double EmergencyFineFactor { get; }
+
+        /// <summary>maxBusyLineCards (D63): calls to a busy recipient allowed on cards at once.</summary>
+        public int MaxBusyLineCards { get; }
 
         /// <summary>quickConnectSeconds and quickConnectTipCents (D59).</summary>
         public QuickConnectTip QuickTip { get; }
@@ -44,5 +56,20 @@ namespace Switchboard.Content
         }
         public IReadOnlyList<IUpgrade> Upgrades { get; }
         public IReadOnlyList<string> Errors { get; }
+
+        /// <summary>The pressure values of the economy file (D63, D82).</summary>
+        public readonly struct Pressure
+        {
+            public Pressure(double defaultPatienceSeconds, double emergencyFineFactor, int maxBusyLineCards)
+            {
+                DefaultPatienceSeconds = defaultPatienceSeconds;
+                EmergencyFineFactor = emergencyFineFactor;
+                MaxBusyLineCards = maxBusyLineCards;
+            }
+
+            public double DefaultPatienceSeconds { get; }
+            public double EmergencyFineFactor { get; }
+            public int MaxBusyLineCards { get; }
+        }
     }
 }

@@ -35,6 +35,7 @@ namespace Switchboard.Content
             BoardSize startingBoard = BoardSize.Full;
             int startingClientSlots = StatSheet.MaxClientSlots;
             var quickTip = new QuickConnectTip(QuickConnectTip.DefaultSeconds, QuickConnectTip.DefaultCents);
+            var pressure = default(EconomyCatalog.Pressure);
             EconomyFileData data = Parse(json, errors);
             if (data != null)
             {
@@ -43,6 +44,7 @@ namespace Switchboard.Content
                 startingBoard = CheckStartingBoard(data.startingBoard, errors);
                 startingClientSlots = CheckStartingClientSlots(data.startingClientSlots, errors);
                 quickTip = CheckQuickConnect(data, errors);
+                pressure = CheckPressure(data, errors);
                 CheckRemovedSections(data, errors);
 
                 var ids = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -75,7 +77,7 @@ namespace Switchboard.Content
                 }
             }
             return new EconomyCatalog(startingCents, startingCords, startingBoard, startingClientSlots, startPool, upgrades, errors,
-                quickTip);
+                quickTip, pressure);
         }
 
         /// <summary>
@@ -226,6 +228,53 @@ namespace Switchboard.Content
                 errors.Add($"startingClientSlots {slots} is outside 1 to {all}, the caller panel's slots. The game opens all {all} for now.");
             else return slots;
             return all;
+        }
+
+        // Pressure (D63, D82). The numbers live only in the file: a field left out or wrong turns its rule off, with a message.
+        private static EconomyCatalog.Pressure CheckPressure(EconomyFileData data, List<string> errors)
+        {
+            double patience = data.defaultPatienceSeconds;
+            if (double.IsNaN(patience))
+            {
+                errors.Add("defaultPatienceSeconds is missing, so callers never hang up. Add how many seconds a caller waits " +
+                    "before hanging up, such as \"defaultPatienceSeconds\": 45.");
+                patience = 0;
+            }
+            else if (patience <= 0)
+            {
+                errors.Add($"defaultPatienceSeconds {Number(patience)} must be above 0. Use a number of seconds such as 45. " +
+                    "Callers never hang up for now.");
+                patience = 0;
+            }
+
+            double factor = data.emergencyFineFactor;
+            if (double.IsNaN(factor))
+            {
+                errors.Add("emergencyFineFactor is missing, so missed emergencies are not fined. Add how many times its pay a " +
+                    "missed emergency costs, such as \"emergencyFineFactor\": 1.5.");
+                factor = 0;
+            }
+            else if (factor < 0)
+            {
+                errors.Add($"emergencyFineFactor {Number(factor)} is negative. Use 0 or more, such as 1.5 (0 for no fines). " +
+                    "Missed emergencies are not fined for now.");
+                factor = 0;
+            }
+
+            int busy = data.maxBusyLineCards;
+            if (busy == EconomyFileData.Unset)
+            {
+                errors.Add("maxBusyLineCards is missing, so nobody calls a person who is on the line. Add how many such calls " +
+                    "may wait at once, such as \"maxBusyLineCards\": 1.");
+                busy = 0;
+            }
+            else if (busy < 0)
+            {
+                errors.Add($"maxBusyLineCards {busy} is negative. Use 0 or more, such as 1. Nobody calls a person who is on " +
+                    "the line for now.");
+                busy = 0;
+            }
+            return new EconomyCatalog.Pressure(patience, factor, busy);
         }
 
         // The tip (D59) is optional: a field left out gets its default with a note; a wrong value is an error.

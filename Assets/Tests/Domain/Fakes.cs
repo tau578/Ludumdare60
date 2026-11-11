@@ -7,20 +7,33 @@ namespace Switchboard.Domain.Tests
     internal static class Scripts
     {
         public static CallScript Call(string id, string from, string to, double centsPerSecond = 5, double durationSeconds = 20,
-            double connectCents = 0) =>
+            double connectCents = 0, double? patienceSeconds = null) =>
             new CallScript(id, "Caller " + id, "caller-01", "Connect me, please.", new JackId(from), new JackId(to),
-                durationSeconds, connectCents, centsPerSecond);
+                durationSeconds, connectCents, centsPerSecond, patienceSeconds: patienceSeconds);
 
-        /// <summary>The Step 4 emergency numbers (D37): 30 s to connect and a 200¢ fine for missing it.</summary>
+        /// <summary>30 s to connect (D64); it pays 30¢ + 7¢/s for 15 s, 135¢ in all, so a 1.5 factor fines 203¢ (D82).</summary>
         public static CallScript Emergency(string id, string from, string to, double centsPerSecond = 7, double durationSeconds = 15,
-            double connectCents = 30, double responseTimeSeconds = 30, long penaltyCents = 200) =>
+            double connectCents = 30, double responseTimeSeconds = 30) =>
             new CallScript(id, "Caller " + id, "caller-02", "Get me the Doctor!", new JackId(from), new JackId(to),
-                durationSeconds, connectCents, centsPerSecond, true, responseTimeSeconds, penaltyCents);
+                durationSeconds, connectCents, centsPerSecond, true, responseTimeSeconds);
 
         /// <summary>
-        /// Count different calls, each between two neighbouring jacks of the board's open part: call_1 joins the
-        /// first two open jacks, call_2 the second and third, and so on.
+        /// Count different calls on the board's open part. call_1 joins the first open jack and the one half the open
+        /// jacks further on, call_2 the second and the next, and so on, so nearby calls share no jack and the queue's
+        /// busy-caller rule (D63) skips none of them.
         /// </summary>
+        /// <summary>
+        /// Up to four calls for a 4x4 stage, on jacks a 3x3 pool never uses (D1 to A4, D2 to B4, D3 to C4, D4 to C3),
+        /// so a bought board's calls never wait for an old card's caller (D63).
+        /// </summary>
+        public static CallScript[] StagePool(int count, string prefix = "stage_")
+        {
+            string[,] pairs = { { "D1", "A4" }, { "D2", "B4" }, { "D3", "C4" }, { "D4", "C3" } };
+            var pool = new CallScript[count];
+            for (int i = 0; i < count; i++) pool[i] = Call(prefix + (i + 1), pairs[i, 0], pairs[i, 1], 5, 20, 10);
+            return pool;
+        }
+
         public static CallScript[] Pool(int count, BoardSize board, string prefix = "call_")
         {
             var jacks = new List<string>();
@@ -28,8 +41,9 @@ namespace Switchboard.Domain.Tests
                 for (int column = 1; column <= board.Cols; column++)
                     jacks.Add($"{(char)('A' + row)}{column}");
             var pool = new CallScript[count];
+            int offset = Math.Max(1, jacks.Count / 2);
             for (int i = 0; i < count; i++)
-                pool[i] = Call(prefix + (i + 1), jacks[i % jacks.Count], jacks[(i + 1) % jacks.Count], 5, 20, 10);
+                pool[i] = Call(prefix + (i + 1), jacks[i % jacks.Count], jacks[(i + offset) % jacks.Count], 5, 20, 10);
             return pool;
         }
     }
@@ -44,6 +58,10 @@ namespace Switchboard.Domain.Tests
         // Off by default, so tests that count money exactly don't see a tip.
         public double QuickConnectSeconds { get; set; }
         public long QuickConnectTipCents { get; set; }
+        // Callers wait forever by default, so tests that tick long don't see hang-ups (D63).
+        public double DefaultPatienceSeconds { get; set; }
+        public double EmergencyFineFactor { get; set; } = 1.5;
+        public int MaxBusyLineCards { get; set; } = 1;
         public IReadOnlyList<IUpgrade> Upgrades { get; set; } = Array.Empty<IUpgrade>();
     }
 
@@ -164,7 +182,7 @@ namespace Switchboard.Domain.Tests
 
     /// <summary>
     /// Emergencies (D51): people's calls from jacks A1 onwards (Grid.Jack) to Police on F6, Fire Brigade on F5 or
-    /// Doctor on F4, with 30 s to connect and a 200¢ fine for missing them.
+    /// Doctor on F4, with 30 s to connect.
     /// </summary>
     internal sealed class EmergencyWorld
     {

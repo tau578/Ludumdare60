@@ -19,8 +19,24 @@ namespace Switchboard.Domain
     /// <summary>Runs the migration steps one version at a time, in order, up to the version this build writes.</summary>
     public static class SaveMigrations
     {
-        /// <summary>The game's own steps. Version 1 is the first format, so there are none yet.</summary>
-        public static readonly IReadOnlyList<SaveMigration> All = Array.Empty<SaveMigration>();
+        /// <summary>The game's own steps.</summary>
+        public static readonly IReadOnlyList<SaveMigration> All = new[]
+        {
+            new SaveMigration(1, MarkEmergencyHintDoneWhenShopHintsAre)
+        };
+
+        /// <summary>The four shop hints of a version 1 save, all done.</summary>
+        public const int VersionOneShopHints = 1 | 2 | 4 | 8;
+
+        /// <summary>
+        /// 1 to 2 (13a pass 4, D81): a save whose four shop hints are all done (seen or skipped) never gets the new
+        /// emergency hint, so Skip tutorial stays final; a tutorial still under way gets it.
+        /// </summary>
+        public static void MarkEmergencyHintDoneWhenShopHintsAre(SaveData data)
+        {
+            if (data.shopHintsDone >= 0 && (data.shopHintsDone & VersionOneShopHints) == VersionOneShopHints)
+                data.shopHintsDone |= (int)ShopHints.Emergency;
+        }
 
         /// <summary>Returns how many steps ran. A save newer than the target is left as it is.</summary>
         public static int Run(SaveData data, IReadOnlyList<SaveMigration> steps, int targetVersion = SaveData.CurrentVersion)

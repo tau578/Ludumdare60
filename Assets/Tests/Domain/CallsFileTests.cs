@@ -28,7 +28,6 @@ namespace Switchboard.Domain.Tests
                 Assert.That(call.emergency, Is.EqualTo(emergency), call.id + " to " + recipient.name);
                 if (!emergency) continue;
                 Assert.That(call.responseTimeSeconds, Is.GreaterThan(0), call.id);
-                Assert.That(call.penaltyCents, Is.GreaterThanOrEqualTo(0), call.id);
             }
         }
 
@@ -47,14 +46,14 @@ namespace Switchboard.Domain.Tests
 
         private const string Sample = @"{
           'calls': [
-            { 'id': 'call_001', 'icon': 'caller-01', 'name': 'Ada Moss', 'message': 'Connect me with Mabel Dunmore, please.', 'from': 'C3', 'to': 'A2', 'durationSeconds': 20, 'connectCents': 10, 'centsPerSecond': 5 },
-            { 'id': 'call_002', 'icon': 'caller-08', 'name': 'Arthur Hollis', 'message': 'My neighbour is ill, get me the Doctor!', 'from': 'A1', 'to': 'D4', 'durationSeconds': 15, 'connectCents': 30, 'centsPerSecond': 7.5, 'emergency': true, 'responseTimeSeconds': 30, 'penaltyCents': 200 }
+            { 'id': 'call_001', 'icon': 'caller-01', 'name': 'Ada Moss', 'message': 'Connect me to <b>Mabel Dunmore</b>. Thank you.', 'from': 'C3', 'to': 'A2', 'durationSeconds': 20, 'connectCents': 10, 'centsPerSecond': 5 },
+            { 'id': 'call_002', 'icon': 'caller-08', 'name': 'Arthur Hollis', 'message': 'Connect me to <b>the doctor</b>. My neighbour is ill!', 'from': 'A1', 'to': 'D4', 'durationSeconds': 15, 'connectCents': 30, 'centsPerSecond': 7.5, 'emergency': true, 'responseTimeSeconds': 30 }
           ]
         }";
 
         private static readonly string[] Fields =
         {
-            "'id': 'call_009'", "'icon': 'caller-02'", "'name': 'Basil Thorne'", "'message': 'Hello there.'", "'from': 'A1'",
+            "'id': 'call_009'", "'icon': 'caller-02'", "'name': 'Basil Thorne'", "'message': 'Connect me to <b>Ida Pell</b>. Hello there.'", "'from': 'A1'",
             "'to': 'B2'", "'durationSeconds': 20", "'connectCents': 10", "'centsPerSecond': 5"
         };
 
@@ -111,7 +110,7 @@ namespace Switchboard.Domain.Tests
             Assert.That(ada.Id, Is.EqualTo("call_001"));
             Assert.That(ada.Icon, Is.EqualTo("caller-01"));
             Assert.That(ada.Name, Is.EqualTo("Ada Moss"));
-            Assert.That(ada.Message, Is.EqualTo("Connect me with Mabel Dunmore, please."));
+            Assert.That(ada.Message, Is.EqualTo("Connect me to <b>Mabel Dunmore</b>. Thank you."));
             Assert.That(ada.From, Is.EqualTo(new JackId("C3")));
             Assert.That(ada.To, Is.EqualTo(new JackId("A2")));
             Assert.That(ada.DurationSeconds, Is.EqualTo(20));
@@ -124,7 +123,8 @@ namespace Switchboard.Domain.Tests
             Assert.That(doctor.IsEmergency, Is.True);
             Assert.That(doctor.CentsPerSecond, Is.EqualTo(7.5), "cents per second may have decimals");
             Assert.That(doctor.ResponseTimeSeconds, Is.EqualTo(30));
-            Assert.That(doctor.PenaltyCents, Is.EqualTo(200));
+            Assert.That(doctor.PatienceSeconds, Is.Null, "an emergency has no patience (D64)");
+            Assert.That(ada.PatienceSeconds, Is.Null, "left out: the default patience applies (D63)");
         }
 
         [Test]
@@ -136,6 +136,7 @@ namespace Switchboard.Domain.Tests
             Assert.That(double.IsNaN(data.calls[0].centsPerSecond), Is.True);
             Assert.That(double.IsNaN(data.calls[0].responseTimeSeconds), Is.True);
             Assert.That(double.IsNaN(data.calls[0].penaltyCents), Is.True);
+            Assert.That(double.IsNaN(data.calls[0].patienceSeconds), Is.True);
         }
 
         [Test]
@@ -201,7 +202,7 @@ namespace Switchboard.Domain.Tests
 
         [Test]
         public void ZeroPayIsAllowed() =>
-            Assert.That(Load(File(Call("'id': 'free'", "'icon': 'caller-01'", "'name': 'A'", "'message': 'Hi'", "'from': 'A1'", "'to': 'B1'",
+            Assert.That(Load(File(Call("'id': 'free'", "'icon': 'caller-01'", "'name': 'A'", "'message': 'Connect me to <b>B</b>. Hi'", "'from': 'A1'", "'to': 'B1'",
                 "'durationSeconds': 5", "'connectCents': 0", "'centsPerSecond': 0"))).Errors, Is.Empty);
 
         [TestCase("'from': 'G1'", "from \"G1\" is not a jack on the board")]
@@ -218,30 +219,62 @@ namespace Switchboard.Domain.Tests
         [Test]
         public void AnEmergencyNeedsAResponseTimeAboveZero()
         {
-            AssertSingleError(Load(File(Call(Fields) .Replace(" }", ", 'emergency': true, 'penaltyCents': 200 }"))),
+            AssertSingleError(Load(File(Call(Fields) .Replace(" }", ", 'emergency': true }"))),
                 "an emergency needs responseTimeSeconds");
-            AssertSingleError(Load(File(Call(Fields).Replace(" }", ", 'emergency': true, 'responseTimeSeconds': 0, 'penaltyCents': 200 }"))),
+            AssertSingleError(Load(File(Call(Fields).Replace(" }", ", 'emergency': true, 'responseTimeSeconds': 0 }"))),
                 "responseTimeSeconds 0 must be above 0");
         }
 
+        // D82: the fine follows pay, so an emergency no longer needs penaltyCents, and one left in gets a plain note.
         [Test]
-        public void AnEmergencyNeedsAPenaltyInWholeCents()
+        public void AnEmergencyNeedsNoPenaltyAndALeftoverOneGetsANote()
         {
-            AssertSingleError(Load(File(Call(Fields).Replace(" }", ", 'emergency': true, 'responseTimeSeconds': 30 }"))),
-                "penaltyCents is missing");
-            AssertSingleError(Load(File(Call(Fields).Replace(" }", ", 'emergency': true, 'responseTimeSeconds': 30, 'penaltyCents': -5 }"))),
-                "penaltyCents -5 is negative");
+            CallsCatalog clean = Load(File(Call(Fields).Replace(" }", ", 'emergency': true, 'responseTimeSeconds': 30 }")));
+            Assert.That(clean.Errors, Is.Empty);
+            Assert.That(clean.Calls[0].IsEmergency, Is.True);
+
+            CallsCatalog leftover = Load(File(Call(Fields).Replace(" }", ", 'emergency': true, 'responseTimeSeconds': 30, 'penaltyCents': 200 }")));
+            AssertSingleError(leftover, "penaltyCents is no longer used");
+            Assert.That(leftover.Calls.Count, Is.EqualTo(1), "a note only: the call still plays");
         }
 
         [Test]
         public void ARegularCallWithEmergencyFieldsGetsANoteAndStillPlays()
         {
-            CallsCatalog catalog = Load(File(Call(Fields).Replace(" }", ", 'responseTimeSeconds': 30, 'penaltyCents': 200 }")));
+            CallsCatalog catalog = Load(File(Call(Fields).Replace(" }", ", 'responseTimeSeconds': 30 }")));
             AssertSingleError(catalog, "only used for emergencies");
             Assert.That(catalog.Calls.Count, Is.EqualTo(1));
             Assert.That(catalog.Calls[0].IsEmergency, Is.False);
             Assert.That(catalog.Calls[0].ResponseTimeSeconds, Is.Zero);
-            Assert.That(catalog.Calls[0].PenaltyCents, Is.Zero);
+        }
+
+        [Test]
+        public void ACallMayHaveItsOwnPatience()
+        {
+            CallsCatalog catalog = Load(File(Call(Fields).Replace(" }", ", 'patienceSeconds': 20 }")));
+            Assert.That(catalog.Errors, Is.Empty);
+            Assert.That(catalog.Calls[0].PatienceSeconds, Is.EqualTo(20));
+        }
+
+        [Test]
+        public void APatienceOfZeroOrLessIsReported()
+        {
+            CallsCatalog zero = Load(File(Call(Fields).Replace(" }", ", 'patienceSeconds': 0 }")));
+            AssertSingleError(zero, "patienceSeconds 0 means this caller never hangs up");
+            Assert.That(zero.Calls[0].PatienceSeconds, Is.EqualTo(0), "a note only: 0 waits forever");
+
+            CallsCatalog negative = Load(File(Call(Fields).Replace(" }", ", 'patienceSeconds': -5 }")));
+            AssertSingleError(negative, "patienceSeconds -5 is negative");
+            Assert.That(negative.Calls[0].PatienceSeconds, Is.Null, "the default patience applies instead");
+        }
+
+        [Test]
+        public void AnEmergencyWithPatienceGetsANoteAndKeepsOnlyItsResponseTime()
+        {
+            CallsCatalog catalog = Load(File(Call(Fields).Replace(" }", ", 'emergency': true, 'responseTimeSeconds': 30, 'patienceSeconds': 45 }")));
+            AssertSingleError(catalog, "patienceSeconds is not used on an emergency");
+            Assert.That(catalog.Calls[0].PatienceSeconds, Is.Null);
+            Assert.That(catalog.Calls[0].ResponseTimeSeconds, Is.EqualTo(30));
         }
 
         [Test]
@@ -254,6 +287,42 @@ namespace Switchboard.Domain.Tests
             Assert.That(catalog.Find("call_010"), Is.Null);
             Assert.That(catalog.IsLeftOut("call_010"), Is.True);
             Assert.That(catalog.Find("call_011"), Is.Not.Null);
+        }
+
+        [TestCase("Connect me to <b>Ada Moss</b>. Quick!", true)]
+        [TestCase("Connect me to <b>the police station</b>.", true)]
+        [TestCase("<b>Ada Moss</b>, please.", false)]
+        [TestCase("Connect me with <b>Ada Moss</b>.", false)]
+        [TestCase("Connect me to <b></b>. Hello.", false)]
+        [TestCase("Connect me to <b>Ada Moss</b>, please.", false)]
+        [TestCase("Connect me to Ada Moss.", false)]
+        public void AMessageOpensByNamingThePersonWanted(string message, bool leadIn) =>
+            Assert.That(CallsFileLoader.HasLeadIn(message), Is.EqualTo(leadIn));
+
+        [Test]
+        public void AMessageWithoutTheLeadInGetsANoteButStillPlays()
+        {
+            CallsCatalog catalog = Load(File(CallWith("message", "'message': '<b>Ida Pell</b>, please.'")));
+            AssertSingleError(catalog, "call_009", "Connect me to <b>Name</b>.", "A note only");
+            Assert.That(catalog.Find("call_009"), Is.Not.Null);
+        }
+
+        // D80: the bold name is the person the call goes to, as the book names them; services as "the <book name>".
+        [Test]
+        public void EveryRealMessageNamesItsRecipientAsTheBookDoes()
+        {
+            var book = JsonUtility.FromJson<BookFileData>(AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Configs/Book.json").text);
+            var calls = JsonUtility.FromJson<CallsFileData>(AssetDatabase.LoadAssetAtPath<TextAsset>(CallsFilePath).text);
+            foreach (var call in calls.calls)
+            {
+                Assert.That(CallsFileLoader.HasLeadIn(call.message), Is.True, call.id + ": " + call.message);
+                int start = CallsFileLoader.LeadIn.Length;
+                string named = call.message.Substring(start, call.message.IndexOf("</b>.", start, StringComparison.Ordinal) - start);
+                bool found = Array.Exists(book.entries, entry => entry.jack == call.to &&
+                    (string.Equals(named, AsCalled(entry.name), StringComparison.OrdinalIgnoreCase) ||
+                     entry.emergencyService && string.Equals(named, "the " + entry.name, StringComparison.OrdinalIgnoreCase)));
+                Assert.That(found, Is.True, $"{call.id}: \"{named}\" is not how the book names the person on {call.to}");
+            }
         }
 
         // The designer balances Calls.json at any time (lead, 2026-10-19): this checks the rules, not the numbers.
@@ -279,9 +348,14 @@ namespace Switchboard.Domain.Tests
                 Assert.That(call.DurationSeconds, Is.GreaterThan(0), call.Id);
                 Assert.That(call.ConnectCents, Is.GreaterThanOrEqualTo(0), call.Id);
                 Assert.That(call.CentsPerSecond, Is.GreaterThanOrEqualTo(0), call.Id);
-                if (!call.IsEmergency) continue;
+                if (!call.IsEmergency)
+                {
+                    Assert.That(call.PatienceSeconds ?? config.LoadEconomy(catalog).DefaultPatienceSeconds, Is.GreaterThan(0),
+                        $"{call.Id}: every regular caller hangs up some time (D63)");
+                    continue;
+                }
                 Assert.That(call.ResponseTimeSeconds, Is.GreaterThan(0), call.Id);
-                Assert.That(call.PenaltyCents, Is.GreaterThanOrEqualTo(0), call.Id);
+                Assert.That(call.PatienceSeconds, Is.Null, call.Id);
             }
         }
     }

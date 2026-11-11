@@ -125,14 +125,31 @@ namespace Switchboard.Domain.Tests
         }
 
         [Test]
-        public void AVersionOneSaveNeedsNoSteps()
+        public void ACurrentSaveNeedsNoSteps()
         {
             int runs = 0;
-            var withStep = new SaveFile(storage, new[] { new SaveMigration(0, _ => runs++) });
-            storage.Write(SaveFile.MainKey, "{\"version\":1,\"cents\":5}");
+            var withStep = new SaveFile(storage, new[] { new SaveMigration(0, _ => runs++), new SaveMigration(1, _ => runs++) });
+            storage.Write(SaveFile.MainKey, "{\"version\":" + SaveData.CurrentVersion + ",\"cents\":5}");
             withStep.Load();
-            Assert.That(runs, Is.EqualTo(0), "a v1 save has nothing to migrate in a v1 game");
-            Assert.That(SaveMigrations.All, Is.Empty, "version 1 is the first format");
+            Assert.That(runs, Is.EqualTo(0), "an up-to-date save has nothing to migrate");
+        }
+
+        // 13a pass 4 (D81): the emergency hint joined the shop hints. A version 1 save with its four shop hints done
+        // (seen or skipped) never gets it; one whose tutorial is still under way does.
+        [TestCase(15, 31)]
+        [TestCase(1 | 2, 1 | 2)]
+        [TestCase(0, 0)]
+        [TestCase(SaveData.ShopHintsMissing, SaveData.ShopHintsMissing)]
+        public void AVersionOneSaveGetsTheEmergencyHintOnlyWhenItsShopHintsAreDone(int before, int after)
+        {
+            var real = new SaveFile(storage, SaveMigrations.All);
+            string hints = before == SaveData.ShopHintsMissing ? "" : ",\"shopHintsDone\":" + before;
+            storage.Write(SaveFile.MainKey, "{\"version\":1,\"cents\":5" + hints + "}");
+            SaveData data = real.Load().Data;
+            Assert.That(data.version, Is.EqualTo(SaveData.CurrentVersion));
+            Assert.That(data.shopHintsDone, Is.EqualTo(after));
+            Assert.That(data.cents, Is.EqualTo(5));
+            Assert.That((int)ShopHints.All, Is.EqualTo(31), "the four shop hints and the emergency");
         }
 
         [Test]

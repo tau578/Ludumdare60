@@ -69,12 +69,13 @@ namespace Switchboard.Domain.Tests
             var reasons = new System.Collections.Generic.List<CallEndReason>();
             crowded.Calls.CallEnded += e => reasons.Add(e.Reason);
             long cents = crowded.Wallet.Cents;
+            int live = crowded.Calls.Live.Count;
             crowded.ClearCalls();
 
             Assert.That(crowded.Calls.Live, Is.Empty);
             Assert.That(crowded.Calls.InHand, Is.Null);
             Assert.That(reasons, Has.All.EqualTo(CallEndReason.Cleared));
-            Assert.That(reasons.Count, Is.EqualTo(4));
+            Assert.That(reasons.Count, Is.EqualTo(live), "every live call, the talking one's refilled window included (D83)");
             Assert.That(board.Returned, Is.EquivalentTo(new[] { new CordId(0), new CordId(1), new CordId(2) }));
             Assert.That(crowded.Desk.HalfPatched, Is.Empty);
             Assert.That(crowded.Wallet.Cents, Is.EqualTo(cents));
@@ -119,7 +120,7 @@ namespace Switchboard.Domain.Tests
             timed.Tick(1);
 
             Assert.That(emergency.EndReason, Is.EqualTo(CallEndReason.Missed));
-            Assert.That(timed.Wallet.Cents, Is.EqualTo(800), "200 cents, never multiplied");
+            Assert.That(timed.Wallet.Cents, Is.EqualTo(797), "1.5 x its 135¢ pay = 203¢ (D82)");
             Assert.That(timed.Calls.Live.Count, Is.EqualTo(1));
             Assert.That(timed.Calls.Live[0].Request.Script.Id, Is.EqualTo("regular"));
         }

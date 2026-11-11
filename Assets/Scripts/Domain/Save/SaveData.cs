@@ -11,7 +11,8 @@ namespace Switchboard.Domain
     [Serializable]
     public sealed class SaveData
     {
-        public const int CurrentVersion = 1;
+        // 2 (13a pass 4): the emergency hint joined the shop hints (SaveMigrations).
+        public const int CurrentVersion = 2;
 
         // 0 means the file had no version; every save written has one.
         public int version;
@@ -35,6 +36,9 @@ namespace Switchboard.Domain
     {
         public long earnedCents;
         public int callsConnected;
+
+        // Missing in saves from before 13a, which JsonUtility reads as 0.
+        public int callsHungUp;
         public long finesPaidCents;
         public double secondsPlayed;
     }

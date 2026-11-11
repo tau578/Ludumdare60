@@ -113,6 +113,15 @@ namespace Switchboard.UI
             return row;
         }
 
+        /// <summary>The name the book lists first for the jack, as its row shows it; null when it isn't in the book.</summary>
+        public string EntryNameFor(string jack)
+        {
+            IReadOnlyList<BookEntry> entries = directory.Entries;
+            for (int i = 0; i < entries.Count; i++)
+                if (entries[i].Jack == jack) return entries[i].Name;
+            return null;
+        }
+
         /// <summary>Which way to turn to the jack's first entry: -1 back, 1 forward, 0 here or not in the book.</summary>
         public int SpreadDirectionTo(string jack)
         {

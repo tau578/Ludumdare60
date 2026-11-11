@@ -22,7 +22,10 @@ namespace Switchboard.Domain.Tests
         // A valid start, so each test sees only its upgrades' messages. Without a calls file the pools aren't checked.
         private const string Head =
             "'startingCords': {0}, 'startingBoard': { 'cols': 3, 'rows': 3 }, 'startingClientSlots': 3, " +
-            "'quickConnectSeconds': 5, 'quickConnectTipCents': 5, ";
+            "'quickConnectSeconds': 5, 'quickConnectTipCents': 5, " + Pressure;
+
+        // The pressure fields (D63, D82), so each test sees only its own messages.
+        private const string Pressure = "'defaultPatienceSeconds': 45, 'emergencyFineFactor': 1.5, 'maxBusyLineCards': 1, ";
 
         private static string Json(params string[] entries) => JsonStartingWith(StatSheet.DefaultStartingCords, entries);
 
@@ -210,7 +213,7 @@ namespace Switchboard.Domain.Tests
         // The quick-connect tip (D59): two top-level fields.
         private static EconomyCatalog LoadWithQuickConnect(string fields) =>
             EconomyFileLoader.Load(("{ 'startingCords': 2, 'startingBoard': { 'cols': 3, 'rows': 3 }, 'startingClientSlots': 3, " +
-                fields + $"'upgrades': [ {Secret} ] }}").Replace('\'', '"'));
+                fields + Pressure + $"'upgrades': [ {Secret} ] }}").Replace('\'', '"'));
 
         [Test]
         public void TheRealFileSetsAQuickConnectTip()

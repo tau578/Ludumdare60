@@ -17,6 +17,7 @@ MonoBehaviour:
   ink: {r: 0.2, g: 0.14117648, b: 0.101960786, a: 1}
   creamText: {r: 0.9529412, g: 0.9137255, b: 0.8117647, a: 1}
   menuText: {r: 1, g: 0.98039216, b: 0.9098039, a: 1}
+  cardTeal: {r: 0.09019608, g: 0.3254902, b: 0.31764707, a: 1}
   goldLine: {r: 0.5882353, g: 0.53333336, b: 0.11764706, a: 1}
   brassPlateTop: {r: 0.7764706, g: 0.6627451, b: 0.36862746, a: 1}
   brassPlateBottom: {r: 0.65882355, g: 0.5411765, b: 0.25882354, a: 1}
@@ -67,6 +68,8 @@ MonoBehaviour:
   urgentWobbleDegrees: 5
   urgentPulsesPerSecond: 3
   lampFlashesPerSecond: 2
+  patienceUrgentSeconds: 5
+  patiencePulsesPerSecond: 1.5
   coinFlightSeconds: 1
   coinSpacingSeconds: 0.055
   drumRollSeconds: 0.15

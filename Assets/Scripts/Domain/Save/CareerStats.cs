@@ -3,7 +3,8 @@ using System;
 namespace Switchboard.Domain
 {
     /// <summary>
-    /// Lifetime numbers across sessions (Design 5.10): money earned, calls connected, fines paid and time played.
+    /// Lifetime numbers across sessions (Design 5.10): money earned, calls connected, callers who hung up (D63), fines
+    /// paid and time played.
     /// They start from the save and only ever grow.
     /// </summary>
     public sealed class CareerStats
@@ -20,10 +21,12 @@ namespace Switchboard.Domain
             {
                 earnedBefore = Math.Max(0, saved.earnedCents);
                 CallsConnected = Math.Max(0, saved.callsConnected);
+                CallsHungUp = Math.Max(0, saved.callsHungUp);
                 FinesPaidCents = Math.Max(0, saved.finesPaidCents);
                 SecondsPlayed = saved.secondsPlayed > 0 ? saved.secondsPlayed : 0;
             }
             calls.CallStateChanged += OnCallStateChanged;
+            calls.CallEnded += e => { if (e.Reason == CallEndReason.HungUp) CallsHungUp++; };
             penalties.FineApplied += e => FinesPaidCents += e.TakenCents;
         }
 
@@ -31,6 +34,9 @@ namespace Switchboard.Domain
         public long EarnedCents => earnedBefore + (long)Math.Round(earnings.TotalPaidCents);
 
         public int CallsConnected { get; private set; }
+
+        /// <summary>Callers whose patience ran out (D63).</summary>
+        public int CallsHungUp { get; private set; }
 
         /// <summary>What fines actually took, which is less than asked when the balance was short.</summary>
         public long FinesPaidCents { get; private set; }
@@ -46,6 +52,7 @@ namespace Switchboard.Domain
         {
             earnedCents = EarnedCents,
             callsConnected = CallsConnected,
+            callsHungUp = CallsHungUp,
             finesPaidCents = FinesPaidCents,
             secondsPlayed = SecondsPlayed
         };
