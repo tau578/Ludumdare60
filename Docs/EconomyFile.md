@@ -22,8 +22,8 @@ Every call is one line in `calls`:
 ```json
 {
   "calls": [
-    { "id": "call_001", "icon": "caller-01", "name": "Ada Moss", "message": "Connect me with Mabel Dunmore, please.", "from": "C3", "to": "A2", "durationSeconds": 20, "connectCents": 10, "centsPerSecond": 5 },
-    { "id": "call_103", "icon": "caller-02", "name": "Herbert Marlow", "message": "Get me the Doctor! My wife has taken a fall!", "from": "D3", "to": "D4", "durationSeconds": 15, "connectCents": 30, "centsPerSecond": 7, "emergency": true, "responseTimeSeconds": 30, "penaltyCents": 200 }
+    { "id": "call_001", "icon": "caller-01", "name": "Ada Moss", "message": "Connect me to <b>Mabel Dunmore</b>. It's about the bake sale.", "from": "C3", "to": "A2", "durationSeconds": 20, "connectCents": 10, "centsPerSecond": 5 },
+    { "id": "call_103", "icon": "caller-02", "name": "Herbert Marlow", "message": "Connect me to <b>the doctor</b>. My wife has taken a fall!", "from": "D3", "to": "D4", "durationSeconds": 15, "connectCents": 30, "centsPerSecond": 7, "emergency": true, "responseTimeSeconds": 30 }
   ]
 }
 ```
@@ -33,7 +33,7 @@ Every call is one line in `calls`:
 | `id` | The call's permanent name, such as `call_001`. The queues in `Economy.json` list calls by id. Every id must be different. | required |
 | `icon` | The caller's portrait: `caller-01` to `caller-12`. | a portrait name from GameConfig's list |
 | `name` | The caller's name, shown under the portrait, such as "Ada Moss". | required |
-| `message` | What the caller says when the player takes the card, in the speech bubble. Usually who they want, so the player can look them up. | required |
+| `message` | What the caller says when the player takes the card, in the speech bubble. It opens with **"Connect me to <b>Name</b>."**, naming the person wanted in bold as the book does ("Violet Fairweather", "Dr Ravi Sharma"; a service as "the police station"), then the caller's own words, kept short (D80). Without that opening the validator gives a note. | required |
 | `from` | The caller's jack, such as `"C3"`. | a jack label (see below) |
 | `to` | The jack of the person or service they want. | a jack label, not the same as `from` |
 | `durationSeconds` | How long the call lasts once connected. | above 0 |
@@ -41,15 +41,18 @@ Every call is one line in `calls`:
 | `centsPerSecond` | What the call pays every second while connected. Decimals are fine: 2.5 pays 2½¢ a second, and nothing is lost to rounding. | 0 or more |
 | `emergency` | `true` makes it an emergency: a red EMERGENCY badge and a countdown ring. | leave it out for a regular call |
 | `responseTimeSeconds` | Emergencies only: the seconds the player has to connect it. | above 0 |
-| `penaltyCents` | Emergencies only: the fine when the time runs out. | 0 or more, whole cents |
+| `patienceSeconds` | Regular calls only, and optional: how long this caller waits before hanging up. Leave it out to use `defaultPatienceSeconds` from `Economy.json`; set it only where a call needs its own. `0` means the caller never hangs up (reported as a note). | above 0 |
+
+`penaltyCents` is gone (D82, step 13a): a missed emergency's fine now follows what the call pays (see "Pressure" under `Economy.json`). A leftover `penaltyCents` gets a plain note and is ignored.
 
 **Jack labels** are written as on the board and in the book: a row letter **A to F**, then a column number **1 to 6**, such as `"C3"` (row C, column 3). The game starts on the `startingBoard` corner (4x4 in the shipped file: rows A to D, columns 1 to 4) and grows from there.
 
-**What a call pays.** A correct connection pays `connectCents` at once, then `centsPerSecond` every second for `durationSeconds`: the shipped first call pays 25¢ + 25 × 5¢ = $1.50. Income upgrades multiply both. The card shows "25¢" and "5¢/s"; the duration stays hidden. Connecting quickly adds a tip (see "Quick-connect tip").
+**What a call pays.** A correct connection pays `connectCents` at once, then `centsPerSecond` every second for `durationSeconds`: the shipped first call pays 25¢ + 12 × 5¢ = 85¢. Income upgrades multiply both. The card shows "25¢" and "5¢/s"; the duration stays hidden. Connecting quickly adds a tip (see "Quick-connect tip").
 
 **What can go wrong for the player:**
 - A wrong patch ends the call with "Wrong number!". There is **no fine**, and the next call in the queue takes the slot. The same call comes back when the queue comes round to it.
-- An emergency that isn't connected within `responseTimeSeconds` ends as "Missed" and takes `penaltyCents` (never multiplied; money never drops below $0.00). A wrong patch or a cut-off emergency is **not** fined.
+- A regular caller who waits longer than their patience hangs up: the card leaves with a "Hung up" stamp. No pay and **no fine**; the call comes back when the queue comes round to it.
+- An emergency that isn't connected within `responseTimeSeconds` ends as "Missed" and is fined `emergencyFineFactor` times what connecting it would have paid (money never drops below $0.00). A wrong patch or a cut-off emergency is **not** fined. Emergencies never hang up: they use only their response time.
 
 **The phone book is only for looking things up.** The calls carry their own jacks; the book (`Book.json`, see [BookFile.md](BookFile.md)) just has to list someone on every jack a call uses, or the player can't find it. The validator checks that.
 
@@ -60,6 +63,7 @@ Every call is one line in `calls`:
 | `startingCents`, `startingCords` | The money and the cords a new game starts with. |
 | `startingBoard`, `startingClientSlots` | How much of the board, and how many caller slots, a new game opens. |
 | `quickConnectSeconds`, `quickConnectTipCents` | The quick-connect tip: how fast the player must connect a call after taking its card, and what that pays. |
+| `defaultPatienceSeconds`, `emergencyFineFactor`, `maxBusyLineCards` | Pressure (step 13a): how long callers wait, how hard a missed emergency is fined, and how many calls to someone already on the line may wait at once. |
 | `startPool` | The call queue of a new game. |
 | `upgrades` | Everything the shop sells. Each `extra_clients` entry has its own `stagePool`. |
 
@@ -73,6 +77,9 @@ The whole file looks like this (the pools and upgrades are shortened here):
   "startingClientSlots": 3,
   "quickConnectSeconds": 5,
   "quickConnectTipCents": 5,
+  "defaultPatienceSeconds": 45,
+  "emergencyFineFactor": 1.5,
+  "maxBusyLineCards": 1,
   "startPool": [ "call_001", "call_002", "call_003", ... ],
   "upgrades": [
     { "id": "board_1", "type": "extra_clients", ..., "stagePool": [ "call_101", "call_102", ... ] },
@@ -91,7 +98,7 @@ Calls don't ring at random any more: they come from a queue, the list of call id
 "startPool": [ "call_001", "call_002", "call_003", "call_004", "call_005", "call_006", "call_007", "call_008" ],
 ```
 
-- **Slots.** Each open caller slot holds one call. Whenever a slot is free, the next call in the queue appears in it **at once**: at the start, when a call ends, and when an upgrade opens a slot. There is no timer. (A finished card keeps its slot while its "Paid" or "Wrong number!" stamp shows, about two seconds.)
+- **Slots.** Each open caller slot (window) holds one **waiting** call: one that rings, is in hand or is half-patched. Whenever a slot is free, the next call in the queue appears in it **at once**: at the start, when a call connects or ends, and when an upgrade opens a slot. There is no timer. A connected or held call shrinks to a small tab under the windows and frees its slot (D83, 13a pass 2b), so with 3 slots and 4 cords up to 4 calls talk while 3 more wait. (A finished card keeps its slot, or a tab its place, while its "Paid" or "Wrong number!" stamp shows, about two seconds.)
 - **Order.** Calls play in the order you list them and loop back to the first. Success or a wrong number doesn't change the order.
 - **No call shows twice.** A call that is still on a card is skipped when the queue comes round to it. If every call in the queue is on a card, a free slot stays empty until one ends. So give a queue at least as many calls as it has slots, and preferably more.
 - **Busy lines.** A call whose jack is already in use waits on its card until the player can connect it.
@@ -126,9 +133,10 @@ The first draft wrote `start_pool` and `stage_pool`; the file uses `startPool` a
 | Field | Meaning | If left out or wrong |
 |---|---|---|
 | `startingBoard` | The part of the board a new game opens. `cols` are the columns 1 to 6, `rows` the rows A to F; each is **1 to 6**. The open part is always the top-left corner: `{ "cols": 3, "rows": 3 }` opens rows A to C and columns 1 to 3 (9 jacks). | The full 6x6 board, with a message |
-| `startingClientSlots` | How many caller slots, from the top, take calls in a new game: **1 to 4**. The others are hidden. | All 4, with a message |
+| `startingClientSlots` | How many caller slots (windows for waiting calls) take calls in a new game: **1 to 4**. The others are hidden. | All 4, with a message |
 
 - Closed jacks are dimmed and can't take a plug. The board in Unity has 6 by 6 jacks and 6 caller slots; those are the only fixed limits.
+- **Keep it at 3 (D83, lead 2026-11-12).** The talking calls' tabs sit in a 2x2 grid in the 4th window's space, so the shipped file opens 3 windows at every stage. With 4 windows the tabs would cover the 4th card; at most 4 tabs fit, so more than 4 cords needs a new layout.
 
 ## Quick-connect tip
 
@@ -145,7 +153,7 @@ A call connected within `quickConnectSeconds` of the player taking its card (cli
 | `quickConnectTipCents` | The tip in **cents**, whole cents only. 0 or more; **0 turns the tip off**. | Left out: 5, with a note. Negative or not whole: 5, with a message. |
 
 - The clock starts when the card is taken, not when it starts ringing, and it stops while the game is paused.
-- Income upgrades (More Profit) **multiply the tip**, like the fee: with "Earn x4", a 5¢ tip pays 20¢. Fines are still never multiplied.
+- Income upgrades (More Profit) **multiply the tip**, like the fee: with "Earn x4", a 5¢ tip pays 20¢. The tip is never part of a fine.
 - A call pays the tip at most once: reconnecting it after a pulled plug (on hold) pays neither the fee nor the tip again.
 - A call whose two jacks are already patched when the card is taken connects at once, and so gets the tip.
 - A wrong number never pays a tip.
@@ -174,7 +182,7 @@ Every upgrade is bought **once**. An entry looks like this:
 
 | `type` | Extra fields | What it does |
 |---|---|---|
-| `extra_income` | `incomeMultiplier` | **Sets** how much every call pays: 1.5 means half as much again. It applies at once, even to calls already connected. Fines are never multiplied. |
+| `extra_income` | `incomeMultiplier` | **Sets** how much every call pays: 1.5 means half as much again. It applies at once, even to calls already connected. A missed emergency's fine follows it too (D82). |
 | `extra_wires` | `wires` | **Sets** the total number of cords. The new cord appears in the tray at once, in a new colour. |
 | `extra_clients` | `boardSize`, `clientSlots`, `stagePool` | **Sets** how much of the board is open, the caller slots and the call queue. The new jacks and slots open at once, and the queue switches to `stagePool`. |
 | `secret` | none | The mystery upgrade, the goal the player saves for. Its shop button fills up as money is saved. There must be **exactly one**. For now, buying it shows "To be continued...". |
@@ -202,7 +210,7 @@ Every upgrade is bought **once**. An entry looks like this:
 (The shipped pools are longer: 10, 12 and 14 calls.)
 
 - `boardSize` is the **whole** open part after buying, written like `startingBoard`, not the jacks added.
-- `clientSlots` is the **total** number of open caller slots after buying, 1 to 4. It may stay the same but never goes down, starting from `startingClientSlots`.
+- `clientSlots` is the **total** number of open caller slots after buying, 1 to 4. It may stay the same but never goes down, starting from `startingClientSlots`. The shipped `board_1` and `board_2` keep **3** (13a pass 2b, D83): the 4th window's space holds the talking calls' tabs, so a bigger board brings more people and calls, not more windows. Their descriptions no longer say "4 callers".
 - Along the chain, starting from `startingBoard`, the board must **grow**: neither `cols` nor `rows` may go down, and at least one must go up.
 - `stagePool` is the queue once this board is bought; see "Call queues". If it's missing or empty, the board can still be bought and the queue stays as it was, with a message.
 - In the shipped files all three emergency services are on the 4x4 start (Hospital A2, Police station D3, Fire station D4), so emergencies can come from the first pool on.
@@ -221,6 +229,24 @@ Entries of the same type form a **chain**, in the order they appear in the file.
 - When a chain is bought out, its button takes the next chain that isn't shown yet, or goes back to the "+" look. The other buttons don't move.
 - To add a new upgrade of a type that already exists, just add a line. No code is needed.
 
+## Pressure: patience, fines and busy lines (step 13a)
+
+```json
+"defaultPatienceSeconds": 45,
+"emergencyFineFactor": 1.5,
+"maxBusyLineCards": 0,
+```
+
+| Field | Meaning | If left out or wrong |
+|---|---|---|
+| `defaultPatienceSeconds` | How long a regular caller waits, in seconds, before hanging up, unless the call sets its own `patienceSeconds`. The clock runs while the card rings, is taken or has one plug in, and stops for good once the call connects. It stops while the game is paused, and while the tutorial guides its first call. | Left out, 0 or less: callers never hang up, with a message. |
+| `emergencyFineFactor` | A missed emergency is fined this many times what connecting it would have paid: its `connectCents` plus `centsPerSecond` × `durationSeconds`, times the income multiplier in force when it is missed (the quick-connect tip doesn't count), rounded to the nearest cent. | Left out or negative: no fines, with a message. 0 also means no fines. |
+| `maxBusyLineCards` | How many calls to someone who is talking (in a connected or held call) may wait on cards at once. Such a card looks like any other (no "Line busy" label, D83): the player either cuts the talking call off or lets the new caller wait on their patience. A call to someone whose own card is still waiting never rings. **0 for now:** busy-recipient calls come back by day in step 13b. | Left out or negative: 0, with a message: nobody calls a person who is on the line. |
+
+**An example fine.** The shipped `call_004` pays 60¢ + 8¢/s for 12 s = 156¢. Missed with no income upgrade, it costs 1.5 × 156¢ = 234¢ ($2.34); with "Earn x2" bought, 468¢. Because the fine follows pay, it grows by itself when pay grows.
+
+**Who may ring.** Nobody calls while they are on a call: the queue skips a call while its caller's jack is the caller's or the recipient's jack of any call on a card, and comes back to it later. A call **to** someone who is talking may still ring, at most `maxBusyLineCards` of them at a time (0 for now); a call to someone whose own card is still waiting never does. With 0, a call to a busy person waits until they are free, so a pool where one person is in many calls can keep a call waiting a long time: spread each person's calls through the pool.
+
 ## Checking the files
 
 In Unity, choose **Tools > Switchboard > Validate Content**. It checks `Calls.json`, `Economy.json` and `Book.json` together. The Console then shows either "Validate Content: no problems found." or one plain message per problem, naming the file, the entry and the fix. For example:
@@ -233,11 +259,14 @@ Economy file: startPool: call_014 uses E5, but the startingBoard opens only 4x4.
 - a missing or empty file, one that isn't valid JSON (usually a missing comma, quote or bracket), or one with no calls (the game still starts, with no calls)
 - an empty or duplicate id
 - an empty `name`, `icon` or `message`, or an icon that isn't a known portrait
+- a note for a `message` that doesn't open with "Connect me to <b>Name</b>." (the call still plays)
 - a missing `durationSeconds`, `connectCents` or `centsPerSecond` (missing numbers never silently become 0)
-- a `durationSeconds` of 0 or less; a negative `connectCents`, `centsPerSecond` or `penaltyCents`; fees and fines that aren't whole cents
+- a `durationSeconds` of 0 or less; a negative `connectCents` or `centsPerSecond`; a fee that isn't whole cents
 - an empty `from` or `to`, a jack that isn't on the 6x6 board, or `from` and `to` the same
-- an emergency without a `responseTimeSeconds` above 0, or without `penaltyCents`
-- a note when a regular call has `responseTimeSeconds` or `penaltyCents` (only used for emergencies; the call still plays)
+- an emergency without a `responseTimeSeconds` above 0
+- a note when a regular call has `responseTimeSeconds` (only used for emergencies; the call still plays)
+- a note when a call still has `penaltyCents` (no longer used; the fine follows pay)
+- a negative `patienceSeconds` (the default is used instead), a note for a `patienceSeconds` of 0 (that caller never hangs up), and a note when an emergency has one (emergencies use only their response time)
 - a jack a call uses that has no entry in the phone book (`Book.json`)
 
 A call with a problem is left out; the others still play.
@@ -246,6 +275,7 @@ A call with a problem is left out; the others still play.
 - a missing file, or one that isn't valid JSON
 - a negative `startingCents`, or a `startingCords` outside 1 to 6 (the game then starts with 2)
 - a note when `quickConnectSeconds` or `quickConnectTipCents` is missing; a negative one, or a `quickConnectTipCents` that isn't whole cents (the game then uses 5)
+- a missing `defaultPatienceSeconds`, `emergencyFineFactor` or `maxBusyLineCards`, a `defaultPatienceSeconds` of 0 or less, or a negative factor or count (that rule is then off)
 - a missing `startingBoard` or `startingClientSlots`, a `startingBoard` without both `cols` and `rows` or outside 1 to 6, or a `startingClientSlots` outside 1 to 4 (the game then opens the full board and all 4 slots)
 - a missing or empty `startPool`; an `extra_clients` entry without a `stagePool`, or with an empty one
 - a pool id that isn't in `Calls.json`, or a call that has a problem there
@@ -266,7 +296,9 @@ More example messages:
 Calls file: Call 3 "call_003": durationSeconds is missing. Add how many seconds the call lasts once connected, such as "durationSeconds": 20.
 Calls file: Call 7 "call_007": to "G2" is not a jack on the board. Use a row letter A to F, then a column 1 to 6, such as "C3".
 Calls file: Call 9 "call_103": an emergency needs responseTimeSeconds, the seconds the player has to connect it, such as "responseTimeSeconds": 30.
-Calls file: Call 2 "call_002": responseTimeSeconds and penaltyCents are only used for emergencies. Add "emergency": true, or remove them.
+Calls file: Call 2 "call_002": responseTimeSeconds is only used for emergencies. Add "emergency": true, or remove it.
+Calls file: Call 4 "call_004": penaltyCents is no longer used: a missed emergency's fine is now Economy.json's emergencyFineFactor times what the call pays. Remove it.
+Calls file: Call 5 "call_005": the message should start with "Connect me to <b>Name</b>.", naming the person wanted in bold, then the caller's own words. A note only: the call still plays.
 Calls file: call_201 uses A5, but no entry in Book.json is on A5, so the player can't look it up. Add an entry with that jack to the book, or give the call another jack.
 Economy file: startPool: call_099 is not in Calls.json. Check the spelling, or add the call to Calls.json.
 Economy file: Upgrade "board_1": stagePool: call_014 uses E5, but board_1 opens only 4x4. The player could never connect it, so it is left out. Move it to the pool of a bigger board, or give it jacks on this one.

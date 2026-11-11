@@ -25,9 +25,9 @@
 | 11a. Gather the sounds | done | ✅ 2026-11-08 | ✅ 23 sounds and 3 tracks imported, console clean | ✅ lead picked | b98f732 |
 | 11c. Main visual feedback | done | ✅ 2026-10-22 (25 min + 13 + 29 + 15 + 16 + 17 + 19 + 23 min fixes) | ✅ 744/744 tests, scope clean | ✅ | abbd5f1, 0deb398 |
 | 12. Paint box (`GameStyle`) | done | ✅ 2026-11-09 (21 min + 14 + 11 + 18 min fixes) | ✅ 745/745 tests, scope clean | ✅ | 9d4dd84 |
-| 13a. Pressure and the queue fix | not started | | | | |
-| 13b. Days | not started | | | | |
-| 13c. Residents and the call director | not started | | | | |
+| 13a. Pressure and the queue fix | done (the feel playtest at the 13c checkpoint) | ✅ 2026-11-10 pass 1 (33 min); 2026-11-12 passes 2 (38 min), 2b (38 min), 3 (20 min), 4 (22 min); 2026-11-13 passes 5 (23 min), 6 (18 min), 7 (4 min) and 8 (6 min) | ✅ 847/848 tests (1 parked until 13c), scope clean | ✅ the lead, 2026-11-13 ("all looks fine now") | committed 2026-11-13, dated 2026-11-11 |
+| 13b. Days (built after 13c, lead 2026-11-12) | not started | | | | |
+| 13c. Residents and the call director (next after 13a) | not started | | | | |
 | 13d. Score and streak | not started | | | | |
 | 13e. Stakes within the day | not started | | | | |
 | 13f. Stakes across days | not started | | | | |
@@ -6308,3 +6308,501 @@ Follow-ups:
 - The 2026-10-25 notes that had no home now have one (Design §12.15, D78–D81): the tutorial gets only the free-a-cord step now and a rework after step 13; every message opens with "Connect me to <b>Name</b>."; new cards arrive at the top; one click on either plug of a finished call's cord frees it into the hand; the book becomes a vertical clipboard docked at the right (new part 13k, independent); pattern-breaking calls fall out of 13c's director; no board change for reading busy lines until 13a is played.
 - Open: a right-click to leave a cord dangling (Plan §8, Design §12.13); whether a cut-off emergency counts as a complaint.
 - The lead's direction, restated: action-based rather than narrative; the story stays between days. The 2026-10-25 tester's complaint was effort, not a wish for a story game.
+
+## Step 13a report: 2026-11-10
+Result: done (pass 1 only; pass 2, D79–D81, is for a later agent)
+Playable now: nobody rings while they are on a call, as caller or recipient. At most one card at a time is a call to someone already on the line; while that person's jack carries a connected or held call, the card shows a small paper "Line busy" tag in place of its pay, and connects as usual once the line frees. Regular callers wait 45 s (an amber ring that empties and pulses gently in its last 5 s) and then hang up with a "Hung up" stamp: no pay, no fine, back later in the queue. The tutorial's call never hangs up while the guide runs. Emergencies give 30 s, ring the alarm bell on arrival and every 6 s until taken, tick in their last 10 s (faster near 0), and a miss costs 1.5 × what the call would have paid, times the income multiplier. The start pool's calls last 12 s.
+How to test:
+1. New game (or Continue). Watch the cards: each regular card has an amber ring that empties over 45 s; in its last 5 s it pulses softly. Let one run out: "Hung up" in brown, the receiver-down sound, and the slot refills.
+2. Connect a call, then watch the queue for a while: nobody whose jack is in a live call (as caller or as the one called) rings. Occasionally (never more than one card) a call to someone already on the line appears; while that person is connected, its card shows "Line busy" instead of the pay. Finish or pull the other call: the tag goes and the call can be patched.
+3. Wait for an emergency (Agatha to the police is in the first pool): the bell rings at once and every 6 s until you take the card, then stops. In its last 10 s the clock ticks, faster near the end. Pause: bell and ticks stop. Let it run out: the fine is 1.5 × its pay (call_004: 60¢ + 8¢/s × 12 s = $1.56, so $2.34 with no income upgrade, $4.68 with "Earn x2").
+4. The first connection lasts 12 s, so the next call follows quickly.
+Created:
+- `Assets/Tests/Domain/PressureTests.cs` (+ `.meta`): the queue rule, busy-recipient cards, Line busy, patience, the tutorial hold, hang-ups, career count and save, the fine in a session, the economy file's pressure fields.
+- `Assets/Tests/Game/Editor/PressureCardTests.cs` (+ `.meta`): the amber ring, the emergency keeping its ring, no ring while held or waiting forever, the ring going on connect, the Line busy tag (ink, no raycasts, contrast ≥ 4.5:1, back to normal), the "Hung up" stamp.
+Changed:
+- Domain:
+  - `Calls/CallEndReason.cs`: `HungUp = 6`.
+  - `Calls/CallScript.cs`: `penaltyCents` removed; `double? PatienceSeconds` (null = the default, 0 = forever, always null on emergencies); `FullPayCents` (fee + rate × length).
+  - `Calls/Call.cs`: `PatienceSeconds`, `PatienceSecondsLeft`, `HasPatience`, `LineBusy`, `HungUpOnBusyLine`; `WaitingHeld` now holds the patience too.
+  - `Calls/CallService.cs`: constructor takes `defaultPatienceSeconds` (0 by default, so existing tests keep waiting forever); `IsJackInLiveCall`, `IsLineBusy` (another live call that is Connected or OnHold uses the recipient's jack); `Tick` counts patience for Incoming/Taken/Connecting non-emergencies unless held, ends at 0 as `HungUp` and sets `HungUpOnBusyLine`; `LineBusy` set on `Add` and every tick.
+  - `Queue/CallQueue.cs`: skips a script whose `From` is in any live call; deals a busy-recipient script only while `BusyLineCards()` < `maxBusyLineCards` (new constructor argument). `BusyLineCards` counts live calls whose `To` is used by an earlier live call, so a card stops counting once that call ends. The caller-name check stays.
+  - `Penalties/PenaltyService.cs`: `PenaltyService(calls, wallet, fineFactor, incomeMultiplier)`; `FineFor(script)` = round(factor × `FullPayCents` × multiplier, nearest cent, halves away from zero); a hang-up is never fined. `FineAppliedArgs` unchanged, so the counter popup, the "Missed −$X" stamp and the coins follow the new amount with no view change.
+  - `Save/CareerStats.cs`, `Save/SaveData.cs`: `CallsHungUp`, saved as `career.callsHungUp` (older saves read 0; no migration needed).
+  - `Definitions/IGameContent.cs`: `DefaultPatienceSeconds`, `EmergencyFineFactor`, `MaxBusyLineCards`.
+  - `GameSession.cs`: passes them to `CallService`, `CallQueue` and `PenaltyService` (the multiplier read live from `StatSheet`).
+- Content:
+  - `CallsFileData.cs`, `CallsFileLoader.cs`: `patienceSeconds` read (negative: message, default used; 0: a note, waits forever; on an emergency: a note, ignored); `penaltyCents` no longer required, a leftover one gets a plain "no longer used" note; the regular-call note now names only `responseTimeSeconds`.
+  - `EconomyFileData.cs`, `EconomyFileLoader.cs`, `EconomyCatalog.cs`, `GameContent.cs`: `defaultPatienceSeconds`, `emergencyFineFactor`, `maxBusyLineCards`. Missing or wrong: that rule is off (no hang-ups, no fines, no busy-recipient cards) with a plain message, so no balance number lives in code.
+- Game:
+  - `Views/CallCardView.cs`: the ring shows for an emergency or for a caller whose patience counts (not while held); a patience ring is Attention amber (`GameStyle.AttentionHover`), alpha 0.7–1 and 2% scale pulse in the last `PatienceUrgentSeconds`; the "Line busy" tag (stamp paper with the stamp's sprite, a soft shadow, Della Respira bold in `CutOffInk`, tilted 4°) in its own layer over the portrait, after the stamp, hiding the fee label, the rate label and the per-second circle while shown; "Hung up" stamp in `CutOffInk`. Ring and tag are polled in `LateUpdate` (the tutorial's release and a freed line change no state). New read-only properties for tests: `IsLineBusyShown`, `IsRingShown`, `IsPatienceRing`, `RingColor`.
+  - `GameStyle.cs`: `patienceUrgentSeconds` (5) and `patiencePulsesPerSecond` (1.5) under "Timings: patience"; the `cutOffInk` tooltip now names the "Hung up" stamp and the "Line busy" tag. The asset wasn't re-saved; the new fields take their code defaults until it is.
+  - `CallAudio.cs`: S1 and S2 (see below); `Bind(calls, style)`; `Advance(gameSeconds)` driven by `Update`; `TickInterval`; `BellsRung`/`TicksPlayed` counters for tests. A hang-up already played the receiver-down (`finished`), as the brief asks.
+  - `GameInstaller.cs`: passes the style to `CallAudio.Bind`.
+- Data:
+  - `Assets/Configs/Economy.json`: `defaultPatienceSeconds` 45, `emergencyFineFactor` 1.5, `maxBusyLineCards` 1. `startingCords` stays 1.
+  - `Assets/Configs/Calls.json`: call_001–call_010 (the start pool, also wherever those ids sit in stage pools) last 12 s; every emergency's `responseTimeSeconds` is 30; `penaltyCents` removed from every entry. Fees, rates and the other lengths unchanged. No call has its own `patienceSeconds`.
+- Tests changed (same intent, pointed at the new rules): `Fakes.cs` (`Scripts.Call` takes `patienceSeconds`; `Scripts.Emergency` lost `penaltyCents`; `Scripts.Pool` now pairs each jack with the one half the open jacks further on, so neighbouring pool calls share no jack and the busy-caller rule skips none; new `Scripts.StagePool` on jacks a 3x3 pool never uses; `FakeContent` gets patience 0, factor 1.5, one busy card), `PenaltyServiceTests` (rewritten for D82: 1.5×, the multiplier, rounding, tip not counted, the 0 floor, HungUp not fined), `CallsFileTests` (patience field and notes; leftover `penaltyCents` note; real file: every regular call has patience above 0), `EconomyFileTests`/`EconomyPoolTests`/`EconomyBoardTests` (their sample files carry the three new fields), `GameSessionTests` and `UpgradeTests` (the fine is now 203¢ and 608¢ with ×3; `FinesAreNotMultiplied` became `FinesFollowTheIncomeMultiplier`), `ResponseTimerTests`, `SaveSessionTests` (the real-file deal order now models the busy-caller rule; stage pools use `StagePool`), `CallQueueTests` (stage pools use `StagePool`), `FeedbackEffectsTests` (the helper's `penalty` argument removed: the fine is 165¢ = 1.5 × 110¢), `CallAudioTests` (new tests below).
+- Docs: `Design.md` (a status row for 13a; 5.1's enum and table rows for new calls, Missed and the new HungUp; 5.2's queue rule and busy recipients; 5.4's ring, tag and stamp; 5.5 and 5.9 for D82, superseding D37's "never multiplied"; 5.11's S1/S2; 5.12's `callsHungUp`; 6.4's new fields; 6.5's field list and validator; §12.4's "wired in 13a"), `EconomyFile.md` (the `patienceSeconds` field, `penaltyCents` gone, a "Pressure" section with the fine rule and an example, the validator lists and example messages, the first call's pay at 12 s), `Plan.md` (§4: two lessons; §8: the queue-rule row removed; Step 14: S1/S2 done in 13a), `StyleGuide.md` (the Attention and Neutral rows name the patience ring, "Hung up" and "Line busy").
+Emergency sounds (S1, S2), wired here because the picks were already imported:
+- `Game.prefab` gets a child `EmergencyAlarmSfx` (AudioSource, no play on awake, plus `AudioChannelSource` on Sfx at 0.45 like the ring), and `CallAudio` points `alarmSource`, `emergencyBell` (`Sfx/EmergencyBell.wav`) and `clockTick` (`Sfx/ClockTick.wav`) at it. Gains 0.8, repeat 6 s, all Inspector settings.
+- An emergency's arrival rings the bell instead of the pitched-up normal ring; it rings again every 6 s while any emergency is still Incoming and not held, and `Stop()` silences it the moment none is (taken, connected, missed, cleared). Normal calls keep their single ring.
+- Ticks start when the most urgent waiting emergency has `GameStyle.UrgentSeconds` (10) left, on the feedback source: every third pulse of the ring (`UrgentPulsesPerSecond`, 3/s) until 60% of those seconds, every second pulse until 30%, then every pulse. They follow the ring's rate, not its exact phase (the card's pulse clock starts when the card shows).
+- Both run on game time (`Time.deltaTime`, 0 while paused) and `SetPaused` also pauses the alarm source.
+- `Plan.md` Step 14 marks S1/S2 as done in 13a.
+Scene and prefab changes: `Game.prefab` only (the alarm source and the four `CallAudio` fields). `Final.unity` unchanged: a test run re-saved it with layout-driven values (caller-slot anchors, two `PhoneBook` overrides swapped), which I discarded with `git checkout`; the open scene isn't dirty.
+Tests: 785/785 EditMode (745 before; new: `PressureTests` ×20, `PressureCardTests` ×7, `PenaltyServiceTests` +6 net (the 1.5× fine, the multiplier, four rounding cases, the tip, the HungUp case; the two `penaltyCents` tests went), `CallsFileTests` +3 net, `CallAudioTests` ×4).
+Console: clean after clearing. During the Play Mode check Unity logged its own "JobTempAlloc … older than 4 frames" and "Ignoring depth surface … memoryless" lines, from stepping frames slowly and from screenshots; none from the project's code.
+Screenshot: `Temp/Captures/step-13a.png` (crop `step-13a-crop.png`): top, Winston waiting with his amber ring half empty under "New order!"; middle, a connected call; bottom, Clive's call to Nora (who is on the line) with "Line busy" in place of his pay and a full amber ring. `step-13a-cards-2-crop.png`: the same with the busy card still Incoming, the tag above its "New order!" stamp. `step-13a-ring-crop.png`: a taken card's ring with 3 s left, a thin amber sliver. `step-13a-hungup-crop.png`: "Hung up" in the neutral brown next to the others. The Play Mode run (50 game seconds at ×5) showed hang-ups, the queue refilling and no errors. Played directly in `Final` only; the scene flow from `MainMenu` wasn't touched.
+Look (StyleGuide §9): the ring is amber, never red; the tag is neutral brown on stamp paper (5.95:1), no shine, no motion of its own; the stamp is the existing stamp in the neutral ink; nothing new takes clicks. What still differs: the portrait art has its own small teal fee circle, so a corner of it peeks out under the tag (visible at the tag's lower right); the tag reads at 1080p, but on a phone its letters will be small (Step 16). No tuning loop was run; the tag's place and size (`AddLineBusyTag`: centre (46, 50), 104×34 in portrait units) and the ring's pulse (`GameStyle`) are easy to adjust.
+Deviations from Design/Plan:
+- Missing pressure fields turn their rule off (with a message) rather than falling back to a number in code, so the numbers stay in `Economy.json` only (D27); the quick-connect tip, by contrast, still falls back to 5.
+- "Line busy" means the recipient's jack carries a *connected or held* call. A call that only rings or is half-patched to that jack doesn't make the line busy, though it does count towards `maxBusyLineCards` when the queue deals (the brief's "in a live call"). So a busy-recipient card can show its pay normally until the other call connects.
+- A busy recipient can be someone who is *calling* (their own card still ringing), not only someone being called: the queue rule allows it, and it is counted as the one busy-recipient card.
+- The S2 ticks follow the ring's pulse rate but not its exact phase.
+Follow-ups:
+- `Calls.json` has no per-call `patienceSeconds` yet; 13b's day multipliers and 13c's residents (`patienceFactor`) will vary it.
+- `HungUpOnBusyLine` is recorded but nothing reads it yet (13e's complaints).
+- Plan §8: the queue-rule row is removed (fixed here; 13c keeps the rule on residents).
+- `GameStyle.asset` hasn't been re-saved, so the two patience timings aren't in the file until someone saves it from the Inspector; they work from their code defaults.
+- The tutorial still says nothing about patience; the D81 rework after step 13 could mention the amber ring.
+- The lead's PlayerPrefs save was written by the Play Mode check (allowed since step 12).
+
+#### Step 13a pass 1: verification (orchestrator, 2026-11-10)
+- **Numbers confirmed by the lead before launch:** patience 45 s, emergencies 30 s, at most one busy-recipient card, starting calls 12 s with today's fees and rates, 1 starting cord, and the fine 1.5× the emergency's pay. The lead asked that pay and fines grow with the level so a fine is always felt: recorded as D82 (fines follow pay now; days scale pay, patience and emergency time in 13b; generated calls vary pay in 13c).
+- **Tests:** re-run through MCP, 785/785 EditMode green. Console clean.
+- **Scope:** `git status` matches the report: 41 files, plus 2 new test files with metas. `Final.unity` is untouched (the test-run re-save was discarded), and `Game.prefab` only gains `EmergencyAlarmSfx`. `Calls.json`: call_001–010 last 12 s, all 8 emergencies have 30 s, and no `penaltyCents` is left.
+- **Code skimmed:** `CallQueue.TakeNext` (from-jack skip, busy-recipient cap), `CallService.Tick` (patience held with `WaitingHeld`, HungUp after Missed, `LineBusy` refreshed each tick), and `PenaltyService.FineFor` (factor × full pay × live multiplier, rounded half away from zero).
+- **Screenshots:** `step-13a-crop.png` and `step-13a-hungup-crop.png`. The "Line busy" tag sits on the pay badge in brown on stamp paper, and the "Hung up" stamp is in brown. Known: a corner of the teal fee circle peeks out under the tag.
+- **For the playtest:** following the brief, a call may be dealt to someone whose own call is still ringing (it uses up the one busy-recipient card). If the lead connects the newer call first, that person's own card then waits with their jack in use. Decide at the playtest whether "ringing" should count as busy for dealing.
+
+#### Step 13a: the lead's notes on pass 1 (2026-11-11)
+- **Build first, playtest later:** no playtest of pass 1. The feel playtests come at three checkpoints: after 13c, after 13e and after 13g (Plan §9, 13a).
+- **Late game, four talking calls filled all four windows** and nothing could ring until one ended: the real cause of the dead time. Talking calls now shrink to tabs at the bottom of the panel and free their window (D83).
+- **The "Line busy" label goes.** A free hold would make busy lines trivial. The choice is to cut the talking call off or let the new caller wait. Busy lines come back by day in 13b, only to someone who is talking (never to someone whose own card is waiting), with a patience for calls on hold (D83).
+- **Prices stay on the waiting cards.** The testers didn't notice them, but before 13a order never mattered. Judge them at the 13c checkpoint (D83).
+- **Pass 2 is split** into cards (pass 2) and hands (pass 3).
+
+
+## Step 13a pass 2 report: 2026-11-12
+Result: partial. The talking-call tabs (and the window count that ignores talking calls) are **blocked on fit**: they don't fit cleanly in the painted caller column at 4 windows, so I stopped there as the brief asks. Everything else in pass 2 is built and tested. Unity MCP then dropped (see Console), so the final Play Mode smoke test and its screenshot are missing.
+Playable now: new waiting cards land at the top of the caller panel and the older ones stay put; when a card leaves, the cards above it slide down. Every message opens with "Connect me to **Name**." and then the caller's own words. No card says "Line busy" any more, and nobody is called while their own card is still waiting (busy-recipient calls are off, `maxBusyLineCards` 0, until 13b). Talking calls still keep their window, as before.
+How to test:
+1. New game: the tutorial's lone card sits in the **bottom** window (cards rest on the lowest windows, the newest on top). After the first fee, the other windows fill above it.
+2. Watch a card leave (paid, hung up, cut off): its stamp shows in place for the hold, then the cards above slide down into its place and the next caller arrives at the top.
+3. Take any card: the bubble reads "Connect me to **<name>**." first, e.g. "Connect me to **Violet Fairweather**. Her library books are overdue again." Services read "the police station", "the hospital", "the fire station".
+4. Nobody whose own card is still ringing, taken or half-patched gets a call, and no call to someone already on the line rings.
+The fit (why the tabs stopped):
+- The caller column is painted into `main_background` (the `CallerQueuePanel` images are disabled). In the 1920×1080 canvas, each window is a 159-unit card on a 208-unit pitch; the fourth card's name plate ends at about y -335, and the column's dark stand starts at about y -405. That leaves **about 65–70 units of free column** (233 wide) under the fourth window at 5×5 and 6×6. Four tabs with a portrait, a time ring and readable money (24 units, the StyleGuide minimum) need about 2×100 units of height in a 2×2 grid, or 4×(40+) in a row of strips with 36-unit portraits. Neither fits without squeezing. The start board (3 windows) has room, because the fourth window's space is free.
+- Screenshots (918×693 Game view, 6×6 save): `Temp/Captures/step-13a2-before.png` (today's panel); `Temp/Captures/step-13a2-fit-mock-stand.png` (option A mocked: four 70-unit tabs on the stand: small, and the labels collide); `Temp/Captures/step-13a2-fit-mock-three-windows.png` (option B mocked: a 2×2 grid of 78-unit tabs in the fourth window's space: fits cleanly). The mocks were throwaway objects in Play Mode; nothing was saved.
+- Options for the lead:
+  - **A. On the stand** at the column's foot (x -960 to about -540, y -405 to -540): a row of four small tabs. Covers the stand's painted top and stripes, and the tabs come out small (70-unit portraits, 24-unit labels that collide; "Paid $1.56" doesn't fit under a 70-unit tab).
+  - **B. Three waiting windows at every stage** (`board_1` and `board_2` `clientSlots` 4 to 3 in `Economy.json`): the fourth window's space (about 230 × 233 units) holds a 2×2 grid of tabs at a readable size. My recommendation: the cast already caps live calls (4 on the start board, 6 at 6×6, D83), so with 4 talking calls a fourth waiting window would rarely fill anyway, and 3 waiting + 4 talking is still far more than today's 4 in all.
+  - **C. A column of tabs in the wall gap** between the caller column and the board (about 90 units wide): the open card's speech bubble opens over that gap and would cover them.
+  - **D. New art:** a tab rail painted under or beside the column.
+- The tabs pass will reuse `CallCardView` in a "tab" mode rather than a new view: the fee popup, the quick-connect tip, the coins, the stamp hold, hold and resume, and the tutorial's `firstCard` tracking keep working with no rewiring, and the tutorial's connected step can add the tab as a second, unclickable hole next to the money counter (today it lights only the counter).
+Created:
+- `Assets/Tests/Game/Editor/CardOrderTests.cs` (+ `.meta`): on the real Final scene: newest on top, cards rest on the lowest open slots, upper cards draw over lower ones, a gap closes from above, a stamp keeps its slot and the next card arrives on top after it.
+Changed:
+- Domain: `Calls/CallService.cs` (`IsJackInWaitingCall`: a call still Incoming, Taken or Connecting uses the jack); `Queue/CallQueue.cs` (a script whose `To` is the jack of a waiting call is always skipped; the busy-recipient cap now only ever applies to someone who is talking).
+- Content: `CallsFileLoader.cs` (`LeadIn`, `HasLeadIn`: "Connect me to <b>" + a name + "</b>."; a plain note for a message without it, the call still plays; the empty-message example uses the lead-in).
+- Game: `Views/CallCardView.cs` (the "Line busy" tag, its fields, polling and `IsLineBusyShown` removed); `Views/CallQueueView.cs` (`shown` is newest first; `SlotOf` rests the cards on the lowest open slots; the slide and draw order unchanged); `GameStyle.cs` (the `cutOffInk` tooltip no longer names the tag; the asset isn't re-saved).
+- Data: `Assets/Configs/Calls.json` (all 33 messages rewritten: "Connect me to <b>Name</b>." with the name as the book has it in first-name order, services as "the police station", "the hospital", "the fire station", then the old flavour, shortened where long; longest 80 characters without tags); `Assets/Configs/Economy.json` (`maxBusyLineCards` 0; `call_009` moved from 9th to 5th in `startPool`, see Deviations).
+- Tests: `PressureTests.cs` (the busy-recipient test connects the talking call first; new `NobodyIsCalledWhileTheirOwnCardStillWaits` ×3 states, run with `maxBusyLineCards` 1); `PressureCardTests.cs` (the Line busy tag test became `ACallToABusyLineKeepsItsPayAndHasNoLineBusyLabel`; the contrast helpers it alone used went); `CallsFileTests.cs` (sample messages carry the lead-in; new `AMessageOpensByNamingThePersonWanted` ×7, `AMessageWithoutTheLeadInGetsANoteButStillPlays`, `EveryRealMessageNamesItsRecipientAsTheBookDoes`); `BoardGrowthTests.cs` (the real start pool runs until every call has rung, at most an hour, not just two rounds).
+- Docs: `Design.md` (a status row for pass 2; §1 rules for busy recipients and cards at the top; 5.2 busy recipients and a starved-call note; 5.4 the card order, the tag struck, the lead-in; 6.5 the field and the validator note; §12.4 "built in pass 2"); `EconomyFile.md` (the `message` field, `maxBusyLineCards` 0 and its meaning, "Who may ring", the validator list and an example note, the sample calls); `BookFile.md` (how messages name people); `StyleGuide.md` (the Neutral rows no longer list the tag); `Plan.md` (§4: two lessons; §8: a "Starved calls in the stage pools" row).
+Scene and prefab changes: none. A test run re-saved `Final.unity` with layout-only values (8 lines); discarded with `git checkout`. Unity reloaded the scene; I couldn't confirm afterwards that it isn't dirty (MCP down).
+Tests: 800/800 EditMode (785 before; new: `CardOrderTests` ×3, `PressureTests.NobodyIsCalledWhileTheirOwnCardStillWaits` ×3, `CallsFileTests` +9). Run through MCP before the disconnect.
+Console: clean after the compiles (only MCP's own "WebSocket is not initialised" line). **Unity MCP then dropped:** after the last full test run and the `Final.unity` checkout, the plugin's WebSocket kept closing and every call timed out for over ten minutes with Unity idle in the background (Editor.log: "Keep-alive failed … closed the WebSocket connection"). So the console wasn't read after that, and the editor state needs a look: it should be idle, not in Play Mode, on `Final.unity`; **the Pause toggle may still be on** (my Play Mode check set `EditorApplication.isPaused` for frame stepping before I stopped Play Mode; nothing else was left: the step callbacks removed themselves, `timeScale` was never changed).
+Screenshot: `Temp/Captures/step-13a2-before.png`, `step-13a2-fit-mock-stand.png`, `step-13a2-fit-mock-three-windows.png`. None yet of the new card order or the lead-in bubble in play (MCP down).
+Deviations from Design/Plan:
+- **Not built (blocked): the tabs and the window count that ignores talking calls (D83)**, with their tests (window count, tab states, fit at every stage, the tutorial's connected step). Waiting for the lead's choice of place (above).
+- "A gap closes from above" built as: the cards rest on the lowest open slots, oldest at the bottom. With every window full (the usual case) it is the same as stacking from the top; when a window is empty (the tutorial's start, or a pool where everyone is busy) the empty one is at the top, where the next card lands. A lone card therefore sits in the bottom window.
+- **`call_009` moved earlier in `startPool`** (from after `call_008` to after `call_005`). With `maxBusyLineCards` 0, `call_009` (Agatha to Winston) and `call_010` (Winston's emergency) never rang in `BoardGrowthTests`' hour of instant connects, because Winston was always on the line when the queue reached them (both involve C2). A model of the same rules found the new order rings every call. The stage pools show the same risk in that model (Plan §8); I left them, since 13c's director replaces the pools and real play varies more.
+- Message names use the book's people in first-name order ("Dr Ravi Sharma" for "Sharma, Ravi (Dr)", "PC Percy Plodwell"), matching the caller names on the cards and Design's example; services as "the police station" etc. (lowercase after "the"). The fixed lead-in always ends in a full stop, emergencies included, so 13c can compose it the same way.
+Follow-ups:
+- The lead's choice for the tabs (A–D above), then a short tabs pass: the domain window rule (`CallQueue` fills while the waiting calls are fewer than `ClientSlots`), `CallCardView` tab mode, `CallQueueView` tab group with serialized size and spacing, the tutorial's connected step lighting the tab, and the tests the brief lists.
+- Starved calls in the stage pools (Plan §8): spread each person's calls through the pools, or let the queue retry a skipped call first (a D52 change, the lead's call).
+- The short Play Mode look loaded the lead's save and may have written it (allowed since step 12).
+
+#### Step 13a pass 2: verification (orchestrator, 2026-11-12)
+- **MCP dropped** at the end of the agent's run. Unity stopped answering in the background until the lead brought it to the front. Afterwards: idle, not in Play Mode, not paused, `Final.unity` active.
+- **Tests:** re-run through MCP, 800/800 EditMode green.
+- **Console:** only MCP connection lines and a Unity services "Token Exchange" error, none from the project.
+- **Scope:** matches the report. No scene or prefab change. `Economy.json` has `maxBusyLineCards` 0, and `call_009` moved to 5th in `startPool`. `Calls.json` messages open with "Connect me to <b>Name</b>.".
+- **Not done:** the talking-call tabs and the waiting-only window count (they don't fit; mock-ups in `Temp/Captures/step-13a2-fit-mock-*.png`), and the agent's final Play Mode smoke run.
+- **Offered to the lead:** three waiting windows at every stage, with the tabs in a 2×2 grid in the 4th window's space (the agent and the orchestrator recommend this).
+- **Layout chosen (lead, 2026-11-12):** three waiting windows at every stage, with the tabs in a 2×2 grid in the 4th window's space. It's built now and open to change; the artist has been asked for an opinion. The orchestrator built a comparison page with a toy model (`Builds/Mockups/caller-column/`, git-ignored). The model shows that dead time comes mostly from call length against the operator's speed, and much less from the layout (a fast operator on 25 s calls: 24% idle today, 19% with tabs). Long 5×5 and 6×6 calls are left to 13b's pace.
+
+## Step 13a pass 2b report: 2026-11-12
+Result: partial. The talking-call tabs, the waiting-only window count and three windows at every stage are built and tested. One real-file test is red, and it needs the lead's call: with talking calls no longer holding a window, more calls are live at once, and the start pool starves (`call_010` never rings; see "Starved calls" below).
+Playable now: when you connect a call, its card shrinks into a small tab in a 2x2 grid under the three caller windows, and its window takes the next caller. The cards above it slide down. A tab shows the caller's portrait, a green ring that empties as the talk runs out, and the money so far on a small teal plate. While a call is on hold, its tab says "On hold" and the money and ring dim. When a talk ends, the tab shows its "Paid $X" or "Cut off" stamp for the usual moment, then leaves, and the other tabs close up. Tabs take no clicks. Every board stage has three waiting windows.
+How to test:
+1. Continue (or New game and finish the tutorial). Connect a call: the card slides down and shrinks into the top-left tab, the "+fee" popup rises from it at full size, and a new caller arrives at the top of the windows.
+2. Connect up to four calls: the tabs fill left to right, then top to bottom. All three windows keep filling while four calls talk (when someone free is in the pool).
+3. Pull one plug of a talking call: its tab reads "On hold" and dims. Plug it back: normal again.
+4. Let a talk finish: "Paid $X" shows on the tab, then the tab leaves and the others move up.
+5. New game: in the tutorial's "connected" step, the spotlight lights the money counter and the new tab.
+6. Buy the bigger boards: still three windows, and the tabs stay in the same place.
+Created:
+- `Assets/Tests/Game/Editor/TalkingTabTests.cs` (+ `.meta`), on the real Final scene: a connected card shrinks into a tab and its window takes the next caller; tab states (time ring in Good green and its fill, the money on its plate, no name, no bubble; "On hold" with frozen money and a dimmed ring; resumed; the "Paid" stamp, then gone, and the pooled card is a full card again); the stamp and popups keep a readable size; four tabs fill the grid in order and close up; a full grid cuts the oldest stamp short; the tabs fit at every board stage (three windows, four tabs beside three waiting cards, no jack, shop or book covered, below the third card, no tab over another); the tab settings are Inspector fields.
+Changed:
+- Domain: `Calls/Call.cs` (`IsWaiting`, `IsTalking`); `Queue/CallQueue.cs` (fills while `WaitingCalls()` < `ClientSlots`; `WaitingCalls()` public).
+- Game: `Views/CallCardView.cs` (tab mode: `SetTab`, `Scale`, `IsTab`, the "Tab plate" image under the portrait, `TabPlateRect`, `EarningsText`, `NamePlateText`; the time ring for a talking call; `IsPatienceRing` only while waiting; the press squashes around `Scale`, since `pressTarget` is the card's root; Inspector fields `tabLabelSize` 24, `tabLabelWidth` 96, `tabLabelGap` -6, `tabStampScale` 0.5); `Views/CallQueueView.cs` (the `tabs` list beside `shown`, the grid at the first closed window's space, `TabCentre`, `TabScaleOf`, `Tabs`, `MaxTabs` 4, the slide and shrink in `LateUpdate`, the pool grows by 4 cards; Inspector fields `tabSize` 80, `tabSpacing` (30, 40), `tabGridOffset` (-10, 6)); `GameStyle.cs` (`cardTeal` #175351, the StyleGuide's card teal; the asset isn't re-saved, so it takes the code default); `FirstOrderGuide.cs` (the connected step also lights the first call's tab, unclickable).
+- Data: `Assets/Configs/Economy.json` (`board_1` and `board_2` `clientSlots` 3; descriptions "5x5" and "6x6").
+- Tests changed to the new window rule (same intent): `PressureTests.cs` (+3: `AConnectFreesItsWindowForTheNextCaller`, `FourTalkingCallsAndThreeWaitingCards`, `AHeldCallHoldsNoWindowAndTakenOrConnectingCallsDo`); `CallQueueTests.cs` (`AConnectedCallHoldsItsSlot…` became `AConnectedCallFreesItsWindowAtOnce`; the bigger-board and tutorial tests expect the freed window to fill); `GameSessionTests.cs` (the clear counts every live call); `BoardGrowthTests.cs` (the window checks count waiting calls); `PressureCardTests.cs` (the patience ring goes on connect, and the card is a tab); `TutorialSpotlightTests.cs` (the connected step's targets are the counter and the tab).
+- Docs: `Design.md` (status row for pass 2b; 5.2 Fill and the starved-call note; 5.4 the tab bullet and the connected, on-hold and ended states; 5.9's `extra_clients` row; D17's row); `EconomyFile.md` (slots hold waiting calls; keep 3; `clientSlots` 3 in the shipped file); `Plan.md` (§4: the press lesson; §8: the starved-calls row with the new numbers).
+Scene and prefab changes: none. The new Inspector fields aren't in `GameUI.prefab` until someone saves it; they take their code defaults. Test runs re-saved `Final.unity` with layout-only values three times; each was discarded with `git checkout`. `Final.unity` is active and not dirty.
+Tests: 809/810 EditMode (800 before; new: `TalkingTabTests` ×7, `PressureTests` +3). **Red:** `BoardGrowthTests.TheRealFilesPlayTheStartPoolOnTheStartingBoardAndSlots`, "every start-pool call rings: expected call_010". That is the starved-call finding below, not a code fault; I left it red so the lead sees it.
+Console: clean. The Play Mode run logged nothing from the project (Editor.log checked); the only lines were MCP's "WebSocket is not initialised" after reloads.
+Screenshot: `Temp/Captures/step-13a2b.png` (the whole game at 1920x1080, 6x6 board, the lead's save) and `step-13a2b-column-crop.png` (the column): three waiting cards (Mr Gnome with "New order!", two emergencies), then four tabs: a talking $10, an "On hold" $6 (dimmed), a "Paid $20.00" stamp with $20, and a talking $65. `step-13a2b-column.png` is an earlier frame with game time frozen, so the four "+fee" and "Quick!" popups hang over the tabs; in play each rises and fades in 1 s.
+Look (StyleGuide §9): reused card art and stamp; the ring in Good green (never Alarm), dimmed on hold; the money in Money gold on Card teal (about 6:1, measured from the hex values); "On hold" in the Label font on the portrait's own name plate; no gloss, nothing new takes clicks, nothing covers a jack, the book or the shop at any stage (tested). **What still differs:** "On hold" on the tab's name plate is small (about 12 units, under the 24-unit minimum) because the painted plate shrinks with the tab; the stamp on a tab is about half size (its text under 24 units too); the top row of tabs sits about 10 units under the third card's EMERGENCY badge; the cord's colour no longer shows on the card (the tab's ring is the time left, in green, so the player links tab to cord by the board's green jacks only). The "+fee" and "Quick!" popups keep full size and briefly cover the neighbouring tab. No tuning loop was run: `tabSize`, `tabSpacing`, `tabGridOffset` (queue) and `tabLabelSize`, `tabLabelWidth`, `tabLabelGap`, `tabStampScale` (card) are Inspector settings.
+Starved calls (needs the lead's call):
+- With talking calls freed from the windows, up to 4 talk and 3 wait on a 9-person start cast, so most people are busy most of the time, and the queue (which moves past a skipped call, D52) loops over the calls whose people happen to be free.
+- `BoardGrowthTests` (instant connects, an hour): `call_010` (Winston's emergency) never rings. It passed under pass 2's rule.
+- A model on the real files (one connect every 4 s, at most N talking, 20 game minutes): on the start board, `call_004`, `call_006`, `call_008`, `call_009` and `call_010` never ring at 1, 2, 3 or 4 cords; at 6x6, 3 to 9 of the 20 calls never ring.
+- Tried and measured, not kept: 16 random `startPool` orders (all still starve in at least one model); a throwaway queue that resumes at the first skipped call (start pool: 1 of 10 unrung; board_1 with 2 or 4 cords: 9 of 15 unrung). Neither fixes it.
+- Options for the lead: accept the red test until 13c's director (it deals calls between free residents, D77); or lower the pressure now (for example, two waiting windows, or a larger start cast in `Calls.json`); or make the D52 change anyway as a partial help. I didn't choose, because each changes the design.
+Deviations from Design/Plan:
+- "A reload shows talking calls as tabs": saves keep no live calls (D55; unfinished calls ring again after a reload), so there is nothing to show. The view puts a call that is already talking straight into the grid when its card first shows; no test, as nothing in the game does that.
+- The tab hides the cord-colour ring; the time-left ring takes its place (Good green, as the brief and the mock-up ask).
+- "On hold" goes on the portrait's name plate, and the money stays on the plate under the tab, so both show at once.
+- The grid is centred on the first closed window's space (`OpenSlotCount`), so if `clientSlots` ever goes back to 4, the tabs move to the 5th space, below the column's art. The tests require 3.
+Follow-ups:
+- The lead's call on starved calls (above; Plan §8).
+- `GameUI.prefab` and `GameStyle.asset` haven't been re-saved, so the new fields sit at their code defaults until someone saves them from the Inspector.
+- Small tab text on phones (Step 16): "On hold", the tab stamp, and 24-unit money at 0.36x.
+- The Game view was 979x643 when I started; I set it to 1920x1080 for the screenshots and left it there (Plan §4 says to leave it at 1920x1080).
+- The Play Mode run used the lead's save (6x6, 4 cords), connected, held and ended its live calls from code, and may have saved it (allowed since step 12).
+
+#### Step 13a pass 2b: verification (orchestrator, 2026-11-12)
+- **Tests:** re-run through MCP: 809/810 EditMode. The one red test is `BoardGrowthTests.TheRealFilesPlayTheStartPoolOnTheStartingBoardAndSlots`: `call_010` never rings. The agent left it red on purpose; it is the lead's decision.
+- **Console:** clean (one MCP connection line). `Final.unity` is not re-saved.
+- **Scope:** matches the report. No scene or prefab change. `Economy.json`: `board_1` and `board_2` `clientSlots` 3, with descriptions "5x5" and "6x6".
+- **Screenshot** `step-13a2b-column-crop.png`: three waiting cards above a 2×2 grid of tabs (talking, on hold dimmed, a "Paid" stamp, talking). It fits inside the column.
+- **Starved calls:** with the busy-caller rule and talking calls freeing their windows, a 9-person start cast can't give every call a turn. The start board's two emergencies (`call_004`, `call_010`) are among the starved ones. The real fix is 13c's call director. Taken to the lead together with the order of 13b and 13c.
+- **The lead's answer (2026-11-12):** park the red test with a reason until 13c, build 13c before 13b, then go on with pass 3.
+
+## Step 13a pass 3 report: 2026-11-12
+Result: done
+Playable now: when a call is over (paid, wrong number, or a circuit with no call at all), one click or tap on either of its plugs pulls both plugs and puts the cord in your hand, with one plug-out sound, as if you had taken it from the tray; click the next caller's jack and carry on. A plug of a live call still puts the call on hold (D07). In a new game, once the first call ends with its cord still plugged, the tutorial shows one more step, "The call is over. Click a plug to free the cord.", with the light on the caller's plug; clicking it frees the cord into your hand and ends the step. The shop hints follow as before.
+How to test:
+1. New game. Play the tutorial's call to its end (12 s after connecting). The new step lights the caller's plug with "The call is over. Click a plug to free the cord."; everything else is dark and takes no clicks. Click the plug: both plugs come out, the cord is in your hand, the step ends.
+2. Plug the cord in hand straight into the next caller's jack and the jack from the book: the call connects and pays its fee.
+3. While a call is talking, click one of its plugs: the call goes on hold and only that plug comes out (unchanged). Plug it back: it resumes.
+4. Let a call finish, then click the *other* plug (the recipient's): same one-click pickup. A wrong-number circuit comes off the same way.
+5. On a phone: a tap does the same as a click.
+Created:
+- `Assets/Tests/Game/Editor/FreeCordTests.cs` (+ `.meta`), on the real Final scene: a finished cord's plug (tapped, no hover) frees both plugs, holds the cord and raises `PickedUp` once; the lifted cord reports as returned (no half-patched cord, and the old circuit no longer connects a new call between the same jacks) and plugs straight into the next call, which pays; a live call's plug still holds the call and only that plug comes out, and plugging back resumes; a circuit with no call comes off whole; without the game's answer the cord code pulls one plug as before.
+Changed:
+- Cord code: `Assets/Scripts/UI/CableController.cs` (`TryLiftFromBoard`: a closed cord's two plugs out at once, one plug-out sound, then `TryPickUp`, so the tray pickup's own path and `PickedUp` event run); `Assets/Scripts/UI/CableInputController.cs` (`CarriesLiveCall`, a `Func<CableController, bool>` the game sets; in `HandleSocketClick`, a click on a plug of a `Connected` cord that carries no live call lifts it into the hand; while unset, the old one-plug pull stays).
+- Game: `Assets/Scripts/Game/CordBridge.cs` (sets `CarriesLiveCall` in `Attach` and answers with `OperatorDesk.CallOn(cord) != null`; "live" while no desk is bound or for an unknown cable; reporting unchanged: a closed circuit turning into a held cord already reports `OnCordReturned`); `Assets/Scripts/Game/FirstOrderGuideSequence.cs` (`FirstOrderGuideStage.FreeCord = 17`; `FirstOrderEnded(bool cordStillPlugged = false)`; `FinishedCordPlugged(plugged, canStart)`, polled; `CablePickedUp` ends the step; it comes before any shop hint and only in calm play; the guide doesn't complete while it is due; it is dropped if the cord leaves the board another way); `Assets/Scripts/Game/FirstOrderGuide.cs` (remembers the cord joining the first call's two jacks when the call ends and polls it; the step's hole on the caller's jack; `IsCalm` shared with the shop hints); `Assets/Scripts/Game/Views/TutorialSpotlight.cs` (`TutorialTexts.freeCord`).
+- Tests: `Assets/Tests/Domain/BoardGrowthTests.cs` (`[Ignore("Calls starve on the 9-person start cast under the busy-caller rule until 13c's call director picks free residents (Plan §8).")]` on `TheRealFilesPlayTheStartPoolOnTheStartingBoardAndSlots`; body unchanged); `Assets/Tests/Game/Editor/FirstOrderGuideTests.cs` (+4: the step after Connected or WaitingForShop, ending only on the pickup, then the shop hints; it waits for calm play and comes before any shop hint; no plugged cord, no step; a cord leaving otherwise ends it; Skip still ends everything); `Assets/Tests/Game/Editor/TutorialSpotlightTests.cs` (+1: `TheFinishedFirstCallTeachesFreeingItsCordWithOneClick` with the real guide: the step's text and hole, everything else blocked, the click through the hole frees the cord into the hand and ends the step); `Assets/Tests/Game/Editor/GamePauseMenuTests.cs` (`AHeldCordSurvivesPauseAndResume` patched a circuit with no call and clicked one plug to get a half-plugged cord in hand; with D79 that lifts the whole cord, so the test now marks its cord as live (`CarriesLiveCall = _ => true`) to stay on the D07 path it is about).
+- Assets: `Assets/Content/GameStyle.asset` (re-saved: only `cardTeal`, `patienceUrgentSeconds` and `patiencePulsesPerSecond` added); `Assets/Prefabs/Game/GameUI.prefab` (re-saved: only `tabSize`, `tabSpacing`, `tabGridOffset` on the queue, `tabLabelSize`, `tabLabelWidth`, `tabLabelGap`, `tabStampScale` on the card, and the new `freeCord` text added; every value is the code default). `ForceReserializeAssets` wrote the asset but not the prefab; `SetDirty` on the three components plus `SaveAssetIfDirty` did (Plan §4 lesson).
+- Docs: `Design.md` (status row "13a pass 3 (hands)"; §1's tutorial line; §4.5 the one-click pickup and how it reports); `Plan.md` (§4: two lessons, re-saving new fields and the one-click pickup in tests; §8: the tutorial-rework row notes the step is built and its one gap; the starved-calls row says the test is parked); `Progress.md` (status row, this report).
+Scene and prefab changes: `GameUI.prefab` re-saved as above; no scene change. The full test runs re-saved `Final.unity` with two prefab overrides swapped (order only); discarded with `git checkout` after reopening the scene, which is active and not dirty.
+Tests: 819/820 EditMode passed, 1 skipped (the parked `BoardGrowthTests` test), 0 failed (810 before; new: `FreeCordTests` x5, `FirstOrderGuideTests` +4, `TutorialSpotlightTests` +1).
+Console: clean (only MCP's "WebSocket is not initialised" lines and two URP "memoryless depth" notes in Play Mode; cleared at the end).
+Screenshot: `Temp/Captures/step-13a3-free-cord-step.png` (new game, 1920x1080: the first call over, its red cord from A1 to B3, the hole on A1's plug, the hint "The call is over. Click a plug to free the cord." with its arrow); `Temp/Captures/step-13a3-cord-in-hand.png` (the frame after a real raycast click through the hole on A1: both jacks empty, the red plug in hand over the board, the spotlight fading out). The dark layer looks faint in both, as in every earlier tutorial capture (`step-10d-after-tutorial.png`); in play it is the usual 78% dim. I fast-forwarded the run at 20x, so Winston's emergency was missed and its fine shows under the counter; nothing to do with this pass.
+Look (StyleGuide §9): no new visual. The step reuses the spotlight, hint, arrow and round jack hole of the plugging steps; the text uses the hint's existing font and ink.
+Deviations from Design/Plan:
+- "A cord whose call has ended" is read as "a closed cord that carries no live call", so a wrong-number circuit and a circuit that never had a call also come off whole in one click. A half-plugged cord (one plug in) is unchanged: clicking its plug pulls that plug, as before.
+- The free-cord step waits for calm play (not paused, the book shut, no cord in hand), like the shop hints, and comes before any shop hint that is due. If a shop hint is showing when the first call ends, the step follows when that hint ends.
+- The hole is on the caller's plug only (the brief says "a plug"); the recipient's plug is blocked during the step.
+Follow-ups:
+- The D76 hover lights don't show that a finished cord's plug can be picked up whole (amber only on an unfinished cord's jack under an empty hand). Worth a look at the 13c playtest if players don't find the one click outside the tutorial.
+- A gap (Plan §8): if every shop hint were done or unsellable before the first call ends, the guide would complete before the free-cord step. That can't happen with the real `Economy.json` in a 12 s call.
+- The Play Mode run deleted the PlayerPrefs save (`operator.save`, `operator.save.backup`) to start a new game, and deleted the one it wrote afterwards (allowed since step 12). The lead's next Final run starts a new game.
+- The open right-click idea (D79) is untouched.
+
+#### Step 13a pass 3: verification (orchestrator, 2026-11-12)
+- **Tests:** re-run through MCP: 819 passed, 1 skipped (the parked starved-calls test, with its reason), 0 failed. Console clean. `Final.unity` is not re-saved.
+- **Scope:** matches the report. In the cord code, `CableInputController` asks the game's `CarriesLiveCall` check before lifting a closed cord whole; without the check, the old one-plug pull stays. `GameStyle.asset` gains only `cardTeal`, `patienceUrgentSeconds` and `patiencePulsesPerSecond`; `GameUI.prefab` gains only 8 lines (the tab fields and the `freeCord` text).
+- **Screenshot** `step-13a3-free-cord-step.png`: the new step's hole is on the caller's plug, with the hint "The call is over. Click a plug to free the cord."
+- **Seen in the capture, for the 13c checkpoint:** on a new game, Winston's emergency (30 s) rang during the tutorial and was missed (the run was fast-forwarded). A first-time player could be fined within the first minute. Check this at the checkpoint, and in the tutorial rework after 13 (D81).
+- **13a is complete:** 4 agent passes. Next, per the lead's order: 13c, then 13b.
+- **The lead's tutorial notes (2026-11-12):** the clock stops while any hint is on screen (the whole game, every hint); the free-cord hint mentions the tray; add an emergency step. Built as pass 4 before the commit. Emergencies coming back to back are a symptom of the starving queue; 13c's director spaces them.
+
+## Step 13a pass 4 report: 2026-11-12
+Result: done
+Playable now: in a new game, every tutorial hint stops the game's clock while it is on screen: no caller loses patience, no emergency counts down, no call talks or pays, nothing new rings and the bell doesn't repeat, but the board still answers clicks, so the player does what the hint asks; the clock runs again the moment the hint ends. The free-cord hint now reads "The call is over. Click a plug to free the cord. Plug it into the next call, or drop it back in the tray." The first emergency that rings while the tutorial runs gets its own hint on its card, "Emergency! Connect it before the red ring runs out, or you pay a fine.", which ends when the card is taken; since the clock holds while it shows, the emergency loses no time while the player reads.
+How to test:
+1. New game. Before clicking the first caller, wait 30 s: nothing else rings. Play the guided call; at "Connected!" the money counter stands still until the hint ends (a click, or 5 s), then pay ticks up.
+2. If the cord hint (or any shop hint) comes up while other callers wait, their amber rings stand still until it ends.
+3. When the first call ends, the free-cord hint shows the new text on three lines; click the plug, then drop the cord back in the tray or plug it into the next caller.
+4. Keep playing until the first emergency rings (Agatha or Winston; the dev panel's calls can't force one). Its card is lit with the emergency text; the bell doesn't repeat and the red ring doesn't move. Click the card: the hint ends and the countdown runs again. A second emergency gets no hint.
+5. Skip tutorial at any time: no emergency hint later. Continue from a save made before the first emergency: the emergency hint still comes once.
+Created: none.
+Changed:
+- Domain: `Assets/Scripts/Domain/Save/ShopHints.cs` (`Emergency = 16`; `All` now 31); `Assets/Scripts/Domain/Save/SaveData.cs` (`CurrentVersion` 2); `Assets/Scripts/Domain/Save/SaveMigrations.cs` (the first real migration, 1 to 2, `MarkEmergencyHintDoneWhenShopHintsAre`: a v1 save whose four shop hints are all done, seen or skipped, gets the emergency hint marked shown, so Skip tutorial stays final; a v1 save mid-tutorial still gets it).
+- Game: `Assets/Scripts/Game/GameLoopRunner.cs` (`Bind(session, clockHeld)`, `IsClockHeld`, `Advance(seconds)` called from `Update`; skips `GameSession.Tick` while held); `Assets/Scripts/Game/CallAudio.cs` (`Bind(..., holdClock)`; `Advance` does nothing while held: no bell repeats, no ticks); `Assets/Scripts/Game/GameInstaller.cs` (one check, "the guide is enabled and a step is on screen", passed to the runner and to `CallAudio`); `Assets/Scripts/Game/FirstOrderGuide.cs` (`HoldsClock`; tracks the first emergency card shown and polls whether it is still ringing; the `Emergency` step's hole on the card); `Assets/Scripts/Game/FirstOrderGuideSequence.cs` (`FirstOrderGuideStage.Emergency = 18`, part of `IsGuiding`; `EmergencyRinging(ringing, canStart)`; ends on the card taken and records `ShopHints.Emergency` like a shop hint); `Assets/Scripts/Game/Views/TutorialSpotlight.cs` (`TutorialTexts.freeCord` new text, new `emergency` text).
+- Prefab: `Assets/Prefabs/Game/GameUI.prefab` (the tutorial's `freeCord` text changed and `emergency` added; nothing else from this pass).
+- Tests: `Assets/Tests/Game/Editor/FirstOrderGuideTests.cs` (+6: the emergency step comes, ends only on the card taken and never again; it waits for a showing hint, then comes first with no gap; Skip or a done hint means none, and Continue keeps the guide for it alone; Connected and mystery still end on frame time while the clock holds (2 cases); every step on screen holds the clock, none between them; two existing tests now expect the emergency step before Complete); `Assets/Tests/Game/Editor/TutorialSpotlightTests.cs` (+3 on the real scene: every first-call step holds the clock with the cord input live and the call connecting, the Connected step holds talk, pay, patience, career seconds and arrivals, and everything runs again after it; the first emergency's step on its card, holding its response time, a waiting caller's patience, the bell and the ticks, ending on the take, recorded, and surviving a save and Continue in both directions; no emergency step after Skip; the free-cord test checks the new text and that the hint box stays on screen and holds its text; three shop-hint tests now expect the emergency step to remain); `Assets/Tests/Game/Editor/CallAudioTests.cs` (+1: a held clock stops the bell's repeats and the ticks, which resume after); `Assets/Tests/Domain/SaveFileTests.cs` (`AVersionOneSaveNeedsNoSteps` became `ACurrentSaveNeedsNoSteps`; +4 cases for the migration); `Assets/Tests/Domain/SaveSessionTests.cs` (the pending hints now include the emergency).
+- Docs: `Design.md` (status row "13a pass 4 (tutorial)"; §1's tutorial line; §4's `GameLoopRunner` line; 5.12's saved shop hints and save version 2; D57 and D81 notes); `Plan.md` (§8 tutorial-rework row; §4: two lessons; the pass 4 brief marked built); `Progress.md` (status row, this report).
+Scene and prefab changes: `GameUI.prefab` texts only (saved through `SerializedObject` plus `SaveAssetIfDirty`; the diff for this pass is the two text lines). No scene change; the full test runs did not re-save `Final.unity` this time.
+Tests: 833/834 EditMode passed, 1 skipped (the parked `BoardGrowthTests` starved-calls test), 0 failed (820 before; +14).
+Console: clean (cleared at the end). During the Play Mode check, one warning came from my own hand-added emergency beyond the three caller windows ("more live calls than open caller slots"), not from play; see the §4 lesson.
+Screenshot: `Temp/Captures/step-13a4-free-cord-text.png` (new game at 1920x1080: the free-cord step on A1's plug, the new text on three lines inside its box, the clock held at 12.2 s); `Temp/Captures/step-13a4-emergency-step.png` (after freeing the cord and dropping it in the tray: Agatha Higgins' emergency card at the top lit, the hint beside it with its arrow, the other two callers' amber rings frozen; her countdown held at 24.48 s through 40 stepped frames, and the take then ended the step and the clock ran on: 24.48 to 23.48 in one second). The run drove the first call's steps through the same calls the tests use (card click, the dark layer's press, the book, `ProcessTarget` on the tray and the jacks) while the clock stood at 0.02 s, which shows input works during a hint; the cord hint and the mystery hint came up in between and held the clock too. The dark layer looks faint, as in every earlier capture.
+Look (StyleGuide §9): no new visual. The emergency step reuses the spotlight, hint, arrow and card hole of the caller step; both texts use the hint's existing font and ink and stay inside the box (checked in the tests at 1920x1080).
+Deviations from Design/Plan:
+- Timed steps count **Unity's frame time** (the guide's existing `Tick(Time.deltaTime)`), which the hold never touches; the pause menu still stops them. Nothing ends on game time, so nothing can deadlock: Connected ends after 5 s or a click, the mystery after 5 s or a click, the gap between shop hints is 1.5 s of frame time.
+- The hold is skipping `GameSession.Tick` and `CallAudio.Advance`, not `Time.timeScale`, so Unity's time, the cords, the cards' motion, stamps and popups and the spotlight keep running. A sound already playing (a bell that just rang) finishes; only its repeats wait.
+- The hold starts in the frame after a step appears (the guide's `LateUpdate` sets the stage; the runner reads it next `Update`), so at most one frame of game time passes (0.02 s in the capture).
+- The emergency step does not wait for "calm play" (book shut, no cord in hand) like the shop hints, only for no other step on screen and no pause, because the emergency's own time runs until it shows; the player can take the card with the book open or a cord in hand. It comes ahead of a due free-cord step or shop hint, and with no gap after the previous hint.
+- If the first emergency is taken before its step could show (only possible within the frame it appears), the step waits for the next emergency rather than being lost; it is recorded only once it has shown.
+- "Once per save" needed a save version: version 2, with a migration (see Changed). The emergency flag is part of `ShopHints.All`, so a session without the tutorial and an old save without the field count it as shown, and the guide on Continue stays bound until the first emergency when only that step is left.
+Follow-ups:
+- The cord hint (and More Profit, More Clients) can come up right after "Connected!" while the first call talks; with the hold, its talk and pay wait until the player buys or dismisses. That is the lead's rule; worth a look at the 13c playtest in case it reads as "the call froze".
+- The emergency step on a Continue game keeps `FirstOrderGuide` running (polling every frame) until the first emergency rings; cheap, but it is a running guide in a game that may never see an emergency again.
+- The Play Mode run deleted the PlayerPrefs save before and after (allowed since step 12); the lead's next run starts a new game.
+
+#### Step 13a pass 4: verification (orchestrator, 2026-11-12)
+- **Tests:** re-run through MCP: 833 passed, 1 skipped (the parked starved-calls test), 0 failed. Console clean. `Final.unity` is not re-saved.
+- **Scope:** matches the report. `GameLoopRunner.Advance` skips `GameSession.Tick` while the guide holds the clock, and `Time.timeScale` is untouched. `GameUI.prefab` changes only the two texts. The save goes to version 2 with its first migration (a save whose four shop hints are all done counts the emergency hint as shown).
+- **Screenshot** `step-13a4-emergency-step.png`: Agatha's emergency card lit, with the hint "Emergency! Connect it before the red ring runs out, or you pay a fine." and the other callers' rings frozen.
+- **Deviations accepted:**
+  - At most one frame of game time slips before the hold starts.
+  - The emergency step doesn't wait for calm play, and comes before a due free-cord or shop hint.
+  - It is recorded only once it has shown.
+  - The save version bump.
+- **For the 13c checkpoint:** a shop hint right after "Connected!" holds the first call's talk and pay until it ends (the lead's rule). Watch whether it reads as "the call froze".
+- **The lead's notes after playing (2026-11-12/13):** keep the one-click pickup into the hand (the tray return by itself was too easy, the tray-drop click an extra step); no new light for a finished call; information hints get an OK button and never close by themselves; action hints keep their spot; a guided second connection. Built as pass 5.
+
+## Step 13a pass 5 report: 2026-11-13
+Result: done
+Playable now: on a new game, every tutorial hint that only explains something has an **OK** button on its hint box, under the text, and nothing else closes it: no timer, and no click elsewhere. Hints that ask for an action still light their target and end when you do it. After you free the first cord, a new hint, "Plug it straight into the next caller.", lights the jack of the caller who has waited longest, and ends as soon as the cord's plug is in that jack. From there you carry on alone: take the card, look up the recipient, plug the other end.
+How to test:
+1. New game. Click the first caller. While the message types, there's no OK. Once it has typed out, "Read who they want to talk to." shows an OK. Clicking the dark area does nothing. Wait as long as you like and the hint stays. Click OK.
+2. "This blinking light is the caller's line..." has an OK too. A fast double-click on the first OK doesn't skip it (0.5 s guard).
+3. The book, the row, the cord and both jacks are action steps, as before: no OK, the lit spot takes the click.
+4. At "Connected! You earn money while they talk." the money counter and the tab are lit but take no click. The hint stays until OK, and the clock stands still meanwhile.
+5. If the cord hint comes, buy the cord (an action). The mystery hint then has an OK. Later, More Profit and More Clients each show their button lit, but it can't be clicked during the hint. Click OK, then buy normally if you want to.
+6. When the first call ends, click the lit plug to free the cord. The next hint lights one caller's jack. Only that jack takes the cord: clicking other jacks, the tray or a card does nothing. Plug it in, and the hint closes and the clock runs again. Take that caller's card and finish the call as usual.
+7. Skip tutorial works at every step, including an OK step and the next-caller step.
+Information steps (end only on OK): the message once typed (`TaskText`, read), the caller's blinking jack (`CallerJack`), "Connected!" (`Connected`), the mystery upgrade (`Mystery`), More Profit (`Profit`), More Clients (`Clients`). There are no others: every other step asks for an action. The action steps are the caller (`Portrait`), the book (`Book`), the row (`ReadingBook`), a cord (`Cables`), the caller's jack (`PluggingCaller`), the found jack (`PluggingRecipient`), free the cord (`FreeCord`), the next caller (`NextCaller`, new), buy the cord (`BuyCord`) and take the emergency card (`Emergency`). The message step while it still types asks for nothing and shows no OK. There is nothing to do until the text is out, and it then turns into an information step.
+Created: none (the new GameObject `GameUI/Tutorial/Hint/Ok` lives in `GameUI.prefab`).
+Changed:
+- Game:
+  - `Assets/Scripts/Game/FirstOrderGuideSequence.cs`:
+    - New: `FirstOrderGuideStage.NextCaller = 19`, `IsInformation`, `OkClicked()` (with the guard `OkClickDelay` 0.5 s) and `NextCallerPolled(cordInHand, callerWaiting, canStart)`. `nextCallerDue` is set when the free-cord step ends and blocks the shop hints and completion while it is due.
+    - Removed: `ConnectedSeconds`, `MysterySeconds`, `ConnectedClickDelay`, `ReadClickDelay` and `AnyClick()`. `Tick` now runs only the guard and the gap between shop hints.
+  - `Assets/Scripts/Game/FirstOrderGuide.cs`:
+    - Listens to `spotlight.OkClicked` instead of `DimPressed`.
+    - Picks the next caller: the oldest live call that is Incoming or Taken, not an emergency, with its jack on the board and free. It keeps the same caller while that caller still waits.
+    - Polls the next-caller step in `LateUpdate` (after the emergency and free-cord polls) and right after a pickup, so the light moves from the plug to the jack in the same frame. A ringing first emergency is still polled first.
+    - The next-caller step's hole is the caller's jack (round, clickable).
+    - More Profit's and More Clients' buttons are now lit but not clickable.
+    - Shows OK while `IsInformation`.
+  - `Assets/Scripts/Game/Views/TutorialSpotlight.cs`:
+    - New fields `okButton` and `okGap` (10).
+    - New members: `OkClicked`, `OkButton`, `IsOkShowing`, and `Show(..., withOk)`.
+    - `SetText` makes the hint taller for the OK button and puts the text above it (label offsets from `hintPadding`, OK anchored bottom-centre).
+    - If an OK step loses its target, the hint stays centred, so it can still end.
+    - `ApplyStyle(GameStyle)` gives the Skip and OK labels the paint box's `MenuText` and `LabelFont`.
+    - Texts: `readMessageDone` is "Read who they want to talk to.", `buyProfit` is "More Profit: every call pays more, so you earn faster.", and the new `nextCaller` is "Plug it straight into the next caller.".
+  - `Assets/Scripts/Game/GameInstaller.cs`: calls `spotlight.ApplyStyle(style)` for the tutorial's spotlight.
+- Prefab: `Assets/Prefabs/Game/GameUI.prefab`:
+  - New: `Tutorial/Hint/Ok`, a copy of `Skip` (sprite `buy_btn_neutral_0`, Skip's colour tints, Della Respira SDF Static 28 in `#FFFAE8`). It is 150x56 (closer to the sprite's 186x68 shape than Skip's 240x56), labelled "OK", sits after `Label` and starts inactive.
+  - `okButton` is wired.
+  - The `readMessageDone` and `buyProfit` texts changed, and the `nextCaller` text was added.
+  - Saved through `PrefabUtility.LoadPrefabContents` and `SaveAsPrefabAsset`. The diff for this pass is only those lines.
+- Tests:
+  - `Assets/Tests/Game/Editor/FirstOrderGuideTests.cs`:
+    - Every `AnyClick` became `OkClicked`. Timed endings became `Ok()`.
+    - The Connected and mystery tests now also check there is no timed ending.
+    - New: `InformationStepsEndOnlyOnOk` (6 cases: no timer, no cable, plug, emergency, next-caller or shop event ends them; OK does). It replaces `TimedStepsStillEndByThemselvesWhileTheClockHolds`.
+    - New: `ActionStepsShowNoOkAndIgnoreIt` (7 cases, plus the message while it types).
+    - New next-caller tests:
+      - `TheNextCallerStepFollowsTheFreedCordAndEndsWhenItsPlugIsIn`: it waits for a caller, then calm play; it comes before shop hints; it ends only on the plug; its caller leaving makes it wait; it comes once only.
+      - `ACordDroppedBeforeTheNextCallerStepShowsDropsItAndSkipStillWorks`.
+      - `TheFirstEmergencyComesBeforeTheNextCallerStep`.
+      - `TheGuideCompletesOnlyAfterTheNextCallerStep`.
+    - The free-cord test now walks through the next-caller step.
+    - The clock-hold test includes `NextCaller`.
+  - `Assets/Tests/Game/Editor/TutorialSpotlightTests.cs` (real scene):
+    - The new helpers `ClickOk` and `Ok` replace dark-layer clicks for the information steps.
+    - The main walk-through checks the following:
+      - No OK while the message types.
+      - OK on the hint under the text (`AssertOkOnHint`).
+      - A stray OK is swallowed.
+      - No timer and no dark-layer click moves on.
+      - An action step has no OK.
+      - The Connected step lights the money without a click, holds, and fits its box with OK.
+    - Mystery, More Profit and More Clients:
+      - The lit buttons are blocked.
+      - Only OK ends the step, and OK buys nothing.
+      - The new More Profit text.
+    - The clock-hold test: 600 s of runner and frame time leave the Connected step and the clock unchanged, and then OK works while the clock holds.
+    - The dark-layer test lists OK as the third clickable graphic and checks its placement and look:
+      - It is a child of the hint, above the dark layer, inactive until needed and reads "OK".
+      - It uses Skip's sprite, tints and font.
+    - Renamed: `TheFinishedFirstCallTeachesFreeingItsCordThenPlugsItIntoTheNextCaller`. It covers:
+      - The free-cord step.
+      - Then the oldest of two waiting callers' jack, the only target: no OK, the clock held, the hint fits. The other caller's jack, the recipient, the cards, the shop and the book are blocked. A blocked click keeps the cord.
+      - The plug ends the step, and the call then connects normally.
+    - New: `TheNextCallerStepWaitsForACallerWithTheClockRunningAndADroppedCordDropsIt` (an emergency is never the target; Skip during the step keeps the cord in hand).
+    - New: `SkipWorksDuringAnInformationStep`.
+    - New helpers `FinishTheFirstCall` and `ClearWaitingCalls`.
+- Docs:
+  - `Design.md`: the status row "13a pass 5 (tutorial clicks)", §1's tutorial line, §4.3's spotlight paragraph, D57, and D81's "Built in 13a passes 3, 4 and 5".
+  - `Plan.md`: §8's tutorial-rework row, the pass 5 brief marked built, and one §4 lesson (stale scratchpad markers).
+  - `Progress.md`: the status row and this report.
+Scene and prefab changes: `GameUI.prefab` as above. No scene change. The full test run re-saved `Final.unity` with two `PhoneBook` overrides swapped (order only); I discarded it with `git checkout`, and the scene is active and not dirty.
+Tests: 850/851 EditMode passed, 1 skipped (the parked `BoardGrowthTests` starved-calls test), 0 failed. There were 834 before, so +17: `FirstOrderGuideTests` +15 (the 6+7 OK cases replace the 2 timed-step cases, plus 4 next-caller tests) and `TutorialSpotlightTests` +2.
+Console: clean (only MCP's "WebSocket is not initialised" and URP's two "memoryless depth" lines in Play Mode); cleared at the end.
+Screenshots:
+- `Temp/Captures/step-13a5-ok-message.png`: new game at 1920x1080. The message step with "Read who they want to talk to." and the OK button under it, next to Skip at the top.
+- `Temp/Captures/step-13a5-ok-connected.png`: the "Connected!" step with its OK, the tab and the counter lit.
+- `Temp/Captures/step-13a5-next-caller.png`:
+  - The new step after the free-cord pickup: C2 lit, "Plug it straight into the next caller." beside it, and the cord in hand.
+  - C2 belongs to `call_002`, the oldest of three waiting callers (`call_002`, `call_007`, `call_005`). The cards still show their "New order!" stamps.
+  - Plugging C2 then ended the step and released the clock.
+  - The dark layer looks faint, as in every earlier capture.
+How the Play Mode run went: it played the real flow: the card, OK twice, the book, the cord, both jacks, OK on "Connected!", buying the cord, OK on the mystery, the call ending, the plug click, then C2. I ran it at timeScale 5 while no hint showed and reset it to 1 afterwards. The save was deleted before and after the run.
+Look (StyleGuide §9): the OK button is the Skip button's art and font, smaller. Its label is `#FFFAE8` on the green button, as on Skip, which already passed its checks. It sits inside the cream hint box, centred under the text with a 10-unit gap, and takes clicks only while it shows. The next-caller step reuses the round jack hole, the hint and the arrow. No new colours.
+Deviations from Design/Plan:
+- **No card step before the jack.** `OperatorDesk` lets a plug into any jack whether or not its card is taken; only a closing circuit needs a taken call (D04 refuses it otherwise; D45 starts Connecting when the card is taken with a plug already in). Following the brief's condition and the lead's rule (don't teach a click that isn't needed), the step lights only the caller's jack. The player then takes the card to read whom the caller wants.
+- **Holes stay lit on information steps.** The money and tab, the jack, the bubble and the shop buttons stay lit, so the hint still points at what it explains, but none of them takes a click. That reads "no hole that invites a click it doesn't need" as "no clickable hole". If the lead wants the light itself gone, it's a one-line change per step.
+- **OK has a 0.5 s guard** after its step starts, like the old click guards. A double-click on one OK can't skip the next step.
+- **More Profit's text drops "Buy it to earn faster"**, because its button can't be clicked during the hint. The lead may prefer other words.
+- **"Next caller" means** the oldest live call that is Incoming or Taken, not an emergency, with a free jack. If an emergency is ringing for the first time, its own step comes first. If nobody waits, the step waits with the clock running. A cord dropped back in the tray before the step shows cancels it, since the free-cord hint offers that choice.
+- **No save version.** The next-caller step belongs to the first-call guide, which is New Game only and never saved. The shown-hints flags are unchanged.
+Follow-ups:
+- The next-caller step lights only the jack. If players don't connect it with a card, lighting that caller's card too (unclickable) would link the two. That's for the 13c playtest.
+- With the cord in hand during the next-caller step, the drawn hand isn't visible in agent captures (no pointer). It is in real play.
+- In real play the first fee already affords More Cables, so after OK on "Connected!" the cord hint comes at once, and while it shows, the first call's talk and pay wait (pass 4's follow-up still applies).
+- `TutorialSpotlight.DimPressed` stays as an event with no listener in the game (tests use the press). It can go in a cleanup.
+
+#### Step 13a pass 5: verification (orchestrator, 2026-11-13)
+- **Tests:** re-run through MCP: 850 passed, 1 skipped (parked), 0 failed. Console clean. `Final.unity` is not re-saved.
+- **Scope:** matches the report. `GameUI.prefab` adds the `Tutorial/Hint/Ok` button (copied from Skip) and three texts.
+- **Screenshot** `step-13a5-ok-connected.png`: "Connected! You earn money while they talk." with an OK button styled like Skip, the arrow pointing at the talking tab.
+- **Deviations accepted:**
+  - No card step before the jack: a plug is accepted in any jack, so the step lights only the jack.
+  - Information steps keep their (unclickable) lights.
+  - OK has a 0.5 s guard.
+  - More Profit's new text.
+- **For the 13c checkpoint:** does the player link the lit jack in the next-caller step to its caller?
+- **The lead's note on pass 5 (2026-11-13):** the next-caller step lit what looked like a random empty jack. The first call is reordered (caller's side, then recipient's side), and the second call repeats the pattern from the card. Built as pass 6. No commit until the lead asks.
+
+## Step 13a pass 6 report: 2026-11-13
+Result: done
+Playable now: a new game's first call teaches the caller's side first and then the recipient's, each light just before you need it. Click the caller. "Their jack is blinking. Take a cord from the tray." lights the tray's cords, and the caller's blinking jack is lit beside them. "Plug it into the blinking jack." Then "They want **Fairweather, Violet**. Open the book." names the recipient the way the book lists them. "Click their name. Their jack lights up." lights the row. "Plug the other end into the lit jack." Then "Connected!" with its OK, the first call's only OK. There is no "read the message" step and no "blinking jack" step any more. After the first call ends and you free its cord, the second call repeats the caller's side: "Take the next caller." lights the waiting caller's card, then "Plug the cord into their blinking jack." lights that caller's jack. After that you finish alone.
+How to test:
+1. New game. Click the caller. The tray lights up, and the caller's jack (A1) blinks in its own small light. The arrow points at the tray, and only the tray cord takes a click.
+2. Take the cord. Only A1 takes the plug. Plug it in.
+3. The book step names the recipient in bold. With one plug in A1 and the other in your hand, click the book (or press Tab). The cord stays in your hand.
+4. Click the lit row. The book closes, the recipient's jack glows steadily and the cord is still in your hand. Plug the other end into it: "Connected!", then OK.
+5. Pressing Escape instead of clicking the row also closes the book with the cord still in hand, and the next step lights the recipient's jack anyway.
+6. Buy the cord if its hint comes, and OK the mystery hint. When the call ends, click the lit plug to free the cord. "Take the next caller." lights the oldest waiting card (the bottom one). Nothing else takes a click, and the cord stays in your hand. Click the card. Its jack starts blinking and "Plug the cord into their blinking jack." lights it. Plug it in, and the hint closes. Finish the call yourself.
+7. Skip tutorial still works at every step.
+Created: none.
+Changed:
+- Game:
+  - `Assets/Scripts/Game/FirstOrderGuideSequence.cs`:
+    - Removed: `TaskText`, `CallerJack`, `IsTaskTextRead`, `TaskTextFinished` and the text-read flag.
+    - The first call's stages are renumbered in play order (they are never saved): `Portrait` 1, `Cables` 2, `PluggingCaller` 3, `Book` 4, `ReadingBook` 5, `PluggingRecipient` 6, `Connected` 7. The later stages keep their values.
+    - New stage `NextCard` 20.
+    - The card goes to `Cables`, and the caller's plug goes to `Book`. The book opens to `ReadingBook`, which closes back to `PluggingRecipient`.
+    - If the caller's plug comes out at `Book` or `PluggingRecipient`, the caller's jack step comes back. A cord back in the tray asks for a cord again, from the book step too.
+    - `IsInformation` covers only Connected, the mystery, More Profit and More Clients.
+    - `NextCallerPolled` gained `cardTaken`: `NextCard` until the card is taken, then `NextCaller`; an already-taken card goes straight to the jack.
+  - `Assets/Scripts/Game/FirstOrderGuide.cs`:
+    - The new holes and texts.
+    - The `Cables` step adds the caller's jack as an aside light.
+    - The book text fills in `{name}` with `PhoneBookView.EntryNameFor` (the jack label if the name is missing).
+    - The `NextCard` hole is the caller's card.
+    - The next-caller candidate must be on a waiting card.
+    - A card click polls the second call's steps, so the light moves in the same frame.
+    - The message-typing hooks are gone.
+  - `Assets/Scripts/Game/Views/TutorialSpotlight.cs`:
+    - `SpotlightTarget.Aside`: a lit hole that the hint position and the arrow ignore, unless every lit place is aside.
+    - Texts: `readMessage`, `readMessageDone` and `callerJack` are removed. `takeCord`, `plugCaller`, `openBook` (with `TutorialTexts.NamePlaceholder` `{name}`), `findJacks`, `plugRecipient` and `nextCaller` are new wording, and `nextCard` is new.
+  - `Assets/Scripts/Game/Views/CallQueueView.cs`: `WaitingCardOf(call)`, the waiting card showing a call (the private `CardOf` also finds tabs).
+- Book: `Assets/Scripts/UI/PhoneBookView.cs`: `EntryNameFor(jack)`, the first book entry's name for a jack, the same entry the book step's row and corner use.
+- Cord input: no change. `CableInputController` already keeps a held or half-plugged cord on book clicks, buttons (the cover is under the `BookShortcut` button) and cards, and an empty click with a fresh half-plugged cord does nothing (`TryRestoreConnection` has no socket to go back to).
+- Prefab: `Assets/Prefabs/Game/GameUI.prefab`. Only the tutorial's text block changed: the three removed texts went, six were reworded and `nextCard` was added. Saved through `SerializedObject` plus `SaveAssetIfDirty`. The line numbers above the block are unchanged.
+- Tests:
+  - `Assets/Tests/Game/Editor/FirstOrderGuideTests.cs`:
+    - New: `TheFirstCallGoesCallerSideThenRecipientSideThenMoneyAndTheShop` (replaces the old order test).
+    - New: `TheFirstCallHasNoReadingStepsAndNoOkBeforeConnected`, which checks the exact stage list and that nothing before Connected ends on time or OK.
+    - New: `PluggingGoesOneJackAtATimeCallerFirstWithTheBookBetween`.
+    - New: `TheSecondCallTakesTheNextCardThenPlugsItsJackAndEndsOnThePlug`.
+    - New: `ACordDroppedBeforeTheSecondCallStepsShowDropsThemAndSkipStillWorks`.
+    - Reworked for the new order: the book-recovery and cord-back tests.
+    - Removed: the message and blinking-jack OK tests and their cases.
+    - The Skip, out-of-step, information and clock-hold cases follow the new stages.
+  - `Assets/Tests/Game/Editor/TutorialSpotlightTests.cs` (real scene):
+    - The walk-through checks every new step's text, holes (the aside jack: lit, round, not clickable, the arrow pointing at the tray) and blocking.
+    - It checks that the hint fits, that the bold recipient name is in the book step, that the cover click keeps the cord, and that the cord input's row click plus the book's row click keep the half-plugged cord and mark the jack.
+    - New: `AHalfPluggedCordStaysInHandThroughTheBookEveryWay`. Guided: Escape (the pause menu's `HandleEscape`) at the reading step keeps the cord, and the call still connects. Unguided (Continue): cover, a click on the pages, a click on the board beside the open book, Tab, Escape, page corners and the row all keep it, and the call connects.
+    - The second-call test now goes card first, then jack: the other card and the jack are blocked, a blocked click takes no card, there is no blink before the take and a blink after it, and the plug ends the step.
+    - `ClearWaitingCalls` finishes the cleared cards so added calls get cards.
+    - The clock-hold, Skip, mid-guide, holes and both arrow tests follow the new order.
+    - Removed: `ReadMessage` and `FinishTyping`. New helper: `CallerSide`.
+- Docs:
+  - `Design.md`: status row "13a pass 6 (first call's order)", §1's tutorial line, §4.3's spotlight paragraph (aside lights), D57, and D81's "Built in 13a passes 3, 4, 5 and 6".
+  - `Plan.md`: the pass 6 brief marked built, §8's tutorial-rework row, and two §4 lessons (cards of cleared calls in tests, real clicks in Play Mode).
+  - `Progress.md`: the status row and this report, which replaces the orchestrator's "interrupted" note.
+Scene and prefab changes: `GameUI.prefab` texts only. No scene change. A test or play run re-saved `Final.unity` with the two `PhoneBook` overrides swapped (order only). I discarded it with `git checkout`, and the scene is active and not dirty.
+Tests: 846/847 EditMode passed, 1 skipped (the parked `BoardGrowthTests` starved-calls test, still parked), 0 failed. There were 851 before: 6 went (the message and blinking-jack OK tests, plus one out-of-step, one guided-ending and two information cases for the removed stages), and 2 are new (`TheFirstCallHasNoReadingStepsAndNoOkBeforeConnected`, `AHalfPluggedCordStaysInHandThroughTheBookEveryWay`). The other changed tests were rewritten or renamed in place.
+Console: clean (only URP's two "memoryless depth" lines in Play Mode); cleared at the end.
+Screenshots (new game, Play Mode stepped, real raycast clicks through `ProcessPointer` and `ExecuteEvents`; the dark layer looks faint, as in every capture, and the held plug and hand don't show without a pointer):
+- `Temp/Captures/step-13a6-step2-tray-and-blinking-jack.png`: the tray cord lit with the hint and its arrow, and A1 lit aside at its blink's high point.
+- `Temp/Captures/step-13a6-step4-book-names-recipient.png`: "They want **Fairweather, Violet**. Open the book." beside the cover, with the red cord running from A1.
+- `Temp/Captures/step-13a6-step6-lit-jack-cord-in-hand.png`: after the real clicks on the cover (top hit `BookShortcut`) and the row (top hit `OpenBook`). The book is shut, B3 glows steadily under "Plug the other end into the lit jack.", and the cord is still `OneEndConnected` and the cord input's active cord.
+- `Temp/Captures/step-13a6-second-call-card.png`: "Take the next caller." on Winston Tuttle's card, the oldest of three, at the bottom.
+- `Temp/Captures/step-13a6-second-call-jack.png`: after the real card click. C2 blinks under "Plug the cord into their blinking jack." and the clock is held. Plugging C2 then ended the step and released the clock.
+How the Play Mode run went: card, tray cord and A1 by real raycasts; then cover and row (the cord survived both); then B3. OK on "Connected!", bought the cord when its hint came (`TryBuy`, standing in for the click) and OK on the mystery hint. Ran at timeScale 5 only while no hint showed, then reset it to 1. Then the free-cord plug click, the card click and the C2 plug. Escape can't be pressed from an agent (Game view focus), so the Escape path is covered by `HandleEscape` in the new test. The save was deleted before and after the run.
+Look (StyleGuide §9): no new art or colours. The aside light is the existing round jack hole. The recipient's name uses the hint's font in bold (TMP faux bold, rich text is on), in ASCII only. All texts fit their box (`AssertHintFits` at 1920x1080).
+Deviations from Design/Plan:
+- **The caller's jack is lit aside in step 2.** The brief puts the hole on a tray cord only. Under the 78% dark layer, "Their jack is blinking." would point at something nearly hidden, so the jack gets a light that only shows. It takes no click, and the hint and arrow ignore it. If the lead prefers the dark, removing it is a one-line change.
+- **The name is the book's listing** ("Fairweather, Violet", from the first entry for the jack, the row the step lights), not the message's "Violet Fairweather", so the player looks for exactly what the book shows.
+- **Step 1 keeps its old text**, "A call! Click the caller to answer." (the brief gives no new one).
+- **The second call's card step requires a card on show.** A call still waiting for a slot isn't a candidate.
+Follow-ups:
+- The book is at sorting order 10. With a half-plugged cord, the loose plug's wire draws under the open book; that's unchanged and fine, but worth watching at the 13k clipboard.
+- At the 13c checkpoint: does the aside light read as "their jack", and does the player link the second call's card to its jack?
+- `TutorialSpotlight.DimPressed` still has no listener in the game (pass 5's follow-up).
+
+#### Step 13a pass 6: verification (orchestrator, 2026-11-13)
+- **Tests:** re-run through MCP: 846 passed, 1 skipped (parked), 0 failed. Console clean. `Final.unity` is not re-saved. The agent's "interrupted" note is replaced by its report.
+- **Screenshot** `step-13a6-step2-tray-and-blinking-jack.png`: the caller's card with "Connect me to <b>Violet Fairweather</b>.", the blinking jack A1 lit (a light only, not clickable), the tray cord lit, and the hint "Their jack is blinking. Take a cord from the tray."
+- **The cord through the book** is checked in Play Mode with real clicks, and in a new test that also covers Tab, Escape, the pages, a board click and the page corners. The cord input needed no change.
+- **Decisions left to the lead:**
+  - The non-clickable light on the blinking jack in step 2.
+  - Step 4 names the recipient as the book lists them ("Fairweather, Violet").
+  - Step 1 keeps "A call! Click the caller to answer."
+- **The lead's note on pass 6 (2026-11-13):** step 2 lit two things (the tray and the blinking jack) and never explained the blink. The rule is now one focus per step, with the explanation at the focus. Built as pass 7, a light pass.
+
+## Step 13a pass 7 report: 2026-11-13
+Result: done (light pass: one compile, no new tests, no Play Mode run)
+- Step 2 now lights only the tray cords: "Take a cord from the tray." The extra non-clickable light on the caller's blinking jack is gone (the `AddSocket(..., aside: true)` call in the `Cables` case). The aside-light code in `TutorialSpotlight` stays in place, now unused.
+- New texts: step 3 "This blinking jack belongs to your caller. Plug the cord into it.", step 6 "The steady light marks who they want. Plug the other end in.", second call "Take the next caller." (unchanged), then "Their jack is blinking now. Plug the cord into it." Steps 1, 4, 5 and 7, the OK steps, the clock hold, the free-cord, emergency and shop texts are unchanged. ASCII only.
+- Changed: `Assets/Scripts/Game/FirstOrderGuide.cs` (step 2 light, comment), `Assets/Scripts/Game/Views/TutorialSpotlight.cs` (default texts, comment), `Assets/Prefabs/Game/GameUI.prefab` (the four strings, saved through `SerializedObject` plus `SaveAssetIfDirty`; nothing else in the block changed), `Assets/Tests/Game/Editor/TutorialSpotlightTests.cs` (the four text assertions; step 2 now expects only the tray cords and checks the caller's jack is not lit). `FirstOrderGuideTests` needed no change.
+- Compile clean; console clean. `TutorialSpotlightTests` and `FirstOrderGuideTests`: 84/84 passed. Full suite left to the orchestrator.
+- `Final.unity` was not re-saved; it is active and not dirty. Docs: this report and the pass 7 brief in `Plan.md` marked built.
+
+#### Step 13a pass 7: verification (orchestrator, 2026-11-13)
+- **Full suite** (run by the orchestrator, as the light brief planned): 846 passed, 1 skipped (parked), 0 failed. Console clean. `Final.unity` is not re-saved.
+- `GameUI.prefab` holds the four new texts: "Take a cord from the tray.", "This blinking jack belongs to your caller. Plug the cord into it.", "The steady light marks who they want. Plug the other end in." and "Their jack is blinking now. Plug the cord into it."
+- **The lead's note on pass 7 (2026-11-13):** the "Connected" step lit the tab and the money counter at once, and the counter was missed. More Profit and More Clients had OK, but the player should buy them. Built as pass 8, a light pass.
+
+## Step 13a pass 8 report: 2026-11-13
+Result: done (light pass: one compile, no new tests, no Play Mode run)
+- "Connected" is now two OK steps, one light each: "Connected! While they talk, the call waits here as a tab." (the talking tab lit), then the new stage `Earning` (21, added at the end of the enum) with "You earn money while they talk." (the money counter lit). Both hold the clock and have the 0.5 s OK guard; the call ending during either goes back to normal play.
+- More Profit and More Clients are action steps like the cord: the hole on their shop button takes the click, no OK, and the purchase ends the step. New texts: "More Profit: every call pays more. Buy it to earn faster." and "More Clients: more callers at once, and a bigger board. Buy it to grow." The mystery hint keeps its OK.
+- Gating: none needed. `FirstOrderGuideSequence.Offer` already starts a shop step only while `OfferOf` reports `Affordable` (`UpgradeService.CanBuy` is Ok and the upgrade sits on a shop button), steps back to normal play if the money goes while it shows, and ends on `Owned`, the same path as the cord. So a purchase step never shows unaffordable.
+- Changed: `Assets/Scripts/Game/FirstOrderGuideSequence.cs` (`Earning`, `IsGuiding`, `IsInformation` without Profit/Clients, `OkClicked`, `FirstOrderEnded`, comments), `Assets/Scripts/Game/FirstOrderGuide.cs` (the two Connected lights split; Profit/Clients holes clickable), `Assets/Scripts/Game/Views/TutorialSpotlight.cs` (texts: `connected`, new `earning`, `buyProfit`, `buyClients`), `Assets/Prefabs/Game/GameUI.prefab` (the same four strings, through `SerializedObject` plus `SaveAssetIfDirty`; only the text block changed), `Assets/Tests/Game/Editor/FirstOrderGuideTests.cs` and `TutorialSpotlightTests.cs` (existing assertions only: the Earning step after Connected in the walk-throughs and helpers, Profit/Clients moved from the OK cases to the action cases and bought by their button, the new texts; a small `OkConnected` helper presses both OKs).
+- Compile clean; console clean. `TutorialSpotlightTests` and `FirstOrderGuideTests`: 85/85 passed (84 before: the information cases went from 4 to 3, the action cases from 7 to 9). Full suite left to the orchestrator.
+- `Final.unity` was not re-saved; it is active and not dirty. Docs: this report and the pass 8 brief in `Plan.md` marked built.
+
+#### Step 13a pass 8: verification (orchestrator, 2026-11-13)
+- **Full suite** (run by the orchestrator): 847 passed, 1 skipped (parked), 0 failed. Console clean. `Final.unity` is not re-saved.
+- **Texts in `GameUI.prefab`:**
+  - "Connected! While they talk, the call waits here as a tab."
+  - "You earn money while they talk."
+  - "More Profit: every call pays more. Buy it to earn faster."
+  - "More Clients: more callers at once, and a bigger board. Buy it to grow."
+- **Gating confirmed in the code:** purchase steps start only while the upgrade is affordable and on a shop button, so a held clock can't trap the player.
+- **The lead's sign-off (2026-11-13):** "all looks fine now". 13a is committed as two commits dated 2026-11-11 (the lead's request): the game changes, then the docs. The hashes go into the next docs update.
+

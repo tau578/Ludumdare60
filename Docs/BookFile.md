@@ -2,7 +2,7 @@
 
 `Assets/Configs/Book.json` is the phone book the player opens on the desk. You edit it by hand, and the game reads it every time it starts. Nothing in Unity needs to change when you edit it. (The calls and the shop have their own guide: [EconomyFile.md](EconomyFile.md).)
 
-The book is **only for looking things up**. The rules never read it: each call in `Calls.json` carries its own jacks. The player reads a name in a call ("Violet Fairweather, please"), finds "Fairweather, Violet" in the book and clicks the row, which marks her jack on the board (or reads the jack and patches it). Some calls ask by profession instead ("The teacher, please"), so the profession matters too.
+The book is **only for looking things up**. The rules never read it: each call in `Calls.json` carries its own jacks. The player reads a name in a call ("Connect me to **Violet Fairweather**.", D80), finds "Fairweather, Violet" in the book and clicks the row, which marks her jack on the board (or reads the jack and patches it). Every message names the person wanted the way the book does, in first-name order ("Dr Ravi Sharma" for "Sharma, Ravi (Dr)"; a service as "the police station"); a test checks that each call's bold name matches an entry on its `to` jack.
 
 ## The format
 

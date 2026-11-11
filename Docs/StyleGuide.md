@@ -64,8 +64,8 @@ Sampled from the game's art and code. Use these instead of inventing new colours
 | **Titles** (screens without money) | **Title gold** `#FFDB1F`, bright | The main menu's titles, the pause titles |
 | **Error** (wrong, fine, can't, missed) | Crimson: **Error glow** `#EE4450` for flashes on dark; **Error** `#C42F3A` for text on dark; **Error ink** `#A42626` on paper; **Error deep** `#74121E` on paper, the worst case | The wrong-number and closed-jack flashes; the fine and "can't afford" on the counter; the "Wrong number!" stamp; the "Missed" stamp |
 | **Alarm** (emergency waiting) | Orange-red: **Alarm glow** `#FF6A3D` for lights on dark; **Alarm** `#E84A34`; **Alarm quiet** `#8E3426` | The countdown ring, the lamp's glow and the red light on the sign; the lit lamp and the card's EMERGENCY badge (cream letters); the unlit lamp |
-| **Attention** (hover, guide) | Amber: `#F5D278` hover, `#FFD06E` lamp | Hovered jacks, the caller's blinking jack, book-row hover |
-| **Neutral** (new order, cut off) | Browns: `#7B5220` "New order!", `#5C5044` "Cut off" | Stamps that are neither good nor bad |
+| **Attention** (hover, guide) | Amber: `#F5D278` hover, `#FFD06E` lamp | Hovered jacks, the caller's blinking jack, book-row hover, a caller's patience ring (13a; a gentle pulse in its last 5 s, never Alarm) |
+| **Neutral** (new order, cut off) | Browns: `#7B5220` "New order!", `#5C5044` "Cut off" | Stamps that are neither good nor bad: also "Hung up" (13a). (Pass 1's "Line busy" paper tag was removed in pass 2, D83.) |
 
 **Rules for red and gold** (lead, 2026-11-09):
 - **The same meaning gets the same colour, and a different meaning a clearly different one.** Several shades are fine when each has a defined job; near-copies that nobody can tell apart are not.
@@ -84,7 +84,7 @@ The most important rule: **the player must read "good" or "bad" from colour and 
 | **Reward** (tip, upgrade, goal) | Money gold | A pop with a small bounce | **Sparkles and shimmer belong here only** | |
 | **Bad** (wrong number, fine, missed) | Error crimson | Sharp and jerky: a "no" shake, a cord jolt, a plaque shake | A short circuit (white flash, falling streaks, an arc, dark smoke); coins leaving the counter | **Stars, confetti, sparkles, gold bursts:** they read as a reward (outside playtest feedback, 2026-10-22). Alarm orange-red |
 | **Urgent** (emergency waiting) | Alarm orange-red | Flashing (2/s), wobbling, faster in the last 10 s | A ticking clock (14) | Anything that keeps going while paused. Error crimson |
-| **Neutral** (new order, cut off, hold) | Browns, cream | A stamp pop; nothing more | | Celebration or alarm |
+| **Neutral** (new order, cut off, hold, hung up) | Browns, cream | A stamp pop; nothing more | | Celebration or alarm |
 | **Attention** (where to look) | Amber | A slow blink or glow | | Red, unless it is urgent |
 
 **Jack hover lights** (lead, 2026-11-09, D76). A drop on a taken jack replaces the cord that was there and sends it back to the tray, so the light tells the player what a drop would do:
